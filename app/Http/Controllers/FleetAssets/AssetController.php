@@ -203,8 +203,111 @@ class AssetController extends Controller
 
         $timeline = $timeline->sortByDesc('date')->values()->take(50);
 
+        $safeAsset = [
+            'id' => $asset->id,
+            'name' => $asset->name,
+            'asset_tag' => $asset->asset_tag,
+            'category' => $asset->category,
+            'status' => $asset->status,
+            'description' => $asset->description,
+            'site_id' => $asset->site_id,
+            'site' => $asset->site ? ['id' => $asset->site->id, 'name' => $asset->site->name] : null,
+            'client' => $asset->client ? ['id' => $asset->client->id, 'name' => trim(($asset->client->first_name ?? '') . ' ' . ($asset->client->last_name ?? ''))] : null,
+            'category_ref' => $asset->categoryRef ? ['id' => $asset->categoryRef->id, 'name' => $asset->categoryRef->name, 'slug' => $asset->categoryRef->slug] : null,
+            'registration_number' => $asset->registration_number ?? null,
+            'fuel_type' => $asset->fuel_type ?? null,
+            'odometer_km' => $asset->odometer_km ?? null,
+            'home_site_id' => $asset->home_site_id ?? null,
+            'home_site' => $asset->homeSite ? ['id' => $asset->homeSite->id, 'name' => $asset->homeSite->name] : null,
+            'primary_driver' => $asset->primaryDriver ? ['id' => $asset->primaryDriver->id, 'name' => $asset->primaryDriver->name] : null,
+            'purchase_date' => optional($asset->purchase_date)->toDateString(),
+            'warranty_expires_at' => optional($asset->warranty_expires_at)->toDateString(),
+            'wof_expires_at' => optional($asset->wof_expires_at)->toDateString(),
+            'registration_expires_at' => optional($asset->registration_expires_at)->toDateString(),
+            'cof_expires_at' => optional($asset->cof_expires_at)->toDateString(),
+            'insurance_expires_at' => optional($asset->insurance_expires_at)->toDateString(),
+            'notes' => $asset->notes,
+            'trackers' => $asset->trackers->map(fn ($t) => [
+                'id' => $t->id,
+                'vendor' => $t->vendor,
+                'device_uid' => $t->device_uid,
+                'status' => $t->status,
+                'last_seen_at' => optional($t->last_seen_at)->toISOString(),
+            ])->values(),
+            'fleet_state' => $asset->fleetState ? [
+                'status' => $asset->fleetState->status,
+                'latitude' => $asset->fleetState->latitude,
+                'longitude' => $asset->fleetState->longitude,
+                'speed_kph' => $asset->fleetState->speed_kph,
+                'last_seen_at' => optional($asset->fleetState->last_seen_at)->toISOString(),
+                'consent_blocked' => (bool) $asset->fleetState->consent_blocked,
+            ] : null,
+            'documents' => $asset->documents->map(fn ($d) => [
+                'id' => $d->id,
+                'title' => $d->title,
+                'file_path' => $d->file_path,
+                'created_at' => optional($d->created_at)->toISOString(),
+            ])->values(),
+            'inspections' => $asset->inspections->map(fn ($i) => [
+                'id' => $i->id,
+                'passed' => $i->passed ?? null,
+                'created_at' => optional($i->created_at)->toISOString(),
+            ])->values(),
+            'work_orders' => $asset->workOrders->map(fn ($w) => [
+                'id' => $w->id,
+                'title' => $w->title,
+                'priority' => $w->priority,
+                'status' => $w->status,
+                'created_at' => optional($w->created_at)->toISOString(),
+            ])->values(),
+            'alerts' => $asset->alerts->map(fn ($a) => [
+                'id' => $a->id,
+                'alert_type' => $a->alert_type,
+                'severity' => $a->severity,
+                'status' => $a->status,
+                'triggered_at' => optional($a->triggered_at)->toISOString(),
+            ])->values(),
+            'geofences' => $asset->geofences->map(fn ($g) => [
+                'id' => $g->id,
+                'name' => $g->name,
+                'type' => $g->type,
+                'is_active' => $g->is_active,
+            ])->values(),
+            'assignments' => $asset->assignments->map(fn ($a) => [
+                'id' => $a->id,
+                'assigned_to' => $a->assigned_to ?? null,
+                'assigned_at' => optional($a->assigned_at)->toISOString(),
+            ])->values(),
+            'ownerships' => $asset->ownerships->map(fn ($o) => [
+                'id' => $o->id,
+                'owner_type' => $o->owner_type ?? null,
+                'started_at' => optional($o->started_at)->toISOString(),
+            ])->values(),
+            'service_schedules' => $asset->serviceSchedules->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->name ?? $s->service_type ?? null,
+                'next_due_at' => optional($s->next_due_at)->toDateString(),
+                'is_active' => $s->is_active,
+            ])->values(),
+            'bookings' => $asset->bookings->map(fn ($b) => [
+                'id' => $b->id,
+                'purpose' => $b->purpose,
+                'status' => $b->status,
+                'starts_at' => optional($b->starts_at)->toISOString(),
+                'ends_at' => optional($b->ends_at)->toISOString(),
+            ])->values(),
+            'checklist_runs' => $asset->checklistRuns->map(fn ($c) => [
+                'id' => $c->id,
+                'passed' => $c->passed,
+                'template' => $c->template ? ['id' => $c->template->id, 'name' => $c->template->name] : null,
+                'completed_at' => optional($c->completed_at)->toISOString(),
+            ])->values(),
+            'created_at' => optional($asset->created_at)->toISOString(),
+            'updated_at' => optional($asset->updated_at)->toISOString(),
+        ];
+
         return Inertia::render('fleet-assets/assets/show', [
-            'asset' => $asset,
+            'asset' => $safeAsset,
             'timeline' => $timeline,
         ]);
     }
@@ -276,8 +379,35 @@ class AssetController extends Controller
         $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
         $categories = AssetCategory::orderBy('name')->get(['id', 'name', 'slug']);
 
+        $editableAsset = [
+            'id' => $asset->id,
+            'name' => $asset->name,
+            'asset_tag' => $asset->asset_tag,
+            'category' => $asset->category,
+            'asset_category_id' => $asset->asset_category_id,
+            'status' => $asset->status,
+            'description' => $asset->description,
+            'site_id' => $asset->site_id,
+            'client_id' => $asset->client_id,
+            'registration_number' => $asset->registration_number ?? null,
+            'fuel_type' => $asset->fuel_type ?? null,
+            'odometer_km' => $asset->odometer_km ?? null,
+            'home_site_id' => $asset->home_site_id ?? null,
+            'primary_driver_user_id' => $asset->primary_driver_user_id ?? null,
+            'purchase_date' => optional($asset->purchase_date)->toDateString(),
+            'purchase_price' => $asset->purchase_price,
+            'warranty_expires_at' => optional($asset->warranty_expires_at)->toDateString(),
+            'wof_expires_at' => optional($asset->wof_expires_at)->toDateString(),
+            'registration_expires_at' => optional($asset->registration_expires_at)->toDateString(),
+            'cof_expires_at' => optional($asset->cof_expires_at)->toDateString(),
+            'insurance_expires_at' => optional($asset->insurance_expires_at)->toDateString(),
+            'notes' => $asset->notes,
+            'requires_maintenance' => $asset->requires_maintenance ?? false,
+            'maintenance_due_at' => optional($asset->maintenance_due_at)->toDateString(),
+        ];
+
         return Inertia::render('fleet-assets/assets/edit', [
-            'asset' => $asset,
+            'asset' => $editableAsset,
             'sites' => $sites,
             'categories' => $categories,
         ]);

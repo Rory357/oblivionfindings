@@ -81,6 +81,10 @@ export default function GeofenceCreate({ assets, sites, prefillSiteId }: Props) 
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!name.trim()) {
+            setErrors({ name: 'Name is required.' });
+            return;
+        }
         if (!shape) {
             setErrors({ shape: 'Please draw a geofence on the map first.' });
             return;

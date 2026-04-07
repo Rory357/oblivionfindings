@@ -8,14 +8,26 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
+use App\Models\Shift;
+use App\Models\User;
+use App\Notifications\Fleet\FleetControlledDrugTransitNotification;
 use App\Services\AuditLogger;
+use App\Services\CoverageRoleService;
+use App\Services\ShiftOperationalSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ResidentTransportController extends Controller
 {
+    public function __construct(
+        protected CoverageRoleService $coverageRoles,
+        protected ShiftOperationalSnapshotService $snapshots,
+    ) {
+    }
+
     public function index(Request $request)
     {
         if (!Schema::hasTable('fleet_resident_transports')) {
@@ -42,7 +54,14 @@ class ResidentTransportController extends Controller
         }
 
         $query = FleetResidentTransport::query()
-            ->with(['asset:id,name,asset_tag', 'driver:id,name']);
+            ->with([
+                'asset:id,name,asset_tag',
+                'driver:id,name',
+                'shift:id,client_id,user_id,starts_at,ends_at,shift_type,location,service_context_id',
+                'shift.staff:id,name',
+                'shift.serviceContext:id,name',
+                'serviceContext:id,name',
+            ]);
 
         if ($request->filled('transport_type')) {
             $query->where('transport_type', $request->input('transport_type'));
@@ -148,7 +167,16 @@ class ResidentTransportController extends Controller
                     'id' => $t->id,
                     'asset' => $t->asset ? ['id' => $t->asset->id, 'name' => $t->asset->name, 'asset_tag' => $t->asset->asset_tag] : null,
                     'driver' => $t->driver ? ['id' => $t->driver->id, 'name' => $t->driver->name] : null,
+                    'site_name' => $t->site_name_snapshot,
                     'resident_name' => $t->resident_name,
+                    'shift' => $t->shift ? [
+                        'id' => $t->shift->id,
+                        'starts_at' => optional($t->shift->starts_at)->toISOString(),
+                        'ends_at' => optional($t->shift->ends_at)->toISOString(),
+                        'shift_type' => $t->shift->shift_type ?? 'standard',
+                        'staff_name' => $t->shift->staff?->name,
+                    ] : null,
+                    'service_context' => $t->serviceContext?->name ?? $t->shift?->serviceContext?->name,
                     'transport_type' => $t->transport_type,
                     'pickup_location' => $t->pickup_location,
                     'dropoff_location' => $t->dropoff_location,
@@ -186,6 +214,12 @@ class ResidentTransportController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'asset_tag']);
 
+        $selectedShift = $request->filled('shift_id')
+            ? Shift::query()
+                ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceContext:id,name'])
+                ->find($request->input('shift_id'))
+            : null;
+
         // Recent resident names for autocomplete
         $recentResidents = Schema::hasTable('fleet_resident_transports')
             ? FleetResidentTransport::query()
@@ -198,8 +232,10 @@ class ResidentTransportController extends Controller
 
         // If a client/resident is selected, pass their active medications
         $clientMedications = [];
-        if ($request->filled('client_id') && Schema::hasTable('client_medications')) {
-            $clientMedications = ClientMedication::where('client_id', (int) $request->input('client_id'))
+        $clientIdForContext = $selectedShift?->client_id ?: ($request->filled('client_id') ? (int) $request->input('client_id') : null);
+
+        if ($clientIdForContext && Schema::hasTable('client_medications')) {
+            $clientMedications = ClientMedication::where('client_id', $clientIdForContext)
                 ->where('active', true)
                 ->whereNull('ceased_at')
                 ->where(function ($q) {
@@ -233,11 +269,34 @@ class ResidentTransportController extends Controller
                 ]);
         }
 
+        $shifts = Shift::query()
+            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
+            ->where('ends_at', '>=', now()->subHours(12))
+            ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceContext:id,name'])
+            ->orderBy('starts_at')
+            ->limit(100)
+            ->get()
+            ->map(fn ($shift) => [
+                'id' => $shift->id,
+                'client_id' => $shift->client_id,
+                'client_name' => $shift->client ? trim(($shift->client->first_name ?? '') . ' ' . ($shift->client->last_name ?? '')) : null,
+                'staff_name' => $shift->staff?->name,
+                'starts_at' => optional($shift->starts_at)->toISOString(),
+                'ends_at' => optional($shift->ends_at)->toISOString(),
+                'status' => $shift->status,
+                'shift_type' => $shift->shift_type ?? 'standard',
+                'location' => $shift->location,
+                'service_context' => $shift->serviceContext?->name,
+            ])
+            ->values();
+
         return Inertia::render('fleet-assets/transports/create', [
             'vehicles' => $vehicles,
             'recent_residents' => $recentResidents,
             'clients' => $clients,
             'client_medications' => $clientMedications,
+            'shifts' => $shifts,
+            'selected_shift_id' => $selectedShift?->id,
             'auth_user' => [
                 'id' => $request->user()->id,
                 'name' => $request->user()->name,
@@ -249,6 +308,7 @@ class ResidentTransportController extends Controller
     {
         $data = $request->validate([
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
             'resident_name' => ['required', 'string', 'max:255'],
             'transport_type' => ['required', 'string', 'in:medical,respite,community,shopping,appointment,social,other'],
             'pickup_location' => ['nullable', 'string', 'max:255'],
@@ -267,10 +327,66 @@ class ResidentTransportController extends Controller
             'medications.*.witness_name' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $shift = null;
+        if (! empty($data['shift_id'])) {
+            $shift = Shift::query()->with(['client:id,first_name,last_name,site_id', 'staff:id,name', 'serviceContext:id,name'])->findOrFail($data['shift_id']);
+
+            if (! empty($data['client_id']) && $shift->client_id && (int) $data['client_id'] !== (int) $shift->client_id) {
+                throw ValidationException::withMessages([
+                    'shift_id' => 'The selected shift does not match the selected resident.',
+                ]);
+            }
+
+            $departedAt = \Illuminate\Support\Carbon::parse($data['departed_at']);
+            $allowedStart = $shift->starts_at?->copy()->subHours(2);
+            $allowedEnd = $shift->ends_at?->copy()->addHours(2);
+
+            if (($allowedStart && $departedAt->lt($allowedStart)) || ($allowedEnd && $departedAt->gt($allowedEnd))) {
+                throw ValidationException::withMessages([
+                    'departed_at' => 'Transport must align with the linked shift window. Use a time within two hours of the shift boundary or unlink the transport from the shift.',
+                ]);
+            }
+
+            if (! $this->coverageRoles->userHasRole($request->user(), 'driver')) {
+                throw ValidationException::withMessages([
+                    'asset_id' => 'Only staff with current driver eligibility can log a resident transport against a shift.',
+                ]);
+            }
+
+            if ($shift->client_id) {
+                $data['client_id'] = $shift->client_id;
+                $data['resident_id'] = $shift->client_id;
+                $data['resident_name'] = trim(($shift->client?->first_name ?? '') . ' ' . ($shift->client?->last_name ?? ''));
+            }
+
+            $data['service_context_id'] = $shift->service_context_id;
+            $data['pickup_location'] = $data['pickup_location'] ?: $shift->location;
+        } elseif (! empty($data['client_id'])) {
+            $data['resident_id'] = $data['client_id'];
+        }
+
         $data['driver_user_id'] = $request->user()->id;
         $data['status'] = 'in_progress';
         $data['passengers_count'] = $data['passengers_count'] ?? 1;
-        $transport = FleetResidentTransport::create(collect($data)->except(['medications', 'client_id'])->toArray());
+        $clientSnapshot = ! $shift && ! empty($data['client_id'])
+            ? $this->snapshots->snapshotForClient(
+                Client::query()->with(['site:id,name', 'serviceContext:id,name'])->find((int) $data['client_id']),
+                $request->user(),
+                $data['pickup_location'] ?? null,
+            )
+            : null;
+        $transport = FleetResidentTransport::create([
+            ...collect($data)->except(['medications', 'client_id'])->toArray(),
+            ...($shift
+                ? $this->snapshots->transportSnapshotForShift($shift, $request->user())
+                : [
+                    'site_id' => $clientSnapshot['site_id'] ?? null,
+                    'site_name_snapshot' => $clientSnapshot['site_name'] ?? null,
+                    'shift_location_snapshot' => $clientSnapshot['location'] ?? null,
+                    'service_context_name_snapshot' => $clientSnapshot['service_context_name'] ?? null,
+                    'driver_name_snapshot' => $clientSnapshot['staff_name'] ?? $request->user()->name,
+                ]),
+        ]);
 
         // Create medication transit logs if medications were packed
         if (!empty($data['medications']) && !empty($data['client_id']) && Schema::hasTable('fleet_medication_transit_logs')) {
@@ -300,6 +416,12 @@ class ResidentTransportController extends Controller
     public function show(Request $request, FleetResidentTransport $transport)
     {
         $transport->load(['asset:id,name,asset_tag', 'driver:id,name,email', 'booking']);
+        $transport->load([
+            'shift:id,client_id,user_id,starts_at,ends_at,shift_type,location,service_context_id',
+            'shift.staff:id,name',
+            'shift.serviceContext:id,name',
+            'serviceContext:id,name',
+        ]);
 
         // Vehicle position for live map during active transport
         $vehiclePosition = null;
@@ -331,36 +453,20 @@ class ResidentTransportController extends Controller
 
         // Care needs (from client support plan if available)
         $careNeeds = [];
-        if ($transport->resident_name && Schema::hasTable('client_support_plan_items')) {
-            // Try to find client by name match
-            $nameParts = explode(' ', trim($transport->resident_name), 2);
-            $clientQuery = \App\Models\Client::query();
-            if (count($nameParts) === 2) {
-                $clientQuery->where('first_name', 'like', $nameParts[0])
-                    ->where('last_name', 'like', $nameParts[1]);
-            } else {
-                $clientQuery->where('first_name', 'like', $transport->resident_name);
-            }
-            $client = $clientQuery->first();
-
-            if ($client) {
-                $careNeeds = DB::table('client_support_plan_items')
-                    ->where('client_id', $client->id)
-                    ->where('category', 'transport')
-                    ->orWhere(function ($q) use ($client) {
-                        $q->where('client_id', $client->id)
-                            ->where('category', 'mobility');
-                    })
-                    ->select('id', 'label', 'notes')
-                    ->limit(10)
-                    ->get()
-                    ->map(fn ($item) => [
-                        'id' => $item->id,
-                        'label' => $item->label,
-                        'notes' => $item->notes,
-                    ])
-                    ->toArray();
-            }
+        $clientId = $transport->resident_id;
+        if ($clientId && Schema::hasTable('client_support_plan_items')) {
+            $careNeeds = DB::table('client_support_plan_items')
+                ->where('client_id', $clientId)
+                ->whereIn('category', ['transport', 'mobility'])
+                ->select('id', 'label', 'notes')
+                ->limit(10)
+                ->get()
+                ->map(fn ($item) => [
+                    'id' => $item->id,
+                    'label' => $item->label,
+                    'notes' => $item->notes,
+                ])
+                ->toArray();
         }
 
         return Inertia::render('fleet-assets/transports/show', [
@@ -380,6 +486,17 @@ class ResidentTransportController extends Controller
                     'id' => $transport->booking->id,
                     'purpose' => $transport->booking->purpose,
                 ] : null,
+                'shift' => $transport->shift ? [
+                    'id' => $transport->shift->id,
+                    'starts_at' => optional($transport->shift->starts_at)->toISOString(),
+                    'ends_at' => optional($transport->shift->ends_at)->toISOString(),
+                    'shift_type' => $transport->shift->shift_type ?? 'standard',
+                    'location' => $transport->shift->location,
+                    'service_context' => $transport->shift->serviceContext?->name,
+                    'staff_name' => $transport->shift->staff?->name,
+                ] : null,
+                'service_context' => $transport->serviceContext?->name ?? $transport->shift?->serviceContext?->name,
+                'site_name' => $transport->site_name_snapshot,
                 'resident_name' => $transport->resident_name,
                 'transport_type' => $transport->transport_type,
                 'pickup_location' => $transport->pickup_location,
@@ -396,7 +513,50 @@ class ResidentTransportController extends Controller
             'vehicle_position' => $vehiclePosition,
             'pre_check_status' => $preCheckStatus,
             'care_needs' => $careNeeds,
+            'completion_blockers' => $this->getCompletionBlockers($transport),
         ]);
+    }
+
+    private function getCompletionBlockers(FleetResidentTransport $transport): array
+    {
+        $blockers = [];
+
+        if ($transport->status !== 'in_progress') {
+            return $blockers;
+        }
+
+        if (Schema::hasTable('fleet_medication_transit_logs')) {
+            $unresolvedMeds = FleetMedicationTransitLog::query()
+                ->where('transport_id', $transport->id)
+                ->whereNull('administered_at')
+                ->whereNull('returned_to_house_at')
+                ->count();
+
+            if ($unresolvedMeds > 0) {
+                $blockers[] = [
+                    'type' => 'unresolved_medications',
+                    'count' => $unresolvedMeds,
+                    'message' => "{$unresolvedMeds} medication(s) not yet administered or returned",
+                ];
+            }
+
+            $controlledMissingWitness = FleetMedicationTransitLog::query()
+                ->where('transport_id', $transport->id)
+                ->where('is_controlled_drug', true)
+                ->whereNotNull('administered_at')
+                ->whereNull('witnessed_by_user_id')
+                ->count();
+
+            if ($controlledMissingWitness > 0) {
+                $blockers[] = [
+                    'type' => 'controlled_drug_witness',
+                    'count' => $controlledMissingWitness,
+                    'message' => "{$controlledMissingWitness} controlled drug(s) administered without witness",
+                ];
+            }
+        }
+
+        return $blockers;
     }
 
     public function complete(Request $request, FleetResidentTransport $transport)
@@ -405,6 +565,17 @@ class ResidentTransportController extends Controller
             'arrived_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        // Verify all medications are accounted for (administered or returned)
+        $unresolvedMeds = FleetMedicationTransitLog::query()
+            ->where('transport_id', $transport->id)
+            ->whereNull('administered_at')
+            ->whereNull('returned_to_house_at')
+            ->count();
+
+        if ($unresolvedMeds > 0) {
+            return back()->with('error', "Cannot complete transport: {$unresolvedMeds} medication(s) still unresolved. All medications must be administered or returned to house first.");
+        }
 
         $transport->update([
             'status' => 'completed',
@@ -572,15 +743,30 @@ class ResidentTransportController extends Controller
             'controlled_drug' => $data['is_controlled_drug'],
         ]);
 
+        // Notify medication managers when a controlled drug is packed
+        if ($data['is_controlled_drug']) {
+            $log->load(['client:id,first_name,last_name', 'packedBy:id,name']);
+            User::whereHas('roles', function ($q) {
+                $q->whereHas('permissions', fn ($p) => $p->where('key', 'fleet.medication.manage'));
+            })->get()->each->notify(new FleetControlledDrugTransitNotification($log));
+        }
+
         return back()->with('success', 'Medication packed for transit.');
     }
 
     public function administerMedication(Request $request, FleetMedicationTransitLog $log)
     {
-        $data = $request->validate([
+        $rules = [
             'witnessed_by_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        ];
+
+        // NZ regulation: controlled drugs require a witness
+        if ($log->is_controlled_drug) {
+            $rules['witnessed_by_user_id'] = ['required', 'integer', 'exists:users,id'];
+        }
+
+        $data = $request->validate($rules);
 
         $log->update([
             'administered_at' => now(),
@@ -627,20 +813,12 @@ class ResidentTransportController extends Controller
                 ->exists();
         }
 
-        // Try to find client by name for care needs, emergency contacts, medications
+        // Load care needs, emergency contacts, medications by client_id
         $careNeeds = [];
         $emergencyContacts = [];
         $medications = [];
 
-        $nameParts = explode(' ', trim($transport->resident_name ?? ''), 2);
-        $clientQuery = \App\Models\Client::query();
-        if (count($nameParts) === 2) {
-            $clientQuery->where('first_name', 'like', $nameParts[0])
-                ->where('last_name', 'like', $nameParts[1]);
-        } else {
-            $clientQuery->where('first_name', 'like', $transport->resident_name ?? '');
-        }
-        $client = $clientQuery->first();
+        $client = $transport->resident_id ? \App\Models\Client::find($transport->resident_id) : null;
 
         if ($client) {
             // Care needs from support plan

@@ -27,6 +27,9 @@ class FleetTrip extends Model
         'duration_s',
         'status',
         'consent_blocked',
+        'is_personal',
+        'marked_personal_by',
+        'marked_personal_at',
     ];
 
     protected $casts = [
@@ -39,6 +42,9 @@ class FleetTrip extends Model
         'reverse_geocoded_at' => 'datetime',
         'distance_km' => 'decimal:3',
         'consent_blocked' => 'boolean',
+        'duration_s' => 'integer',
+        'is_personal' => 'boolean',
+        'marked_personal_at' => 'datetime',
     ];
 
     public function asset(): BelongsTo
@@ -54,5 +60,15 @@ class FleetTrip extends Model
     public function segments(): HasMany
     {
         return $this->hasMany(FleetTripSegment::class, 'fleet_trip_id');
+    }
+
+    public function signals(): HasMany
+    {
+        return $this->hasMany(FleetSignal::class, 'trip_id');
+    }
+
+    public function markedPersonalBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'marked_personal_by');
     }
 }

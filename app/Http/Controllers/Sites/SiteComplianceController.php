@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\SiteCertification;
 use App\Models\SiteComplianceCheck;
 use App\Models\SiteFeedback;
+use App\Models\SiteCoverageRequirement;
 use App\Models\SiteStaffRequirement;
 use Illuminate\Http\Request;
 
@@ -267,6 +268,100 @@ class SiteComplianceController extends Controller
         $requirement->delete();
 
         return redirect()->back()->with('success', 'Staff requirement removed successfully.');
+    }
+
+    public function storeCoverageRequirement(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'coverage_type' => 'required|string|in:day,evening,overnight,custom',
+            'day_of_week' => 'required|string|in:mon,tue,wed,thu,fri,sat,sun',
+            'starts_time' => 'required|date_format:H:i',
+            'ends_time' => 'required|date_format:H:i',
+            'minimum_staff' => 'required|integer|min:1|max:12',
+            'service_context_id' => 'nullable|integer|exists:service_contexts,id',
+            'preferred_client_id' => 'nullable|integer|exists:clients,id',
+            'role_requirements' => 'nullable|array',
+            'role_requirements.*.key' => 'required_with:role_requirements|string|in:caregiver,driver,med_competent',
+            'role_requirements.*.minimum' => 'required_with:role_requirements|integer|min:1|max:12',
+            'allow_overstaffing' => 'nullable|boolean',
+            'shift_type' => 'nullable|string|in:standard,sleepover,on_call,split,travel',
+            'notes' => 'nullable|string',
+        ]);
+
+        if (! empty($validated['preferred_client_id'])) {
+            abort_unless(
+                \App\Models\Client::query()
+                    ->whereKey($validated['preferred_client_id'])
+                    ->where('site_id', $site->id)
+                    ->exists(),
+                422,
+                'Preferred planning client must belong to this site.'
+            );
+        }
+
+        SiteCoverageRequirement::create([
+            ...$validated,
+            'site_id' => $site->id,
+            'organization_id' => $request->user()?->organization_id,
+            'allow_overstaffing' => (bool) ($validated['allow_overstaffing'] ?? true),
+            'is_active' => true,
+        ]);
+
+        return redirect()->back()->with('success', 'Coverage requirement added successfully.');
+    }
+
+    public function updateCoverageRequirement(Request $request, Site $site, SiteCoverageRequirement $requirement)
+    {
+        $this->authorize('update', $site);
+
+        abort_if($requirement->site_id !== $site->id, 404);
+
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'coverage_type' => 'sometimes|required|string|in:day,evening,overnight,custom',
+            'day_of_week' => 'sometimes|required|string|in:mon,tue,wed,thu,fri,sat,sun',
+            'starts_time' => 'sometimes|required|date_format:H:i',
+            'ends_time' => 'sometimes|required|date_format:H:i',
+            'minimum_staff' => 'sometimes|required|integer|min:1|max:12',
+            'service_context_id' => 'nullable|integer|exists:service_contexts,id',
+            'preferred_client_id' => 'nullable|integer|exists:clients,id',
+            'role_requirements' => 'nullable|array',
+            'role_requirements.*.key' => 'required_with:role_requirements|string|in:caregiver,driver,med_competent',
+            'role_requirements.*.minimum' => 'required_with:role_requirements|integer|min:1|max:12',
+            'allow_overstaffing' => 'nullable|boolean',
+            'shift_type' => 'nullable|string|in:standard,sleepover,on_call,split,travel',
+            'notes' => 'nullable|string',
+            'is_active' => 'boolean',
+        ]);
+
+        if (! empty($validated['preferred_client_id'])) {
+            abort_unless(
+                \App\Models\Client::query()
+                    ->whereKey($validated['preferred_client_id'])
+                    ->where('site_id', $site->id)
+                    ->exists(),
+                422,
+                'Preferred planning client must belong to this site.'
+            );
+        }
+
+        $requirement->update($validated);
+
+        return redirect()->back()->with('success', 'Coverage requirement updated successfully.');
+    }
+
+    public function destroyCoverageRequirement(Request $request, Site $site, SiteCoverageRequirement $requirement)
+    {
+        $this->authorize('update', $site);
+
+        abort_if($requirement->site_id !== $site->id, 404);
+
+        $requirement->delete();
+
+        return redirect()->back()->with('success', 'Coverage requirement removed successfully.');
     }
 
     // Feedback

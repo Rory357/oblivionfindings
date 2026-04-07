@@ -49,6 +49,11 @@ class FleetMedicationTransitLog extends Model
         return $this->belongsTo(FleetResidentTransport::class, 'transport_id');
     }
 
+    public function outing(): BelongsTo
+    {
+        return $this->belongsTo(FleetOuting::class, 'outing_id');
+    }
+
     public function packedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'packed_by_user_id');

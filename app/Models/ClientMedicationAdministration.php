@@ -30,6 +30,10 @@ class ClientMedicationAdministration extends Model
         'correction_reason',
         'dose_given',
         'notes',
+        'review_required',
+        'review_reason',
+        'review_flagged_at',
+        'review_flagged_by',
         'blood_glucose_level',
         'insulin_units_given',
         'injection_site',
@@ -49,6 +53,8 @@ class ClientMedicationAdministration extends Model
         'scheduled_for' => 'datetime',
         'administered_at' => 'datetime',
         'is_correction' => 'boolean',
+        'review_required' => 'boolean',
+        'review_flagged_at' => 'datetime',
         'blood_glucose_level' => 'decimal:1',
         'insulin_units_given' => 'decimal:1',
         'inhaler_technique_observed' => 'boolean',
@@ -86,6 +92,11 @@ class ClientMedicationAdministration extends Model
     public function witnessedBy()
     {
         return $this->belongsTo(User::class, 'witnessed_by');
+    }
+
+    public function reviewFlaggedBy()
+    {
+        return $this->belongsTo(User::class, 'review_flagged_by');
     }
 
     public function round()

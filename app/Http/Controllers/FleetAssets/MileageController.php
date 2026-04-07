@@ -202,6 +202,9 @@ class MileageController extends Controller
 
     public function approve(Request $request, FleetPersonalTrip $trip)
     {
+        abort_if($trip->user_id === $request->user()->id, 403, 'Cannot approve your own mileage claim.');
+        abort_unless($trip->status === 'pending', 422, 'Only pending claims can be approved.');
+
         $trip->update([
             'status' => 'approved',
             'approved_by_user_id' => $request->user()->id,
@@ -227,6 +230,19 @@ class MileageController extends Controller
         AuditLogger::log('fleet.mileage.reject', $trip);
 
         return back()->with('success', 'Mileage claim rejected.');
+    }
+
+    public function markPaid(Request $request, FleetPersonalTrip $trip)
+    {
+        abort_unless($trip->status === 'approved', 422, 'Only approved claims can be marked as paid.');
+
+        $trip->update([
+            'status' => 'paid',
+        ]);
+
+        AuditLogger::log('fleet.mileage.paid', $trip);
+
+        return back()->with('success', 'Claim marked as paid.');
     }
 
     public function export(Request $request)

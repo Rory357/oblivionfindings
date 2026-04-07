@@ -64,7 +64,11 @@ class QueclinkAdapter implements TelemetryAdapterInterface
             return Carbon::createFromTimestamp((int) $value);
         }
 
-        return Carbon::parse($value);
+        try {
+            return Carbon::parse($value);
+        } catch (\Carbon\Exceptions\InvalidFormatException) {
+            return null;
+        }
     }
 
     protected function mapEventType(string $alarm, array $payload): ?string

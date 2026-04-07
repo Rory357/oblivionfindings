@@ -44,8 +44,14 @@ type Incident = {
 
 type Vehicle = { id: number; name: string };
 
+type PaginatedIncidents = {
+    data: Incident[];
+    links?: Array<{ url: string | null; label: string; active: boolean }>;
+    meta?: { current_page: number; last_page: number; total: number };
+};
+
 type Props = {
-    incidents: Incident[];
+    incidents: Incident[] | PaginatedIncidents;
     vehicles: Vehicle[];
     filters: {
         vehicle_id?: string;
@@ -98,8 +104,10 @@ function statusBadge(status: string) {
     }
 }
 
-export default function IncidentIndex({ incidents, vehicles, filters, stats }: Props) {
-    const allIncidents = incidents ?? [];
+export default function IncidentIndex({ incidents: rawIncidents, vehicles, filters, stats }: Props) {
+    const allIncidents = Array.isArray(rawIncidents) ? rawIncidents : (rawIncidents?.data ?? []);
+    const paginationLinks = !Array.isArray(rawIncidents) ? rawIncidents?.links ?? [] : [];
+    const paginationMeta = !Array.isArray(rawIncidents) ? rawIncidents?.meta ?? {} : {};
     const resolvedCount = allIncidents.filter((i) => i.status === 'resolved' || i.status === 'closed').length;
     const resolutionRate = allIncidents.length > 0 ? Math.round((resolvedCount / allIncidents.length) * 100) : 0;
 
@@ -268,6 +276,22 @@ export default function IncidentIndex({ incidents, vehicles, filters, stats }: P
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination */}
+                {(paginationMeta.last_page ?? 1) > 1 && paginationLinks.length > 0 && (
+                    <div className="flex items-center justify-center gap-1 pt-4">
+                        {paginationLinks.map((link, i) => (
+                            <Button
+                                key={i}
+                                variant={link.active ? 'default' : 'outline'}
+                                size="sm"
+                                disabled={!link.url}
+                                onClick={() => link.url && router.get(link.url)}
+                                dangerouslySetInnerHTML={{ __html: link.label }}
+                            />
+                        ))}
+                    </div>
+                )}
             </PageShell>
         </AppLayout>
     );

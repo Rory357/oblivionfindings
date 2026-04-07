@@ -12,6 +12,7 @@ class FleetShiftHandover extends Model
     use AuditableChanges, HasFactory;
 
     protected $fillable = [
+        'tenant_id',
         'asset_id',
         'outgoing_user_id',
         'incoming_user_id',
@@ -38,6 +39,7 @@ class FleetShiftHandover extends Model
         'damage_notes' => 'array',
         'handed_over_at' => 'datetime',
         'accepted_at' => 'datetime',
+        'odometer_km' => 'integer',
     ];
 
     public function asset(): BelongsTo

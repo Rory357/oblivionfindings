@@ -59,7 +59,6 @@ class ShiftIncidentController extends Controller
             'source_id' => $incident->id,
         ]);
 
-        // Notify managers/assigned workers that an incident was submitted from a shift.
         app(NotificationService::class)->notifyCrud(
             $request->user(),
             'submitted',
@@ -67,29 +66,15 @@ class ShiftIncidentController extends Controller
             $incident,
             $shift->client,
             [
-                'title' => 'Incident submitted from shift',
+                'title' => $incident->severity === 'high'
+                    ? 'High severity incident submitted from shift'
+                    : 'Incident submitted from shift',
                 'body' => "Client: {$shift->client->first_name} {$shift->client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
                 'url' => url("/incidents/{$incident->id}"),
                 'include_entity_user' => false,
+                'include_assigned_workers' => $incident->severity !== 'high',
             ]
         );
-
-        // High severity alert -> managers only
-        if ($incident->severity === 'high') {
-            app(NotificationService::class)->notifyCrud(
-                $request->user(),
-                'created',
-                'incident',
-                $incident,
-                $shift->client,
-                [
-                    'title' => 'High severity incident reported',
-                    'body' => "Client: {$shift->client->first_name} {$shift->client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
-                    'url' => url("/incidents/{$incident->id}"),
-                    'include_assigned_workers' => false,
-                ]
-            );
-        }
 
         return back()->with('success', 'Incident recorded for shift.');
     }

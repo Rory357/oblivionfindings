@@ -41,6 +41,7 @@ use App\Http\Controllers\Operations\FundingController;
 use App\Http\Controllers\Operations\FundingClaimController;
 use App\Http\Controllers\Operations\MessageController;
 use App\Http\Controllers\Operations\ReportController;
+use App\Http\Controllers\Operations\ShiftReportController;
 use App\Http\Controllers\Operations\PriceBookController;
 use App\Http\Controllers\Operations\QuoteController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
@@ -430,9 +431,18 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->name('operations.shifts.store');
 
     // Recurring shifts (weekly series)
+    Route::get('/shifts/series', [ShiftSeriesController::class, 'index'])
+        ->middleware('permission:rostering.viewAny|shifts.viewAny|shifts.manageAny')
+        ->name('operations.shifts.series.index');
+    Route::get('/shifts/series/{series}', [ShiftSeriesController::class, 'show'])
+        ->middleware('permission:rostering.viewAny|shifts.viewAny|shifts.manageAny')
+        ->name('operations.shifts.series.show');
     Route::post('/shifts/series', [ShiftSeriesController::class, 'store'])
         ->middleware('permission:shifts.create')
         ->name('operations.shifts.series.store');
+    Route::patch('/shifts/series/{series}/cancel-future', [ShiftSeriesController::class, 'cancelFuture'])
+        ->middleware('permission:rostering.viewAny|shifts.manageAny')
+        ->name('operations.shifts.series.cancel_future');
 
     // Shift updates
     Route::get('/shifts/{shift}/edit', [ShiftController::class, 'edit'])
@@ -457,6 +467,18 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::patch('/shifts/{shift}/complete', [ShiftController::class, 'complete'])
         ->middleware('permission:shifts.update|shifts.manageAny')
         ->name('operations.shifts.complete');
+    Route::patch('/shifts/{shift}/cancel', [ShiftController::class, 'cancelOccurrence'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('operations.shifts.cancel');
+    Route::patch('/shifts/{shift}/reopen', [ShiftController::class, 'reopenOccurrence'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('operations.shifts.reopen');
+    Route::post('/shifts/{shift}/replacement-request', [ShiftController::class, 'requestReplacement'])
+        ->middleware('permission:shifts.update|shifts.manageAny')
+        ->name('operations.shifts.replacement.request');
+    Route::patch('/shifts/{shift}/replacement-request/cancel', [ShiftController::class, 'cancelReplacement'])
+        ->middleware('permission:shifts.update|shifts.manageAny')
+        ->name('operations.shifts.replacement.cancel');
 
     // Shift tasks
     Route::patch('/shifts/{shift}/tasks/{task}', [ShiftTaskController::class, 'update'])
@@ -477,16 +499,19 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
 
     Route::get('/handovers', [HandoverController::class, 'index'])
-        ->middleware('permission:handovers.viewAny')
+        ->middleware('permission:handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('operations.handovers.index');
     Route::get('/handovers/{handover}', [HandoverController::class, 'show'])
-        ->middleware('permission:handovers.viewAny')
+        ->middleware('permission:handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('operations.handovers.show');
     Route::post('/shifts/{shift}/handover', [HandoverController::class, 'store'])
-        ->middleware('permission:handovers.create')
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
         ->name('operations.shifts.handover.store');
+    Route::patch('/handovers/{handover}/submit', [HandoverController::class, 'submit'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
+        ->name('operations.handovers.submit');
     Route::patch('/handovers/{handover}/acknowledge', [HandoverController::class, 'acknowledge'])
-        ->middleware('permission:handovers.viewAny')
+        ->middleware('permission:handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('operations.handovers.acknowledge');
 
     // -------------------------------------------------------------------------
@@ -663,6 +688,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     Route::middleware('permission:operations.reports.view')->group(function () {
         Route::get('/reports', [ReportController::class, 'index'])->name('operations.reports.index');
+        Route::get('/reports/shifts', [ShiftReportController::class, 'index'])->name('operations.reports.shifts.index');
+        Route::get('/reports/shifts/export', [ShiftReportController::class, 'export'])->name('operations.reports.shifts.export');
         Route::get('/reports/{type}', [ReportController::class, 'show'])->name('operations.reports.show');
     });
 
@@ -744,16 +771,16 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
 
     Route::get('/job-board', [JobBoardController::class, 'index'])
-        ->middleware('permission:shifts.viewAny|shifts.viewAssigned')
+        ->middleware('permission:job_board.viewAny|shifts.viewAny|shifts.viewAssigned')
         ->name('operations.job_board.index');
     Route::post('/job-board/{position}/claim', [JobBoardController::class, 'claim'])
-        ->middleware('permission:shifts.viewAssigned')
+        ->middleware('permission:job_board.claim|shifts.viewAssigned|shifts.manageAny')
         ->name('operations.job_board.claim');
     Route::post('/job-board/{position}/approve', [JobBoardController::class, 'approve'])
-        ->middleware('permission:shifts.manageAny')
+        ->middleware('permission:job_board.approve|shifts.manageAny')
         ->name('operations.job_board.approve');
     Route::post('/shifts/{shift}/open-position', [JobBoardController::class, 'createPosition'])
-        ->middleware('permission:shifts.manageAny')
+        ->middleware('permission:job_board.create|shifts.manageAny')
         ->name('operations.job_board.create');
 
     // -------------------------------------------------------------------------

@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { formatCurrency, formatDateTime } from '@/lib/fleet-utils';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, Fuel, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -57,16 +59,6 @@ interface Props {
     can: { manage: boolean };
 }
 
-function formatDateTime(isoString: string | null): string {
-    if (!isoString) return '-';
-    return new Date(isoString).toLocaleString();
-}
-
-function formatCurrency(value: number | null): string {
-    if (value === null) return '-';
-    return `$${value.toFixed(2)}`;
-}
-
 export default function FleetFuelIndex({
     logs,
     vehicles,
@@ -76,6 +68,7 @@ export default function FleetFuelIndex({
 }: Props) {
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [selectedVehicle, setSelectedVehicle] = useState<number | null>(null);
+    const [deletingFuelId, setDeletingFuelId] = useState<number | null>(null);
 
     const form = useForm({
         logged_at: new Date().toISOString().slice(0, 16),
@@ -91,6 +84,14 @@ export default function FleetFuelIndex({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedVehicle) return;
+        if (!form.data.quantity_litres || parseFloat(form.data.quantity_litres) <= 0) {
+            form.setError('quantity_litres', 'Quantity must be greater than 0.');
+            return;
+        }
+        if (!form.data.total_cost || parseFloat(form.data.total_cost) <= 0) {
+            form.setError('total_cost', 'Cost must be greater than 0.');
+            return;
+        }
 
         form.post(`/fleet/vehicles/${selectedVehicle}/fuel`, {
             onSuccess: () => {
@@ -102,9 +103,7 @@ export default function FleetFuelIndex({
     };
 
     const handleDelete = (id: number) => {
-        if (confirm('Are you sure you want to delete this fuel log?')) {
-            router.delete(`/fleet/fuel/${id}`, { preserveScroll: true });
-        }
+        router.delete(`/fleet/fuel/${id}`, { preserveScroll: true });
     };
 
     const applyFilter = (key: string, value: string) => {
@@ -493,7 +492,7 @@ export default function FleetFuelIndex({
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() =>
-                                                            handleDelete(log.id)
+                                                            setDeletingFuelId(log.id)
                                                         }
                                                     >
                                                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -549,6 +548,17 @@ export default function FleetFuelIndex({
                     )}
                 </div>
             </PageShell>
+
+            <ConfirmDialog
+                open={deletingFuelId !== null}
+                onClose={() => setDeletingFuelId(null)}
+                onConfirm={() => {
+                    if (deletingFuelId !== null) handleDelete(deletingFuelId);
+                }}
+                title="Delete Fuel Log"
+                description="Are you sure you want to delete this fuel log?"
+                confirmText="Delete"
+            />
         </AppLayout>
     );
 }

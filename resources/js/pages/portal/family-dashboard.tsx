@@ -1,3 +1,5 @@
+import { PresenceBadge, PresenceDot } from '@/components/presence-dot';
+import ShiftTimelineSummary from '@/components/shift-timeline-summary';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,9 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useInitials } from '@/hooks/use-initials';
-import { PresenceDot, PresenceBadge } from '@/components/presence-dot';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -31,7 +32,7 @@ import {
     Video,
     X,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 function getGreeting(): { text: string; emoji: string } {
@@ -42,14 +43,36 @@ function getGreeting(): { text: string; emoji: string } {
     return { text: 'Good night', emoji: '✨' };
 }
 
-type Staff = { id: number; name: string; avatar?: string | null; email?: string; presence?: string };
-type ShiftWorker = { id: number; name: string; avatar?: string | null; presence?: string; shift_starts_at?: string; shift_ends_at?: string };
+type Staff = {
+    id: number;
+    name: string;
+    avatar?: string | null;
+    email?: string;
+    presence?: string;
+};
+type ShiftWorker = {
+    id: number;
+    name: string;
+    avatar?: string | null;
+    presence?: string;
+    shift_starts_at?: string;
+    shift_ends_at?: string;
+    shift_type?: string | null;
+    service_context?: string | null;
+    location?: string | null;
+};
 type ShiftItem = {
     id: number;
     starts_at: string;
     ends_at: string;
     status: string;
     type: string;
+    shift_type?: string | null;
+    service_context?: string | null;
+    location?: string | null;
+    is_sleepover?: boolean;
+    is_on_call?: boolean;
+    expected_break_minutes?: number | null;
     staff?: { id: number; name: string; avatar?: string | null } | null;
 };
 type MonthShift = {
@@ -59,6 +82,11 @@ type MonthShift = {
     ends_at: string;
     status: string;
     type: string;
+    shift_type?: string | null;
+    service_context?: string | null;
+    location?: string | null;
+    is_sleepover?: boolean;
+    is_on_call?: boolean;
     staff_name?: string | null;
 };
 type ReactionGroup = {
@@ -73,6 +101,7 @@ type EventItem = {
     body?: string | null;
     occurred_at: string;
     actor_name?: string | null;
+    meta?: Record<string, unknown> | null;
     reactions?: ReactionGroup[];
 };
 type IncidentItem = {
@@ -110,7 +139,12 @@ type Props = {
         dietary_requirements?: string | null;
         mobility_needs?: string | null;
     };
-    site?: { id: number; name: string; address?: string | null; city?: string | null } | null;
+    site?: {
+        id: number;
+        name: string;
+        address?: string | null;
+        city?: string | null;
+    } | null;
     keyWorker?: Staff | null;
     supportWorkers: Staff[];
     currentShiftWorker?: ShiftWorker | null;
@@ -158,23 +192,72 @@ type Props = {
     familyNotesSummary?: {
         open: number;
         overdue: number;
-        recent: Array<{ id: number; title: string; note_type: string; priority: string; due_date?: string | null; is_overdue: boolean }>;
+        recent: Array<{
+            id: number;
+            title: string;
+            note_type: string;
+            priority: string;
+            due_date?: string | null;
+            is_overdue: boolean;
+            assigned_shift?: {
+                starts_at?: string | null;
+                shift_type?: string | null;
+            } | null;
+        }>;
     };
 };
 
-const EMOTION_INFO: Record<string, { emoji: string; label: string; color: string }> = {
-    happy: { emoji: '😊', label: 'Happy', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-    calm: { emoji: '😌', label: 'Calm', color: 'bg-sky-100 text-sky-700 border-sky-200' },
-    excited: { emoji: '🤩', label: 'Excited', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-    tired: { emoji: '😴', label: 'Tired', color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
-    anxious: { emoji: '😰', label: 'Anxious', color: 'bg-orange-100 text-orange-700 border-orange-200' },
-    sad: { emoji: '😢', label: 'Sad', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-    frustrated: { emoji: '😤', label: 'Frustrated', color: 'bg-red-100 text-red-700 border-red-200' },
-    confused: { emoji: '😕', label: 'Confused', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+const EMOTION_INFO: Record<
+    string,
+    { emoji: string; label: string; color: string }
+> = {
+    happy: {
+        emoji: '😊',
+        label: 'Happy',
+        color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    },
+    calm: {
+        emoji: '😌',
+        label: 'Calm',
+        color: 'bg-sky-100 text-sky-700 border-sky-200',
+    },
+    excited: {
+        emoji: '🤩',
+        label: 'Excited',
+        color: 'bg-amber-100 text-amber-700 border-amber-200',
+    },
+    tired: {
+        emoji: '😴',
+        label: 'Tired',
+        color: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    },
+    anxious: {
+        emoji: '😰',
+        label: 'Anxious',
+        color: 'bg-orange-100 text-orange-700 border-orange-200',
+    },
+    sad: {
+        emoji: '😢',
+        label: 'Sad',
+        color: 'bg-blue-100 text-blue-700 border-blue-200',
+    },
+    frustrated: {
+        emoji: '😤',
+        label: 'Frustrated',
+        color: 'bg-red-100 text-red-700 border-red-200',
+    },
+    confused: {
+        emoji: '😕',
+        label: 'Confused',
+        color: 'bg-purple-100 text-purple-700 border-purple-200',
+    },
 };
 
 function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 function formatDate(dateStr: string): string {
@@ -195,6 +278,10 @@ function formatFullDate(iso: string): string {
     });
 }
 
+function formatShiftTypeLabel(value?: string | null): string {
+    return (value ?? 'standard').replace(/_/g, ' ');
+}
+
 const statusColors: Record<string, string> = {
     scheduled: 'bg-blue-100 text-blue-800',
     in_progress: 'bg-amber-100 text-amber-800',
@@ -205,7 +292,10 @@ const statusColors: Record<string, string> = {
     declined: 'bg-red-100 text-red-800',
 };
 
-const visitTypeLabels: Record<string, { label: string; icon: typeof Calendar }> = {
+const visitTypeLabels: Record<
+    string,
+    { label: string; icon: typeof Calendar }
+> = {
     in_person: { label: 'In Person', icon: Users },
     video_call: { label: 'Video Call', icon: Video },
     outing: { label: 'Outing', icon: MapPin },
@@ -250,7 +340,9 @@ export default function FamilyDashboard({
     familyNotesSummary,
 }: Props) {
     const getInitials = useInitials();
-    const name = client.preferred_name || `${client.first_name} ${client.last_name}`.trim();
+    const name =
+        client.preferred_name ||
+        `${client.first_name} ${client.last_name}`.trim();
     const fullName = `${client.first_name} ${client.last_name}`.trim();
     const [bookingOpen, setBookingOpen] = useState(false);
     const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
@@ -278,20 +370,25 @@ export default function FamilyDashboard({
     };
 
     const cancelVisit = (visitId: number) => {
-        router.post(`/portal/clients/${client.id}/visit-requests/${visitId}/cancel`, {}, {
-            preserveScroll: true,
-            onSuccess: () => toast.success('Visit request cancelled.'),
-        });
+        router.post(
+            `/portal/clients/${client.id}/visit-requests/${visitId}/cancel`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success('Visit request cancelled.'),
+            },
+        );
     };
 
     // Build calendar grid for month view
     const calendarDays = useMemo(() => {
         const today = new Date();
-        const days: { date: string; isToday: boolean; shifts: MonthShift[] }[] = [];
+        const days: { date: string; isToday: boolean; shifts: MonthShift[] }[] =
+            [];
         for (let i = 0; i < 28; i++) {
             const d = new Date(today);
             d.setDate(d.getDate() + i);
-            const dateStr = d.toISOString().split('T')[0];
+            const dateStr = d.toISOString().split('T')[0] ?? d.toISOString();
             days.push({
                 date: dateStr,
                 isToday: i === 0,
@@ -316,7 +413,14 @@ export default function FamilyDashboard({
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
                             <Avatar className="h-16 w-16 ring-2 ring-amber-200 ring-offset-2 dark:ring-amber-700">
-                                <AvatarImage src={client.avatar ?? client.profile_photo_url ?? undefined} alt={fullName} />
+                                <AvatarImage
+                                    src={
+                                        client.avatar ??
+                                        client.profile_photo_url ??
+                                        undefined
+                                    }
+                                    alt={fullName}
+                                />
                                 <AvatarFallback className="bg-amber-100 text-lg font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                                     {getInitials(fullName)}
                                 </AvatarFallback>
@@ -330,13 +434,19 @@ export default function FamilyDashboard({
                                 </p>
                                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                                     {relation && (
-                                        <Badge variant="outline" className="capitalize border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                                        <Badge
+                                            variant="outline"
+                                            className="border-amber-200 bg-amber-50 text-amber-700 capitalize dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                                        >
                                             <Heart className="mr-1 h-3 w-3" />
                                             {relation}
                                         </Badge>
                                     )}
                                     {client.date_of_birth && (
-                                        <span>Age {calculateAge(client.date_of_birth)}</span>
+                                        <span>
+                                            Age{' '}
+                                            {calculateAge(client.date_of_birth)}
+                                        </span>
                                     )}
                                     {client.status && (
                                         <Badge
@@ -353,7 +463,10 @@ export default function FamilyDashboard({
                                 </div>
                             </div>
                         </div>
-                        <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
+                        <Dialog
+                            open={bookingOpen}
+                            onOpenChange={setBookingOpen}
+                        >
                             <DialogTrigger asChild>
                                 <Button size="lg" className="gap-2 shadow-md">
                                     <CalendarPlus className="h-5 w-5" />
@@ -364,31 +477,58 @@ export default function FamilyDashboard({
                                 <DialogHeader>
                                     <DialogTitle>Request a Visit</DialogTitle>
                                     <DialogDescription>
-                                        Submit a visit request to see {name}. The care team will review and confirm.
+                                        Submit a visit request to see {name}.
+                                        The care team will review and confirm.
                                     </DialogDescription>
                                 </DialogHeader>
-                                <form onSubmit={submitVisit} className="space-y-4">
+                                <form
+                                    onSubmit={submitVisit}
+                                    className="space-y-4"
+                                >
                                     <div>
-                                        <Label htmlFor="visit-date">Date *</Label>
+                                        <Label htmlFor="visit-date">
+                                            Date *
+                                        </Label>
                                         <Input
                                             id="visit-date"
                                             type="date"
                                             value={form.data.requested_date}
-                                            onChange={(e) => form.setData('requested_date', e.target.value)}
-                                            min={new Date().toISOString().split('T')[0]}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'requested_date',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            min={
+                                                new Date()
+                                                    .toISOString()
+                                                    .split('T')[0]
+                                            }
                                         />
                                         {form.errors.requested_date && (
-                                            <p className="mt-1 text-xs text-red-500">{form.errors.requested_date}</p>
+                                            <p className="mt-1 text-xs text-red-500">
+                                                {form.errors.requested_date}
+                                            </p>
                                         )}
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <Label htmlFor="time-start">From</Label>
+                                            <Label htmlFor="time-start">
+                                                From
+                                            </Label>
                                             <Input
                                                 id="time-start"
                                                 type="time"
-                                                value={form.data.preferred_time_start}
-                                                onChange={(e) => form.setData('preferred_time_start', e.target.value)}
+                                                value={
+                                                    form.data
+                                                        .preferred_time_start
+                                                }
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'preferred_time_start',
+                                                        e.target.value,
+                                                    )
+                                                }
                                             />
                                         </div>
                                         <div>
@@ -396,26 +536,50 @@ export default function FamilyDashboard({
                                             <Input
                                                 id="time-end"
                                                 type="time"
-                                                value={form.data.preferred_time_end}
-                                                onChange={(e) => form.setData('preferred_time_end', e.target.value)}
+                                                value={
+                                                    form.data.preferred_time_end
+                                                }
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'preferred_time_end',
+                                                        e.target.value,
+                                                    )
+                                                }
                                             />
                                         </div>
                                     </div>
                                     <div>
                                         <Label>Visit Type *</Label>
                                         <div className="mt-2 grid grid-cols-3 gap-2">
-                                            {(['in_person', 'video_call', 'outing'] as const).map((type) => {
-                                                const { label, icon: Icon } = visitTypeLabels[type];
-                                                const selected = form.data.visit_type === type;
+                                            {(
+                                                [
+                                                    'in_person',
+                                                    'video_call',
+                                                    'outing',
+                                                ] as const
+                                            ).map((type) => {
+                                                const visitType =
+                                                    visitTypeLabels[type] ??
+                                                    visitTypeLabels.in_person!;
+                                                const { label, icon: Icon } =
+                                                    visitType;
+                                                const selected =
+                                                    form.data.visit_type ===
+                                                    type;
                                                 return (
                                                     <button
                                                         key={type}
                                                         type="button"
-                                                        onClick={() => form.setData('visit_type', type)}
+                                                        onClick={() =>
+                                                            form.setData(
+                                                                'visit_type',
+                                                                type,
+                                                            )
+                                                        }
                                                         className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${
                                                             selected
                                                                 ? 'border-primary bg-primary/5 text-primary'
-                                                                : 'border-border hover:border-primary/30 text-muted-foreground'
+                                                                : 'border-border text-muted-foreground hover:border-primary/30'
                                                         }`}
                                                     >
                                                         <Icon className="h-5 w-5" />
@@ -426,22 +590,43 @@ export default function FamilyDashboard({
                                         </div>
                                     </div>
                                     <div>
-                                        <Label htmlFor="visit-notes">Notes</Label>
+                                        <Label htmlFor="visit-notes">
+                                            Notes
+                                        </Label>
                                         <textarea
                                             id="visit-notes"
                                             className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                             rows={3}
                                             placeholder="Any special requests or things to note..."
                                             value={form.data.notes}
-                                            onChange={(e) => form.setData('notes', e.target.value)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'notes',
+                                                    e.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <div className="flex justify-end gap-2 pt-2">
-                                        <Button type="button" variant="outline" onClick={() => setBookingOpen(false)}>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setBookingOpen(false)
+                                            }
+                                        >
                                             Cancel
                                         </Button>
-                                        <Button type="submit" disabled={form.processing || !form.data.requested_date}>
-                                            {form.processing ? 'Submitting...' : 'Submit Request'}
+                                        <Button
+                                            type="submit"
+                                            disabled={
+                                                form.processing ||
+                                                !form.data.requested_date
+                                            }
+                                        >
+                                            {form.processing
+                                                ? 'Submitting...'
+                                                : 'Submit Request'}
                                         </Button>
                                     </div>
                                 </form>
@@ -454,37 +639,37 @@ export default function FamilyDashboard({
                 <div className="flex flex-wrap gap-2 sm:gap-3">
                     <Link
                         href={`/portal/clients/${client.id}/messages`}
-                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                     >
                         <span>💬</span> Send a Message
                     </Link>
                     <button
                         onClick={() => setBookingOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                     >
                         <span>📅</span> Plan a Visit
                     </button>
                     <Link
                         href={`/portal/clients/${client.id}/photos`}
-                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                     >
                         <span>📸</span> Photos
                     </Link>
                     <Link
                         href={`/portal/clients/${client.id}/timeline`}
-                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                     >
                         <span>📋</span> Timeline
                     </Link>
                     <Link
                         href={`/portal/clients/${client.id}/documents`}
-                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                     >
                         <span>📄</span> Documents
                     </Link>
                     <Link
                         href={`/portal/clients/${client.id}/health`}
-                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                     >
                         <span>🏥</span> Health
                     </Link>
@@ -502,7 +687,13 @@ export default function FamilyDashboard({
                         bgClass="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/20"
                     />
                     <GlanceCard
-                        emoji={stats.shiftsThisWeek > 3 ? '📅' : stats.shiftsThisWeek > 0 ? '🗓️' : '🌈'}
+                        emoji={
+                            stats.shiftsThisWeek > 3
+                                ? '📅'
+                                : stats.shiftsThisWeek > 0
+                                  ? '🗓️'
+                                  : '🌈'
+                        }
                         message={
                             stats.shiftsThisWeek > 3
                                 ? `A busy week with ${stats.shiftsThisWeek} visits!`
@@ -524,80 +715,189 @@ export default function FamilyDashboard({
                 </div>
 
                 {/* ── Mood Summary ────────────────────────────── */}
-                {emotionSummary && (Object.keys(emotionSummary.today).length > 0 || Object.keys(emotionSummary.week).length > 0 || Object.keys(emotionSummary.month).length > 0) && (() => {
-                    const renderMoodCard = (title: string, data: Record<string, number>, emoji: string) => {
-                        const sorted = Object.entries(data).sort(([, a], [, b]) => b - a);
-                        const top = sorted[0];
-                        if (!top) return (
-                            <div className="rounded-2xl border bg-card p-4 text-center">
-                                <p className="text-xs text-muted-foreground">{emoji} {title}</p>
-                                <p className="mt-1 text-sm text-muted-foreground">No mood recorded</p>
+                {emotionSummary &&
+                    (Object.keys(emotionSummary.today).length > 0 ||
+                        Object.keys(emotionSummary.week).length > 0 ||
+                        Object.keys(emotionSummary.month).length > 0) &&
+                    (() => {
+                        const renderMoodCard = (
+                            title: string,
+                            data: Record<string, number>,
+                            emoji: string,
+                        ) => {
+                            const sorted = Object.entries(data).sort(
+                                ([, a], [, b]) => b - a,
+                            );
+                            const top = sorted[0];
+                            if (!top)
+                                return (
+                                    <div className="rounded-2xl border bg-card p-4 text-center">
+                                        <p className="text-xs text-muted-foreground">
+                                            {emoji} {title}
+                                        </p>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            No mood recorded
+                                        </p>
+                                    </div>
+                                );
+                            const info = EMOTION_INFO[top[0]];
+                            return (
+                                <div className="rounded-2xl border bg-card p-4">
+                                    <p className="text-xs text-muted-foreground">
+                                        {emoji} {title}
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <span className="text-2xl">
+                                            {info?.emoji ?? top[0]}
+                                        </span>
+                                        <span className="text-sm font-semibold">
+                                            {info?.label ?? top[0]}
+                                        </span>
+                                    </div>
+                                    {sorted.length > 1 && (
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                            {sorted
+                                                .slice(1)
+                                                .map(([key, count]) => (
+                                                    <span
+                                                        key={key}
+                                                        className={`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium ${EMOTION_INFO[key]?.color ?? 'bg-muted'}`}
+                                                    >
+                                                        {
+                                                            EMOTION_INFO[key]
+                                                                ?.emoji
+                                                        }{' '}
+                                                        {count}
+                                                    </span>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        };
+
+                        return (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                {renderMoodCard(
+                                    'Today',
+                                    emotionSummary.today,
+                                    '🌤️',
+                                )}
+                                {renderMoodCard(
+                                    'This Week',
+                                    emotionSummary.week,
+                                    '📅',
+                                )}
+                                {renderMoodCard(
+                                    'This Month',
+                                    emotionSummary.month,
+                                    '🗓️',
+                                )}
                             </div>
                         );
-                        const info = EMOTION_INFO[top[0]];
-                        return (
-                            <div className="rounded-2xl border bg-card p-4">
-                                <p className="text-xs text-muted-foreground">{emoji} {title}</p>
-                                <div className="mt-2 flex items-center gap-2">
-                                    <span className="text-2xl">{info?.emoji ?? top[0]}</span>
-                                    <span className="text-sm font-semibold">{info?.label ?? top[0]}</span>
+                    })()}
+
+                {/* ── Family Notes Summary ────────────────────── */}
+                {familyNotesSummary &&
+                    (familyNotesSummary.open > 0 ||
+                        (familyNotesSummary.recent ?? []).length > 0) && (
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <span>📝</span> Your Notes & To-Dos
+                                </CardTitle>
+                                <Button variant="ghost" size="sm" asChild>
+                                    <Link
+                                        href={`/portal/clients/${client.id}/family-notes`}
+                                    >
+                                        View all →
+                                    </Link>
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="mb-3 flex items-center gap-4">
+                                    <span className="text-sm">
+                                        <span className="font-bold text-blue-700">
+                                            {familyNotesSummary.open}
+                                        </span>{' '}
+                                        open
+                                    </span>
+                                    {familyNotesSummary.overdue > 0 && (
+                                        <span className="text-sm font-medium text-red-600">
+                                            {familyNotesSummary.overdue} overdue
+                                        </span>
+                                    )}
                                 </div>
-                                {sorted.length > 1 && (
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                        {sorted.slice(1).map(([key, count]) => (
-                                            <span key={key} className={`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium ${EMOTION_INFO[key]?.color ?? 'bg-muted'}`}>
-                                                {EMOTION_INFO[key]?.emoji} {count}
-                                            </span>
+                                {(familyNotesSummary.recent ?? []).length >
+                                    0 && (
+                                    <div className="space-y-1.5">
+                                        {familyNotesSummary.recent.map((n) => (
+                                            <div
+                                                key={n.id}
+                                                className={`flex items-center justify-between rounded-lg border p-2 ${n.is_overdue ? 'border-red-200 bg-red-50/30' : ''}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm">
+                                                        {n.note_type === 'todo'
+                                                            ? '✅'
+                                                            : n.note_type ===
+                                                                'request'
+                                                              ? '🙏'
+                                                              : n.note_type ===
+                                                                  'reminder'
+                                                                ? '⏰'
+                                                                : '📝'}
+                                                    </span>
+                                                    <div>
+                                                        <span className="text-sm font-medium">
+                                                            {n.title}
+                                                        </span>
+                                                        {n.assigned_shift
+                                                            ?.starts_at && (
+                                                            <p className="text-[10px] text-violet-600">
+                                                                Assigned to{' '}
+                                                                {formatShiftTypeLabel(
+                                                                    n
+                                                                        .assigned_shift
+                                                                        .shift_type,
+                                                                )}{' '}
+                                                                shift on{' '}
+                                                                {new Date(
+                                                                    n
+                                                                        .assigned_shift
+                                                                        .starts_at,
+                                                                ).toLocaleDateString(
+                                                                    'en-NZ',
+                                                                    {
+                                                                        day: 'numeric',
+                                                                        month: 'short',
+                                                                    },
+                                                                )}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {n.due_date && (
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {new Date(
+                                                            n.due_date +
+                                                                'T00:00:00',
+                                                        ).toLocaleDateString(
+                                                            'en-NZ',
+                                                            {
+                                                                day: 'numeric',
+                                                                month: 'short',
+                                                            },
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
                                         ))}
                                     </div>
                                 )}
-                            </div>
-                        );
-                    };
-
-                    return (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            {renderMoodCard('Today', emotionSummary.today, '🌤️')}
-                            {renderMoodCard('This Week', emotionSummary.week, '📅')}
-                            {renderMoodCard('This Month', emotionSummary.month, '🗓️')}
-                        </div>
-                    );
-                })()}
-
-                {/* ── Family Notes Summary ────────────────────── */}
-                {familyNotesSummary && (familyNotesSummary.open > 0 || (familyNotesSummary.recent ?? []).length > 0) && (
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <span>📝</span> Your Notes & To-Dos
-                            </CardTitle>
-                            <Button variant="ghost" size="sm" asChild>
-                                <Link href={`/portal/clients/${client.id}/family-notes`}>View all →</Link>
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-4 mb-3">
-                                <span className="text-sm"><span className="font-bold text-blue-700">{familyNotesSummary.open}</span> open</span>
-                                {familyNotesSummary.overdue > 0 && (
-                                    <span className="text-sm text-red-600 font-medium">{familyNotesSummary.overdue} overdue</span>
-                                )}
-                            </div>
-                            {(familyNotesSummary.recent ?? []).length > 0 && (
-                                <div className="space-y-1.5">
-                                    {familyNotesSummary.recent.map((n) => (
-                                        <div key={n.id} className={`flex items-center justify-between rounded-lg border p-2 ${n.is_overdue ? 'border-red-200 bg-red-50/30' : ''}`}>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm">{n.note_type === 'todo' ? '✅' : n.note_type === 'request' ? '🙏' : n.note_type === 'reminder' ? '⏰' : '📝'}</span>
-                                                <span className="text-sm font-medium">{n.title}</span>
-                                            </div>
-                                            {n.due_date && <span className="text-[10px] text-muted-foreground">{new Date(n.due_date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</span>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
+                            </CardContent>
+                        </Card>
+                    )}
 
                 {/* ── Main content grid ──────────────────────── */}
                 <div className="grid gap-6 lg:grid-cols-3">
@@ -611,20 +911,32 @@ export default function FamilyDashboard({
                                     Today's Schedule
                                 </CardTitle>
                                 <span className="text-sm text-muted-foreground">
-                                    {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+                                    {new Date().toLocaleDateString([], {
+                                        weekday: 'long',
+                                        month: 'long',
+                                        day: 'numeric',
+                                    })}
                                 </span>
                             </CardHeader>
                             <CardContent>
                                 {todayShifts.length > 0 ? (
                                     <div className="space-y-3">
                                         {todayShifts.map((shift) => (
-                                            <ShiftRow key={shift.id} shift={shift} />
+                                            <ShiftRow
+                                                key={shift.id}
+                                                shift={shift}
+                                            />
                                         ))}
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                                        <span className="mb-2 text-3xl">🌿</span>
-                                        <p className="text-sm text-muted-foreground">Nothing on the schedule today &mdash; time to relax!</p>
+                                        <span className="mb-2 text-3xl">
+                                            🌿
+                                        </span>
+                                        <p className="text-sm text-muted-foreground">
+                                            Nothing on the schedule today
+                                            &mdash; time to relax!
+                                        </p>
                                     </div>
                                 )}
                             </CardContent>
@@ -642,28 +954,46 @@ export default function FamilyDashboard({
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-3 rounded-lg bg-amber-50/50 p-3 dark:bg-amber-950/10">
                                         <span className="text-2xl">
-                                            {dailySummary.completedToday > 0 && dailySummary.scheduledToday === 0
+                                            {dailySummary.completedToday > 0 &&
+                                            dailySummary.scheduledToday === 0
                                                 ? '🌟'
-                                                : dailySummary.completedToday > 0
+                                                : dailySummary.completedToday >
+                                                    0
                                                   ? '😊'
-                                                  : dailySummary.scheduledToday > 0
+                                                  : dailySummary.scheduledToday >
+                                                      0
                                                     ? '👍'
                                                     : '🌿'}
                                         </span>
                                         <div>
                                             <p className="text-sm font-medium">
-                                                {dailySummary.completedToday > 0 && dailySummary.scheduledToday > 0
+                                                {dailySummary.completedToday >
+                                                    0 &&
+                                                dailySummary.scheduledToday > 0
                                                     ? `${name} has had ${dailySummary.completedToday} visit${dailySummary.completedToday !== 1 ? 's' : ''} so far, with ${dailySummary.scheduledToday} more to come!`
-                                                    : dailySummary.completedToday > 0
+                                                    : dailySummary.completedToday >
+                                                        0
                                                       ? `All done for today! ${name} had ${dailySummary.completedToday} visit${dailySummary.completedToday !== 1 ? 's' : ''}`
-                                                      : dailySummary.scheduledToday > 0
+                                                      : dailySummary.scheduledToday >
+                                                          0
                                                         ? `${dailySummary.scheduledToday} visit${dailySummary.scheduledToday !== 1 ? 's' : ''} coming up today \u2014 we'll keep you updated!`
                                                         : `A peaceful day for ${name} \u2014 nothing on the schedule`}
                                             </p>
                                             {dailySummary.lastEvent && (
                                                 <p className="text-xs text-muted-foreground">
-                                                    Last activity: {dailySummary.lastEvent.subject} at{' '}
-                                                    {new Date(dailySummary.lastEvent.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    Last activity:{' '}
+                                                    {
+                                                        dailySummary.lastEvent
+                                                            .subject
+                                                    }{' '}
+                                                    at{' '}
+                                                    {new Date(
+                                                        dailySummary.lastEvent
+                                                            .occurred_at,
+                                                    ).toLocaleTimeString([], {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                    })}
                                                 </p>
                                             )}
                                         </div>
@@ -678,27 +1008,37 @@ export default function FamilyDashboard({
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span>🎯</span>
-                                        {carePlan.title || `${name}'s Care Plan`}
+                                        {carePlan.title ||
+                                            `${name}'s Care Plan`}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {carePlan.goals_count > 0 && (
                                         <div>
                                             <div className="flex items-center justify-between text-sm">
-                                                <span className="font-medium">Goals Progress</span>
+                                                <span className="font-medium">
+                                                    Goals Progress
+                                                </span>
                                                 <span className="text-muted-foreground">
-                                                    {carePlan.goals_completed}/{carePlan.goals_count}
+                                                    {carePlan.goals_completed}/
+                                                    {carePlan.goals_count}
                                                 </span>
                                             </div>
                                             <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
                                                 <div
                                                     className="h-full rounded-full bg-primary transition-all"
-                                                    style={{ width: `${carePlan.goals_count > 0 ? (carePlan.goals_completed / carePlan.goals_count) * 100 : 0}%` }}
+                                                    style={{
+                                                        width: `${carePlan.goals_count > 0 ? (carePlan.goals_completed / carePlan.goals_count) * 100 : 0}%`,
+                                                    }}
                                                 />
                                             </div>
-                                            {carePlan.goals_completed === carePlan.goals_count && carePlan.goals_count > 0 && (
-                                                <p className="mt-1.5 text-xs font-medium text-emerald-600">All goals achieved! 🎉</p>
-                                            )}
+                                            {carePlan.goals_completed ===
+                                                carePlan.goals_count &&
+                                                carePlan.goals_count > 0 && (
+                                                    <p className="mt-1.5 text-xs font-medium text-emerald-600">
+                                                        All goals achieved! 🎉
+                                                    </p>
+                                                )}
                                         </div>
                                     )}
                                     {carePlan.important_to_me && (
@@ -706,37 +1046,51 @@ export default function FamilyDashboard({
                                             <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                                                 ⭐ What's Important to Me
                                             </p>
-                                            <p className="text-sm leading-relaxed">{carePlan.important_to_me}</p>
+                                            <p className="text-sm leading-relaxed">
+                                                {carePlan.important_to_me}
+                                            </p>
                                         </div>
                                     )}
                                     {carePlan.ideal_day && (
                                         <div>
-                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            <p className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                                 🌅 My Ideal Day
                                             </p>
-                                            <p className="text-sm leading-relaxed">{carePlan.ideal_day}</p>
+                                            <p className="text-sm leading-relaxed">
+                                                {carePlan.ideal_day}
+                                            </p>
                                         </div>
                                     )}
                                     {carePlan.how_to_support && (
                                         <div>
-                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            <p className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                                 🤝 How to Support Me
                                             </p>
-                                            <p className="text-sm leading-relaxed">{carePlan.how_to_support}</p>
+                                            <p className="text-sm leading-relaxed">
+                                                {carePlan.how_to_support}
+                                            </p>
                                         </div>
                                     )}
                                     {(carePlan.likes || carePlan.dislikes) && (
                                         <div className="grid grid-cols-2 gap-3">
                                             {carePlan.likes && (
                                                 <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/20">
-                                                    <p className="mb-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">💚 Things I Love</p>
-                                                    <p className="text-xs leading-relaxed text-emerald-800 dark:text-emerald-300">{carePlan.likes}</p>
+                                                    <p className="mb-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                                                        💚 Things I Love
+                                                    </p>
+                                                    <p className="text-xs leading-relaxed text-emerald-800 dark:text-emerald-300">
+                                                        {carePlan.likes}
+                                                    </p>
                                                 </div>
                                             )}
                                             {carePlan.dislikes && (
                                                 <div className="rounded-lg bg-rose-50 p-3 dark:bg-rose-950/20">
-                                                    <p className="mb-1 text-xs font-medium text-rose-700 dark:text-rose-400">Not a Fan Of</p>
-                                                    <p className="text-xs leading-relaxed text-rose-800 dark:text-rose-300">{carePlan.dislikes}</p>
+                                                    <p className="mb-1 text-xs font-medium text-rose-700 dark:text-rose-400">
+                                                        Not a Fan Of
+                                                    </p>
+                                                    <p className="text-xs leading-relaxed text-rose-800 dark:text-rose-300">
+                                                        {carePlan.dislikes}
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
@@ -780,28 +1134,64 @@ export default function FamilyDashboard({
                                     <div className="space-y-3">
                                         {weekShifts.length > 0 ? (
                                             weekShifts.map((shift) => (
-                                                <ShiftRow key={shift.id} shift={shift} showDate />
+                                                <ShiftRow
+                                                    key={shift.id}
+                                                    shift={shift}
+                                                    showDate
+                                                />
                                             ))
                                         ) : (
                                             <div className="flex flex-col items-center justify-center py-6 text-center">
-                                                <span className="mb-2 text-3xl">🌈</span>
-                                                <p className="text-sm text-muted-foreground">A clear week ahead &mdash; enjoy the downtime!</p>
+                                                <span className="mb-2 text-3xl">
+                                                    🌈
+                                                </span>
+                                                <p className="text-sm text-muted-foreground">
+                                                    A clear week ahead &mdash;
+                                                    enjoy the downtime!
+                                                </p>
                                             </div>
                                         )}
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-7 gap-1">
-                                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-                                            <div key={d} className="pb-2 text-center text-xs font-medium text-muted-foreground">
+                                        {[
+                                            'Mon',
+                                            'Tue',
+                                            'Wed',
+                                            'Thu',
+                                            'Fri',
+                                            'Sat',
+                                            'Sun',
+                                        ].map((d) => (
+                                            <div
+                                                key={d}
+                                                className="pb-2 text-center text-xs font-medium text-muted-foreground"
+                                            >
                                                 {d}
                                             </div>
                                         ))}
                                         {/* Pad start */}
                                         {(() => {
-                                            const firstDay = new Date(calendarDays[0].date + 'T00:00:00').getDay();
-                                            const offset = firstDay === 0 ? 6 : firstDay - 1;
-                                            return Array.from({ length: offset }).map((_, i) => (
-                                                <div key={`pad-${i}`} className="h-16" />
+                                            const firstCalendarDay =
+                                                calendarDays[0];
+                                            if (!firstCalendarDay) {
+                                                return null;
+                                            }
+                                            const firstDay = new Date(
+                                                firstCalendarDay.date +
+                                                    'T00:00:00',
+                                            ).getDay();
+                                            const offset =
+                                                firstDay === 0
+                                                    ? 6
+                                                    : firstDay - 1;
+                                            return Array.from({
+                                                length: offset,
+                                            }).map((_, i) => (
+                                                <div
+                                                    key={`pad-${i}`}
+                                                    className="h-16"
+                                                />
                                             ));
                                         })()}
                                         {calendarDays.map((day) => (
@@ -817,29 +1207,40 @@ export default function FamilyDashboard({
                                             >
                                                 <span
                                                     className={`font-medium ${
-                                                        day.isToday ? 'text-primary' : 'text-foreground'
+                                                        day.isToday
+                                                            ? 'text-primary'
+                                                            : 'text-foreground'
                                                     }`}
                                                 >
-                                                    {new Date(day.date + 'T00:00:00').getDate()}
+                                                    {new Date(
+                                                        day.date + 'T00:00:00',
+                                                    ).getDate()}
                                                 </span>
                                                 {day.shifts.length > 0 && (
                                                     <div className="mt-auto flex gap-0.5">
-                                                        {day.shifts.slice(0, 3).map((s) => (
-                                                            <div
-                                                                key={s.id}
-                                                                className={`h-1.5 w-1.5 rounded-full ${
-                                                                    s.status === 'completed'
-                                                                        ? 'bg-emerald-500'
-                                                                        : s.status === 'in_progress'
-                                                                          ? 'bg-amber-500'
-                                                                          : 'bg-blue-500'
-                                                                }`}
-                                                                title={`${s.staff_name ?? 'Staff'} - ${s.status}`}
-                                                            />
-                                                        ))}
-                                                        {day.shifts.length > 3 && (
+                                                        {day.shifts
+                                                            .slice(0, 3)
+                                                            .map((s) => (
+                                                                <div
+                                                                    key={s.id}
+                                                                    className={`h-1.5 w-1.5 rounded-full ${
+                                                                        s.status ===
+                                                                        'completed'
+                                                                            ? 'bg-emerald-500'
+                                                                            : s.status ===
+                                                                                'in_progress'
+                                                                              ? 'bg-amber-500'
+                                                                              : 'bg-blue-500'
+                                                                    }`}
+                                                                    title={`${s.staff_name ?? 'Staff'} - ${s.status}`}
+                                                                />
+                                                            ))}
+                                                        {day.shifts.length >
+                                                            3 && (
                                                             <span className="text-[9px] text-muted-foreground">
-                                                                +{day.shifts.length - 3}
+                                                                +
+                                                                {day.shifts
+                                                                    .length - 3}
                                                             </span>
                                                         )}
                                                     </div>
@@ -850,7 +1251,9 @@ export default function FamilyDashboard({
                                 )}
                                 <div className="mt-4 flex justify-center">
                                     <Button variant="ghost" size="sm" asChild>
-                                        <Link href={`/portal/clients/${client.id}/schedule`}>
+                                        <Link
+                                            href={`/portal/clients/${client.id}/schedule`}
+                                        >
                                             View full schedule →
                                         </Link>
                                     </Button>
@@ -865,7 +1268,12 @@ export default function FamilyDashboard({
                                     <span>✈️</span>
                                     Your Visits
                                 </CardTitle>
-                                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setBookingOpen(true)}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-1.5"
+                                    onClick={() => setBookingOpen(true)}
+                                >
                                     <CalendarPlus className="h-3.5 w-3.5" />
                                     New Request
                                 </Button>
@@ -874,7 +1282,10 @@ export default function FamilyDashboard({
                                 {visitRequests.length > 0 ? (
                                     <div className="space-y-3">
                                         {visitRequests.map((visit) => {
-                                            const vt = visitTypeLabels[visit.visit_type] ?? visitTypeLabels.in_person;
+                                            const vt =
+                                                visitTypeLabels[
+                                                    visit.visit_type
+                                                ] ?? visitTypeLabels.in_person!;
                                             const VtIcon = vt.icon;
                                             return (
                                                 <div
@@ -887,21 +1298,30 @@ export default function FamilyDashboard({
                                                         </div>
                                                         <div>
                                                             <div className="text-sm font-medium">
-                                                                {formatDate(visit.requested_date)}
+                                                                {formatDate(
+                                                                    visit.requested_date,
+                                                                )}
                                                                 {visit.preferred_time_start && (
                                                                     <span className="ml-2 font-normal text-muted-foreground">
-                                                                        {visit.preferred_time_start}
-                                                                        {visit.preferred_time_end && ` - ${visit.preferred_time_end}`}
+                                                                        {
+                                                                            visit.preferred_time_start
+                                                                        }
+                                                                        {visit.preferred_time_end &&
+                                                                            ` - ${visit.preferred_time_end}`}
                                                                     </span>
                                                                 )}
                                                             </div>
                                                             <div className="text-xs text-muted-foreground">
                                                                 {vt.label}
-                                                                {visit.notes && ` \u2022 ${visit.notes}`}
+                                                                {visit.notes &&
+                                                                    ` \u2022 ${visit.notes}`}
                                                             </div>
                                                             {visit.review_notes && (
                                                                 <div className="mt-1 text-xs text-muted-foreground italic">
-                                                                    Staff note: {visit.review_notes}
+                                                                    Staff note:{' '}
+                                                                    {
+                                                                        visit.review_notes
+                                                                    }
                                                                 </div>
                                                             )}
                                                         </div>
@@ -912,12 +1332,17 @@ export default function FamilyDashboard({
                                                         >
                                                             {visit.status}
                                                         </Badge>
-                                                        {visit.status === 'pending' && (
+                                                        {visit.status ===
+                                                            'pending' && (
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
                                                                 className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
-                                                                onClick={() => cancelVisit(visit.id)}
+                                                                onClick={() =>
+                                                                    cancelVisit(
+                                                                        visit.id,
+                                                                    )
+                                                                }
                                                             >
                                                                 <X className="h-4 w-4" />
                                                             </Button>
@@ -929,8 +1354,13 @@ export default function FamilyDashboard({
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                                        <span className="mb-2 text-3xl">💛</span>
-                                        <p className="text-sm text-muted-foreground">No visits planned yet &mdash; ready when you are!</p>
+                                        <span className="mb-2 text-3xl">
+                                            💛
+                                        </span>
+                                        <p className="text-sm text-muted-foreground">
+                                            No visits planned yet &mdash; ready
+                                            when you are!
+                                        </p>
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -957,20 +1387,27 @@ export default function FamilyDashboard({
                                 {recentEvents.length > 0 ? (
                                     <div className="relative space-y-0">
                                         {recentEvents.map((event, idx) => (
-                                            <div key={event.id} className="relative flex gap-4 pb-4 last:pb-0">
+                                            <div
+                                                key={event.id}
+                                                className="relative flex gap-4 pb-4 last:pb-0"
+                                            >
                                                 {/* Timeline line */}
-                                                {idx < recentEvents.length - 1 && (
-                                                    <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
+                                                {idx <
+                                                    recentEvents.length - 1 && (
+                                                    <div className="absolute top-6 bottom-0 left-[11px] w-px bg-border" />
                                                 )}
                                                 {/* Dot */}
                                                 <div className="relative z-10 mt-1.5 h-[9px] w-[9px] shrink-0 rounded-full border-2 border-primary bg-background" />
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-start justify-between gap-2">
-                                                        <p className="text-sm font-medium leading-tight">
-                                                            {event.subject || event.type}
+                                                        <p className="text-sm leading-tight font-medium">
+                                                            {event.subject ||
+                                                                event.type}
                                                         </p>
                                                         <span className="shrink-0 text-xs text-muted-foreground">
-                                                            {formatFullDate(event.occurred_at)}
+                                                            {formatFullDate(
+                                                                event.occurred_at,
+                                                            )}
                                                         </span>
                                                     </div>
                                                     {event.body && (
@@ -978,29 +1415,52 @@ export default function FamilyDashboard({
                                                             {event.body}
                                                         </p>
                                                     )}
+                                                    <ShiftTimelineSummary
+                                                        eventType={event.type}
+                                                        meta={event.meta as any}
+                                                        className="mt-1.5"
+                                                    />
                                                     {event.actor_name && (
                                                         <p className="mt-0.5 text-xs text-muted-foreground/70">
-                                                            By {event.actor_name}
+                                                            By{' '}
+                                                            {event.actor_name}
                                                         </p>
                                                     )}
-                                                    {event.reactions && event.reactions.length > 0 && (
-                                                        <div className="mt-1.5 flex flex-wrap gap-1">
-                                                            {event.reactions.map((r) => (
-                                                                <span
-                                                                    key={r.emoji}
-                                                                    className="inline-flex items-center gap-0.5 rounded-full border bg-muted/50 px-1.5 py-0.5 text-[10px]"
-                                                                >
-                                                                    {r.emoji} {r.count}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    )}
+                                                    {event.reactions &&
+                                                        event.reactions.length >
+                                                            0 && (
+                                                            <div className="mt-1.5 flex flex-wrap gap-1">
+                                                                {event.reactions.map(
+                                                                    (r) => (
+                                                                        <span
+                                                                            key={
+                                                                                r.emoji
+                                                                            }
+                                                                            className="inline-flex items-center gap-0.5 rounded-full border bg-muted/50 px-1.5 py-0.5 text-[10px]"
+                                                                        >
+                                                                            {
+                                                                                r.emoji
+                                                                            }{' '}
+                                                                            {
+                                                                                r.count
+                                                                            }
+                                                                        </span>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        )}
                                                 </div>
                                             </div>
                                         ))}
                                         <div className="mt-4 flex justify-center">
-                                            <Button variant="ghost" size="sm" asChild>
-                                                <Link href={`/portal/clients/${client.id}/timeline`}>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/portal/clients/${client.id}/timeline`}
+                                                >
                                                     View all activity →
                                                 </Link>
                                             </Button>
@@ -1008,8 +1468,13 @@ export default function FamilyDashboard({
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-6 text-center">
-                                        <span className="mb-2 text-3xl">📬</span>
-                                        <p className="text-sm text-muted-foreground">All quiet for now &mdash; we'll keep you posted!</p>
+                                        <span className="mb-2 text-3xl">
+                                            📬
+                                        </span>
+                                        <p className="text-sm text-muted-foreground">
+                                            All quiet for now &mdash; we'll keep
+                                            you posted!
+                                        </p>
                                     </div>
                                 )}
                             </CardContent>
@@ -1036,7 +1501,14 @@ export default function FamilyDashboard({
                                 {(client.address_line_1 || client.city) && (
                                     <div className="flex items-center gap-2 text-muted-foreground">
                                         <MapPin className="h-3.5 w-3.5" />
-                                        <span>{[client.address_line_1, client.city].filter(Boolean).join(', ')}</span>
+                                        <span>
+                                            {[
+                                                client.address_line_1,
+                                                client.city,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(', ')}
+                                        </span>
                                     </div>
                                 )}
                                 {site && (
@@ -1049,27 +1521,33 @@ export default function FamilyDashboard({
                                     <>
                                         <Separator />
                                         <div>
-                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            <p className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                                 Interests & Hobbies
                                             </p>
-                                            <p className="text-sm">{client.interests_hobbies}</p>
+                                            <p className="text-sm">
+                                                {client.interests_hobbies}
+                                            </p>
                                         </div>
                                     </>
                                 )}
                                 {client.dietary_requirements && (
                                     <div>
-                                        <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                        <p className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                             Dietary Requirements
                                         </p>
-                                        <p className="text-sm">{client.dietary_requirements}</p>
+                                        <p className="text-sm">
+                                            {client.dietary_requirements}
+                                        </p>
                                     </div>
                                 )}
                                 {client.mobility_needs && (
                                     <div>
-                                        <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                        <p className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                             Mobility Needs
                                         </p>
-                                        <p className="text-sm">{client.mobility_needs}</p>
+                                        <p className="text-sm">
+                                            {client.mobility_needs}
+                                        </p>
                                     </div>
                                 )}
                             </CardContent>
@@ -1090,44 +1568,142 @@ export default function FamilyDashboard({
                                             <div className="flex items-center gap-3">
                                                 <div className="relative">
                                                     <Avatar className="h-10 w-10">
-                                                        <AvatarImage src={currentShiftWorker.avatar ?? undefined} />
-                                                        <AvatarFallback className="text-xs">{getInitials(currentShiftWorker.name)}</AvatarFallback>
+                                                        <AvatarImage
+                                                            src={
+                                                                currentShiftWorker.avatar ??
+                                                                undefined
+                                                            }
+                                                        />
+                                                        <AvatarFallback className="text-xs">
+                                                            {getInitials(
+                                                                currentShiftWorker.name,
+                                                            )}
+                                                        </AvatarFallback>
                                                     </Avatar>
-                                                    <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={currentShiftWorker.presence ?? 'offline'} /></span>
+                                                    <span className="absolute -right-0.5 -bottom-0.5">
+                                                        <PresenceDot
+                                                            status={
+                                                                currentShiftWorker.presence ??
+                                                                'offline'
+                                                            }
+                                                        />
+                                                    </span>
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-semibold">{currentShiftWorker.name}</p>
-                                                    <p className="text-[10px] text-emerald-600">Currently on shift</p>
+                                                    <p className="text-sm font-semibold">
+                                                        {
+                                                            currentShiftWorker.name
+                                                        }
+                                                    </p>
+                                                    <p className="text-[10px] text-emerald-600">
+                                                        Currently on shift
+                                                    </p>
+                                                    {(currentShiftWorker.shift_type ||
+                                                        currentShiftWorker.service_context ||
+                                                        currentShiftWorker.location) && (
+                                                        <p className="text-[10px] text-muted-foreground">
+                                                            {formatShiftTypeLabel(
+                                                                currentShiftWorker.shift_type,
+                                                            )}
+                                                            {currentShiftWorker.service_context
+                                                                ? ` · ${currentShiftWorker.service_context}`
+                                                                : ''}
+                                                            {currentShiftWorker.location
+                                                                ? ` · ${currentShiftWorker.location}`
+                                                                : ''}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" asChild>
-                                                <Link href={`/portal/clients/${client.id}/messages`}>
-                                                    <MessageSquare className="h-3 w-3" />Chat
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 gap-1 text-xs"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/portal/clients/${client.id}/messages`}
+                                                >
+                                                    <MessageSquare className="h-3 w-3" />
+                                                    Chat
                                                 </Link>
                                             </Button>
                                         </div>
                                     ) : (
-                                        <p className="text-xs text-muted-foreground">No one currently on shift</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            No one currently on shift
+                                        </p>
                                     )}
                                     {nextShiftWorker && (
                                         <div className="flex items-center justify-between border-t pt-2">
                                             <div className="flex items-center gap-3">
                                                 <div className="relative">
                                                     <Avatar className="h-9 w-9">
-                                                        <AvatarImage src={nextShiftWorker.avatar ?? undefined} />
-                                                        <AvatarFallback className="text-xs">{getInitials(nextShiftWorker.name)}</AvatarFallback>
+                                                        <AvatarImage
+                                                            src={
+                                                                nextShiftWorker.avatar ??
+                                                                undefined
+                                                            }
+                                                        />
+                                                        <AvatarFallback className="text-xs">
+                                                            {getInitials(
+                                                                nextShiftWorker.name,
+                                                            )}
+                                                        </AvatarFallback>
                                                     </Avatar>
-                                                    <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={nextShiftWorker.presence ?? 'offline'} /></span>
+                                                    <span className="absolute -right-0.5 -bottom-0.5">
+                                                        <PresenceDot
+                                                            status={
+                                                                nextShiftWorker.presence ??
+                                                                'offline'
+                                                            }
+                                                        />
+                                                    </span>
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-medium">{nextShiftWorker.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground">
-                                                        Next: {nextShiftWorker.shift_starts_at ? new Date(nextShiftWorker.shift_starts_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                    <p className="text-sm font-medium">
+                                                        {nextShiftWorker.name}
                                                     </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        Next:{' '}
+                                                        {nextShiftWorker.shift_starts_at
+                                                            ? new Date(
+                                                                  nextShiftWorker.shift_starts_at,
+                                                              ).toLocaleTimeString(
+                                                                  'en-NZ',
+                                                                  {
+                                                                      hour: '2-digit',
+                                                                      minute: '2-digit',
+                                                                  },
+                                                              )
+                                                            : '—'}
+                                                    </p>
+                                                    {(nextShiftWorker.shift_type ||
+                                                        nextShiftWorker.service_context ||
+                                                        nextShiftWorker.location) && (
+                                                        <p className="text-[10px] text-muted-foreground">
+                                                            {formatShiftTypeLabel(
+                                                                nextShiftWorker.shift_type,
+                                                            )}
+                                                            {nextShiftWorker.service_context
+                                                                ? ` · ${nextShiftWorker.service_context}`
+                                                                : ''}
+                                                            {nextShiftWorker.location
+                                                                ? ` · ${nextShiftWorker.location}`
+                                                                : ''}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" asChild>
-                                                <Link href={`/portal/clients/${client.id}/messages`}>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 gap-1 text-xs"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/portal/clients/${client.id}/messages`}
+                                                >
                                                     <MessageSquare className="h-3 w-3" />
                                                 </Link>
                                             </Button>
@@ -1150,20 +1726,49 @@ export default function FamilyDashboard({
                                     <div className="flex items-center gap-3">
                                         <div className="relative">
                                             <Avatar className="h-11 w-11 ring-2 ring-amber-100 ring-offset-1 dark:ring-amber-800">
-                                                <AvatarImage src={keyWorker.avatar ?? undefined} alt={keyWorker.name} />
+                                                <AvatarImage
+                                                    src={
+                                                        keyWorker.avatar ??
+                                                        undefined
+                                                    }
+                                                    alt={keyWorker.name}
+                                                />
                                                 <AvatarFallback className="bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-                                                    {getInitials(keyWorker.name)}
+                                                    {getInitials(
+                                                        keyWorker.name,
+                                                    )}
                                                 </AvatarFallback>
                                             </Avatar>
-                                            <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={keyWorker.presence ?? 'offline'} /></span>
+                                            <span className="absolute -right-0.5 -bottom-0.5">
+                                                <PresenceDot
+                                                    status={
+                                                        keyWorker.presence ??
+                                                        'offline'
+                                                    }
+                                                />
+                                            </span>
                                         </div>
                                         <div>
-                                            <p className="font-medium">{keyWorker.name}</p>
-                                            <PresenceBadge status={keyWorker.presence ?? 'offline'} />
+                                            <p className="font-medium">
+                                                {keyWorker.name}
+                                            </p>
+                                            <PresenceBadge
+                                                status={
+                                                    keyWorker.presence ??
+                                                    'offline'
+                                                }
+                                            />
                                         </div>
                                     </div>
-                                    <Button variant="outline" size="sm" className="mt-3 w-full gap-1.5" asChild>
-                                        <Link href={`/portal/clients/${client.id}/messages`}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-3 w-full gap-1.5"
+                                        asChild
+                                    >
+                                        <Link
+                                            href={`/portal/clients/${client.id}/messages`}
+                                        >
                                             <MessageSquare className="h-3.5 w-3.5" />
                                             Send a Message
                                         </Link>
@@ -1184,22 +1789,59 @@ export default function FamilyDashboard({
                                 <CardContent>
                                     <div className="space-y-3">
                                         {supportWorkers.map((worker) => (
-                                            <div key={worker.id} className="flex items-center justify-between">
+                                            <div
+                                                key={worker.id}
+                                                className="flex items-center justify-between"
+                                            >
                                                 <div className="flex items-center gap-3">
                                                     <div className="relative">
                                                         <Avatar className="h-9 w-9">
-                                                            <AvatarImage src={worker.avatar ?? undefined} alt={worker.name} />
-                                                            <AvatarFallback className="text-xs">{getInitials(worker.name)}</AvatarFallback>
+                                                            <AvatarImage
+                                                                src={
+                                                                    worker.avatar ??
+                                                                    undefined
+                                                                }
+                                                                alt={
+                                                                    worker.name
+                                                                }
+                                                            />
+                                                            <AvatarFallback className="text-xs">
+                                                                {getInitials(
+                                                                    worker.name,
+                                                                )}
+                                                            </AvatarFallback>
                                                         </Avatar>
-                                                        <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={worker.presence ?? 'offline'} size="sm" /></span>
+                                                        <span className="absolute -right-0.5 -bottom-0.5">
+                                                            <PresenceDot
+                                                                status={
+                                                                    worker.presence ??
+                                                                    'offline'
+                                                                }
+                                                                size="sm"
+                                                            />
+                                                        </span>
                                                     </div>
                                                     <div>
-                                                        <p className="text-sm font-medium">{worker.name}</p>
-                                                        <PresenceBadge status={worker.presence ?? 'offline'} />
+                                                        <p className="text-sm font-medium">
+                                                            {worker.name}
+                                                        </p>
+                                                        <PresenceBadge
+                                                            status={
+                                                                worker.presence ??
+                                                                'offline'
+                                                            }
+                                                        />
                                                     </div>
                                                 </div>
-                                                <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" asChild>
-                                                    <Link href={`/portal/clients/${client.id}/messages`}>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 gap-1 text-xs"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={`/portal/clients/${client.id}/messages`}
+                                                    >
                                                         <MessageSquare className="h-3 w-3" />
                                                     </Link>
                                                 </Button>
@@ -1211,44 +1853,52 @@ export default function FamilyDashboard({
                         )}
 
                         {/* Medical Summary */}
-                        {medicalSummary && (medicalSummary.allergies || medicalSummary.disabilities) && (
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <span>🏥</span>
-                                        Health at a Glance
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3 text-sm">
-                                    {medicalSummary.allergies && (
-                                        <div>
-                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-rose-600">
-                                                Allergies
-                                            </p>
-                                            <p className="rounded-md bg-rose-50 px-3 py-2 text-rose-800">
-                                                {medicalSummary.allergies}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {medicalSummary.disabilities && (
-                                        <div>
-                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                                Disabilities
-                                            </p>
-                                            <p>{medicalSummary.disabilities}</p>
-                                        </div>
-                                    )}
-                                    {medicalSummary.notes && (
-                                        <div>
-                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                                Notes
-                                            </p>
-                                            <p className="text-muted-foreground">{medicalSummary.notes}</p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
+                        {medicalSummary &&
+                            (medicalSummary.allergies ||
+                                medicalSummary.disabilities) && (
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <span>🏥</span>
+                                            Health at a Glance
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3 text-sm">
+                                        {medicalSummary.allergies && (
+                                            <div>
+                                                <p className="mb-1 text-xs font-medium tracking-wider text-rose-600 uppercase">
+                                                    Allergies
+                                                </p>
+                                                <p className="rounded-md bg-rose-50 px-3 py-2 text-rose-800">
+                                                    {medicalSummary.allergies}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {medicalSummary.disabilities && (
+                                            <div>
+                                                <p className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                                    Disabilities
+                                                </p>
+                                                <p>
+                                                    {
+                                                        medicalSummary.disabilities
+                                                    }
+                                                </p>
+                                            </div>
+                                        )}
+                                        {medicalSummary.notes && (
+                                            <div>
+                                                <p className="mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                                    Notes
+                                                </p>
+                                                <p className="text-muted-foreground">
+                                                    {medicalSummary.notes}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
 
                         {/* Critical Alerts */}
                         {criticalAlerts.length > 0 && (
@@ -1262,15 +1912,24 @@ export default function FamilyDashboard({
                                 <CardContent>
                                     <div className="space-y-3">
                                         {criticalAlerts.map((alert) => (
-                                            <div key={alert.id} className="rounded-lg border border-red-200 bg-white p-3">
+                                            <div
+                                                key={alert.id}
+                                                className="rounded-lg border border-red-200 bg-white p-3"
+                                            >
                                                 <div className="flex items-start justify-between gap-2">
-                                                    <span className="text-sm font-medium">{alert.type}</span>
-                                                    <Badge className={`${severityColors[alert.severity] ?? ''} border-0 text-[10px]`}>
+                                                    <span className="text-sm font-medium">
+                                                        {alert.type}
+                                                    </span>
+                                                    <Badge
+                                                        className={`${severityColors[alert.severity] ?? ''} border-0 text-[10px]`}
+                                                    >
                                                         {alert.severity}
                                                     </Badge>
                                                 </div>
                                                 <p className="mt-1 text-xs text-muted-foreground">
-                                                    {formatFullDate(alert.occurred_at)}
+                                                    {formatFullDate(
+                                                        alert.occurred_at,
+                                                    )}
                                                 </p>
                                                 {alert.description && (
                                                     <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
@@ -1296,9 +1955,14 @@ export default function FamilyDashboard({
                                 <CardContent>
                                     <div className="space-y-3">
                                         {recentIncidents.map((inc) => (
-                                            <div key={inc.id} className="rounded-lg border p-3">
+                                            <div
+                                                key={inc.id}
+                                                className="rounded-lg border p-3"
+                                            >
                                                 <div className="flex items-start justify-between gap-2">
-                                                    <span className="text-sm font-medium">{inc.type}</span>
+                                                    <span className="text-sm font-medium">
+                                                        {inc.type}
+                                                    </span>
                                                     <Badge
                                                         className={`${severityColors[inc.severity] ?? ''} border-0 text-[10px]`}
                                                     >
@@ -1306,7 +1970,9 @@ export default function FamilyDashboard({
                                                     </Badge>
                                                 </div>
                                                 <p className="mt-1 text-xs text-muted-foreground">
-                                                    {formatFullDate(inc.occurred_at)}
+                                                    {formatFullDate(
+                                                        inc.occurred_at,
+                                                    )}
                                                 </p>
                                                 {inc.description && (
                                                     <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
@@ -1338,39 +2004,75 @@ function GlanceCard({
     bgClass: string;
 }) {
     return (
-        <div className={`flex items-center gap-3 rounded-2xl border p-4 shadow-sm ${bgClass}`}>
+        <div
+            className={`flex items-center gap-3 rounded-2xl border p-4 shadow-sm ${bgClass}`}
+        >
             <span className="text-2xl">{emoji}</span>
             <p className="text-sm font-medium">{message}</p>
         </div>
     );
 }
 
-function ShiftRow({ shift, showDate }: { shift: ShiftItem; showDate?: boolean }) {
+function ShiftRow({
+    shift,
+    showDate,
+}: {
+    shift: ShiftItem;
+    showDate?: boolean;
+}) {
     const getInitials = useInitials();
     return (
         <div className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
             {shift.staff && (
                 <Avatar className="h-9 w-9">
-                    <AvatarImage src={shift.staff.avatar ?? undefined} alt={shift.staff.name} />
-                    <AvatarFallback className="text-xs">{getInitials(shift.staff.name)}</AvatarFallback>
+                    <AvatarImage
+                        src={shift.staff.avatar ?? undefined}
+                        alt={shift.staff.name}
+                    />
+                    <AvatarFallback className="text-xs">
+                        {getInitials(shift.staff.name)}
+                    </AvatarFallback>
                 </Avatar>
             )}
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{shift.staff?.name ?? 'Staff TBC'}</span>
-                    <Badge className={`${statusColors[shift.status] ?? ''} border-0 text-[10px]`}>
+                    <span className="text-sm font-medium">
+                        {shift.staff?.name ?? 'Staff TBC'}
+                    </span>
+                    <Badge
+                        className={`${statusColors[shift.status] ?? ''} border-0 text-[10px]`}
+                    >
                         {shift.status.replace('_', ' ')}
                     </Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">
                     {showDate && (
                         <span className="mr-1.5">
-                            {new Date(shift.starts_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                            {new Date(shift.starts_at).toLocaleDateString([], {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                            })}
                             {' \u2022 '}
                         </span>
                     )}
                     {formatTime(shift.starts_at)} - {formatTime(shift.ends_at)}
                 </div>
+                {(shift.shift_type ||
+                    shift.service_context ||
+                    shift.location ||
+                    shift.is_sleepover ||
+                    shift.is_on_call) && (
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                        {formatShiftTypeLabel(shift.shift_type || shift.type)}
+                        {shift.service_context
+                            ? ` · ${shift.service_context}`
+                            : ''}
+                        {shift.location ? ` · ${shift.location}` : ''}
+                        {shift.is_sleepover ? ' · Sleepover' : ''}
+                        {shift.is_on_call ? ' · On-call' : ''}
+                    </div>
+                )}
             </div>
         </div>
     );

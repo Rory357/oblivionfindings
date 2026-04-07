@@ -306,15 +306,19 @@ class ResidentTrackingController extends Controller
                 'meta' => $t->meta,
             ]);
 
-        // Currently assigned trackers
-        $assignedTrackers = LocationHardware::query()
+        // Currently assigned trackers (batch-load clients to avoid N+1)
+        $assignedTrackerRecords = LocationHardware::query()
             ->where('category', LocationHardware::CATEGORY_TRACKER)
             ->where('linked_person_type', 'client')
             ->whereNotNull('linked_person_id')
             ->orderBy('name')
-            ->get()
-            ->map(function ($t) {
-                $client = Client::find($t->linked_person_id);
+            ->get();
+
+        $clientIds = $assignedTrackerRecords->pluck('linked_person_id')->unique()->all();
+        $clients = Client::with('site:id,name')->whereIn('id', $clientIds)->get()->keyBy('id');
+
+        $assignedTrackers = $assignedTrackerRecords->map(function ($t) use ($clients) {
+                $client = $clients[$t->linked_person_id] ?? null;
                 return [
                     'id' => $t->id,
                     'name' => $t->name,

@@ -6,6 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -63,6 +73,7 @@ export default function BookingShow({ booking }: Props) {
     const returnForm = useForm({ odometer_in: '', condition_on_return: '', return_notes: '' });
     const [showCancelDialog, setShowCancelDialog] = useState(false);
     const [showRejectDialog, setShowRejectDialog] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
 
     const currentStepIndex = statusSteps.indexOf(b.status ?? '');
 
@@ -339,7 +350,7 @@ export default function BookingShow({ booking }: Props) {
                                             placeholder="Current km"
                                         />
                                     </div>
-                                    <Button type="submit" size="lg" disabled={checkoutForm.processing}>
+                                    <Button type="submit" size="lg" disabled={checkoutForm.processing || !checkoutForm.data.odometer_out}>
                                         Checkout
                                     </Button>
                                 </form>
@@ -427,14 +438,34 @@ export default function BookingShow({ booking }: Props) {
                     description="Are you sure you want to cancel this booking? This action cannot be undone."
                     confirmText="Cancel Booking"
                 />
-                <ConfirmDialog
-                    open={showRejectDialog}
-                    onClose={() => setShowRejectDialog(false)}
-                    onConfirm={() => router.post(`/fleet-assets/bookings/${b.id}/reject`, { rejection_reason: 'Rejected' })}
-                    title="Reject Booking"
-                    description="Are you sure you want to reject this booking request?"
-                    confirmText="Reject"
-                />
+                <AlertDialog open={showRejectDialog} onOpenChange={(isOpen) => { if (!isOpen) setShowRejectDialog(false); }}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Reject Booking</AlertDialogTitle>
+                            <AlertDialogDescription>Provide a reason for rejecting this booking request.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <textarea
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            rows={3}
+                            placeholder="Reason for rejection..."
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                        />
+                        <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setShowRejectDialog(false)}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                disabled={!rejectionReason.trim()}
+                                onClick={() => {
+                                    router.post(`/fleet-assets/bookings/${b.id}/reject`, { rejection_reason: rejectionReason });
+                                    setShowRejectDialog(false);
+                                }}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                                Reject
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageShell>
         </AppLayout>
     );

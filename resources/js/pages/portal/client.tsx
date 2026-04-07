@@ -1,16 +1,23 @@
-import { Button } from '@/components/ui/button';
+import ShiftTimelineSummary from '@/components/shift-timeline-summary';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useInitials } from '@/hooks/use-initials';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 
 type Props = {
-    client: { id: number; first_name: string; last_name: string; avatar?: string | null; profile_photo_url?: string | null };
+    client: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        avatar?: string | null;
+        profile_photo_url?: string | null;
+    };
     profile: any | null;
     medications: Array<any>;
     conditions: Array<any>;
@@ -19,7 +26,12 @@ type Props = {
     incidents: Array<any>;
     events: Array<any>;
     assets?: Array<any>;
-    tracking_consent?: { id: number; status: string; given_at?: string | null; expires_at?: string | null } | null;
+    tracking_consent?: {
+        id: number;
+        status: string;
+        given_at?: string | null;
+        expires_at?: string | null;
+    } | null;
     rag_answer?: { text: string | null; sources?: Array<any> } | null;
     can?: { viewIncidents: boolean; downloadIncidentAttachments: boolean };
 };
@@ -66,14 +78,26 @@ export default function PortalClient({
         >
             <Head title={`Portal - ${name}`} />
 
-            <div className="flex items-center gap-3 rounded-md border p-4" data-test="portal-client-header">
+            <div
+                className="flex items-center gap-3 rounded-md border p-4"
+                data-test="portal-client-header"
+            >
                 <Avatar className="h-10 w-10">
-                    <AvatarImage src={(client as any).avatar ?? (client as any).profile_photo_url ?? undefined} alt={name} />
+                    <AvatarImage
+                        src={
+                            (client as any).avatar ??
+                            (client as any).profile_photo_url ??
+                            undefined
+                        }
+                        alt={name}
+                    />
                     <AvatarFallback>{getInitials(name)}</AvatarFallback>
                 </Avatar>
                 <div>
                     <div className="text-lg font-semibold">{name}</div>
-                    <div className="text-sm text-muted-foreground">Client portal</div>
+                    <div className="text-sm text-muted-foreground">
+                        Client portal
+                    </div>
                 </div>
             </div>
 
@@ -284,17 +308,30 @@ export default function PortalClient({
                                 <div className="font-medium">Assets</div>
                                 <div className="mt-2 space-y-2">
                                     {assets.map((a: any) => (
-                                        <div key={a.id} className="rounded-md border p-2">
-                                            <div className="text-sm font-medium">{a.name}</div>
+                                        <div
+                                            key={a.id}
+                                            className="rounded-md border p-2"
+                                        >
+                                            <div className="text-sm font-medium">
+                                                {a.name}
+                                            </div>
                                             <div className="text-xs text-slate-500">
-                                                {[a.asset_tag ? `#${a.asset_tag}` : null, a.status, a.risk_level]
+                                                {[
+                                                    a.asset_tag
+                                                        ? `#${a.asset_tag}`
+                                                        : null,
+                                                    a.status,
+                                                    a.risk_level,
+                                                ]
                                                     .filter(Boolean)
                                                     .join(' â€¢ ') || '-'}
                                             </div>
                                         </div>
                                     ))}
                                     {!assets.length && (
-                                        <div className="text-xs text-slate-500">No assets linked.</div>
+                                        <div className="text-xs text-slate-500">
+                                            No assets linked.
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -302,12 +339,16 @@ export default function PortalClient({
                             <Separator />
 
                             <div>
-                                <div className="font-medium">Tracking consent</div>
+                                <div className="font-medium">
+                                    Tracking consent
+                                </div>
                                 <div className="mt-2 text-xs text-slate-600">
                                     {tracking_consent ? (
                                         <div>
                                             Status: {tracking_consent.status}
-                                            {tracking_consent.given_at ? ` â€¢ Given: ${new Date(tracking_consent.given_at).toLocaleDateString()}` : ''}
+                                            {tracking_consent.given_at
+                                                ? ` â€¢ Given: ${new Date(tracking_consent.given_at).toLocaleDateString()}`
+                                                : ''}
                                             {tracking_consent.expires_at
                                                 ? ` â€¢ Expires: ${new Date(tracking_consent.expires_at).toLocaleDateString()}`
                                                 : ''}
@@ -337,7 +378,9 @@ export default function PortalClient({
                                                             <div className="text-sm font-medium">
                                                                 {i.type}{' '}
                                                                 <span className="ml-2 text-xs text-slate-500">
-                                                                    ({i.severity})
+                                                                    (
+                                                                    {i.severity}
+                                                                    )
                                                                 </span>
                                                             </div>
                                                             <div className="text-xs text-slate-500">
@@ -359,30 +402,41 @@ export default function PortalClient({
                                                     {i.immediate_action_taken && (
                                                         <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
                                                             <span className="font-medium text-slate-700">
-                                                                Immediate action:
+                                                                Immediate
+                                                                action:
                                                             </span>{' '}
-                                                            {i.immediate_action_taken}
+                                                            {
+                                                                i.immediate_action_taken
+                                                            }
                                                         </div>
                                                     )}
 
-                                                    {!!(i.attachments || []).length && (
+                                                    {!!(i.attachments || [])
+                                                        .length && (
                                                         <div className="mt-3 space-y-2">
                                                             <div className="text-xs font-medium text-slate-600">
                                                                 Attachments
                                                             </div>
-                                                            {(i.attachments || []).map((a: any) => (
+                                                            {(
+                                                                i.attachments ||
+                                                                []
+                                                            ).map((a: any) => (
                                                                 <div
                                                                     key={a.id}
                                                                     className="flex items-center justify-between gap-3 rounded-md border p-2"
                                                                 >
                                                                     <div className="min-w-0">
                                                                         <div className="truncate text-xs font-medium">
-                                                                            {a.original_name}
+                                                                            {
+                                                                                a.original_name
+                                                                            }
                                                                         </div>
                                                                     </div>
                                                                     {a.download_url ? (
                                                                         <a
-                                                                            href={a.download_url}
+                                                                            href={
+                                                                                a.download_url
+                                                                            }
                                                                             className="rounded-md border px-3 py-1 text-xs hover:bg-muted"
                                                                         >
                                                                             Download
@@ -501,6 +555,10 @@ export default function PortalClient({
                                         {e.body}
                                     </div>
                                 )}
+                                <ShiftTimelineSummary
+                                    eventType={e.type}
+                                    meta={e.meta}
+                                />
                                 <div className="mt-2 text-xs text-slate-500">
                                     {e.actor?.name ? `By ${e.actor.name}` : ''}{' '}
                                     {e.site?.name ? `- ${e.site.name}` : ''}

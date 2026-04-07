@@ -21,6 +21,8 @@ class FleetTripSegment extends Model
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
         'distance_km' => 'decimal:3',
+        'duration_s' => 'integer',
+        'seq' => 'integer',
     ];
 
     public function trip(): BelongsTo

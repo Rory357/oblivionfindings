@@ -61,6 +61,18 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/shifts/{shift}/complete', [ShiftController::class, 'complete'])
         ->middleware('permission:shifts.update|shifts.manageAny')
         ->name('shifts.complete');
+    Route::patch('/shifts/{shift}/cancel', [ShiftController::class, 'cancelOccurrence'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('shifts.cancel');
+    Route::patch('/shifts/{shift}/reopen', [ShiftController::class, 'reopenOccurrence'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('shifts.reopen');
+    Route::post('/shifts/{shift}/replacement-request', [ShiftController::class, 'requestReplacement'])
+        ->middleware('permission:shifts.update|shifts.manageAny')
+        ->name('shifts.replacement.request');
+    Route::patch('/shifts/{shift}/replacement-request/cancel', [ShiftController::class, 'cancelReplacement'])
+        ->middleware('permission:shifts.update|shifts.manageAny')
+        ->name('shifts.replacement.cancel');
 
     // Shift tasks
     Route::patch('/shifts/{shift}/tasks/{task}', [ShiftTaskController::class, 'update'])
@@ -124,9 +136,9 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
         ->name('attendance.index');
     Route::post('/attendance/clock-in', [AttendanceController::class, 'clockIn'])
-        ->middleware('permission:timesheets.create')
+        ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('attendance.clockIn');
     Route::post('/attendance/clock-out', [AttendanceController::class, 'clockOut'])
-        ->middleware('permission:timesheets.create')
+        ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('attendance.clockOut');
 });

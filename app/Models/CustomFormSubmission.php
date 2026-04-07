@@ -41,6 +41,11 @@ class CustomFormSubmission extends Model
         return $this->belongsTo(Client::class);
     }
 
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
+    }
+
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');

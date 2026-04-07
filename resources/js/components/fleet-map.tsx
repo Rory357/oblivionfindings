@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type FleetMapMarker = {
     id: string | number;
@@ -53,6 +53,7 @@ export default function FleetMap({
     const markerRefs = useRef<any[]>([]);
     const polylineRef = useRef<any>(null);
     const loggedRef = useRef(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     useEffect(() => {
         loadGoogleMaps(apiKey)
@@ -112,10 +113,26 @@ export default function FleetMap({
                     }).catch(() => undefined);
                 }
             })
-            .catch(() => {
-                // Intentionally swallow load errors; UI will show fallback.
+            .catch((err) => {
+                setLoadError(err?.message || 'Failed to load Google Maps');
             });
     }, [apiKey, center, zoom, markers, polyline, usageContext, usageAssetId]);
+
+    if (loadError) {
+        return (
+            <div className="w-full rounded-md border">
+                <div
+                    className="flex w-full items-center justify-center bg-muted/30 text-sm text-muted-foreground"
+                    style={{ height: `${height}px` }}
+                >
+                    <div className="text-center">
+                        <p className="font-medium">Map unavailable</p>
+                        <p className="mt-1 text-xs">{loadError}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full rounded-md border">

@@ -170,6 +170,14 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!name.trim()) {
+            setErrors({ name: 'Name is required.' });
+            return;
+        }
+        if (type === 'polygon' && polygonPoints.length < 3) {
+            setErrors({ shape: 'Polygon requires at least 3 points.' });
+            return;
+        }
         setProcessing(true);
 
         let shape: Record<string, any> = {};

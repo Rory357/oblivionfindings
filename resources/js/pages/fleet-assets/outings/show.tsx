@@ -18,12 +18,23 @@ import {
     Play,
     Square,
     User,
+    UserCheck,
     Users,
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { formatDate, formatDateTime, formatRelativeTime } from '@/lib/fleet-utils';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type Resident = {
     id: number;
@@ -32,6 +43,7 @@ type Resident = {
     transport_needs?: Record<string, boolean> | null;
     pre_check_completed: boolean;
     medication_packed: boolean;
+    returned_at: string | null;
     notes: string | null;
 };
 
@@ -86,6 +98,7 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
     const statusConfig = STATUS_CONFIG[safeOuting.status] ?? STATUS_CONFIG.planned;
 
     const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [showReturnAllDialog, setShowReturnAllDialog] = useState(false);
 
     // Auto-refresh when active
     useEffect(() => {
@@ -158,15 +171,19 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                     backLabel="Back to Outings"
                     actions={
                         <div className="flex gap-2">
-                            {safeOuting.status === 'planned' && (
+                            {safeOuting.status === 'planned' && (() => {
+                                const allPreChecked = safeResidents.length === 0 || safeResidents.every((r) => r.pre_check_completed);
+                                return (
                                 <>
                                     <Button
                                         size="sm"
                                         className="bg-purple-600 hover:bg-purple-700"
                                         onClick={() => router.post(`/fleet-assets/outings/${safeOuting.id}/start`)}
+                                        disabled={!allPreChecked}
+                                        title={!allPreChecked ? 'All residents must complete their pre-departure check first' : undefined}
                                     >
                                         <Play className="mr-2 h-4 w-4" />
-                                        Start Outing
+                                        {!allPreChecked ? 'Pre-checks Incomplete' : 'Start Outing'}
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -177,16 +194,37 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                                         Cancel
                                     </Button>
                                 </>
-                            )}
-                            {safeOuting.status === 'active' && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => router.post(`/fleet-assets/outings/${safeOuting.id}/complete`)}
-                                >
-                                    <Square className="mr-2 h-4 w-4" />
-                                    Complete Outing
-                                </Button>
-                            )}
+                                );
+                            })()}
+                            {safeOuting.status === 'active' && (() => {
+                                const returnedCount = safeResidents.filter((r) => r.returned_at).length;
+                                const totalCount = safeResidents.length;
+                                const allReturned = totalCount === 0 || returnedCount === totalCount;
+                                const unreturned = safeResidents.filter((r) => !r.returned_at);
+                                return (
+                                    <>
+                                        {unreturned.length > 1 && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setShowReturnAllDialog(true)}
+                                            >
+                                                <UserCheck className="mr-2 h-4 w-4" />
+                                                Return All ({unreturned.length})
+                                            </Button>
+                                        )}
+                                        <Button
+                                            size="sm"
+                                            onClick={() => router.post(`/fleet-assets/outings/${safeOuting.id}/complete`)}
+                                            disabled={!allReturned}
+                                            title={!allReturned ? `All residents must be marked as returned first (${returnedCount} of ${totalCount} returned)` : undefined}
+                                        >
+                                            <Square className="mr-2 h-4 w-4" />
+                                            {!allReturned ? `Complete (${returnedCount}/${totalCount} returned)` : 'Complete Outing'}
+                                        </Button>
+                                    </>
+                                );
+                            })()}
                         </div>
                     }
                 />
@@ -320,6 +358,30 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                                                         </div>
                                                         <span className="text-[10px] text-muted-foreground">Meds</span>
                                                     </div>
+                                                    {safeOuting.status === 'active' && (
+                                                        resident.returned_at ? (
+                                                            <Badge className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 text-[10px] h-5">
+                                                                <UserCheck className="mr-1 h-3 w-3" />
+                                                                Returned
+                                                            </Badge>
+                                                        ) : (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-6 text-[10px] px-2"
+                                                                onClick={() => router.post(`/fleet-assets/outings/${safeOuting.id}/residents/${resident.id}/return`)}
+                                                            >
+                                                                <UserCheck className="mr-1 h-3 w-3" />
+                                                                Mark Returned
+                                                            </Button>
+                                                        )
+                                                    )}
+                                                    {safeOuting.status === 'completed' && resident.returned_at && (
+                                                        <Badge className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 text-[10px] h-5">
+                                                            <UserCheck className="mr-1 h-3 w-3" />
+                                                            Returned
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
@@ -431,6 +493,14 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                                         {safeResidents.filter((r) => r.medication_packed).length} / {safeResidents.length}
                                     </span>
                                 </div>
+                                {(safeOuting.status === 'active' || safeOuting.status === 'completed') && (
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Returned</span>
+                                        <span className="font-medium">
+                                            {safeResidents.filter((r) => r.returned_at).length} / {safeResidents.length}
+                                        </span>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -446,6 +516,39 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                     description={`Are you sure you want to cancel "${safeOuting.title}"? This will also cancel the linked vehicle booking if one exists.`}
                     confirmText="Cancel Outing"
                 />
+
+                {/* Return All Residents Dialog */}
+                <AlertDialog open={showReturnAllDialog} onOpenChange={(open) => { if (!open) setShowReturnAllDialog(false); }}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Return All Residents</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Mark all unreturned residents as returned now?
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="space-y-1.5 py-2">
+                            {safeResidents.filter((r) => !r.returned_at).map((r) => (
+                                <div key={r.id} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                                    <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                    <span className="font-medium">{r.client_name}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => {
+                                    router.post(`/fleet-assets/outings/${safeOuting.id}/residents/return-all`);
+                                    setShowReturnAllDialog(false);
+                                }}
+                                className="bg-green-600 hover:bg-green-700"
+                            >
+                                <UserCheck className="mr-2 h-4 w-4" />
+                                Return All ({safeResidents.filter((r) => !r.returned_at).length})
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageShell>
         </AppLayout>
     );

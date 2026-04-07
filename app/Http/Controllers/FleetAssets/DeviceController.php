@@ -5,9 +5,12 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetTracker;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\LocationHardware;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 
 class DeviceController extends Controller
@@ -85,8 +88,28 @@ class DeviceController extends Controller
 
         $allDevices = $trackers->concat($hardwareTrackers)->values();
 
+        // Paginate the combined collection
+        $perPage = 25;
+        $page = (int) $request->input('page', 1);
+        $paginated = new LengthAwarePaginator(
+            $allDevices->forPage($page, $perPage)->values(),
+            $allDevices->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
+
+        // Summary stats across all devices (not just current page)
+        $stats = [
+            'total' => $allDevices->count(),
+            'online' => $allDevices->where('status', 'online')->count(),
+            'offline' => $allDevices->filter(fn ($d) => in_array($d['status'], ['offline', 'stale']))->count(),
+            'unpaired' => $allDevices->where('asset', null)->count(),
+        ];
+
         return Inertia::render('fleet-assets/devices/index', [
-            'devices' => $allDevices,
+            'devices' => $paginated,
+            'stats' => $stats,
         ]);
     }
 
@@ -184,5 +207,160 @@ class DeviceController extends Controller
         ]);
 
         return back()->with('success', 'Tracker unpaired successfully.');
+    }
+
+    public function consentIndex(Request $request)
+    {
+        $trackers = AssetTracker::query()
+            ->with([
+                'asset:id,name,asset_tag,client_id',
+                'asset.client:id,first_name,last_name',
+                'consent:id,status,given_at,withdrawn_at,given_by_user_id,expires_at',
+                'consent.givenBy:id,name',
+            ])
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $devices = $trackers->map(function (AssetTracker $t) {
+            $consent = $t->consent;
+            $consentValid = $consent ? $consent->isValid() : false;
+
+            if (!$consent) {
+                $consentStatus = 'pending';
+            } elseif ($consent->status === 'withdrawn' || $consent->withdrawn_at) {
+                $consentStatus = 'revoked';
+            } elseif ($consentValid) {
+                $consentStatus = 'consented';
+            } elseif ($consent->isExpired()) {
+                $consentStatus = 'expired';
+            } else {
+                $consentStatus = 'pending';
+            }
+
+            return [
+                'id' => $t->id,
+                'vendor' => $t->vendor,
+                'device_uid' => $t->device_uid,
+                'status' => $t->status,
+                'consent_status' => $consentStatus,
+                'consent_given_at' => optional($consent?->given_at)->toISOString(),
+                'consent_withdrawn_at' => optional($consent?->withdrawn_at)->toISOString(),
+                'consent_expires_at' => optional($consent?->expires_at)->toISOString(),
+                'consent_given_by' => $consent?->givenBy?->name,
+                'asset' => $t->asset ? [
+                    'id' => $t->asset->id,
+                    'name' => $t->asset->name,
+                    'asset_tag' => $t->asset->asset_tag,
+                ] : null,
+                'client_name' => $t->asset?->client
+                    ? trim($t->asset->client->first_name . ' ' . $t->asset->client->last_name)
+                    : null,
+            ];
+        });
+
+        $stats = [
+            'total' => $devices->count(),
+            'consented' => $devices->where('consent_status', 'consented')->count(),
+            'revoked' => $devices->where('consent_status', 'revoked')->count(),
+            'pending' => $devices->where('consent_status', 'pending')->count(),
+            'expired' => $devices->where('consent_status', 'expired')->count(),
+        ];
+
+        return Inertia::render('fleet-assets/devices/consent', [
+            'devices' => $devices->values(),
+            'stats' => $stats,
+        ]);
+    }
+
+    public function grantConsent(Request $request, AssetTracker $tracker)
+    {
+        $request->validate([
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $tracker->load('asset.client');
+
+        // Find or create the Fleet Tracking consent type
+        $consentType = ConsentType::query()
+            ->where('name', 'Fleet Tracking')
+            ->first();
+
+        if (!$consentType) {
+            $consentType = ConsentType::create([
+                'name' => 'Fleet Tracking',
+                'category' => 'operational',
+                'description' => 'Consent for vehicle location tracking.',
+                'purpose' => 'Enable fleet vehicle GPS tracking.',
+                'legal_basis' => 'consent',
+                'is_mandatory' => false,
+                'requires_capacity_assessment' => false,
+                'allows_withdrawal' => true,
+                'renewal_required' => false,
+                'active' => true,
+            ]);
+        }
+
+        $currentVersion = $consentType->currentVersion()->first();
+
+        // If an existing consent is linked but withdrawn/expired, supersede it
+        $oldConsent = $tracker->consent;
+
+        $consent = ClientConsent::create([
+            'client_id' => $tracker->asset?->client_id,
+            'consent_type_id' => $consentType->id,
+            'consent_type_version_id' => $currentVersion?->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'given_by_user_id' => $request->user()->id,
+            'given_method' => 'electronic',
+            'given_notes' => $request->input('notes'),
+            'created_by' => $request->user()->id,
+            'updated_by' => $request->user()->id,
+        ]);
+
+        if ($oldConsent) {
+            $oldConsent->update(['superseded_by_consent_id' => $consent->id]);
+        }
+
+        $tracker->update(['consent_id' => $consent->id]);
+
+        AuditLogger::log('assets.tracker.consent.granted', $tracker->asset, [
+            'tracker_id' => $tracker->id,
+            'consent_id' => $consent->id,
+            'granted_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Location tracking consent granted.');
+    }
+
+    public function revokeConsent(Request $request, AssetTracker $tracker)
+    {
+        $request->validate([
+            'reason' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $consent = $tracker->consent;
+
+        if (!$consent) {
+            return back()->withErrors(['consent' => 'No active consent to revoke.']);
+        }
+
+        $consent->update([
+            'status' => 'withdrawn',
+            'withdrawn_at' => now(),
+            'withdrawn_by_user_id' => $request->user()->id,
+            'withdrawal_reason' => $request->input('reason'),
+            'withdrawal_acknowledged' => true,
+            'updated_by' => $request->user()->id,
+        ]);
+
+        AuditLogger::log('assets.tracker.consent.revoked', $tracker->asset, [
+            'tracker_id' => $tracker->id,
+            'consent_id' => $consent->id,
+            'revoked_by' => $request->user()->id,
+            'reason' => $request->input('reason'),
+        ]);
+
+        return back()->with('success', 'Location tracking consent revoked. Telemetry location data will be blocked.');
     }
 }

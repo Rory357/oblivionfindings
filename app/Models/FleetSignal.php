@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FleetSignal extends Model
 {
@@ -48,5 +49,10 @@ class FleetSignal extends Model
     public function driverSession(): BelongsTo
     {
         return $this->belongsTo(FleetDriverSession::class, 'driver_session_id');
+    }
+
+    public function outbox(): HasOne
+    {
+        return $this->hasOne(FleetSignalOutbox::class, 'fleet_signal_id');
     }
 }

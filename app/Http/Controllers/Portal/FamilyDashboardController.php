@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\FamilyPortalSetting;
 use App\Models\FamilyVisitRequest;
 use App\Models\ProgressNote;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
+use App\Services\ShiftTimelineService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -26,6 +28,8 @@ class FamilyDashboardController extends Controller
         $tomorrow = (clone $today)->addDay();
         $weekEnd = (clone $today)->addDays(7);
         $monthEnd = (clone $today)->addDays(30);
+        $portalSettings = FamilyPortalSetting::query()->where('client_id', $client->id)->first();
+        $showShiftSchedule = $portalSettings?->show_shift_schedule ?? true;
 
         // Load client with key relationships
         $client->load(['keyWorker:id,name,email,profile_photo_path,last_seen_at,presence_status', 'supportWorkers:id,name,email,profile_photo_path,last_seen_at,presence_status', 'site:id,name,address_line_1,city', 'medicalProfile']);
@@ -39,54 +43,81 @@ class FamilyDashboardController extends Controller
         };
 
         // Today's shifts
-        $todayShifts = Shift::where('client_id', $client->id)
-            ->whereBetween('starts_at', [$today, $tomorrow])
-            ->orderBy('starts_at')
-            ->with('staff:id,name,email,profile_photo_path')
-            ->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'starts_at' => $s->starts_at?->toISOString(),
-                'ends_at' => $s->ends_at?->toISOString(),
-                'status' => $s->status,
-                'type' => $s->type ?? 'support',
-                'staff' => $s->staff ? ['id' => $s->staff->id, 'name' => $s->staff->name, 'avatar' => $s->staff->avatar] : null,
-            ]);
+        $todayShifts = $showShiftSchedule
+            ? Shift::where('client_id', $client->id)
+                ->where('starts_at', '<', $tomorrow)
+                ->where('ends_at', '>', $today)
+                ->orderBy('starts_at')
+                ->with(['staff:id,name,email,profile_photo_path', 'serviceContext:id,name'])
+                ->get()
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'starts_at' => $s->starts_at?->toISOString(),
+                    'ends_at' => $s->ends_at?->toISOString(),
+                    'status' => $s->status,
+                    'type' => $s->shift_type ?? 'standard',
+                    'shift_type' => $s->shift_type ?? 'standard',
+                    'service_context' => $s->serviceContext?->name,
+                    'location' => $s->location,
+                    'is_sleepover' => (bool) $s->is_sleepover,
+                    'is_on_call' => (bool) $s->is_on_call,
+                    'expected_break_minutes' => $s->expected_break_minutes,
+                    'staff' => $s->staff ? ['id' => $s->staff->id, 'name' => $s->staff->name, 'avatar' => $s->staff->avatar] : null,
+                ])
+            : collect();
 
         // This week's shifts
-        $weekShifts = Shift::where('client_id', $client->id)
-            ->whereBetween('starts_at', [$today, $weekEnd])
-            ->orderBy('starts_at')
-            ->with('staff:id,name,profile_photo_path')
-            ->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'starts_at' => $s->starts_at?->toISOString(),
-                'ends_at' => $s->ends_at?->toISOString(),
-                'status' => $s->status,
-                'type' => $s->type ?? 'support',
-                'staff' => $s->staff ? ['id' => $s->staff->id, 'name' => $s->staff->name, 'avatar' => $s->staff->avatar] : null,
-            ]);
+        $weekShifts = $showShiftSchedule
+            ? Shift::where('client_id', $client->id)
+                ->where('starts_at', '<', $weekEnd)
+                ->where('ends_at', '>', $today)
+                ->orderBy('starts_at')
+                ->with(['staff:id,name,profile_photo_path', 'serviceContext:id,name'])
+                ->get()
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'starts_at' => $s->starts_at?->toISOString(),
+                    'ends_at' => $s->ends_at?->toISOString(),
+                    'status' => $s->status,
+                    'type' => $s->shift_type ?? 'standard',
+                    'shift_type' => $s->shift_type ?? 'standard',
+                    'service_context' => $s->serviceContext?->name,
+                    'location' => $s->location,
+                    'is_sleepover' => (bool) $s->is_sleepover,
+                    'is_on_call' => (bool) $s->is_on_call,
+                    'expected_break_minutes' => $s->expected_break_minutes,
+                    'staff' => $s->staff ? ['id' => $s->staff->id, 'name' => $s->staff->name, 'avatar' => $s->staff->avatar] : null,
+                ])
+            : collect();
 
         // Monthly calendar events (shifts for the next 30 days)
-        $monthShifts = Shift::where('client_id', $client->id)
-            ->whereBetween('starts_at', [$today, $monthEnd])
-            ->orderBy('starts_at')
-            ->with('staff:id,name')
-            ->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'date' => $s->starts_at?->toDateString(),
-                'starts_at' => $s->starts_at?->toISOString(),
-                'ends_at' => $s->ends_at?->toISOString(),
-                'status' => $s->status,
-                'type' => $s->type ?? 'support',
-                'staff_name' => $s->staff?->name,
-            ]);
+        $monthShifts = $showShiftSchedule
+            ? Shift::where('client_id', $client->id)
+                ->where('starts_at', '<', $monthEnd)
+                ->where('ends_at', '>', $today)
+                ->orderBy('starts_at')
+                ->with(['staff:id,name', 'serviceContext:id,name'])
+                ->get()
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'date' => $s->starts_at?->toDateString(),
+                    'starts_at' => $s->starts_at?->toISOString(),
+                    'ends_at' => $s->ends_at?->toISOString(),
+                    'status' => $s->status,
+                    'type' => $s->shift_type ?? 'standard',
+                    'shift_type' => $s->shift_type ?? 'standard',
+                    'service_context' => $s->serviceContext?->name,
+                    'location' => $s->location,
+                    'is_sleepover' => (bool) $s->is_sleepover,
+                    'is_on_call' => (bool) $s->is_on_call,
+                    'staff_name' => $s->staff?->name,
+                ])
+            : collect();
 
         // Recent timeline events (portal-visible)
         $recentEvents = TimelineEvent::where('client_id', $client->id)
             ->where('visibility', 'portal')
+            ->when(! $showShiftSchedule, fn ($query) => $query->whereNotIn('type', ShiftTimelineService::shiftEventTypes()))
             ->orderByDesc('occurred_at')
             ->limit(10)
             ->with(['actor:id,name', 'reactions'])
@@ -143,16 +174,23 @@ class FamilyDashboardController extends Controller
             ]);
 
         // Daily summary (deterministic)
-        $completedToday = Shift::where('client_id', $client->id)
-            ->whereBetween('starts_at', [$today, $tomorrow])
-            ->where('status', 'completed')
-            ->count();
-        $scheduledToday = Shift::where('client_id', $client->id)
-            ->whereBetween('starts_at', [$today, $tomorrow])
-            ->where('status', 'scheduled')
-            ->count();
+        $completedToday = $showShiftSchedule
+            ? Shift::where('client_id', $client->id)
+                ->where('starts_at', '<', $tomorrow)
+                ->where('ends_at', '>', $today)
+                ->where('status', 'completed')
+                ->count()
+            : 0;
+        $scheduledToday = $showShiftSchedule
+            ? Shift::where('client_id', $client->id)
+                ->where('starts_at', '<', $tomorrow)
+                ->where('ends_at', '>', $today)
+                ->whereIn('status', ['scheduled', 'in_progress'])
+                ->count()
+            : 0;
         $lastEvent = TimelineEvent::where('client_id', $client->id)
             ->where('visibility', 'portal')
+            ->when(! $showShiftSchedule, fn ($query) => $query->whereNotIn('type', ShiftTimelineService::shiftEventTypes()))
             ->orderByDesc('occurred_at')
             ->first();
 
@@ -260,10 +298,11 @@ class FamilyDashboardController extends Controller
                 'avatar' => $w->avatar,
                 'presence' => $derivePresence($w),
             ])->values(),
-            'currentShiftWorker' => (function () use ($client, $derivePresence) {
+            'currentShiftWorker' => (function () use ($client, $derivePresence, $showShiftSchedule) {
+                if (! $showShiftSchedule) return null;
                 $current = Shift::where('client_id', $client->id)
                     ->where('status', 'in_progress')
-                    ->with('staff:id,name,profile_photo_path,last_seen_at,presence_status')
+                    ->with(['staff:id,name,profile_photo_path,last_seen_at,presence_status', 'serviceContext:id,name'])
                     ->first();
                 if (!$current?->staff) return null;
                 return [
@@ -272,14 +311,18 @@ class FamilyDashboardController extends Controller
                     'avatar' => $current->staff->avatar,
                     'presence' => $derivePresence($current->staff),
                     'shift_ends_at' => $current->ends_at?->toISOString(),
+                    'shift_type' => $current->shift_type ?? 'standard',
+                    'service_context' => $current->serviceContext?->name,
+                    'location' => $current->location,
                 ];
             })(),
-            'nextShiftWorker' => (function () use ($client, $derivePresence) {
+            'nextShiftWorker' => (function () use ($client, $derivePresence, $showShiftSchedule) {
+                if (! $showShiftSchedule) return null;
                 $next = Shift::where('client_id', $client->id)
                     ->where('status', 'scheduled')
                     ->where('starts_at', '>', now())
                     ->orderBy('starts_at')
-                    ->with('staff:id,name,profile_photo_path,last_seen_at,presence_status')
+                    ->with(['staff:id,name,profile_photo_path,last_seen_at,presence_status', 'serviceContext:id,name'])
                     ->first();
                 if (!$next?->staff) return null;
                 return [
@@ -288,6 +331,9 @@ class FamilyDashboardController extends Controller
                     'avatar' => $next->staff->avatar,
                     'presence' => $derivePresence($next->staff),
                     'shift_starts_at' => $next->starts_at?->toISOString(),
+                    'shift_type' => $next->shift_type ?? 'standard',
+                    'service_context' => $next->serviceContext?->name,
+                    'location' => $next->location,
                 ];
             })(),
             'todayShifts' => $todayShifts->values(),
@@ -330,7 +376,8 @@ class FamilyDashboardController extends Controller
                     ->open()
                     ->orderByDesc('created_at')
                     ->limit(3)
-                    ->get(['id', 'title', 'note_type', 'priority', 'due_date', 'status'])
+                    ->with(['shift:id,starts_at,shift_type'])
+                    ->get(['id', 'title', 'note_type', 'priority', 'due_date', 'status', 'assigned_to_shift_id'])
                     ->map(fn ($n) => [
                         'id' => $n->id,
                         'title' => $n->title,
@@ -338,6 +385,10 @@ class FamilyDashboardController extends Controller
                         'priority' => $n->priority,
                         'due_date' => $n->due_date?->toDateString(),
                         'is_overdue' => $n->due_date && $n->due_date->isPast(),
+                        'assigned_shift' => $n->shift ? [
+                            'starts_at' => $n->shift->starts_at?->toISOString(),
+                            'shift_type' => $n->shift->shift_type ?? 'standard',
+                        ] : null,
                     ]),
             ],
         ]);

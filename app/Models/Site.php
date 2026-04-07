@@ -180,6 +180,11 @@ class Site extends Model
         return $this->hasMany(SiteStaffRequirement::class);
     }
 
+    public function coverageRequirements(): HasMany
+    {
+        return $this->hasMany(SiteCoverageRequirement::class);
+    }
+
     public function feedback(): HasMany
     {
         return $this->hasMany(SiteFeedback::class);

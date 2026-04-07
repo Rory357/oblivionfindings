@@ -10,6 +10,7 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -30,6 +31,8 @@ class ControlRoomAlertController extends Controller
             'client:id,first_name,last_name',
             'sla',
         ]);
+
+        $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions());
 
         // Filters
         if ($status = $request->input('status')) {
@@ -111,12 +114,15 @@ class ControlRoomAlertController extends Controller
         ]);
 
         // Stats (unfiltered counts)
+        $statsBase = ControlRoomAlert::query();
+        $this->siteAccess()->applyAlertScope($statsBase, $user, $this->alertBypassPermissions());
+
         $stats = [
-            'total' => ControlRoomAlert::count(),
-            'open' => ControlRoomAlert::where('status', 'open')->count(),
-            'critical' => ControlRoomAlert::where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'assigned_to_me' => ControlRoomAlert::where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
-            'unassigned' => ControlRoomAlert::whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'total' => (clone $statsBase)->count(),
+            'open' => (clone $statsBase)->where('status', 'open')->count(),
+            'critical' => (clone $statsBase)->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'assigned_to_me' => (clone $statsBase)->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
         ];
 
         $staff = User::staff()
@@ -182,7 +188,10 @@ class ControlRoomAlertController extends Controller
 
         $alerts = ControlRoomAlert::whereIn('id', $data['alert_ids'])
             ->where('status', 'open')
+            ->tap(fn ($query) => $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions()))
             ->get();
+
+        abort_if($alerts->count() !== count($data['alert_ids']), 403, 'You are not authorized to manage one or more selected alerts.');
 
         $count = 0;
         foreach ($alerts as $alert) {
@@ -220,7 +229,11 @@ class ControlRoomAlertController extends Controller
             'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
-        $alerts = ControlRoomAlert::whereIn('id', $data['alert_ids'])->get();
+        $alerts = ControlRoomAlert::whereIn('id', $data['alert_ids'])
+            ->tap(fn ($query) => $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions()))
+            ->get();
+
+        abort_if($alerts->count() !== count($data['alert_ids']), 403, 'You are not authorized to assign one or more selected alerts.');
 
         $count = 0;
         foreach ($alerts as $alert) {
@@ -250,6 +263,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $alert->update([
             'assigned_to_user_id' => $user->id,
@@ -274,6 +288,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $alert->load([
             'asset:id,name,asset_tag',
@@ -339,6 +354,9 @@ class ControlRoomAlertController extends Controller
                     'occurred_at' => optional($alert->fleetSignal->occurred_at)->toISOString(),
                     'payload' => $alert->fleetSignal->payload,
                 ] : null,
+                'fleet_context' => $alert->context['fleet_context']
+                    ?? $alert->context['normalized_data']['fleet_context']
+                    ?? null,
                 'assigned_to_user_id' => $alert->assigned_to_user_id,
                 'assigned_to' => $alert->assignedTo ? [
                     'id' => $alert->assignedTo->id,
@@ -525,6 +543,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         if ($alert->status === 'closed' || $alert->status === 'resolved') {
             return back()->withErrors(['alert' => 'Cannot acknowledge a closed or resolved alert.']);
@@ -558,6 +577,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         if (!in_array($alert->status, ['open', 'ack'])) {
             return back()->withErrors(['alert' => 'Alert must be open or acknowledged to start triage.']);
@@ -589,6 +609,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         if ($alert->status === 'closed' || $alert->status === 'resolved') {
             return back()->withErrors(['alert' => 'Alert is already resolved or closed.']);
@@ -622,6 +643,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         if ($alert->status === 'closed') {
             return back()->withErrors(['alert' => 'Alert is already closed.']);
@@ -653,6 +675,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
@@ -700,6 +723,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $previousAssignee = $alert->assigned_to_user_id;
 
@@ -742,6 +766,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.escalate'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         if ($alert->status === 'closed' || $alert->status === 'resolved') {
             return back()->withErrors(['alert' => 'Cannot escalate a closed or resolved alert.']);
@@ -786,6 +811,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'note' => ['required', 'string', 'max:2000'],
@@ -820,6 +846,7 @@ class ControlRoomAlertController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'priority' => ['nullable', 'in:critical,high,medium,low'],
@@ -907,5 +934,28 @@ class ControlRoomAlertController extends Controller
 
         return redirect()->route('control-room.alerts.show', $alert)
             ->with('success', 'Alert created.');
+    }
+
+    protected function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function alertBypassPermissions(): array
+    {
+        return ['shifts.manageAny', 'timesheets.manageAny', 'reports.viewAny'];
+    }
+
+    protected function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
+    {
+        $this->siteAccess()->assertCanAccessAlert(
+            $user,
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to access alerts for this site.',
+        );
     }
 }

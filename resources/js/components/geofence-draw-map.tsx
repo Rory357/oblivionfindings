@@ -73,7 +73,19 @@ export default function GeofenceDrawMap({ center = { lat: -36.8485, lng: 174.763
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
         const map = L.map(containerRef.current, { center: [center.lat, center.lng], zoom });
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
+
+        const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            maxZoom: 19,
+        });
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; <a href="https://www.esri.com/">Esri</a>, Earthstar Geographics',
+            maxZoom: 19,
+        });
+
+        streetLayer.addTo(map);
+        L.control.layers({ 'Street': streetLayer, 'Satellite': satelliteLayer }, {}, { position: 'topright' }).addTo(map);
+
         mapRef.current = map;
         // Force tile load after render
         setTimeout(() => map.invalidateSize(), 100);

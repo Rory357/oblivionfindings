@@ -2,19 +2,44 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\CustomForm;
+use App\Models\CustomFormSubmission;
+use App\Models\FleetResidentTransport;
 use App\Models\IncidentTemplate;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\ShiftHandover;
+use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftTask;
+use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\EnhancedMarService;
+use App\Services\ShiftAssignmentRecommendationService;
+use App\Services\CoverageReservationService;
+use App\Services\Operations\TimesheetReconciliationService;
+use App\Services\ShiftCoverageService;
+use App\Services\ShiftConflictService;
+use App\Services\ShiftHandoverService;
+use App\Services\ShiftOperationalSnapshotService;
+use App\Services\ShiftReplacementService;
+use App\Services\ShiftCancellationService;
+use App\Services\ShiftStaffEligibilityService;
+use App\Services\ShiftStateGuardService;
+use App\Services\ShiftTimelineService;
+use App\Services\UserSiteAccessService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Services\NotificationService;
 use App\Services\ServiceContextResolver;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
+use App\Models\TimelineEvent;
+use Illuminate\Validation\ValidationException;
 
 class ShiftController extends Controller
 {
@@ -46,6 +71,8 @@ class ShiftController extends Controller
             ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
             ->whereBetween('starts_at', [$start, $end])
             ->orderBy('starts_at');
+
+        $this->siteAccess()->applyShiftScope($query, $auth, $this->shiftBypassPermissions());
 
         if ($request->filled('status')) {
             $query->where('status', $request->query('status'));
@@ -88,11 +115,19 @@ class ShiftController extends Controller
 
         $shifts = $query->paginate(25)->withQueryString();
 
-        $clients = Client::query()
+        $clients = $this->siteAccess()->applyClientScope(
+            Client::query(),
+            $auth,
+            $this->shiftBypassPermissions(),
+        )
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
-        $staff = User::staff()
+        $staff = $this->siteAccess()->applyStaffScope(
+            User::staff(),
+            $auth,
+            $this->shiftBypassPermissions(),
+        )
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -123,20 +158,53 @@ class ShiftController extends Controller
             abort(403);
         }
 
+        $this->assertCanAccessShift($auth, $shift);
+
         $shift->load([
             'client:id,first_name,last_name,site_id',
             'staff:id,name,email',
+            'site:id,name,type',
             'tasks',
             'serviceContext:id,name,type,is_active',
         ]);
 
-        // Pinned handover notes for this client
-        $handover = \App\Models\TimelineEvent::query()
-            ->where('client_id', $shift->client_id)
-            ->where('type', 'handover')
-            ->where('is_pinned', true)
-            ->orderByDesc('occurred_at')
-            ->with(['actor:id,name'])
+        $canViewMedications = $auth->canDo('medications.view')
+            || $auth->canDo('medications.administer.record')
+            || $auth->canDo('clients.update');
+        $canRecordMedications = $auth->canDo('medications.administer.record')
+            || $auth->canDo('clients.update');
+        $canViewForms = $auth->canDo('custom_forms.viewAny')
+            || $auth->canDo('custom_forms.submit');
+        $canSubmitForms = $auth->canDo('custom_forms.submit');
+        $latestReplacement = $shift->replacementRequests()
+            ->with([
+                'requester:id,name',
+                'currentStaff:id,name',
+                'replacementStaff:id,name',
+                'approver:id,name',
+                'canceller:id,name',
+                'openPosition.claimer:id,name',
+                'openPosition.approver:id,name',
+            ])
+            ->latest('requested_at')
+            ->first();
+
+        $transports = FleetResidentTransport::query()
+            ->where('shift_id', $shift->id)
+            ->with(['asset:id,name,asset_tag', 'driver:id,name'])
+            ->orderByDesc('departed_at')
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get();
+
+        $handover = ShiftHandover::query()
+            ->where(function ($query) use ($shift) {
+                $query->where('outgoing_shift_id', $shift->id)
+                    ->orWhere('incoming_shift_id', $shift->id)
+                    ->orWhere('client_id', $shift->client_id);
+            })
+            ->orderByDesc('created_at')
+            ->with(['outgoingStaff:id,name', 'incomingStaff:id,name'])
             ->limit(5)
             ->get();
 
@@ -160,16 +228,83 @@ class ShiftController extends Controller
             ->orderBy('name')
             ->get();
 
+        $availableForms = collect();
+        $formSubmissions = collect();
+
+        if ($canViewForms) {
+            $availableForms = CustomForm::query()
+                ->when($auth->organization_id, fn ($query) => $query->where('organization_id', $auth->organization_id))
+                ->active()
+                ->whereIn('form_type', ['general', 'shift', 'care_delivery', 'handover'])
+                ->orderBy('name')
+                ->get(['id', 'name', 'description', 'form_type', 'schema']);
+
+            $formSubmissions = CustomFormSubmission::query()
+                ->where('shift_id', $shift->id)
+                ->with(['form:id,name,form_type', 'submitter:id,name'])
+                ->orderByDesc('created_at')
+                ->limit(25)
+                ->get();
+        }
+
+        $medicationSummary = null;
+        $medicationWitnesses = collect();
+
+        if ($canViewMedications && $shift->client) {
+            $mar = app(EnhancedMarService::class)->build(
+                $shift->client,
+                ($shift->starts_at ?? now())->copy()->startOfDay(),
+                now(),
+                $shift->id,
+            );
+
+            $shiftMedicationSummary = app(EnhancedMarService::class)->getShiftSummary($shift->id);
+
+            $medicationSummary = [
+                'stats' => $mar['stats'],
+                'allergies' => $mar['allergies'],
+                'due' => collect($mar['scheduled'] ?? [])
+                    ->filter(fn ($row) => in_array($row['schedule_state'] ?? null, ['due', 'due_soon', 'late', 'missed_auto'], true))
+                    ->values()
+                    ->take(8)
+                    ->all(),
+                'prn' => collect($mar['prn'] ?? [])
+                    ->values()
+                    ->take(6)
+                    ->all(),
+                'recent_history' => array_slice($shiftMedicationSummary['administrations'] ?? [], 0, 10),
+                'by_status' => $shiftMedicationSummary['by_status'] ?? [],
+            ];
+        }
+
+        if ($canRecordMedications) {
+            $medicationWitnesses = User::staff()
+                ->where(function ($query) {
+                    $query->whereHas('roles.permissions', fn ($rolePermissions) => $rolePermissions->where('key', 'medications.controlled.witness'))
+                        ->orWhereHas('permissionOverrides', fn ($overrides) => $overrides->where('permissions.key', 'medications.controlled.witness')->wherePivot('allowed', true));
+                })
+                ->whereDoesntHave('permissionOverrides', fn ($overrides) => $overrides->where('permissions.key', 'medications.controlled.witness')->wherePivot('allowed', false))
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        $assignmentCandidates = [];
+        if ($auth->canDo('shifts.manageAny') && in_array($shift->status, ['draft', 'scheduled', 'in_progress'], true)) {
+            $assignmentCandidates = app(ShiftAssignmentRecommendationService::class)->forShift($shift, $auth);
+        }
+        $coverage = app(ShiftCoverageService::class)->coverageStatusForShift($shift);
 
         return inertia('operations/shifts/show', [
             'shift' => $shift,
-            'handover' => $handover->map(fn($e) => [
-                'id' => $e->id,
-                'type' => $e->type,
-                'occurred_at' => optional($e->occurred_at)->toISOString(),
-                'subject' => $e->subject,
-                'body' => $e->body,
-                'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
+            'handover' => $handover->map(fn($entry) => [
+                'id' => $entry->id,
+                'type' => 'handover',
+                'occurred_at' => optional($entry->created_at)->toISOString(),
+                'subject' => $entry->incomingStaff?->name
+                    ? 'Handover to '.$entry->incomingStaff->name
+                    : 'Shift handover',
+                'body' => $entry->handover_notes,
+                'actor' => $entry->outgoingStaff ? ['id' => $entry->outgoingStaff->id, 'name' => $entry->outgoingStaff->name] : null,
             ])->values(),
             'notes' => $notes->map(fn($e) => [
                 'id' => $e->id,
@@ -182,10 +317,107 @@ class ShiftController extends Controller
             ])->values(),
             'incidents' => $incidents,
             'incidentTemplates' => $incidentTemplates,
+            'forms' => [
+                'available' => $availableForms->map(fn (CustomForm $form) => [
+                    'id' => $form->id,
+                    'name' => $form->name,
+                    'description' => $form->description,
+                    'form_type' => $form->form_type ?: 'general',
+                    'schema' => $form->schema ?? [],
+                ])->values(),
+                'submissions' => $formSubmissions->map(fn (CustomFormSubmission $submission) => [
+                    'id' => $submission->id,
+                    'status' => $submission->status ?? 'submitted',
+                    'submitted_at' => optional($submission->created_at)->toISOString(),
+                    'data' => $submission->data ?? [],
+                    'submitter' => $submission->submitter
+                        ? ['id' => $submission->submitter->id, 'name' => $submission->submitter->name]
+                        : null,
+                    'form' => $submission->form
+                        ? [
+                            'id' => $submission->form->id,
+                            'name' => $submission->form->name,
+                            'form_type' => $submission->form->form_type ?: 'general',
+                        ]
+                        : null,
+                ])->values(),
+            ],
+            'medications' => $medicationSummary,
+            'medicationWitnesses' => $medicationWitnesses->map(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+            ])->values(),
+            'transports' => $transports->map(fn (FleetResidentTransport $transport) => [
+                'id' => $transport->id,
+                'status' => $transport->status,
+                'transport_type' => $transport->transport_type,
+                'resident_name' => $transport->resident_name,
+                'pickup_location' => $transport->pickup_location,
+                'dropoff_location' => $transport->dropoff_location,
+                'departed_at' => optional($transport->departed_at)->toISOString(),
+                'arrived_at' => optional($transport->arrived_at)->toISOString(),
+                'asset' => $transport->asset ? [
+                    'id' => $transport->asset->id,
+                    'name' => $transport->asset->name,
+                    'asset_tag' => $transport->asset->asset_tag,
+                ] : null,
+                'driver' => $transport->driver ? [
+                    'id' => $transport->driver->id,
+                    'name' => $transport->driver->name,
+                ] : null,
+            ])->values(),
+            'replacementRequest' => $latestReplacement ? [
+                'id' => $latestReplacement->id,
+                'status' => $latestReplacement->status,
+                'reason' => $latestReplacement->reason,
+                'notes' => $latestReplacement->notes,
+                'required_skills' => $latestReplacement->required_skills ?? [],
+                'requested_at' => optional($latestReplacement->requested_at)->toISOString(),
+                'claimed_at' => optional($latestReplacement->claimed_at)->toISOString(),
+                'approved_at' => optional($latestReplacement->approved_at)->toISOString(),
+                'cancelled_at' => optional($latestReplacement->cancelled_at)->toISOString(),
+                'requested_by' => $latestReplacement->requester
+                    ? ['id' => $latestReplacement->requester->id, 'name' => $latestReplacement->requester->name]
+                    : null,
+                'current_staff' => $latestReplacement->currentStaff
+                    ? ['id' => $latestReplacement->currentStaff->id, 'name' => $latestReplacement->currentStaff->name]
+                    : null,
+                'replacement_staff' => $latestReplacement->replacementStaff
+                    ? ['id' => $latestReplacement->replacementStaff->id, 'name' => $latestReplacement->replacementStaff->name]
+                    : null,
+                'approved_by' => $latestReplacement->approver
+                    ? ['id' => $latestReplacement->approver->id, 'name' => $latestReplacement->approver->name]
+                    : null,
+                'cancelled_by' => $latestReplacement->canceller
+                    ? ['id' => $latestReplacement->canceller->id, 'name' => $latestReplacement->canceller->name]
+                    : null,
+                'is_active' => in_array($latestReplacement->status, [ShiftReplacementService::REQUESTED, ShiftReplacementService::CLAIMED], true),
+                'open_position' => $latestReplacement->openPosition ? [
+                    'id' => $latestReplacement->openPosition->id,
+                    'status' => $latestReplacement->openPosition->status,
+                    'expires_at' => optional($latestReplacement->openPosition->expires_at)->toISOString(),
+                    'claimed_by' => $latestReplacement->openPosition->claimer
+                        ? ['id' => $latestReplacement->openPosition->claimer->id, 'name' => $latestReplacement->openPosition->claimer->name]
+                        : null,
+                    'approved_by' => $latestReplacement->openPosition->approver
+                        ? ['id' => $latestReplacement->openPosition->approver->id, 'name' => $latestReplacement->openPosition->approver->name]
+                        : null,
+                ] : null,
+            ] : null,
+            'assignmentCandidates' => $assignmentCandidates,
+            'coverage' => $coverage,
             'can' => [
                 'add_note' => $auth->canDo('timeline.create'),
                 'create_incident' => $auth->canDo('incidents.create'),
                 'mark_tasks' => true,
+                'view_forms' => $canViewForms,
+                'submit_form' => $canSubmitForms,
+                'view_medication' => $canViewMedications,
+                'record_medication' => $canRecordMedications,
+                'request_replacement' => $this->canRequestReplacement($auth, $shift),
+                'cancel_replacement' => $latestReplacement ? $this->canCancelReplacement($auth, $latestReplacement) : false,
+                'assign_shift' => $auth->canDo('shifts.manageAny'),
+                'view_transport' => $auth->canDo('fleet.viewAny') || $auth->canDo('assets.viewAny'),
             ],
         ]);
     }
@@ -195,24 +427,118 @@ class ShiftController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.create'), 403);
 
-        $clients = Client::query()
+        $defaultSiteId = $request->query('site_id');
+        $coverageRuleId = $request->query('coverage_rule_id');
+
+        if (! $defaultSiteId && $coverageRuleId) {
+            $defaultSiteId = \App\Models\SiteCoverageRequirement::query()
+                ->whereKey($coverageRuleId)
+                ->value('site_id');
+        }
+
+        if ($defaultSiteId) {
+            $this->siteAccess()->assertCanAccessSiteId(
+                $auth,
+                (int) $defaultSiteId,
+                $this->shiftBypassPermissions(),
+                'You are not authorized to create shifts for that site.',
+            );
+        }
+
+        if ($request->filled('client_id')) {
+            $this->siteAccess()->assertCanAccessClientId(
+                $auth,
+                (int) $request->query('client_id'),
+                $this->shiftBypassPermissions(),
+                'You are not authorized to create shifts for that site.',
+            );
+        }
+
+        $clients = $this->siteAccess()->applyClientScope(
+            Client::query(),
+            $auth,
+            $this->shiftBypassPermissions(),
+        )
             ->with('site:id,name')
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']);
-        $staff = User::staff()->orderBy('name')->get(['id', 'name', 'email']);
+        $staff = $this->siteAccess()->applyStaffScope(
+            User::staff(),
+            $auth,
+            $this->shiftBypassPermissions(),
+        )->orderBy('name')->get(['id', 'name', 'email']);
 
         $serviceContexts = ServiceContext::query()
             ->orderBy('name')
             ->get(['id', 'name', 'type', 'is_active']);
 
         $defaultClientId = $request->query('client_id');
+        $defaultUserId = $request->query('user_id');
+        $coverageReservation = null;
+        $coverageContext = null;
+
+        if ($defaultSiteId && $request->filled('starts_at') && $request->filled('ends_at')) {
+            try {
+                $coverageReservation = app(CoverageReservationService::class)->createQuickFillReservation(
+                    $auth,
+                    (int) $defaultSiteId,
+                    Carbon::parse((string) $request->query('starts_at')),
+                    Carbon::parse((string) $request->query('ends_at')),
+                    $coverageRuleId ? (int) $coverageRuleId : null,
+                    null,
+                    [
+                        'return_to' => $request->query('return_to'),
+                    ],
+                );
+            } catch (\Throwable $e) {
+                $coverageReservation = null;
+            }
+
+            $coverageContext = $this->coverageContextFromWindow(
+                (int) $defaultSiteId,
+                (string) $request->query('starts_at'),
+                (string) $request->query('ends_at'),
+                $coverageRuleId ? (int) $coverageRuleId : null,
+            );
+        }
+
+        if (! $defaultClientId) {
+            $defaultClientId = $coverageContext['preferred_client_id'] ?? null;
+        }
+
+        if (! $defaultClientId && $defaultSiteId) {
+            $defaultClientId = Client::query()
+                ->where('site_id', $defaultSiteId)
+                ->orderBy('first_name')
+                ->value('id');
+        }
 
         return inertia('operations/shifts/create', [
             'clients' => $clients,
             'staff' => $staff,
             'serviceContexts' => $serviceContexts,
-            'defaultServiceContextId' => ServiceContext::defaultId(),
+            'defaultServiceContextId' => $request->query('service_context_id') ?? ServiceContext::defaultId(),
             'defaultClientId' => $defaultClientId,
+            'defaultSiteId' => $defaultSiteId,
+            'defaultUserId' => $defaultUserId,
+            'defaultStartsAt' => $request->query('starts_at'),
+            'defaultEndsAt' => $request->query('ends_at'),
+            'defaultLocation' => $request->query('location'),
+            'defaultShiftType' => $request->query('shift_type'),
+            'defaultOpenShift' => $request->boolean('open_shift'),
+            'defaultRepeatWeekly' => $request->boolean('repeat_weekly'),
+            'defaultRepeatEndDate' => $request->query('repeat_end_date'),
+            'defaultReturnTo' => $request->query('return_to'),
+            'coverageReservationToken' => $coverageReservation?->reservation_token,
+            'coverageContext' => $coverageContext ?? [
+                'rule_id' => $coverageRuleId,
+                'rule_name' => $request->query('coverage_rule_name'),
+                'required_staff' => $request->query('coverage_required_staff'),
+                'missing_staff' => $request->query('coverage_missing_staff'),
+                'site_id' => $defaultSiteId,
+                'preferred_client_id' => $defaultClientId,
+                'role_shortages' => collect(json_decode((string) $request->query('coverage_role_shortages', '[]'), true) ?: [])->values()->all(),
+            ],
         ]);
     }
 
@@ -230,10 +556,37 @@ class ShiftController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:10000'],
-            'status' => ['nullable', 'in:draft,scheduled,in_progress,completed,cancelled'],
+            'status' => ['nullable', 'in:draft,scheduled'],
+            'shift_type' => ['nullable', 'in:standard,sleepover,on_call,split,travel'],
+            'is_sleepover' => ['nullable', 'boolean'],
+            'is_on_call' => ['nullable', 'boolean'],
+            'expected_break_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
+            'coverage_roles' => ['nullable', 'array'],
+            'coverage_roles.*' => ['string', 'in:caregiver,driver,med_competent'],
+            'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
+            'return_to' => ['nullable', 'string', 'max:2048'],
             'tasks' => ['sometimes', 'array', 'max:50'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
         ]);
+
+        $data = $this->normalizeShiftData($data);
+        $data['site_id'] = $this->resolveSiteIdForPayload($data);
+        $this->siteAccess()->assertCanAccessSiteId(
+            $auth,
+            $data['site_id'],
+            $this->shiftBypassPermissions(),
+            'You are not authorized to create shifts for that site.',
+        );
+        $this->assertCoverageClientMatchesContext(
+            (int) $data['client_id'],
+            $data['site_id'],
+            ! empty($data['coverage_rule_id']) ? (int) $data['coverage_rule_id'] : null,
+        );
+        $data['status'] = app(ShiftStateGuardService::class)->normalizePlanningStatus(
+            $data['status'] ?? null,
+            ! empty($data['user_id']),
+        );
 
         // Additional validation: shift duration cannot exceed 24 hours
         $startsAt = \Carbon\Carbon::parse($data['starts_at']);
@@ -251,45 +604,71 @@ class ShiftController extends Controller
                 $data['service_context_id'] ?? null
             );
 
-        // Conflict check: staff or client overlap
-        $conflicts = Shift::query()
-            ->where(function ($q) use ($data) {
-                if (!empty($data['user_id'])) {
-                    $q->where('user_id', $data['user_id']);
-                }
-                $q->orWhere('client_id', $data['client_id']);
-            })
-            ->where('starts_at', '<', $data['ends_at'])
-            ->where('ends_at', '>', $data['starts_at'])
-            ->exists();
+        $blockingConflicts = app(ShiftConflictService::class)->findBlockingStaffConflicts(
+            ! empty($data['user_id']) ? (int) $data['user_id'] : null,
+            $startsAt,
+            $endsAt,
+        );
 
-        if ($conflicts) {
+        if ($blockingConflicts->isNotEmpty()) {
             return back()->withErrors([
-                'starts_at' => 'Conflicting shift detected for this staff member or client during that time.',
+                'starts_at' => app(ShiftConflictService::class)->blockingMessage($blockingConflicts),
             ])->withInput();
         }
 
-        $shift = DB::transaction(function () use ($auth, $data) {
-            $shift = Shift::create([
-                ...\Illuminate\Support\Arr::except($data, ['tasks']),
-                'status' => $data['status'] ?? 'scheduled',
-                'created_by' => $auth->id,
-            ]);
+        $reservation = app(CoverageReservationService::class)->validateToken(
+            $data['coverage_reservation_token'] ?? null,
+            $auth,
+            [
+                'site_id' => $data['site_id'] ?? null,
+                'coverage_requirement_id' => $data['coverage_rule_id'] ?? null,
+                'window_starts_at' => $data['starts_at'] ?? null,
+                'window_ends_at' => $data['ends_at'] ?? null,
+            ],
+        );
 
-            $tasks = collect($data['tasks'] ?? [])
-                ->map(fn ($t, $i) => ['label' => (string) ($t['label'] ?? ''), 'sort_order' => $i])
-                ->filter(fn ($t) => trim($t['label']) !== '')
-                ->values();
+        if (! $reservation) {
+            $reservation = app(CoverageReservationService::class)->reserveForCoveragePayload($auth, $data, 'shift_store');
+        }
 
-            foreach ($tasks as $t) {
-                ShiftTask::create([
-                    'shift_id' => $shift->id,
-                    'label' => $t['label'],
-                    'sort_order' => $t['sort_order'],
+        try {
+            $shift = DB::transaction(function () use ($auth, $data, $reservation) {
+                $shift = Shift::create([
+                    ...\Illuminate\Support\Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']),
+                    'status' => $data['status'],
+                    'created_by' => $auth->id,
                 ]);
-            }
-            return $shift;
-        });
+
+                $tasks = collect($data['tasks'] ?? [])
+                    ->map(fn ($t, $i) => ['label' => (string) ($t['label'] ?? ''), 'sort_order' => $i])
+                    ->filter(fn ($t) => trim($t['label']) !== '')
+                    ->values();
+
+                foreach ($tasks as $t) {
+                    ShiftTask::create([
+                        'shift_id' => $shift->id,
+                        'label' => $t['label'],
+                        'sort_order' => $t['sort_order'],
+                    ]);
+                }
+
+                app(CoverageReservationService::class)->fulfill($reservation, $shift);
+                return $shift;
+            });
+        } catch (\Throwable $e) {
+            app(CoverageReservationService::class)->release($reservation);
+            throw $e;
+        }
+
+        $timeline = app(ShiftTimelineService::class);
+        $freshShift = $shift->fresh();
+        if ($freshShift?->status === 'in_progress') {
+            $timeline->recordStarted($freshShift, $auth, $freshShift->actual_starts_at ?? $freshShift->starts_at ?? now());
+        } elseif ($freshShift?->status === 'completed') {
+            $timeline->recordCompleted($freshShift, $auth, $freshShift->actual_ends_at ?? $freshShift->ends_at ?? now());
+        } elseif ($freshShift?->status === 'cancelled') {
+            $timeline->recordCancelled($freshShift, $auth);
+        }
 
         // Notify assigned staff only (open shifts have no assignee).
         // Wrapped in try-catch to prevent notification failures from breaking the request.
@@ -312,7 +691,7 @@ class ShiftController extends Controller
             }
         }
 
-        return redirect()->route('shifts.index')->with('success', 'Shift created.');
+        return redirect($data['return_to'] ?? route('shifts.index'))->with('success', 'Shift created.');
     }
 
     public function edit(Request $request, Shift $shift)
@@ -325,12 +704,22 @@ class ShiftController extends Controller
             abort(403);
         }
 
+        $this->assertCanAccessShift($auth, $shift);
+
         $shift->load(['client:id,first_name,last_name,service_context_id', 'staff:id,name,email', 'tasks', 'serviceContext:id,name,type,is_active']);
-        $clients = Client::query()
+        $clients = $this->siteAccess()->applyClientScope(
+            Client::query(),
+            $auth,
+            $this->shiftBypassPermissions(),
+        )
             ->with('site:id,name')
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']);
-        $staff = User::staff()->orderBy('name')->get(['id', 'name', 'email']);
+        $staff = $this->siteAccess()->applyStaffScope(
+            User::staff(),
+            $auth,
+            $this->shiftBypassPermissions(),
+        )->orderBy('name')->get(['id', 'name', 'email']);
 
         $serviceContexts = ServiceContext::query()
             ->orderBy('name')
@@ -349,14 +738,25 @@ class ShiftController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.update'), 403);
+        $originalStatus = $shift->status;
+        $notificationSnapshotBefore = [
+            'user_id' => $shift->user_id,
+            'starts_at' => $shift->starts_at?->toISOString(),
+            'ends_at' => $shift->ends_at?->toISOString(),
+            'location' => $shift->location,
+            'service_context_id' => $shift->service_context_id,
+            'status' => $shift->status,
+        ];
 
         if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
-        // Lock: once a shift is completed, treat it as immutable (auditable record).
-        if ($shift->status === 'completed') {
-            return back()->with('error', 'This shift has been completed and is now locked.');
+        $this->assertCanAccessShift($auth, $shift);
+
+        // Lock: completed and cancelled shifts are immutable workflow records.
+        if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+            return back()->with('error', 'This shift is locked and can no longer be edited.');
         }
 
         $data = $request->validate([
@@ -368,19 +768,71 @@ class ShiftController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:10000'],
-            'status' => ['nullable', 'in:draft,scheduled,in_progress,completed,cancelled'],
+            'status' => ['nullable', 'in:draft,scheduled'],
+            'shift_type' => ['nullable', 'in:standard,sleepover,on_call,split,travel'],
+            'is_sleepover' => ['nullable', 'boolean'],
+            'is_on_call' => ['nullable', 'boolean'],
+            'expected_break_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'coverage_rule_id' => ['nullable', 'integer', 'exists:site_coverage_requirements,id'],
+            'coverage_roles' => ['nullable', 'array'],
+            'coverage_roles.*' => ['string', 'in:caregiver,driver,med_competent'],
+            'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
+            'series_scope' => ['nullable', 'in:this,future'],
             'tasks' => ['sometimes', 'array', 'max:50'],
             'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
             'tasks.*.is_completed' => ['sometimes', 'boolean'],
         ]);
 
+        $data = $this->normalizeShiftData($data);
+        if (array_key_exists('client_id', $data) || empty($shift->site_id)) {
+            $data['site_id'] = $this->resolveSiteIdForPayload($data, $shift);
+        }
+        $this->siteAccess()->assertCanAccessSiteId(
+            $auth,
+            $data['site_id'] ?? $this->siteAccess()->shiftSiteId($shift),
+            $this->shiftBypassPermissions(),
+            'You are not authorized to update shifts for this site.',
+        );
+        $this->assertCoverageClientMatchesContext(
+            (int) ($data['client_id'] ?? $shift->client_id),
+            $data['site_id'] ?? $shift->site_id,
+            ! empty($data['coverage_rule_id']) ? (int) $data['coverage_rule_id'] : null,
+        );
+        app(ShiftStateGuardService::class)->assertEditableFromPlanning($shift, $data['status'] ?? null);
+        $seriesScope = $shift->shift_series_id && ($data['series_scope'] ?? 'this') === 'future'
+            ? 'future'
+            : 'this';
+        $originalUserId = $shift->user_id;
+
         // Additional validation: shift duration cannot exceed 24 hours
-        $startsAt = \Carbon\Carbon::parse($data['starts_at']);
-        $endsAt = \Carbon\Carbon::parse($data['ends_at']);
+        $startsAt = Carbon::parse($data['starts_at']);
+        $endsAt = Carbon::parse($data['ends_at']);
         if ($startsAt->diffInHours($endsAt) > 24) {
             return back()->withErrors([
                 'ends_at' => 'Shift duration cannot exceed 24 hours.',
+            ])->withInput();
+        }
+
+        if ($seriesScope === 'future' && ! $auth->canDo('shifts.manageAny')) {
+            return back()->withErrors([
+                'series_scope' => 'Only schedulers or managers can update future occurrences in a recurring series.',
+            ])->withInput();
+        }
+
+        if ($shift->status === 'in_progress' && array_key_exists('user_id', $data) && empty($data['user_id'])) {
+            return back()->withErrors([
+                'user_id' => 'In-progress shifts cannot be unassigned from planning edits. Use the replacement workflow instead.',
+            ])->withInput();
+        }
+
+        if (
+            $seriesScope === 'future'
+            && $shift->starts_at
+            && $startsAt->toDateString() !== $shift->starts_at->copy()->toDateString()
+        ) {
+            return back()->withErrors([
+                'starts_at' => 'Future recurring updates can change the time pattern, but not move this occurrence to a different date.',
             ])->withInput();
         }
 
@@ -391,71 +843,144 @@ class ShiftController extends Controller
                 $data['service_context_id'] ?? null
             );
 
-        // Conflict check: staff or client overlap (ignore self)
-        $conflicts = Shift::query()
-            ->where('id', '!=', $shift->id)
-            ->where(function ($q) use ($data) {
-                if (!empty($data['user_id'])) {
-                    $q->where('user_id', $data['user_id']);
-                }
-                $q->orWhere('client_id', $data['client_id']);
-            })
-            ->where('starts_at', '<', $data['ends_at'])
-            ->where('ends_at', '>', $data['starts_at'])
-            ->exists();
+        $resolvedHasAssignee = array_key_exists('user_id', $data)
+            ? ! empty($data['user_id'])
+            : ! empty($shift->user_id);
+        $resolvedCoverageRoles = array_key_exists('coverage_roles', $data)
+            ? array_values($data['coverage_roles'] ?? [])
+            : array_values($shift->coverage_roles ?? []);
 
-        if ($conflicts) {
-            return back()->withErrors([
-                'starts_at' => 'Conflicting shift detected for this staff member or client during that time.',
-            ])->withInput();
+        if (array_key_exists('status', $data)) {
+            $data['status'] = app(ShiftStateGuardService::class)->normalizePlanningStatus(
+                $data['status'],
+                $resolvedHasAssignee,
+            );
+        } elseif (array_key_exists('user_id', $data)) {
+            $data['status'] = $resolvedHasAssignee
+                ? ($shift->status === 'draft' ? 'scheduled' : $shift->status)
+                : 'draft';
         }
 
-        DB::transaction(function () use ($auth, $shift, $data) {
-            $shift->update(\Illuminate\Support\Arr::except($data, ['tasks']));
+        $reservationContext = [
+            ...$data,
+            'site_id' => $data['site_id'] ?? $shift->site_id,
+            'starts_at' => $data['starts_at'] ?? $shift->starts_at?->toIso8601String(),
+            'ends_at' => $data['ends_at'] ?? $shift->ends_at?->toIso8601String(),
+            'coverage_roles' => $resolvedCoverageRoles,
+        ];
+        $reservation = app(CoverageReservationService::class)->validateToken(
+            $data['coverage_reservation_token'] ?? null,
+            $auth,
+            [
+                'site_id' => $reservationContext['site_id'] ?? null,
+                'coverage_requirement_id' => $data['coverage_rule_id'] ?? null,
+                'window_starts_at' => $reservationContext['starts_at'] ?? null,
+                'window_ends_at' => $reservationContext['ends_at'] ?? null,
+            ],
+        );
 
-            if (array_key_exists('tasks', $data)) {
-                // Replace tasks list (keep completion state if matching by id)
-                $existing = $shift->tasks()->get()->keyBy('id');
-                $incoming = collect($data['tasks'] ?? [])
-                    ->map(fn ($t, $i) => [
-                        'id' => $t['id'] ?? null,
-                        'label' => (string) ($t['label'] ?? ''),
-                        'sort_order' => $i,
-                    ])
-                    ->filter(fn ($t) => trim($t['label']) !== '')
-                    ->values();
+        if (! $reservation && (
+            array_key_exists('user_id', $data)
+            || array_key_exists('starts_at', $data)
+            || array_key_exists('ends_at', $data)
+            || array_key_exists('client_id', $data)
+            || array_key_exists('coverage_roles', $data)
+        )) {
+            $reservation = app(CoverageReservationService::class)->reserveForCoveragePayload($auth, $reservationContext, 'shift_update');
+        }
 
-                // Delete removed
-                $keepIds = $incoming->pluck('id')->filter()->all();
-                $shift->tasks()->whereNotIn('id', $keepIds)->delete();
-
-                foreach ($incoming as $t) {
-                    if ($t['id'] && $existing->has($t['id'])) {
-                        $existing[$t['id']]->update([
-                            'label' => $t['label'],
-                            'sort_order' => $t['sort_order'],
-                        ]);
-                    } else {
-                        ShiftTask::create([
-                            'shift_id' => $shift->id,
-                            'label' => $t['label'],
-                            'sort_order' => $t['sort_order'],
-                        ]);
-                    }
-                }
+        if ($seriesScope === 'future') {
+            if ($shift->status === 'in_progress') {
+                return back()->withErrors([
+                    'series_scope' => 'Future updates cannot start from an in-progress occurrence. Open a later occurrence in the series instead.',
+                ])->withInput();
             }
-        });
+
+            try {
+                $this->applyFutureSeriesUpdate($shift, $data);
+                app(CoverageReservationService::class)->fulfill($reservation, $shift->fresh());
+            } catch (\Throwable $e) {
+                app(CoverageReservationService::class)->release($reservation);
+                throw $e;
+            }
+        } else {
+            $conflicts = $this->shiftHasConflict(
+                ! empty($data['user_id']) ? (int) $data['user_id'] : null,
+                (int) $data['client_id'],
+                $startsAt,
+                $endsAt,
+                $shift->id,
+            );
+
+            if ($conflicts) {
+                return back()->withErrors([
+                    'starts_at' => 'This staff member already has another shift during that time.',
+                ])->withInput();
+            }
+
+            try {
+                DB::transaction(function () use ($shift, $data, $reservation) {
+                    $lockedShift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
+                    $lockedShift->update(Arr::except($data, ['tasks', 'series_scope', 'coverage_reservation_token', 'coverage_rule_id']));
+
+                    if (array_key_exists('tasks', $data)) {
+                        $this->syncShiftTasks($lockedShift, $data['tasks'] ?? []);
+                    }
+
+                    app(CoverageReservationService::class)->fulfill($reservation, $lockedShift);
+                });
+            } catch (\Throwable $e) {
+                app(CoverageReservationService::class)->release($reservation);
+                throw $e;
+            }
+        }
+
+        $freshShift = $shift->fresh();
+        if ($freshShift) {
+            $timeline = app(ShiftTimelineService::class);
+
+            if ($originalStatus !== 'in_progress' && $freshShift->status === 'in_progress') {
+                $timeline->recordStarted($freshShift, $auth, $freshShift->actual_starts_at ?? $freshShift->starts_at ?? now());
+            }
+
+            if ($originalStatus !== 'completed' && $freshShift->status === 'completed') {
+                $timeline->recordCompleted($freshShift, $auth, $freshShift->actual_ends_at ?? $freshShift->ends_at ?? now());
+            }
+
+            if ($originalStatus !== 'cancelled' && $freshShift->status === 'cancelled') {
+                $timeline->recordCancelled($freshShift, $auth);
+            }
+
+            if (
+                $freshShift->user_id
+                && $originalUserId
+                && (int) $freshShift->user_id !== (int) $originalUserId
+            ) {
+                app(ShiftReplacementService::class)->resolveFromManualAssignment($freshShift, (int) $freshShift->user_id, $auth);
+            }
+        }
 
         // Notify assigned staff - wrapped in try-catch to prevent failures from breaking the request
+        $shouldNotifyUpdate = $freshShift && [
+            'user_id' => $freshShift->user_id,
+            'starts_at' => $freshShift->starts_at?->toISOString(),
+            'ends_at' => $freshShift->ends_at?->toISOString(),
+            'location' => $freshShift->location,
+            'service_context_id' => $freshShift->service_context_id,
+            'status' => $freshShift->status,
+        ] !== $notificationSnapshotBefore;
+
         try {
             $client = Client::query()->find($shift->client_id);
             $targetUserIds = $shift->user_id ? [$shift->user_id] : [];
-            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'shift', $shift, $client, [
-                'title' => 'Shift updated',
-                'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
-                'url' => url("/shifts/{$shift->id}"),
-                'target_user_ids' => $targetUserIds,
-            ]);
+            if ($shouldNotifyUpdate) {
+                app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'shift', $shift, $client, [
+                    'title' => 'Shift updated',
+                    'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
+                    'url' => url("/shifts/{$shift->id}"),
+                    'target_user_ids' => $targetUserIds,
+                ]);
+            }
         } catch (\Throwable $e) {
             Log::warning('Failed to send shift update notification', [
                 'shift_id' => $shift->id,
@@ -463,7 +988,10 @@ class ShiftController extends Controller
             ]);
         }
 
-        return redirect()->route('shifts.index')->with('success', 'Shift updated.');
+        return redirect()->route('shifts.index')->with(
+            'success',
+            $seriesScope === 'future' ? 'Recurring shift series updated.' : 'Shift updated.',
+        );
     }
 
 
@@ -471,13 +999,18 @@ class ShiftController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.update'), 403);
+        $this->assertCanAccessShift($auth, $shift);
 
         if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
-        if (!in_array($shift->status, ['scheduled', 'draft'], true)) {
+        if ($shift->status !== 'scheduled') {
             return back()->withErrors(['status' => 'Only scheduled shifts can be started.']);
+        }
+
+        if (! $shift->user_id) {
+            return back()->withErrors(['status' => 'Only assigned shifts can be started. Assign a staff member before starting the shift.']);
         }
 
         $shift->update([
@@ -486,6 +1019,11 @@ class ShiftController extends Controller
             'started_by' => $shift->started_by ?? $auth->id,
         ]);
 
+        $startedShift = $shift->fresh();
+        if ($startedShift) {
+            app(ShiftTimelineService::class)->recordStarted($startedShift, $auth, $startedShift->actual_starts_at ?? now());
+        }
+
         return back()->with('success', 'Shift started.');
     }
 
@@ -493,13 +1031,20 @@ class ShiftController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.update'), 403);
+        $this->assertCanAccessShift($auth, $shift);
 
         if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
-        if (!in_array($shift->status, ['scheduled', 'in_progress'], true)) {
-            return back()->withErrors(['status' => 'Only scheduled or in-progress shifts can be completed.']);
+        if ($shift->status === 'completed') {
+            return back()->with('success', 'Shift already completed.');
+        }
+
+        if ($shift->status !== 'in_progress') {
+            throw ValidationException::withMessages([
+                'status' => 'Only in-progress shifts can be completed. Start the shift first.',
+            ]);
         }
 
         $data = $request->validate([
@@ -509,10 +1054,49 @@ class ShiftController extends Controller
             'allow_incomplete_tasks' => ['nullable', 'boolean'],
             'incomplete_tasks_reason' => ['nullable', 'string', 'max:2000'],
             'create_timesheet' => ['nullable', 'boolean'],
+            'handover_waiver_reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $shift->loadMissing(['tasks', 'client']);
+        $shift->loadMissing([
+            'tasks',
+            'client',
+            'staff:id,name',
+            'site:id,name',
+            'serviceContext:id,name,type',
+            'attendanceSessions:id,user_id,shift_id,clock_in_at,clock_out_at,break_minutes,status',
+        ]);
+        $attendanceSessions = $shift->attendanceSessions
+            ->when($shift->user_id, fn ($collection) => $collection->where('user_id', $shift->user_id))
+            ->values();
+        $openAttendanceSession = $attendanceSessions->first(
+            fn (HrAttendanceSession $session) => $session->status === 'open' || ! $session->clock_out_at
+        );
+        $actualStartAt = $shift->actual_starts_at
+            ?: $attendanceSessions
+                ->whereNotNull('clock_in_at')
+                ->sortBy('clock_in_at')
+                ->first()?->clock_in_at;
         $incompleteTasks = $shift->tasks->where('is_completed', false)->values();
+        $handoverRequirement = app(ShiftHandoverService::class)->completionRequirement($shift);
+        $handoverWaiverReason = trim((string) ($data['handover_waiver_reason'] ?? ''));
+
+        if ($openAttendanceSession) {
+            throw ValidationException::withMessages([
+                'status' => 'This shift has an open attendance session. Clock out before completing the shift.',
+            ]);
+        }
+
+        if (! $actualStartAt) {
+            throw ValidationException::withMessages([
+                'status' => 'This shift has no actual start evidence. Start the shift or record attendance before completing it.',
+            ]);
+        }
+
+        $actualEndAt = $attendanceSessions
+            ->whereNotNull('clock_out_at')
+            ->sortByDesc('clock_out_at')
+            ->first()?->clock_out_at
+            ?? now();
 
         // Enforce: a shift must have at least one progress/shift note OR a completion summary.
         $existingNoteCount = \App\Models\ClientNote::query()
@@ -522,39 +1106,71 @@ class ShiftController extends Controller
 
         $finalBody = trim((string)($data['final_note_body'] ?? ''));
         if ($finalBody === '' && $existingNoteCount === 0) {
-            return back()->withErrors([
+            throw ValidationException::withMessages([
                 'final_note_body' => 'Add at least one progress note during the shift or provide a shift summary note to complete the shift.',
             ]);
         }
 
         $allowIncomplete = (bool)($data['allow_incomplete_tasks'] ?? false);
         if ($incompleteTasks->count() > 0 && !$allowIncomplete) {
-            return back()->withErrors([
+            throw ValidationException::withMessages([
                 'allow_incomplete_tasks' => 'This shift still has incomplete tasks. Complete all tasks or allow completion with a reason.',
             ]);
         }
         if ($incompleteTasks->count() > 0 && $allowIncomplete && empty(trim((string)($data['incomplete_tasks_reason'] ?? '')))) {
-            return back()->withErrors([
+            throw ValidationException::withMessages([
                 'incomplete_tasks_reason' => 'Please provide a reason for completing with incomplete tasks.',
             ]);
         }
+        if (($handoverRequirement['requires_handover'] ?? false)
+            && ! $handoverRequirement['matched_handover']
+            && $handoverWaiverReason === '') {
+            throw ValidationException::withMessages([
+                'handover_waiver_reason' => $handoverRequirement['reason'],
+            ]);
+        }
 
-        DB::transaction(function () use ($auth, $shift, $data, $incompleteTasks, $allowIncomplete, $finalBody) {
+        DB::transaction(function () use ($auth, $shift, $data, $incompleteTasks, $allowIncomplete, $finalBody, $handoverRequirement, $handoverWaiverReason, $actualStartAt, $actualEndAt) {
             $now = now();
+            $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
+
+            if ($shift->status === 'completed') {
+                return;
+            }
+
+            if ($shift->status !== 'in_progress') {
+                throw ValidationException::withMessages([
+                    'status' => 'Only in-progress shifts can be completed. Start the shift first.',
+                ]);
+            }
 
             $shift->update([
                 'status' => 'completed',
-                'actual_starts_at' => $shift->actual_starts_at ?? $now,
-                'actual_ends_at' => $now,
+                'actual_starts_at' => $actualStartAt,
+                'actual_ends_at' => $actualEndAt,
                 'started_by' => $shift->started_by ?? $auth->id,
                 'completed_by' => $auth->id,
+                'handover_waiver_reason' => null,
+                'handover_waived_at' => null,
+                'handover_waived_by' => null,
             ]);
+
+            if (($handoverRequirement['requires_handover'] ?? false)
+                && ! $handoverRequirement['matched_handover']
+                && $handoverWaiverReason !== '') {
+                app(ShiftHandoverService::class)->recordCompletionWaiver(
+                    $shift->fresh() ?? $shift,
+                    $auth,
+                    $handoverWaiverReason,
+                    $handoverRequirement,
+                );
+            }
 
             // Create a shift summary note (auditable via ClientNote + TimelineEvent)
             $subject = trim((string)($data['final_note_subject'] ?? 'Shift summary'));
             $body = $finalBody !== ''
                 ? $finalBody
-                : 'Shift completed — see shift notes for details.';
+                : 'Shift completed - see shift notes for details.';
 
             $note = \App\Models\ClientNote::create([
                 'client_id' => $shift->client_id,
@@ -568,65 +1184,215 @@ class ShiftController extends Controller
                 'is_pinned' => false,
             ]);
 
-            \App\Models\TimelineEvent::create([
-                'source_type' => \App\Models\ClientNote::class,
-                'source_id' => $note->id,
-                'occurred_at' => $now,
-                'type' => 'shift_note',
-                'actor_user_id' => $auth->id,
-                'client_id' => $shift->client_id,
-                'shift_id' => $shift->id,
-                'site_id' => $shift->client?->site_id,
-                'subject' => $subject,
-                'body' => $body,
-                'meta' => array_filter([
-                    'completed_with_incomplete_tasks' => $incompleteTasks->count() > 0 ? true : null,
-                    'incomplete_tasks_reason' => $allowIncomplete ? (string)($data['incomplete_tasks_reason'] ?? null) : null,
-                    'incomplete_task_count' => $incompleteTasks->count() ?: null,
-                ]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $auth->id,
-            ]);
+            \App\Models\TimelineEvent::query()->updateOrCreate(
+                [
+                    'type' => 'shift_note',
+                    'source_type' => \App\Models\ClientNote::class,
+                    'source_id' => $note->id,
+                ],
+                [
+                    'occurred_at' => $now,
+                    'actor_user_id' => $auth->id,
+                    'client_id' => $shift->client_id,
+                    'shift_id' => $shift->id,
+                    'site_id' => $shift->client?->site_id,
+                    'subject' => $subject,
+                    'body' => $body,
+                    'meta' => array_filter([
+                        'note_id' => $note->id,
+                        'completed_with_incomplete_tasks' => $incompleteTasks->count() > 0 ? true : null,
+                        'incomplete_tasks_reason' => $allowIncomplete ? (string)($data['incomplete_tasks_reason'] ?? null) : null,
+                        'incomplete_task_count' => $incompleteTasks->count() ?: null,
+                        'handover_waiver_reason' => $handoverWaiverReason !== '' ? $handoverWaiverReason : null,
+                    ]),
+                    'visibility' => 'internal',
+                    'is_pinned' => false,
+                    'created_by' => $auth->id,
+                ]
+            );
 
             // Auto-create timesheet (optional)
             $wantTimesheet = (bool)($data['create_timesheet'] ?? true);
-            if ($wantTimesheet && $auth->canDo('timesheets.create')) {
-                $exists = \App\Models\Timesheet::query()->where('shift_id', $shift->id)->exists();
-                if (!$exists) {
-                    $startsAt = $shift->actual_starts_at ?? $shift->starts_at ?? $now;
-                    $endsAt = $shift->actual_ends_at ?? $shift->ends_at ?? $now;
-                    \App\Models\Timesheet::create([
-                        'user_id' => $shift->user_id,
-                        'client_id' => $shift->client_id,
-                        'shift_id' => $shift->id,
-                        'work_date' => $startsAt->toDateString(),
-                        'starts_at' => $startsAt,
-                        'ends_at' => $endsAt,
-                        'break_minutes' => 0,
-                        'notes' => null,
-                        'status' => 'draft',
-                        'created_by' => $auth->id,
-                    ]);
-                }
+            if ($wantTimesheet) {
+                $this->syncDraftTimesheetFromShift($shift->fresh(), $auth->id);
             }
         });
 
+        $completedShift = $shift->fresh();
+        if ($completedShift) {
+            app(ShiftTimelineService::class)->recordCompleted(
+                $completedShift,
+                $auth,
+                $completedShift->actual_ends_at ?? now(),
+                [
+                    'completed_with_incomplete_tasks' => $incompleteTasks->count() > 0 ? true : null,
+                    'incomplete_tasks_reason' => $allowIncomplete ? (string) ($data['incomplete_tasks_reason'] ?? null) : null,
+                    'incomplete_task_count' => $incompleteTasks->count() ?: null,
+                    'handover_required' => ($handoverRequirement['requires_handover'] ?? false) ? true : null,
+                    'handover_id' => $handoverRequirement['matched_handover']?->id,
+                    'handover_waiver_reason' => $handoverWaiverReason !== '' ? $handoverWaiverReason : null,
+                ]
+            );
+        }
+
         return back()->with('success', 'Shift completed.');
+    }
+
+    public function cancelOccurrence(Request $request, Shift $shift, ShiftCancellationService $cancellationService)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        $result = $cancellationService->cancel($shift, $auth);
+
+        if ($result['already_cancelled']) {
+            return back()->with('success', 'Shift is already cancelled.');
+        }
+
+        return back()->with('success', 'Shift occurrence cancelled.');
+    }
+
+    public function reopenOccurrence(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+
+        if ($shift->status !== 'cancelled') {
+            return back()->with('error', 'Only cancelled occurrences can be reopened.');
+        }
+
+        $shift->update([
+            'status' => app(ShiftStateGuardService::class)->normalizePlanningStatus(
+                $shift->user_id ? 'scheduled' : 'draft',
+                ! empty($shift->user_id),
+            ),
+            'actual_starts_at' => null,
+            'actual_ends_at' => null,
+        ]);
+
+        TimelineEvent::query()
+            ->where('type', ShiftTimelineService::CANCELLED_EVENT_TYPE)
+            ->where('source_type', Shift::class)
+            ->where('source_id', $shift->id)
+            ->delete();
+
+        $freshShift = $shift->fresh();
+        if ($freshShift) {
+            app(ShiftTimelineService::class)->syncSnapshot($freshShift);
+        }
+
+        return back()->with('success', 'Shift occurrence reopened.');
+    }
+
+    protected function syncDraftTimesheetFromShift(Shift $shift, int $actorId): void
+    {
+        if (! $shift->user_id || ! $shift->client_id) {
+            return;
+        }
+
+        $shift->loadMissing([
+            'attendanceSessions:id,user_id,shift_id,clock_in_at,clock_out_at,break_minutes,status',
+            'client:id,first_name,last_name,site_id',
+            'client.site:id,name',
+            'site:id,name',
+            'serviceContext:id,name',
+            'staff:id,name',
+        ]);
+
+        $startsAt = $shift->actual_starts_at ?? $shift->starts_at;
+        $endsAt = $shift->actual_ends_at ?? $shift->ends_at;
+
+        if (! $startsAt || ! $endsAt) {
+            return;
+        }
+
+        $matchingAttendanceSessions = $shift->attendanceSessions
+            ->where('user_id', $shift->user_id)
+            ->values();
+        $uniqueAttendanceSession = $matchingAttendanceSessions->count() === 1
+            ? $matchingAttendanceSessions->first()
+            : null;
+
+        $timesheet = Timesheet::query()->firstOrNew([
+            'shift_id' => $shift->id,
+            'user_id' => $shift->user_id,
+        ]);
+
+        if ($timesheet->exists && ! in_array($timesheet->status, ['draft', 'returned'], true)) {
+            return;
+        }
+
+        $snapshot = app(ShiftOperationalSnapshotService::class)->snapshotForShift($shift, $shift->staff);
+
+        $timesheet->fill([
+            'user_id' => $shift->user_id,
+            'client_id' => $shift->client_id,
+            'shift_site_id' => $snapshot['site_id'] ?? $timesheet->shift_site_id,
+            'shift_service_context_id' => $snapshot['service_context_id'] ?? $timesheet->shift_service_context_id,
+            'attendance_session_id' => $timesheet->attendance_session_id ?: $uniqueAttendanceSession?->id,
+            'work_date' => $startsAt->toDateString(),
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'break_minutes' => (int) ($shift->expected_break_minutes ?? $timesheet->break_minutes ?? 0),
+            'sleepover' => (bool) $shift->is_sleepover,
+            'on_call' => (bool) $shift->is_on_call,
+            'shift_site_name_snapshot' => $snapshot['site_name'] ?? $timesheet->shift_site_name_snapshot,
+            'shift_location_snapshot' => $snapshot['location'] ?? $timesheet->shift_location_snapshot,
+            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? $timesheet->service_context_name_snapshot,
+            'client_name_snapshot' => $snapshot['client_name'] ?? $timesheet->client_name_snapshot,
+            'staff_name_snapshot' => $snapshot['staff_name'] ?? $timesheet->staff_name_snapshot,
+            'shift_type_snapshot' => $snapshot['shift_type'] ?? $timesheet->shift_type_snapshot ?? 'standard',
+            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $timesheet->coverage_roles_snapshot ?? [],
+            'status' => 'draft',
+        ]);
+
+        if (! $timesheet->exists) {
+            $timesheet->created_by = $actorId;
+        }
+
+        $timesheet->save();
+
+        app(TimesheetReconciliationService::class)->reconcile($timesheet, $uniqueAttendanceSession);
+    }
+
+    protected function normalizeShiftData(array $data): array
+    {
+        $data['shift_type'] = $data['shift_type'] ?? 'standard';
+        $data['is_sleepover'] = (bool) ($data['is_sleepover'] ?? false);
+        $data['is_on_call'] = (bool) ($data['is_on_call'] ?? false);
+
+        if ($data['shift_type'] === 'sleepover') {
+            $data['is_sleepover'] = true;
+        }
+
+        if ($data['shift_type'] === 'on_call') {
+            $data['is_on_call'] = true;
+        }
+
+        $data['expected_break_minutes'] = array_key_exists('expected_break_minutes', $data)
+            && $data['expected_break_minutes'] !== null
+            && $data['expected_break_minutes'] !== ''
+            ? (int) $data['expected_break_minutes']
+            : null;
+
+        return $data;
     }
 
     public function assign(Request $request, Shift $shift)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
 
         // Lock: once completed, immutable.
-        if ($shift->status === 'completed') {
-            return back()->with('error', 'This shift has been completed and is now locked.');
+        if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+            return back()->with('error', 'This shift is locked and can no longer be reassigned.');
         }
 
         $data = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
+            'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
             'return_to' => ['nullable', 'string'],
         ]);
 
@@ -636,39 +1402,48 @@ class ShiftController extends Controller
         // HR Compliance check: block assignment if hard-stop failures exist
         try {
             $assignee = User::findOrFail($data['user_id']);
-            $compliance = app(ComplianceMatrixService::class)->canAssignToShift($assignee, $shift);
+            $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($shift, $assignee);
 
-            if ($compliance['blocked']) {
-                $failureNames = collect($compliance['failures'])->pluck('requirement')->implode(', ');
+            if (! $eligibility['is_eligible']) {
                 return back()->withErrors([
-                    'user_id' => "Cannot assign: staff member has compliance failures ({$failureNames}).",
-                ])->with('compliance_warnings', $compliance['warnings']);
+                    'user_id' => $eligibility['blocked_reasons'][0] ?? 'This staff member cannot be assigned to the shift.',
+                ])->with('compliance_warnings', $eligibility['compliance_warnings'] ?? []);
             }
 
-            // Pass warnings through to the session for UI display
-            if (!empty($compliance['warnings'])) {
-                session()->flash('compliance_warnings', $compliance['warnings']);
+            if (! empty($eligibility['warning_reasons'])) {
+                session()->flash('assignment_warnings', $eligibility['warning_reasons']);
             }
         } catch (\Throwable $e) {
             // Don't block assignment if compliance service fails
             Log::warning('Compliance check failed during shift assignment', ['error' => $e->getMessage()]);
         }
 
-        // Check staff overlap conflicts
-        $conflicts = Shift::query()
-            ->where('id', '!=', $shift->id)
-            ->where('user_id', $data['user_id'])
-            ->where('starts_at', '<', $shift->ends_at)
-            ->where('ends_at', '>', $shift->starts_at)
-            ->exists();
+        $reservation = app(CoverageReservationService::class)->reserveForAssignment($shift, $auth, 'assignment');
+        $originalUserId = $shift->user_id;
+        try {
+            DB::transaction(function () use ($shift, $data, $reservation) {
+                $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
+                if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'user_id' => 'This shift was changed by another scheduler and can no longer be assigned.',
+                    ]);
+                }
 
-        if ($conflicts) {
-            return back()->withErrors([
-                'user_id' => 'Conflicting shift detected for this staff member during that time.',
-            ]);
+                $shift->update([
+                    'user_id' => $data['user_id'],
+                    'status' => $shift->status === 'draft' ? 'scheduled' : $shift->status,
+                ]);
+
+                app(CoverageReservationService::class)->fulfill($reservation, $shift);
+            });
+        } catch (\Throwable $e) {
+            app(CoverageReservationService::class)->release($reservation);
+            throw $e;
         }
 
-        $shift->update(['user_id' => $data['user_id']]);
+        if ($originalUserId && (int) $originalUserId !== (int) $data['user_id']) {
+            app(ShiftReplacementService::class)->resolveFromManualAssignment($shift->fresh(), (int) $data['user_id'], $auth);
+        }
 
         return redirect($data['return_to'] ?? url('/rostering'))->with('success', 'Shift assigned.');
     }
@@ -677,14 +1452,368 @@ class ShiftController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
 
-        if ($shift->status === 'completed') {
-            return back()->with('error', 'This shift has been completed and is now locked.');
+        if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+            return back()->with('error', 'This shift is locked and can no longer be unassigned.');
+        }
+
+        if ($shift->status === 'in_progress') {
+            return back()->with('error', 'In-progress shifts cannot be unassigned. Use the replacement workflow instead.');
         }
 
         $returnTo = $request->input('return_to') ?: url('/rostering');
-        $shift->update(['user_id' => null]);
+        app(CoverageReservationService::class)->releaseForShift($shift);
+        $shift->update([
+            'user_id' => null,
+            'status' => 'draft',
+        ]);
 
         return redirect($returnTo)->with('success', 'Shift unassigned.');
+    }
+
+    public function requestReplacement(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $this->canRequestReplacement($auth, $shift), 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'required_skills' => ['nullable', 'array'],
+            'required_skills.*' => ['string', 'max:100'],
+            'publish_to_job_board' => ['nullable', 'boolean'],
+            'expires_at' => ['nullable', 'date', 'after:now'],
+        ]);
+
+        app(ShiftReplacementService::class)->request($shift, $auth, $data);
+
+        return back()->with('success', 'Replacement request created.');
+    }
+
+    public function cancelReplacement(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        $replacement = $shift->replacementRequests()
+            ->active()
+            ->latest('requested_at')
+            ->firstOrFail();
+
+        abort_unless($this->canCancelReplacement($auth, $replacement), 403);
+
+        app(ShiftReplacementService::class)->cancel($replacement, $auth);
+
+        return back()->with('success', 'Replacement request cancelled.');
+    }
+
+    protected function canRequestReplacement(?User $auth, Shift $shift): bool
+    {
+        if (! $auth) {
+            return false;
+        }
+
+        if ($auth->canDo('shifts.manageAny')) {
+            return true;
+        }
+
+        return $auth->canDo('shifts.update') && (int) $shift->user_id === (int) $auth->id;
+    }
+
+    protected function canCancelReplacement(?User $auth, ShiftReplacementRequest $replacement): bool
+    {
+        if (! $auth) {
+            return false;
+        }
+
+        if ($auth->canDo('shifts.manageAny')) {
+            return true;
+        }
+
+        if (! $auth->canDo('shifts.update')) {
+            return false;
+        }
+
+        return in_array((int) $auth->id, [
+            (int) $replacement->requested_by,
+            (int) $replacement->current_staff_id,
+        ], true);
+    }
+
+    protected function applyFutureSeriesUpdate(Shift $shift, array $data): void
+    {
+        $editedStart = Carbon::parse($data['starts_at']);
+        $editedEnd = Carbon::parse($data['ends_at']);
+
+        $futureShifts = Shift::query()
+            ->with('tasks')
+            ->where('shift_series_id', $shift->shift_series_id)
+            ->where('starts_at', '>=', $shift->starts_at)
+            ->whereNotIn('status', ['in_progress', 'completed', 'cancelled'])
+            ->orderBy('starts_at')
+            ->get();
+
+        $conflictDates = [];
+        foreach ($futureShifts as $futureShift) {
+            [$targetStart, $targetEnd] = $futureShift->id === $shift->id
+                ? [$editedStart->copy(), $editedEnd->copy()]
+                : $this->buildSeriesWindowForShift($futureShift, $editedStart, $editedEnd);
+
+            if ($this->shiftHasConflict(
+                ! empty($data['user_id']) ? (int) $data['user_id'] : null,
+                (int) $data['client_id'],
+                $targetStart,
+                $targetEnd,
+                $futureShift->id,
+            )) {
+                $conflictDates[] = $targetStart->format('D j M g:i A');
+            }
+        }
+
+        $futureWindows = $futureShifts
+            ->map(function (Shift $futureShift) use ($shift, $editedStart, $editedEnd) {
+                [$targetStart, $targetEnd] = $futureShift->id === $shift->id
+                    ? [$editedStart->copy(), $editedEnd->copy()]
+                    : $this->buildSeriesWindowForShift($futureShift, $editedStart, $editedEnd);
+
+                return [
+                    'starts_at' => $targetStart,
+                    'ends_at' => $targetEnd,
+                ];
+            })
+            ->values()
+            ->all();
+
+        if ($this->hasOverlappingFutureSeriesWindows($futureWindows)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'series_scope' => 'Updating future occurrences would make this recurring pattern overlap itself. Adjust the time pattern first.',
+            ]);
+        }
+
+        if ($conflictDates !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'series_scope' => 'Updating future occurrences would create conflicts on: '.collect($conflictDates)->take(4)->implode(', ').(count($conflictDates) > 4 ? '...' : ''),
+            ]);
+        }
+
+        DB::transaction(function () use ($shift, $data, $editedStart, $editedEnd, $futureShifts) {
+            $series = $shift->series()->first();
+            if ($series) {
+                $series->update(array_merge(
+                    Arr::only($data, [
+                        'client_id',
+                        'site_id',
+                        'service_context_id',
+                        'user_id',
+                        'location',
+                        'notes',
+                        'status',
+                        'shift_type',
+                        'is_sleepover',
+                        'is_on_call',
+                        'expected_break_minutes',
+                        'coverage_roles',
+                    ]),
+                    [
+                        'starts_time' => $editedStart->format('H:i'),
+                        'ends_time' => $editedEnd->format('H:i'),
+                    ],
+                ));
+            }
+
+            foreach ($futureShifts as $futureShift) {
+                [$targetStart, $targetEnd] = $futureShift->id === $shift->id
+                    ? [$editedStart->copy(), $editedEnd->copy()]
+                    : $this->buildSeriesWindowForShift($futureShift, $editedStart, $editedEnd);
+
+                $futureShift->update(array_merge(
+                    Arr::except($data, ['tasks', 'series_scope', 'coverage_reservation_token', 'coverage_rule_id']),
+                    [
+                        'site_id' => $this->resolveSiteIdForPayload($data, $futureShift),
+                        'starts_at' => $targetStart,
+                        'ends_at' => $targetEnd,
+                    ],
+                ));
+
+                if (array_key_exists('tasks', $data)) {
+                    $this->syncShiftTasks($futureShift, $data['tasks'] ?? []);
+                }
+            }
+        });
+    }
+
+    protected function buildSeriesWindowForShift(Shift $shift, Carbon $editedStart, Carbon $editedEnd): array
+    {
+        $durationMinutes = $editedStart->diffInMinutes($editedEnd);
+        $targetStart = $shift->starts_at
+            ? $shift->starts_at->copy()->setTime(
+                (int) $editedStart->format('H'),
+                (int) $editedStart->format('i'),
+                0,
+            )
+            : $editedStart->copy();
+
+        return [
+            $targetStart,
+            $targetStart->copy()->addMinutes($durationMinutes),
+        ];
+    }
+
+    /**
+     * @param array<int, array{starts_at: Carbon, ends_at: Carbon}> $windows
+     */
+    protected function hasOverlappingFutureSeriesWindows(array $windows): bool
+    {
+        $sorted = collect($windows)
+            ->sortBy(fn (array $window) => $window['starts_at']->getTimestamp())
+            ->values();
+
+        for ($index = 1; $index < $sorted->count(); $index++) {
+            $previous = $sorted[$index - 1];
+            $current = $sorted[$index];
+
+            if ($previous['ends_at']->gt($current['starts_at'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function shiftHasConflict(?int $userId, int $clientId, Carbon $startsAt, Carbon $endsAt, ?int $ignoreShiftId = null): bool
+    {
+        return app(ShiftConflictService::class)
+            ->findBlockingStaffConflicts($userId, $startsAt, $endsAt, $ignoreShiftId)
+            ->isNotEmpty();
+    }
+
+    protected function syncShiftTasks(Shift $shift, array $tasks): void
+    {
+        $existing = $shift->tasks()->get()->keyBy('id');
+        $incoming = collect($tasks)
+            ->map(fn ($task, $index) => [
+                'id' => $task['id'] ?? null,
+                'label' => (string) ($task['label'] ?? ''),
+                'sort_order' => $index,
+            ])
+            ->filter(fn ($task) => trim($task['label']) !== '')
+            ->values();
+
+        $keepIds = $incoming->pluck('id')->filter()->all();
+        if ($keepIds === []) {
+            $shift->tasks()->delete();
+        } else {
+            $shift->tasks()->whereNotIn('id', $keepIds)->delete();
+        }
+
+        foreach ($incoming as $task) {
+            if ($task['id'] && $existing->has($task['id'])) {
+                $existing[$task['id']]->update([
+                    'label' => $task['label'],
+                    'sort_order' => $task['sort_order'],
+                ]);
+
+                continue;
+            }
+
+            ShiftTask::create([
+                'shift_id' => $shift->id,
+                'label' => $task['label'],
+                'sort_order' => $task['sort_order'],
+            ]);
+        }
+    }
+
+    protected function resolveSiteIdForPayload(array $data, ?Shift $existingShift = null): ?int
+    {
+        $clientId = $data['client_id'] ?? $existingShift?->client_id;
+        if (! $clientId) {
+            return $existingShift?->site_id;
+        }
+
+        return Client::query()->whereKey($clientId)->value('site_id');
+    }
+
+    protected function assertCoverageClientMatchesContext(int $clientId, ?int $siteId, ?int $coverageRuleId = null): void
+    {
+        $clientSiteId = Client::query()->whereKey($clientId)->value('site_id');
+
+        if ($siteId && (int) $clientSiteId !== (int) $siteId) {
+            abort(422, 'The selected planning client does not belong to the site coverage window you are filling.');
+        }
+
+        if ($coverageRuleId) {
+            $ruleSiteId = \App\Models\SiteCoverageRequirement::query()
+                ->whereKey($coverageRuleId)
+                ->value('site_id');
+
+            if ($ruleSiteId && (int) $clientSiteId !== (int) $ruleSiteId) {
+                abort(422, 'The selected planning client no longer matches the linked site coverage rule.');
+            }
+        }
+    }
+
+    protected function coverageContextFromWindow(
+        int $siteId,
+        string $startsAt,
+        string $endsAt,
+        ?int $coverageRuleId = null,
+    ): ?array {
+        try {
+            $window = app(ShiftCoverageService::class)->findCoverageWindow(
+                $siteId,
+                Carbon::parse($startsAt),
+                Carbon::parse($endsAt),
+                $coverageRuleId,
+            );
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (! $window) {
+            return null;
+        }
+
+        return [
+            'rule_id' => $window['rule_id'] ?? $coverageRuleId,
+            'rule_name' => $window['rule_name'] ?? null,
+            'required_staff' => $window['required_staff'] ?? null,
+            'missing_staff' => $window['missing_staff'] ?? null,
+            'site_id' => $window['site_id'] ?? $siteId,
+            'site_name' => $window['site_name'] ?? null,
+            'site_client_count' => $window['site_client_count'] ?? null,
+            'site_clients' => $window['site_clients'] ?? [],
+            'preferred_client_id' => $window['preferred_client_id'] ?? null,
+            'preferred_client_name' => $window['preferred_client_name'] ?? null,
+            'role_shortages' => $window['planned_role_shortages'] ?? $window['role_shortages'] ?? [],
+            'fill_intent' => $window['fill_intent'] ?? null,
+            'coverage_slots' => $window['coverage_slots'] ?? [],
+        ];
+    }
+
+    protected function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function shiftBypassPermissions(): array
+    {
+        return ['shifts.manageAny', 'reports.viewAny'];
+    }
+
+    protected function assertCanAccessShift(User $auth, Shift $shift): void
+    {
+        $this->siteAccess()->assertCanAccessShift(
+            $auth,
+            $shift,
+            $this->shiftBypassPermissions(),
+            'You are not authorized to access shifts for this site.',
+        );
     }
 }

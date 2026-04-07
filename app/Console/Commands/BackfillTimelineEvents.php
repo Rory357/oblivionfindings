@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use App\Models\ClientNote;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
+use App\Observers\ClientNoteObserver;
+use App\Services\ShiftTimelineService;
 use Illuminate\Console\Command;
 
 class BackfillTimelineEvents extends Command
@@ -26,23 +28,39 @@ class BackfillTimelineEvents extends Command
         }
 
         $shiftCount = 0;
-        Shift::query()->with('client')->chunk(200, function ($shifts) use (&$shiftCount) {
+        $timeline = app(ShiftTimelineService::class);
+        Shift::query()->with(['client', 'client.portalUsers:id', 'staff:id,name', 'serviceContext:id,name,type'])->chunk(200, function ($shifts) use (&$shiftCount, $timeline) {
             foreach ($shifts as $s) {
-                $s->touch(); // triggers observer updated()
+                $timeline->syncSnapshot($s);
+
+                if ($s->status === 'in_progress') {
+                    $timeline->recordStarted($s, null, $s->actual_starts_at ?? $s->starts_at ?? now(), false);
+                }
+
+                if ($s->status === 'completed') {
+                    $timeline->recordStarted($s, null, $s->actual_starts_at ?? $s->starts_at ?? now(), false);
+                    $timeline->recordCompleted($s, null, $s->actual_ends_at ?? $s->ends_at ?? now(), [], false);
+                }
+
+                if ($s->status === 'cancelled') {
+                    $timeline->recordCancelled($s);
+                }
+
                 $shiftCount++;
             }
         });
 
         $noteCount = 0;
-        ClientNote::query()->with('client')->chunk(200, function ($notes) use (&$noteCount) {
+        $noteObserver = app(ClientNoteObserver::class);
+        ClientNote::query()->with('client')->chunk(200, function ($notes) use (&$noteCount, $noteObserver) {
             foreach ($notes as $n) {
-                $n->touch();
+                $noteObserver->updated($n);
                 $noteCount++;
             }
         });
 
         $this->info("Done. Shifts processed: {$shiftCount}. Notes processed: {$noteCount}.");
-        $this->warn('Note: This uses model observers. If you disable observers, it will not create events.');
+        $this->warn('Shift events are rebuilt directly from operational data. Client notes still use the note observer mapping.');
 
         return self::SUCCESS;
     }

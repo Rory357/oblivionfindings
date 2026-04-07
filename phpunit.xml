@@ -8,6 +8,9 @@
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
         </testsuite>
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
@@ -31,6 +34,7 @@
         <env name="DB_USERNAME" value="testUser"/>
         <env name="DB_PASSWORD" value="test101"/>
         <env name="APP_URL" value="http://localhost"/>
+        <env name="APP_DEBUG" value="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

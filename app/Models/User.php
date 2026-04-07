@@ -300,6 +300,38 @@ class User extends Authenticatable
         return $this->hasMany(MedicationCompetencyAssessment::class);
     }
 
+    // ── Fleet relationships ──────────────────────────────────────────────────
+
+    public function fleetDriverSessions()
+    {
+        return $this->hasMany(FleetDriverSession::class);
+    }
+
+    public function fleetBookings()
+    {
+        return $this->hasMany(FleetVehicleBooking::class);
+    }
+
+    public function fleetIncidentsReported()
+    {
+        return $this->hasMany(FleetIncident::class, 'reported_by_user_id');
+    }
+
+    public function fleetIncidentsAsDiver()
+    {
+        return $this->hasMany(FleetIncident::class, 'driver_user_id');
+    }
+
+    public function fleetPersonalTrips()
+    {
+        return $this->hasMany(FleetPersonalTrip::class);
+    }
+
+    public function fleetFuelLogs()
+    {
+        return $this->hasMany(FleetFuelLog::class);
+    }
+
     // ---------------------------
     // Impersonation Guards
     // ---------------------------

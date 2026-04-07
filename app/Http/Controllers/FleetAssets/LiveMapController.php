@@ -42,6 +42,7 @@ class LiveMapController extends Controller
                 'speed_kph' => $v->fleetState->speed_kph,
                 'heading_deg' => $v->fleetState->heading_deg,
                 'last_seen_at' => optional($v->fleetState->last_seen_at)->toISOString(),
+                'consent_blocked' => (bool) $v->fleetState->consent_blocked,
                 'home_site' => $hasFleetFields && $v->homeSite ? [
                     'id' => $v->homeSite->id,
                     'name' => $v->homeSite->name,

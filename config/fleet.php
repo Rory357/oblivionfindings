@@ -8,8 +8,8 @@ return [
     ],
 
     'signals' => [
-        'geofence_debounce_minutes' => env('FLEET_GEOFENCE_DEBOUNCE_MINUTES', 5),
         'offline_after_minutes' => env('FLEET_OFFLINE_AFTER_MINUTES', 15),
+        'dwell_threshold_minutes' => env('FLEET_DWELL_THRESHOLD_MINUTES', 10),
     ],
 
     'maps' => [
@@ -35,7 +35,8 @@ return [
 
     'retention' => [
         'telemetry_days' => env('FLEET_TELEMETRY_RETENTION_DAYS', 365),
-        'asset_snapshot_days' => env('ASSET_TELEMETRY_SNAPSHOT_RETENTION_DAYS', 365),
-        'asset_history_days' => env('ASSET_TELEMETRY_HISTORY_RETENTION_DAYS', 730),
     ],
+
+    'reimbursement_rate_per_km' => env('FLEET_REIMBURSEMENT_RATE_PER_KM', 0.99),
+    'avg_cost_per_km' => env('FLEET_AVG_COST_PER_KM', 0.35),
 ];

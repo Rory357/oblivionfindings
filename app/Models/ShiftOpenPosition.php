@@ -12,8 +12,10 @@ class ShiftOpenPosition extends Model
     protected $fillable = [
         'organization_id',
         'shift_id',
+        'replacement_request_id',
         'status',
         'required_skills',
+        'coverage_roles',
         'notes',
         'claimed_by',
         'claimed_at',
@@ -24,6 +26,7 @@ class ShiftOpenPosition extends Model
 
     protected $casts = [
         'required_skills' => 'array',
+        'coverage_roles' => 'array',
         'claimed_at' => 'datetime',
         'approved_at' => 'datetime',
         'expires_at' => 'datetime',
@@ -32,6 +35,11 @@ class ShiftOpenPosition extends Model
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class);
+    }
+
+    public function replacementRequest(): BelongsTo
+    {
+        return $this->belongsTo(ShiftReplacementRequest::class, 'replacement_request_id');
     }
 
     public function claimer(): BelongsTo

@@ -9,6 +9,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatCurrency } from '@/lib/fleet-utils';
 import { Head } from '@inertiajs/react';
 import { Calculator, DollarSign, Download, MapPin, Receipt, Users } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -76,7 +77,7 @@ export default function MileageReimbursement() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <FleetStatCard label="TOTAL STAFF" value={staffCount} icon={Users} subtitle="Staff with trips" />
                         <FleetStatCard label="TOTAL DISTANCE" value={`${totalDistance.toFixed(1)} km`} icon={MapPin} subtitle="Kilometres driven" />
-                        <FleetStatCard label="TOTAL REIMBURSEMENT" value={`$${totalAmount.toFixed(2)}`} icon={DollarSign} subtitle={`At $${rate}/km`} />
+                        <FleetStatCard label="TOTAL REIMBURSEMENT" value={formatCurrency(totalAmount)} icon={DollarSign} subtitle={`At ${formatCurrency(rate)}/km`} />
                     </div>
                 )}
 

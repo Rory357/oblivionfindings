@@ -9,6 +9,7 @@ use App\Models\FleetIncident;
 use App\Models\FleetResidentTransport;
 use App\Models\SafeguardingAlert;
 use App\Models\User;
+use App\Notifications\Fleet\FleetIncidentReportedNotification;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -95,11 +96,13 @@ class IncidentController extends Controller
             }, 'fleet-incidents-' . now()->format('Y-m-d') . '.csv');
         }
 
-        $incidents = $query
+        $paginator = $query
             ->latest('occurred_at')
-            ->limit(100)
-            ->get()
-            ->map(fn ($i) => [
+            ->paginate(25)
+            ->withQueryString();
+
+        $incidents = [
+            'data' => $paginator->getCollection()->map(fn ($i) => [
                 'id' => $i->id,
                 'asset' => $i->asset ? [
                     'id' => $i->asset->id,
@@ -115,8 +118,14 @@ class IncidentController extends Controller
                 'status' => $i->status,
                 'police_notified' => $i->police_notified,
                 'insurance_claimed' => $i->insurance_claimed,
-            ])
-            ->values();
+            ])->values(),
+            'links' => $paginator->linkCollection()->toArray(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
 
         // Summary stats
         $mtdStart = now()->startOfMonth();
@@ -213,6 +222,27 @@ class IncidentController extends Controller
             'severity' => $data['severity'],
         ]);
 
+        // Emit fleet signal for critical/major incidents → feeds control room
+        if (in_array($data['severity'], ['critical', 'major'])) {
+            app(\App\Services\Fleet\FleetSignalService::class)->emit([
+                'asset_id' => $data['asset_id'],
+                'signal_type' => 'incident.reported',
+                'severity_hint' => $data['severity'] === 'critical' ? 'critical' : 'high',
+                'occurred_at' => $data['occurred_at'],
+                'payload' => [
+                    'incident_id' => $incident->id,
+                    'incident_type' => $data['incident_type'],
+                    'description' => \Illuminate\Support\Str::limit($data['description'], 200),
+                ],
+            ]);
+        }
+
+        // Notify fleet managers
+        $incident->load('asset:id,name');
+        User::whereHas('roles', function ($q) {
+            $q->whereHas('permissions', fn ($p) => $p->where('key', 'fleet.incidents.manage'));
+        })->get()->each->notify(new FleetIncidentReportedNotification($incident));
+
         // Incident chain: auto-create client incidents & safeguarding alerts
         $this->processIncidentChain($incident, $request);
 
@@ -284,11 +314,29 @@ class IncidentController extends Controller
             $updates['resolved_at'] = now();
         }
 
+        $previousStatus = $incident->status;
         $incident->update($updates);
 
         AuditLogger::log('fleet.incident.update', $incident, [
             'status' => $data['status'],
+            'previous_status' => $previousStatus,
         ]);
+
+        // Emit fleet signal for critical/major incidents on status change
+        if (in_array($incident->severity, ['critical', 'major']) && $previousStatus !== $data['status']) {
+            app(\App\Services\Fleet\FleetSignalService::class)->emit([
+                'asset_id' => $incident->asset_id,
+                'signal_type' => 'incident.' . $data['status'],
+                'severity_hint' => $incident->severity === 'critical' ? 'critical' : 'high',
+                'occurred_at' => now(),
+                'payload' => [
+                    'incident_id' => $incident->id,
+                    'incident_type' => $incident->incident_type,
+                    'previous_status' => $previousStatus,
+                    'new_status' => $data['status'],
+                ],
+            ]);
+        }
 
         return back()->with('success', 'Incident updated successfully.');
     }

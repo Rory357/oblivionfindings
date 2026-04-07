@@ -5,12 +5,14 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FleetIncident extends Model
 {
-    use AuditableChanges;
+    use AuditableChanges, SoftDeletes;
 
     protected $fillable = [
+        'tenant_id',
         'asset_id',
         'reported_by_user_id',
         'driver_user_id',

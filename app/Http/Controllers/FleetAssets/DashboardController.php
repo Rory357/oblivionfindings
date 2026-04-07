@@ -78,12 +78,51 @@ class DashboardController extends Controller
             ->where('severity', 'critical')
             ->count();
 
-        // Active bookings count (pending or approved)
-        $recentBookingsCount = Schema::hasTable('fleet_vehicle_bookings')
+        // Booking status counts
+        $hasBookingsTable = Schema::hasTable('fleet_vehicle_bookings');
+        $recentBookingsCount = $hasBookingsTable
             ? FleetVehicleBooking::query()
                 ->whereIn('status', ['pending', 'approved'])
                 ->count()
             : 0;
+
+        $checkedOutCount = $hasBookingsTable
+            ? FleetVehicleBooking::query()
+                ->where('status', 'checked_out')
+                ->count()
+            : 0;
+
+        $overdueCount = $hasBookingsTable
+            ? FleetVehicleBooking::query()
+                ->where('status', 'checked_out')
+                ->where('ends_at', '<', now())
+                ->count()
+            : 0;
+
+        // Today's outings
+        $hasOutingsTable = Schema::hasTable('fleet_outings');
+        $todayOutings = $hasOutingsTable
+            ? FleetOuting::query()
+                ->whereIn('status', ['planned', 'active'])
+                ->where(function ($q) {
+                    $q->whereDate('planned_departure', today())
+                      ->orWhere('status', 'active');
+                })
+                ->with(['asset:id,name', 'driver:id,name'])
+                ->limit(10)
+                ->get()
+                ->map(fn ($o) => [
+                    'id' => $o->id,
+                    'title' => $o->title,
+                    'destination' => $o->destination,
+                    'status' => $o->status,
+                    'planned_departure' => optional($o->planned_departure)->toISOString(),
+                    'asset' => $o->asset ? ['id' => $o->asset->id, 'name' => $o->asset->name] : null,
+                    'driver' => $o->driver ? ['id' => $o->driver->id, 'name' => $o->driver->name] : null,
+                    'resident_count' => $o->residents()->count(),
+                ])
+                ->values()
+            : collect();
 
         // Upcoming maintenance (service schedules due within 30 days)
         $upcomingMaintenanceCount = Schema::hasTable('fleet_service_schedules')
@@ -158,9 +197,35 @@ class DashboardController extends Controller
             ->whereNotNull('name')
             ->get(['id', 'name', 'type']);
 
-        $fleetBySite = $sites->map(function ($site) use ($vehicleIds, $hasFuelTable) {
-            $siteVehicles = Asset::vehicles()->where('site_id', $site->id)->get();
-            $siteVehicleIds = $siteVehicles->pluck('id')->all();
+        // Batch-load all vehicles grouped by site_id (avoids N+1 per site)
+        $allSiteVehicles = Asset::vehicles()
+            ->whereIn('site_id', $sites->pluck('id'))
+            ->with('fleetState')
+            ->get()
+            ->groupBy('site_id');
+
+        $allSiteVehicleIds = $allSiteVehicles->flatMap->pluck('id')->all();
+
+        $alertCountsBySite = ControlRoomAlert::query()
+            ->whereIn('asset_id', $allSiteVehicleIds)
+            ->whereNotIn('status', ['closed', 'resolved'])
+            ->join('assets', 'assets.id', '=', 'control_room_alerts.asset_id')
+            ->selectRaw('assets.site_id, COUNT(*) as cnt')
+            ->groupBy('assets.site_id')
+            ->pluck('cnt', 'site_id');
+
+        $fuelCostsBySite = $hasFuelTable
+            ? FleetFuelLog::query()
+                ->whereIn('asset_id', $allSiteVehicleIds)
+                ->whereMonth('created_at', now()->month)
+                ->join('assets', 'assets.id', '=', 'fleet_fuel_logs.asset_id')
+                ->selectRaw('assets.site_id, SUM(fleet_fuel_logs.total_cost) as total')
+                ->groupBy('assets.site_id')
+                ->pluck('total', 'site_id')
+            : collect();
+
+        $fleetBySite = $sites->map(function ($site) use ($allSiteVehicles, $alertCountsBySite, $fuelCostsBySite) {
+            $siteVehicles = $allSiteVehicles->get($site->id, collect());
 
             return [
                 'id' => $site->id,
@@ -168,12 +233,8 @@ class DashboardController extends Controller
                 'type' => $site->type,
                 'vehicle_count' => $siteVehicles->count(),
                 'online_count' => $siteVehicles->filter(fn ($v) => $v->fleetState?->status === 'online')->count(),
-                'active_alerts' => ControlRoomAlert::whereIn('asset_id', $siteVehicleIds)
-                    ->whereNotIn('status', ['closed', 'resolved'])->count(),
-                'fuel_cost_mtd' => $hasFuelTable
-                    ? FleetFuelLog::whereIn('asset_id', $siteVehicleIds)
-                        ->whereMonth('created_at', now()->month)->sum('total_cost')
-                    : 0,
+                'active_alerts' => (int) ($alertCountsBySite[$site->id] ?? 0),
+                'fuel_cost_mtd' => round((float) ($fuelCostsBySite[$site->id] ?? 0), 2),
             ];
         })->filter(fn ($s) => $s['vehicle_count'] > 0)->values();
 
@@ -306,6 +367,13 @@ class DashboardController extends Controller
                 'total_devices' => $totalDevices,
                 'online_devices' => $onlineDevices,
                 'recent_bookings_count' => $recentBookingsCount,
+                'checked_out_count' => $checkedOutCount,
+                'overdue_count' => $overdueCount,
+                'outings_past_return' => $hasOutingsTable
+                    ? FleetOuting::where('status', 'active')
+                        ->where('planned_return', '<', now())
+                        ->count()
+                    : 0,
                 'upcoming_maintenance_count' => $upcomingMaintenanceCount,
                 'trips_today' => $tripsToday,
                 'tracked_residents' => $trackedResidents,
@@ -324,6 +392,7 @@ class DashboardController extends Controller
             'fleet_by_site' => $fleetBySite,
             'after_hours_trips' => $afterHoursTrips,
             'my_site_vehicles' => $mySiteVehicles,
+            'today_outings' => $todayOutings,
         ]);
     }
 }

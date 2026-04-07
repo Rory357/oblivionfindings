@@ -13,6 +13,7 @@ use App\Observers\SiteObserver;
 use App\Observers\SiteHazardObserver;
 use App\Observers\SiteChecklistRunObserver;
 use App\Events\FleetSignalEmitted;
+use App\Events\FleetWanderingAlertTriggered;
 use App\Services\AuditLogger;
 use App\Services\Integration\Adapters\UnifiAdapter;
 use App\Services\Integration\IntegrationAdapterRegistry;
@@ -66,6 +67,27 @@ class AppServiceProvider extends ServiceProvider
                 'severity' => $event->signal->severity_hint,
                 'occurred_at' => optional($event->signal->occurred_at)->toISOString(),
             ]);
+
+            // Broadcast wandering alert when a geofence breach involves a resident-linked tracker
+            if (in_array($event->signal->signal_type, ['geofence.breach', 'vehicle.sos'])) {
+                $asset = $event->signal->asset;
+                if ($asset && $asset->client_id) {
+                    $client = $asset->client;
+                    $payload = $event->signal->payload ?? [];
+
+                    broadcast(new FleetWanderingAlertTriggered(
+                        alertId: $event->signal->id,
+                        alertType: $event->signal->signal_type,
+                        severity: $event->signal->severity_hint ?? 'medium',
+                        clientName: $client ? trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')) : null,
+                        clientId: $asset->client_id,
+                        latitude: $payload['lat'] ?? $payload['latitude'] ?? null,
+                        longitude: $payload['lng'] ?? $payload['longitude'] ?? null,
+                        geofenceName: $payload['geofence_name'] ?? null,
+                        triggeredAt: optional($event->signal->occurred_at)->toISOString() ?? now()->toISOString(),
+                    ));
+                }
+            }
         });
 
         // Cross-domain event listeners

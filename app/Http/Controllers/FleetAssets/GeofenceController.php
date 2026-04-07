@@ -171,6 +171,11 @@ class GeofenceController extends Controller
 
     public function toggleActive(Request $request, AssetGeofence $geofence)
     {
+        // If deactivating, clean up state for vehicles currently inside
+        if ($geofence->is_active) {
+            $this->cleanupGeofenceStates($geofence);
+        }
+
         $geofence->update(['is_active' => !$geofence->is_active]);
 
         AuditLogger::log('fleet.geofence.toggle', $geofence, [
@@ -183,6 +188,9 @@ class GeofenceController extends Controller
 
     public function destroy(Request $request, AssetGeofence $geofence)
     {
+        // Emit exit signals for vehicles currently inside and clean up state
+        $this->cleanupGeofenceStates($geofence);
+
         AuditLogger::log('fleet.geofence.delete', $geofence, [
             'geofence_id' => $geofence->id,
             'asset_id' => $geofence->asset_id,
@@ -192,5 +200,37 @@ class GeofenceController extends Controller
 
         return redirect()->route('fleet-assets.geofences.index')
             ->with('success', 'Geofence deleted.');
+    }
+
+    private function cleanupGeofenceStates(AssetGeofence $geofence): void
+    {
+        $insideStates = \App\Models\FleetGeofenceState::query()
+            ->where('geofence_id', $geofence->id)
+            ->where('status', 'inside')
+            ->get();
+
+        $signalService = app(\App\Services\Fleet\FleetSignalService::class);
+
+        foreach ($insideStates as $state) {
+            try {
+                $signalService->emit([
+                    'asset_id' => $state->asset_id,
+                    'geofence_id' => $geofence->id,
+                    'signal_type' => 'geofence.exit',
+                    'severity_hint' => 'low',
+                    'occurred_at' => now(),
+                    'payload' => [
+                        'geofence_name' => $geofence->name,
+                        'reason' => 'geofence_removed',
+                    ],
+                ]);
+            } catch (\Throwable $e) {
+                \Log::warning("Failed to emit exit signal for geofence {$geofence->id}, asset {$state->asset_id}: {$e->getMessage()}");
+            }
+        }
+
+        \App\Models\FleetGeofenceState::query()
+            ->where('geofence_id', $geofence->id)
+            ->delete();
     }
 }

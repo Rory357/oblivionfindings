@@ -1,0 +1,579 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Shift;
+use App\Models\ShiftHandover;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class ShiftHandoverService
+{
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_SUBMITTED = 'submitted';
+
+    public const STATUS_ACKNOWLEDGED = 'acknowledged';
+
+    public function __construct(
+        protected ShiftTimelineService $timelineService,
+    ) {
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{handover: ShiftHandover, action: string}
+     */
+    public function save(Shift $outgoingShift, User $actor, array $data): array
+    {
+        $outgoingShift->loadMissing([
+            'tasks:id,shift_id,label,is_completed',
+            'incidents:id,shift_id,type,severity,status,occurred_at',
+            'client:id,first_name,last_name,site_id',
+            'site:id,name,type',
+            'serviceContext:id,name,type',
+            'staff:id,name',
+        ]);
+
+        $submit = (bool) ($data['submit'] ?? true);
+        $existing = $this->activeHandoverForShift($outgoingShift);
+
+        if ($existing?->status === self::STATUS_ACKNOWLEDGED) {
+            throw ValidationException::withMessages([
+                'handover' => 'This shift handover has already been acknowledged and cannot be replaced.',
+            ]);
+        }
+
+        if ($existing && $existing->status === self::STATUS_SUBMITTED) {
+            throw ValidationException::withMessages([
+                'handover' => 'A submitted handover already exists for this shift.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($outgoingShift, $actor, $data, $submit, $existing) {
+            $incomingShift = $this->resolveIncomingShift($outgoingShift, $data['incoming_shift_id'] ?? null);
+
+            $handover = $existing && $existing->status === self::STATUS_DRAFT
+                ? $existing
+                : new ShiftHandover();
+
+            $handover->fill([
+                'organization_id' => $actor->organization_id,
+                'outgoing_shift_id' => $outgoingShift->id,
+                'incoming_shift_id' => $incomingShift?->id,
+                'client_id' => $data['client_id'] ?? $outgoingShift->client_id,
+                'outgoing_staff_id' => $outgoingShift->user_id ?: $actor->id,
+                'incoming_staff_id' => $incomingShift?->user_id ?? ($data['incoming_staff_id'] ?? null),
+                'handover_notes' => (string) $data['handover_notes'],
+                'client_mood' => $data['client_mood'] ?? null,
+                'tasks_pending' => $this->normalizeStructuredItems($data['tasks_pending'] ?? null)
+                    ?? $outgoingShift->tasks
+                        ->where('is_completed', false)
+                        ->map(fn ($task) => ['id' => $task->id, 'label' => $task->label])
+                        ->values()
+                        ->all(),
+                'medications_due' => $this->normalizeStructuredItems($data['medications_due'] ?? null),
+                'incidents_to_note' => $this->normalizeStructuredItems($data['incidents_to_note'] ?? null)
+                    ?? $outgoingShift->incidents
+                        ->map(fn ($incident) => [
+                            'id' => $incident->id,
+                            'type' => $incident->type,
+                            'severity' => $incident->severity,
+                            'status' => $incident->status,
+                            'occurred_at' => optional($incident->occurred_at)->toISOString(),
+                        ])
+                        ->values()
+                        ->all(),
+                'follow_up_items' => $this->normalizeStructuredItems($data['follow_up_items'] ?? null),
+                'status' => self::STATUS_DRAFT,
+            ]);
+
+            $handover->save();
+
+            $freshHandover = $handover->fresh([
+                'outgoingShift.client:id,first_name,last_name,site_id',
+                'outgoingShift.site:id,name,type',
+                'outgoingShift.serviceContext:id,name,type',
+                'outgoingShift.staff:id,name',
+                'incomingShift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,status',
+                'incomingStaff:id,name',
+                'outgoingStaff:id,name',
+            ]) ?? $handover;
+
+            $this->timelineService->recordHandoverCreated($freshHandover, $outgoingShift, $actor);
+            AuditLogger::log('shift.handover.created', $freshHandover, [
+                'shift_id' => $outgoingShift->id,
+                'incoming_shift_id' => $freshHandover->incoming_shift_id,
+                'status' => $freshHandover->status,
+            ]);
+
+            if (! $submit) {
+                return [
+                    'handover' => $freshHandover,
+                    'action' => 'draft_saved',
+                ];
+            }
+
+            $submitted = $this->submit($freshHandover, $actor);
+
+            return [
+                'handover' => $submitted,
+                'action' => 'submitted',
+            ];
+        });
+    }
+
+    public function submit(ShiftHandover $handover, User $actor): ShiftHandover
+    {
+        if ($handover->status === self::STATUS_ACKNOWLEDGED) {
+            throw ValidationException::withMessages([
+                'handover' => 'Acknowledged handovers cannot be resubmitted.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($handover, $actor) {
+            $handover = ShiftHandover::query()
+                ->lockForUpdate()
+                ->findOrFail($handover->id);
+
+            if ($handover->status === self::STATUS_SUBMITTED) {
+                return $handover->fresh([
+                    'outgoingShift.client:id,first_name,last_name,site_id',
+                    'outgoingShift.site:id,name,type',
+                    'outgoingShift.serviceContext:id,name,type',
+                    'outgoingShift.staff:id,name',
+                    'incomingShift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,status',
+                    'incomingStaff:id,name',
+                    'outgoingStaff:id,name',
+                ]) ?? $handover;
+            }
+
+            $handover->loadMissing([
+                'outgoingShift.client:id,first_name,last_name,site_id',
+                'outgoingShift.site:id,name,type',
+                'outgoingShift.serviceContext:id,name,type',
+                'outgoingShift.staff:id,name',
+                'incomingShift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,status',
+                'incomingStaff:id,name',
+                'outgoingStaff:id,name',
+            ]);
+
+            $matchedIncoming = $handover->incomingShift
+                ?: $this->resolveExpectedIncomingShift($handover->outgoingShift)->get('matched_shift');
+
+            $handover->forceFill([
+                'incoming_shift_id' => $handover->incoming_shift_id ?: $matchedIncoming?->id,
+                'incoming_staff_id' => $matchedIncoming?->user_id ?: $handover->incoming_staff_id,
+                'status' => self::STATUS_SUBMITTED,
+                'submitted_at' => $handover->submitted_at ?? now(),
+                'submitted_by' => $actor->id,
+            ])->save();
+
+            $fresh = $handover->fresh([
+                'outgoingShift.client:id,first_name,last_name,site_id',
+                'outgoingShift.site:id,name,type',
+                'outgoingShift.serviceContext:id,name,type',
+                'outgoingShift.staff:id,name',
+                'incomingShift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,status',
+                'incomingStaff:id,name',
+                'outgoingStaff:id,name',
+            ]) ?? $handover;
+
+            $this->timelineService->recordHandoverSubmitted($fresh, $fresh->outgoingShift, $actor);
+            AuditLogger::log('shift.handover.submitted', $fresh, [
+                'shift_id' => $fresh->outgoing_shift_id,
+                'incoming_shift_id' => $fresh->incoming_shift_id,
+            ]);
+
+            return $fresh;
+        });
+    }
+
+    public function acknowledge(ShiftHandover $handover, User $actor): ShiftHandover
+    {
+        if ($handover->status === self::STATUS_DRAFT) {
+            throw ValidationException::withMessages([
+                'handover' => 'Draft handovers must be submitted before they can be acknowledged.',
+            ]);
+        }
+
+        if ($handover->status === self::STATUS_ACKNOWLEDGED) {
+            return $handover->fresh() ?? $handover;
+        }
+
+        return DB::transaction(function () use ($handover, $actor) {
+            $handover = ShiftHandover::query()
+                ->lockForUpdate()
+                ->findOrFail($handover->id);
+
+            $handover->loadMissing([
+                'outgoingShift.client:id,first_name,last_name,site_id',
+                'outgoingShift.site:id,name,type',
+                'outgoingShift.serviceContext:id,name,type',
+                'outgoingShift.staff:id,name',
+                'incomingShift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,status',
+                'incomingStaff:id,name',
+                'outgoingStaff:id,name',
+            ]);
+            $this->assertAcknowledgementTargetStillValid($handover);
+
+            $handover->forceFill([
+                'incoming_staff_id' => $this->currentIncomingStaffId($handover) ?? $handover->incoming_staff_id,
+                'status' => self::STATUS_ACKNOWLEDGED,
+                'acknowledged_at' => now(),
+                'acknowledged_by' => $actor->id,
+            ])->save();
+
+            $fresh = $handover->fresh([
+                'outgoingShift.client:id,first_name,last_name,site_id',
+                'outgoingShift.site:id,name,type',
+                'outgoingShift.serviceContext:id,name,type',
+                'outgoingShift.staff:id,name',
+                'incomingShift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,status',
+                'incomingStaff:id,name',
+                'outgoingStaff:id,name',
+                'acknowledger:id,name',
+            ]) ?? $handover;
+
+            $this->timelineService->recordHandoverAcknowledged($fresh, $fresh->outgoingShift, $actor);
+            AuditLogger::log('shift.handover.acknowledged', $fresh, [
+                'shift_id' => $fresh->outgoing_shift_id,
+                'incoming_shift_id' => $fresh->incoming_shift_id,
+            ]);
+
+            return $fresh;
+        });
+    }
+
+    /**
+     * @return array{
+     *     requires_handover: bool,
+     *     ambiguous: bool,
+     *     matched_shift: Shift|null,
+     *     candidate_ids: array<int, int>,
+     *     matched_handover: ShiftHandover|null,
+     *     reason: string
+     * }
+     */
+    public function completionRequirement(Shift $shift): array
+    {
+        $expectation = $this->resolveExpectedIncomingShift($shift);
+        $matchedShift = $expectation['matched_shift'];
+
+        $matchedHandover = null;
+        if ($matchedShift) {
+            $matchedHandover = ShiftHandover::query()
+                ->where('outgoing_shift_id', $shift->id)
+                ->whereIn('status', [self::STATUS_SUBMITTED, self::STATUS_ACKNOWLEDGED])
+                ->where(function (Builder $query) use ($matchedShift) {
+                    $query->where('incoming_shift_id', $matchedShift->id)
+                        ->orWhereNull('incoming_shift_id');
+                })
+                ->latest('submitted_at')
+                ->latest('id')
+                ->first();
+        }
+
+        return [
+            'requires_handover' => $matchedShift !== null,
+            'ambiguous' => $expectation['ambiguous'],
+            'matched_shift' => $matchedShift,
+            'candidate_ids' => $expectation['candidate_ids'],
+            'matched_handover' => $matchedHandover,
+            'reason' => $matchedShift
+                ? 'A relevant incoming shift exists, so a submitted handover or waiver reason is required before completion.'
+                : ($expectation['ambiguous']
+                    ? 'Multiple possible incoming shifts matched, so handover targeting was not inferred automatically.'
+                    : 'No qualifying incoming shift was found.'),
+        ];
+    }
+
+    public function recordCompletionWaiver(Shift $shift, User $actor, string $reason, array $requirement): void
+    {
+        $shift->forceFill([
+            'handover_waiver_reason' => $reason,
+            'handover_waived_at' => now(),
+            'handover_waived_by' => $actor->id,
+        ])->save();
+
+        $shift->loadMissing([
+            'client:id,first_name,last_name,site_id',
+            'site:id,name,type',
+            'serviceContext:id,name,type',
+            'staff:id,name',
+        ]);
+
+        $this->timelineService->recordHandoverWaived(
+            $shift,
+            $reason,
+            $actor,
+            $requirement['matched_shift'] ?? null,
+            (bool) ($requirement['ambiguous'] ?? false),
+        );
+
+        AuditLogger::log('shift.handover.waived', $shift, [
+            'shift_id' => $shift->id,
+            'reason' => $reason,
+            'matched_incoming_shift_id' => $requirement['matched_shift']?->id,
+            'ambiguous_match' => (bool) ($requirement['ambiguous'] ?? false),
+        ]);
+    }
+
+    /**
+     * @return array{
+     *     matched_shift: Shift|null,
+     *     ambiguous: bool,
+     *     candidate_ids: array<int, int>
+     * }
+     */
+    public function resolveExpectedIncomingShift(Shift $outgoingShift): array
+    {
+        $outgoingShift->loadMissing([
+            'client:id,first_name,last_name,site_id',
+            'site:id,name,type',
+            'serviceContext:id,name,type',
+        ]);
+
+        $windowStart = $outgoingShift->starts_at ?? now()->subHour();
+        $windowEnd = ($outgoingShift->actual_ends_at ?? $outgoingShift->ends_at ?? $windowStart)->copy()->addHours(12);
+        $siteId = $this->effectiveSiteId($outgoingShift);
+
+        $query = Shift::query()
+            ->with(['client:id,first_name,last_name,site_id', 'site:id,name,type', 'serviceContext:id,name,type', 'staff:id,name'])
+            ->whereKeyNot($outgoingShift->id)
+            ->whereNotIn('status', ['cancelled'])
+            ->whereNotNull('starts_at')
+            ->whereBetween('starts_at', [$windowStart, $windowEnd])
+            ->orderBy('starts_at')
+            ->orderBy('id');
+
+        if ($outgoingShift->client_id) {
+            $query->where('client_id', $outgoingShift->client_id);
+        } elseif ($siteId) {
+            $query->where(function (Builder $builder) use ($siteId) {
+                $builder->where('site_id', $siteId)
+                    ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery->where('site_id', $siteId));
+            });
+        } else {
+            return [
+                'matched_shift' => null,
+                'ambiguous' => false,
+                'candidate_ids' => [],
+            ];
+        }
+
+        if ($outgoingShift->service_context_id) {
+            $query->where('service_context_id', $outgoingShift->service_context_id);
+        }
+
+        $candidates = $query->take(3)->get()->values();
+
+        if ($candidates->isEmpty()) {
+            return [
+                'matched_shift' => null,
+                'ambiguous' => false,
+                'candidate_ids' => [],
+            ];
+        }
+
+        if ($candidates->count() > 1 && optional($candidates[1]->starts_at)->equalTo($candidates[0]->starts_at)) {
+            return [
+                'matched_shift' => null,
+                'ambiguous' => true,
+                'candidate_ids' => $candidates->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            ];
+        }
+
+        return [
+            'matched_shift' => $candidates->first(),
+            'ambiguous' => false,
+            'candidate_ids' => $candidates->pluck('id')->map(fn ($id) => (int) $id)->all(),
+        ];
+    }
+
+    public function canViewAny(?User $auth): bool
+    {
+        return (bool) $auth && (
+            $auth->canDo('handovers.viewAny')
+            || $auth->canDo('shifts.viewAny')
+            || $auth->canDo('shifts.manageAny')
+        );
+    }
+
+    public function canAccessWorkflow(?User $auth): bool
+    {
+        return (bool) $auth && (
+            $this->canViewAny($auth)
+            || $auth->canDo('shifts.viewAssigned')
+            || $auth->canDo('shifts.update')
+            || $auth->canDo('handovers.create')
+        );
+    }
+
+    public function canSubmit(ShiftHandover $handover, ?User $auth): bool
+    {
+        if (! $auth) {
+            return false;
+        }
+
+        if ($this->canViewAny($auth)) {
+            return true;
+        }
+
+        return in_array($handover->status, [self::STATUS_DRAFT, self::STATUS_SUBMITTED], true)
+            && (int) $handover->outgoing_staff_id === (int) $auth->id;
+    }
+
+    public function canAcknowledge(ShiftHandover $handover, ?User $auth): bool
+    {
+        if (! $auth) {
+            return false;
+        }
+
+        if ($this->canViewAny($auth)) {
+            return true;
+        }
+
+        if ($handover->status !== self::STATUS_SUBMITTED) {
+            return false;
+        }
+
+        $incomingUserId = $this->currentIncomingStaffId($handover);
+
+        return $incomingUserId !== null
+            && (int) $incomingUserId === (int) $auth->id
+            && ($auth->canDo('shifts.update') || $auth->canDo('shifts.viewAssigned'));
+    }
+
+    public function relatedToUser(ShiftHandover $handover, User $auth): bool
+    {
+        $incomingUserId = $this->currentIncomingStaffId($handover);
+
+        return in_array((int) $auth->id, array_filter([
+            (int) $handover->outgoing_staff_id,
+            $incomingUserId ? (int) $incomingUserId : null,
+            $handover->outgoingShift?->user_id ? (int) $handover->outgoingShift?->user_id : null,
+            $handover->incomingShift?->user_id ? (int) $handover->incomingShift?->user_id : null,
+        ], fn ($value) => $value !== null), true);
+    }
+
+    protected function resolveIncomingShift(Shift $outgoingShift, mixed $incomingShiftId): ?Shift
+    {
+        if ($incomingShiftId) {
+            $incomingShift = Shift::query()
+                ->with(['client:id,first_name,last_name,site_id', 'site:id,name,type', 'serviceContext:id,name,type', 'staff:id,name'])
+                ->findOrFail((int) $incomingShiftId);
+
+            if (! $this->incomingShiftMatches($outgoingShift, $incomingShift)) {
+                throw ValidationException::withMessages([
+                    'incoming_shift_id' => 'The selected incoming shift does not match the outgoing handover context.',
+                ]);
+            }
+
+            return $incomingShift;
+        }
+
+        return $this->resolveExpectedIncomingShift($outgoingShift)['matched_shift'];
+    }
+
+    protected function incomingShiftMatches(Shift $outgoingShift, Shift $incomingShift): bool
+    {
+        if ((int) $incomingShift->id === (int) $outgoingShift->id) {
+            return false;
+        }
+
+        if ($incomingShift->status === 'cancelled') {
+            return false;
+        }
+
+        if ($outgoingShift->client_id && (int) $incomingShift->client_id !== (int) $outgoingShift->client_id) {
+            return false;
+        }
+
+        if ($outgoingShift->service_context_id && (int) $incomingShift->service_context_id !== (int) $outgoingShift->service_context_id) {
+            return false;
+        }
+
+        $outgoingSiteId = $this->effectiveSiteId($outgoingShift);
+        $incomingSiteId = $this->effectiveSiteId($incomingShift);
+
+        if ($outgoingSiteId && $incomingSiteId && $outgoingSiteId !== $incomingSiteId) {
+            return false;
+        }
+
+        return ! $incomingShift->starts_at || ! $outgoingShift->starts_at
+            ? true
+            : $incomingShift->starts_at->greaterThanOrEqualTo($outgoingShift->starts_at);
+    }
+
+    protected function activeHandoverForShift(Shift $shift): ?ShiftHandover
+    {
+        return ShiftHandover::query()
+            ->where('outgoing_shift_id', $shift->id)
+            ->whereIn('status', [self::STATUS_DRAFT, self::STATUS_SUBMITTED, self::STATUS_ACKNOWLEDGED])
+            ->latest('id')
+            ->first();
+    }
+
+    protected function effectiveSiteId(Shift $shift): ?int
+    {
+        return $shift->site_id ?: $shift->client?->site_id;
+    }
+
+    protected function currentIncomingStaffId(ShiftHandover $handover): ?int
+    {
+        if ($handover->incoming_shift_id) {
+            return $handover->incomingShift?->user_id ? (int) $handover->incomingShift->user_id : null;
+        }
+
+        return $handover->incoming_staff_id ? (int) $handover->incoming_staff_id : null;
+    }
+
+    protected function assertAcknowledgementTargetStillValid(ShiftHandover $handover): void
+    {
+        if (! $handover->incoming_shift_id) {
+            return;
+        }
+
+        $incomingShift = $handover->incomingShift;
+
+        if (! $incomingShift || $incomingShift->status === 'cancelled') {
+            throw ValidationException::withMessages([
+                'handover' => 'This handover can no longer be acknowledged because the incoming shift is no longer active.',
+            ]);
+        }
+
+        if (! $incomingShift->user_id) {
+            throw ValidationException::withMessages([
+                'handover' => 'This handover can no longer be acknowledged because the incoming shift no longer has an assigned staff member.',
+            ]);
+        }
+
+    }
+
+    protected function normalizeStructuredItems(mixed $value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            return is_array($decoded) ? array_values($decoded) : null;
+        }
+
+        if (is_array($value)) {
+            return array_values($value);
+        }
+
+        if ($value instanceof Collection) {
+            return $value->values()->all();
+        }
+
+        return null;
+    }
+}

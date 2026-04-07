@@ -646,12 +646,22 @@ class MyHrController extends Controller
         $activeClock = HrTimeEntry::forTenant($tenantId)
             ->forUser($user->id)
             ->active()
+            ->with([
+                'shift:id,client_id,service_context_id,starts_at,ends_at,shift_type,is_sleepover,is_on_call,expected_break_minutes,location',
+                'shift.client:id,first_name,last_name',
+                'shift.serviceContext:id,name',
+            ])
             ->first(['id', 'clock_in', 'notes', 'shift_id']);
 
         $todayEntries = HrTimeEntry::forTenant($tenantId)
             ->forUser($user->id)
             ->where('entry_date', now()->toDateString())
-            ->with('shift:id,starts_at,ends_at', 'shift.client:id,first_name,last_name', 'client:id,first_name,last_name')
+            ->with(
+                'shift:id,client_id,service_context_id,starts_at,ends_at,shift_type,is_sleepover,is_on_call,expected_break_minutes,location',
+                'shift.client:id,first_name,last_name',
+                'shift.serviceContext:id,name',
+                'client:id,first_name,last_name'
+            )
             ->orderBy('clock_in')
             ->get()
             ->map(fn ($entry) => [
@@ -669,6 +679,12 @@ class MyHrController extends Controller
                     'id' => $entry->shift->id,
                     'starts_at' => $entry->shift->starts_at?->format('H:i'),
                     'ends_at' => $entry->shift->ends_at?->format('H:i'),
+                    'shift_type' => $entry->shift->shift_type ?? 'standard',
+                    'is_sleepover' => (bool) $entry->shift->is_sleepover,
+                    'is_on_call' => (bool) $entry->shift->is_on_call,
+                    'expected_break_minutes' => $entry->shift->expected_break_minutes,
+                    'location' => $entry->shift->location,
+                    'service_context_name' => $entry->shift->serviceContext?->name,
                     'client_name' => trim(($entry->shift->client?->first_name ?? '') . ' ' . ($entry->shift->client?->last_name ?? '')),
                 ] : null,
                 'client_name' => $entry->client
@@ -680,10 +696,10 @@ class MyHrController extends Controller
 
         // Upcoming shifts for the next 3 days
         $upcomingShifts = Shift::where('user_id', $user->id)
-            ->whereIn('status', ['scheduled', 'draft'])
+            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->where('starts_at', '>=', now())
             ->where('starts_at', '<=', now()->addDays(3))
-            ->with('client:id,first_name,last_name')
+            ->with('client:id,first_name,last_name', 'serviceContext:id,name')
             ->orderBy('starts_at')
             ->limit(10)
             ->get()
@@ -692,8 +708,12 @@ class MyHrController extends Controller
                 'starts_at' => $shift->starts_at?->format('Y-m-d H:i'),
                 'ends_at' => $shift->ends_at?->format('Y-m-d H:i'),
                 'shift_type' => $shift->shift_type ?? 'standard',
+                'is_sleepover' => (bool) $shift->is_sleepover,
+                'is_on_call' => (bool) $shift->is_on_call,
+                'expected_break_minutes' => $shift->expected_break_minutes,
                 'client_name' => trim(($shift->client?->first_name ?? '') . ' ' . ($shift->client?->last_name ?? '')),
                 'location' => $shift->location,
+                'service_context_name' => $shift->serviceContext?->name,
                 'status' => $shift->status,
             ]);
 
@@ -702,6 +722,18 @@ class MyHrController extends Controller
                 'id' => $activeClock->id,
                 'clock_in' => $activeClock->clock_in->format('Y-m-d H:i'),
                 'notes' => $activeClock->notes,
+                'shift' => $activeClock->shift ? [
+                    'id' => $activeClock->shift->id,
+                    'starts_at' => $activeClock->shift->starts_at?->format('H:i'),
+                    'ends_at' => $activeClock->shift->ends_at?->format('H:i'),
+                    'shift_type' => $activeClock->shift->shift_type ?? 'standard',
+                    'is_sleepover' => (bool) $activeClock->shift->is_sleepover,
+                    'is_on_call' => (bool) $activeClock->shift->is_on_call,
+                    'expected_break_minutes' => $activeClock->shift->expected_break_minutes,
+                    'location' => $activeClock->shift->location,
+                    'service_context_name' => $activeClock->shift->serviceContext?->name,
+                    'client_name' => trim(($activeClock->shift->client?->first_name ?? '') . ' ' . ($activeClock->shift->client?->last_name ?? '')),
+                ] : null,
             ] : null,
             'todayEntries' => $todayEntries,
             'weeklySummary' => $weeklySummary,

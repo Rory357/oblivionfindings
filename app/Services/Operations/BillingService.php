@@ -13,10 +13,20 @@ use Carbon\Carbon;
 
 class BillingService
 {
+    public function __construct(
+        protected PayrollRateResolver $rateResolver,
+        protected \App\Services\ShiftOperationalSnapshotService $snapshots,
+    ) {
+    }
+
     public function generateFromTimesheet(Timesheet $timesheet): ?BillingEntry
     {
         if ($timesheet->status !== 'approved') {
             return null;
+        }
+
+        if (! $timesheet->is_snapshot_complete) {
+            throw new \RuntimeException("Timesheet {$timesheet->id} is missing required snapshot data and cannot be billed safely.");
         }
 
         // Check if already billed
@@ -44,6 +54,7 @@ class BillingService
         $hours = $this->calculateHours($timesheet);
         $rateType = $this->determineRateType($timesheet);
         $rate = $this->resolveRate($agreement, $rateType);
+        $payroll = $this->rateResolver->resolve($timesheet);
 
         return BillingEntry::create([
             'organization_id' => $client->organization_id,
@@ -58,6 +69,7 @@ class BillingService
             'rate' => $rate,
             'amount' => round($hours * $rate, 2),
             'rate_type' => $rateType,
+            ...$this->snapshots->billingSnapshotForTimesheet($timesheet, $payroll['pay_rate'], $payroll['payroll_cost']),
             'status' => 'pending',
             'notes' => $timesheet->notes,
         ]);

@@ -20,6 +20,13 @@ export default function ReportsIndex() {
 
     const reportTypes = [
         {
+            title: 'Shift Operations',
+            description: 'Decision-grade staffing, coverage, reconciliation, variance, and operational risk reporting.',
+            href: '/operations/reports/shifts',
+            icon: FileBarChart,
+            color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+        },
+        {
             title: `${clientSingular} Summary`,
             description: `${clientSingular} activity, hours delivered, care plan progress, and goal outcomes.`,
             href: '/operations/reports/client-summary',

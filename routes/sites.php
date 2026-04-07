@@ -314,6 +314,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('sites.staff_requirements.destroy')
         ->middleware('permission:sites.update');
 
+    Route::post('/sites/{site}/coverage-requirements', [SiteComplianceController::class, 'storeCoverageRequirement'])
+        ->name('sites.coverage_requirements.store')
+        ->middleware('permission:sites.update');
+    Route::put('/sites/{site}/coverage-requirements/{requirement}', [SiteComplianceController::class, 'updateCoverageRequirement'])
+        ->name('sites.coverage_requirements.update')
+        ->middleware('permission:sites.update');
+    Route::delete('/sites/{site}/coverage-requirements/{requirement}', [SiteComplianceController::class, 'destroyCoverageRequirement'])
+        ->name('sites.coverage_requirements.destroy')
+        ->middleware('permission:sites.update');
+
     // Feedback
     Route::get('/sites/{site}/feedback', [SiteComplianceController::class, 'feedback'])
         ->name('sites.feedback')

@@ -14,6 +14,10 @@ class ReverseGeocodeFleetTrip implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 3;
+    public $timeout = 30;
+    public $backoff = [15, 60];
+
     public function __construct(public int $tripId)
     {
     }

@@ -13,11 +13,13 @@ class FleetOutingResident extends Model
         'pre_check_completed',
         'medication_packed',
         'notes',
+        'returned_at',
     ];
 
     protected $casts = [
         'pre_check_completed' => 'boolean',
         'medication_packed' => 'boolean',
+        'returned_at' => 'datetime',
     ];
 
     public function outing(): BelongsTo

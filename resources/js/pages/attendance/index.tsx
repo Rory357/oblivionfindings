@@ -1,9 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 
 type Session = {
@@ -45,6 +45,14 @@ type Props = {
         status: string;
         location: string | null;
     } | null;
+    eligibleShifts: Array<{
+        id: number;
+        starts_at: string;
+        ends_at: string;
+        status: string;
+        location: string | null;
+        client_name: string;
+    }>;
     staff: Array<{ id: number; name: string; email: string }>;
     filters: { user_id?: number | null };
     todayHours: number;
@@ -68,6 +76,7 @@ export default function AttendanceIndex({
     sessions,
     openSession,
     activeShift,
+    eligibleShifts,
     staff,
     filters,
     todayHours,
@@ -75,6 +84,13 @@ export default function AttendanceIndex({
     canClock,
 }: Props) {
     const [breakMinutes, setBreakMinutes] = useState('0');
+    const [selectedShiftId, setSelectedShiftId] = useState<string>(
+        activeShift
+            ? String(activeShift.id)
+            : eligibleShifts[0]
+              ? String(eligibleShifts[0].id)
+              : '',
+    );
 
     const selectedUserId = filters.user_id ?? null;
 
@@ -95,7 +111,11 @@ export default function AttendanceIndex({
                             value={selectedUserId ?? ''}
                             onChange={(event) => {
                                 const value = event.target.value;
-                                router.get('/attendance', value ? { user_id: Number(value) } : {}, { preserveState: true, replace: true });
+                                router.get(
+                                    '/attendance',
+                                    value ? { user_id: Number(value) } : {},
+                                    { preserveState: true, replace: true },
+                                );
                             }}
                         >
                             <option value="">My sessions</option>
@@ -111,22 +131,33 @@ export default function AttendanceIndex({
                 <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-muted-foreground">Today</CardTitle>
+                            <CardTitle className="text-sm text-muted-foreground">
+                                Today
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-semibold">{todayHours.toFixed(2)}h</p>
-                            <p className="text-xs text-muted-foreground">Total tracked today</p>
+                            <p className="text-2xl font-semibold">
+                                {todayHours.toFixed(2)}h
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                Total tracked today
+                            </p>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-muted-foreground">Current Session</CardTitle>
+                            <CardTitle className="text-sm text-muted-foreground">
+                                Current Session
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {openSession ? (
                                 <div className="space-y-2">
-                                    <p className="text-sm">Clocked in at {toLocal(openSession.clock_in_at)}</p>
+                                    <p className="text-sm">
+                                        Clocked in at{' '}
+                                        {toLocal(openSession.clock_in_at)}
+                                    </p>
                                     <p className="text-xs text-muted-foreground">
                                         Session is in progress
                                     </p>
@@ -137,28 +168,68 @@ export default function AttendanceIndex({
                                     ) : null}
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground">No open session.</p>
+                                <p className="text-sm text-muted-foreground">
+                                    No open session.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-muted-foreground">Suggested Shift</CardTitle>
+                            <CardTitle className="text-sm text-muted-foreground">
+                                Eligible Shifts
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {activeShift ? (
-                                <div className="space-y-1 text-sm">
-                                    <p>Shift #{activeShift.id}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {toLocal(activeShift.starts_at)} to {toLocal(activeShift.ends_at)}
-                                    </p>
-                                    {activeShift.location ? (
-                                        <p className="text-xs text-muted-foreground">{activeShift.location}</p>
-                                    ) : null}
+                            {eligibleShifts.length > 0 ? (
+                                <div className="space-y-2 text-sm">
+                                    <select
+                                        className="w-full rounded-md border bg-background p-2 text-sm"
+                                        value={selectedShiftId}
+                                        onChange={(event) =>
+                                            setSelectedShiftId(
+                                                event.target.value,
+                                            )
+                                        }
+                                    >
+                                        {eligibleShifts.map((shift) => (
+                                            <option
+                                                key={shift.id}
+                                                value={shift.id}
+                                            >
+                                                #{shift.id}{' '}
+                                                {shift.client_name
+                                                    ? `- ${shift.client_name}`
+                                                    : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="text-xs text-muted-foreground">
+                                        {selectedShiftId
+                                            ? (() => {
+                                                  const selectedShift =
+                                                      eligibleShifts.find(
+                                                          (shift) =>
+                                                              String(
+                                                                  shift.id,
+                                                              ) ===
+                                                              selectedShiftId,
+                                                      );
+                                                  if (!selectedShift) {
+                                                      return 'Choose the shift you are starting.';
+                                                  }
+
+                                                  return `${toLocal(selectedShift.starts_at)} to ${toLocal(selectedShift.ends_at)}${selectedShift.location ? ` • ${selectedShift.location}` : ''}`;
+                                              })()
+                                            : 'Choose the shift you are starting.'}
+                                    </div>
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground">No upcoming assigned shift.</p>
+                                <p className="text-sm text-muted-foreground">
+                                    No eligible assigned shift found near the
+                                    current time.
+                                </p>
                             )}
                         </CardContent>
                     </Card>
@@ -173,21 +244,32 @@ export default function AttendanceIndex({
                             {openSession ? (
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                                     <div className="w-full sm:w-48">
-                                        <div className="mb-1 text-xs text-muted-foreground">Break minutes</div>
+                                        <div className="mb-1 text-xs text-muted-foreground">
+                                            Break minutes
+                                        </div>
                                         <Input
                                             type="number"
                                             min={0}
                                             max={240}
                                             value={breakMinutes}
-                                            onChange={(event) => setBreakMinutes(event.target.value)}
+                                            onChange={(event) =>
+                                                setBreakMinutes(
+                                                    event.target.value,
+                                                )
+                                            }
                                         />
                                     </div>
                                     <Button
                                         onClick={() =>
-                                            router.post('/attendance/clock-out', {
-                                                session_id: openSession.id,
-                                                break_minutes: Number(breakMinutes || 0),
-                                            })
+                                            router.post(
+                                                '/attendance/clock-out',
+                                                {
+                                                    session_id: openSession.id,
+                                                    break_minutes: Number(
+                                                        breakMinutes || 0,
+                                                    ),
+                                                },
+                                            )
                                         }
                                     >
                                         Clock Out
@@ -197,8 +279,14 @@ export default function AttendanceIndex({
                                 <Button
                                     onClick={() =>
                                         router.post('/attendance/clock-in', {
-                                            shift_id: activeShift?.id ?? null,
+                                            shift_id: selectedShiftId
+                                                ? Number(selectedShiftId)
+                                                : null,
                                         })
+                                    }
+                                    disabled={
+                                        eligibleShifts.length > 1 &&
+                                        !selectedShiftId
                                     }
                                 >
                                     Clock In
@@ -216,34 +304,64 @@ export default function AttendanceIndex({
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-medium">Clock In</th>
-                                    <th className="px-4 py-3 text-left font-medium">Clock Out</th>
-                                    <th className="px-4 py-3 text-right font-medium">Break</th>
-                                    <th className="px-4 py-3 text-right font-medium">Hours</th>
-                                    <th className="px-4 py-3 text-left font-medium">Timesheet</th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Clock In
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Clock Out
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Break
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Hours
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Timesheet
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
                                 {sessions.data.map((session) => (
-                                    <tr key={session.id} className="hover:bg-muted/20">
-                                        <td className="px-4 py-3">{toLocal(session.clock_in_at)}</td>
-                                        <td className="px-4 py-3">{toLocal(session.clock_out_at)}</td>
-                                        <td className="px-4 py-3 text-right">{session.break_minutes}m</td>
-                                        <td className="px-4 py-3 text-right">{session.worked_hours.toFixed(2)}h</td>
+                                    <tr
+                                        key={session.id}
+                                        className="hover:bg-muted/20"
+                                    >
+                                        <td className="px-4 py-3">
+                                            {toLocal(session.clock_in_at)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {toLocal(session.clock_out_at)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            {session.break_minutes}m
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            {session.worked_hours.toFixed(2)}h
+                                        </td>
                                         <td className="px-4 py-3">
                                             {session.timesheet_id ? (
-                                                <Link className="underline" href={`/timesheets/${session.timesheet_id}/edit`}>
-                                                    #{session.timesheet_id} ({session.timesheet_status})
+                                                <Link
+                                                    className="underline"
+                                                    href={`/timesheets/${session.timesheet_id}/edit`}
+                                                >
+                                                    #{session.timesheet_id} (
+                                                    {session.timesheet_status})
                                                 </Link>
                                             ) : (
-                                                <span className="text-muted-foreground">Not synced</span>
+                                                <span className="text-muted-foreground">
+                                                    Not synced
+                                                </span>
                                             )}
                                         </td>
                                     </tr>
                                 ))}
                                 {sessions.data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                                        <td
+                                            colSpan={5}
+                                            className="px-4 py-8 text-center text-muted-foreground"
+                                        >
                                             No attendance sessions found.
                                         </td>
                                     </tr>

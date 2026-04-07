@@ -1,6 +1,7 @@
 /**
  * Reusable Fleet Chart Components (Pure SVG, no external dependencies)
  */
+import { useState } from 'react';
 
 export const FLEET_COLORS = {
     primary: '#7c3aed',      // purple-600
@@ -109,6 +110,8 @@ export function HalfMoonGauge({
 /*  SparklineChart - Tiny line chart for trends                        */
 /* ------------------------------------------------------------------ */
 
+let sparklineCounter = 0;
+
 export function SparklineChart({
     data,
     color = FLEET_COLORS.primary,
@@ -120,6 +123,8 @@ export function SparklineChart({
     height?: number;
     width?: number;
 }) {
+    const [gradientId] = useState(() => `sparkGrad-${color.replace('#', '')}-${++sparklineCounter}`);
+
     if (!data || data.length < 2) {
         return <svg width={width} height={height} />;
     }
@@ -141,12 +146,12 @@ export function SparklineChart({
     return (
         <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
             <defs>
-                <linearGradient id={`sparkGrad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={color} stopOpacity="0.3" />
                     <stop offset="100%" stopColor={color} stopOpacity="0.02" />
                 </linearGradient>
             </defs>
-            <path d={areaPath} fill={`url(#sparkGrad-${color.replace('#', '')})`} />
+            <path d={areaPath} fill={`url(#${gradientId})`} />
             <polyline
                 points={polyline}
                 fill="none"

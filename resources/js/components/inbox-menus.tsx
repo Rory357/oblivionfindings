@@ -90,6 +90,7 @@ const MODULE_DOT_COLOURS: Record<string, string> = {
     governance: 'bg-emerald-500',
     sites: 'bg-amber-500',
     incidents: 'bg-red-500',
+    fleet: 'bg-purple-500',
     system: 'bg-slate-500',
 };
 

@@ -22,6 +22,11 @@ import {
     Download,
     Fuel,
     Route,
+    Shield,
+    TrendingDown,
+    TrendingUp,
+    User,
+    Users,
     Wrench,
 } from 'lucide-react';
 import { formatCurrency, formatDistance } from '@/lib/fleet-utils';
@@ -43,10 +48,41 @@ type FuelByVehicleRow = {
 
 type ExpiringItem = {
     id: number;
+    vehicle_id?: number;
+    vehicle_name?: string;
     name: string;
     asset_tag: string | null;
     type: string;
     expires_at: string | null;
+    days_remaining?: number;
+    status?: string;
+};
+
+type IncidentStats = {
+    total: number;
+    by_severity: Record<string, number>;
+    by_type: Record<string, number>;
+    open: number;
+};
+
+type VehicleUtilRow = {
+    id: number; name: string; asset_tag: string;
+    trips: number; km: number; trips_per_week: number; km_per_week: number;
+    idle_days: number | null; cost_per_km: number | null; flag: 'underused' | 'overused' | 'normal';
+};
+
+type StaffRiskRow = {
+    id: number; name: string; sessions: number; incidents: number;
+    safety_score: number | null; risk_flag: 'high' | 'medium' | 'low';
+};
+
+type ResidentDemand = {
+    residents: Array<{ id: number; name: string; transport_count: number; per_week: number; last_transport: string | null }>;
+    purpose_breakdown: Record<string, number>;
+};
+
+type TrendRow = {
+    month: string; trips: number; distance_km: number; fuel_cost: number; incidents: number;
 };
 
 type Props = {
@@ -73,6 +109,12 @@ type Props = {
     compliance: {
         expiring_items: ExpiringItem[];
     };
+    trip_distribution: Record<string, number>;
+    incident_stats: IncidentStats;
+    vehicle_utilisation?: VehicleUtilRow[];
+    staff_risk?: StaffRiskRow[];
+    resident_demand?: ResidentDemand;
+    trends?: TrendRow[];
 };
 
 export default function FleetReports({
@@ -83,6 +125,12 @@ export default function FleetReports({
     fuel_by_vehicle: rawFuelByVehicle,
     maintenance_stats: rawMaintenanceStats,
     compliance: rawCompliance,
+    trip_distribution: rawTripDistribution,
+    incident_stats: rawIncidentStats,
+    vehicle_utilisation: rawVehicleUtil,
+    staff_risk: rawStaffRisk,
+    resident_demand: rawResidentDemand,
+    trends: rawTrends,
 }: Props) {
     const trip_stats = rawTripStats ?? { total_trips: 0, total_distance_km: 0, total_hours: 0 };
     const fuel_stats = rawFuelStats ?? { total_fill_ups: 0, total_litres: 0, total_cost: 0, avg_cost_per_litre: 0 };
@@ -91,6 +139,12 @@ export default function FleetReports({
     const maintenance_stats = rawMaintenanceStats ?? { total_work_orders: 0, total_cost: 0, completed_count: 0, open_count: 0 };
     const compliance = rawCompliance ?? { expiring_items: [] };
     const expiring_items = compliance.expiring_items ?? [];
+    const tripDistribution = rawTripDistribution ?? {};
+    const incidentStats: IncidentStats = rawIncidentStats ?? { total: 0, by_severity: {}, by_type: {}, open: 0 };
+    const vehicleUtil = rawVehicleUtil ?? [];
+    const staffRisk = rawStaffRisk ?? [];
+    const residentDemand = rawResidentDemand ?? { residents: [], purpose_breakdown: {} };
+    const trends = rawTrends ?? [];
 
     const handlePeriodChange = (newPeriod: string) => {
         router.get('/fleet-assets/reports', { period: newPeriod }, { preserveState: true });
@@ -114,16 +168,12 @@ export default function FleetReports({
         maxValue: maxDistance,
     }));
 
-    // Build weekly trip data (fake weekly breakdown from totals for demo)
-    const weeklyTrips = [
-        { label: 'Mon', value: Math.round((trip_stats.total_trips ?? 0) * 0.18) },
-        { label: 'Tue', value: Math.round((trip_stats.total_trips ?? 0) * 0.2) },
-        { label: 'Wed', value: Math.round((trip_stats.total_trips ?? 0) * 0.22) },
-        { label: 'Thu', value: Math.round((trip_stats.total_trips ?? 0) * 0.17) },
-        { label: 'Fri', value: Math.round((trip_stats.total_trips ?? 0) * 0.15) },
-        { label: 'Sat', value: Math.round((trip_stats.total_trips ?? 0) * 0.05) },
-        { label: 'Sun', value: Math.round((trip_stats.total_trips ?? 0) * 0.03) },
-    ];
+    // Map DAYOFWEEK (1=Sun, 2=Mon, ..., 7=Sat) to day labels using real data
+    const dowLabels: Record<number, string> = { 1: 'Sun', 2: 'Mon', 3: 'Tue', 4: 'Wed', 5: 'Thu', 6: 'Fri', 7: 'Sat' };
+    const weeklyTrips = [2, 3, 4, 5, 6, 7, 1].map((dow) => ({
+        label: dowLabels[dow],
+        value: tripDistribution[String(dow)] ?? 0,
+    }));
 
     // Sparkline for fuel cost trend
     const fuelTrendData = [
@@ -256,7 +306,7 @@ export default function FleetReports({
                                     <div className="text-xs text-muted-foreground">Total Work Orders</div>
                                 </div>
                                 <div className="rounded-md border p-3 text-center">
-                                    <div className="text-2xl font-bold">${(maintenance_stats.total_cost ?? 0).toFixed(2)}</div>
+                                    <div className="text-2xl font-bold">{formatCurrency(maintenance_stats.total_cost ?? 0)}</div>
                                     <div className="text-xs text-muted-foreground">Total Cost</div>
                                 </div>
                                 <div className="rounded-md border p-3 text-center">
@@ -274,32 +324,38 @@ export default function FleetReports({
                     {/* Compliance - Expiring Items */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Upcoming Expirations (30 days)</CardTitle>
+                            <CardTitle className="text-base">Upcoming Expirations (90 days)</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {expiring_items.length > 0 ? (
                                 <div className="space-y-2">
-                                    {expiring_items.map((item, i) => (
-                                        <div key={`${item.id}-${item.type}-${i}`} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                                <div>
-                                                    <Link href={`/fleet-assets/assets/${item.id}`} className="font-medium text-primary hover:underline">
-                                                        {item.name}
-                                                    </Link>
-                                                    {item.asset_tag && (
-                                                        <span className="ml-1 text-xs text-muted-foreground">({item.asset_tag})</span>
-                                                    )}
+                                    {expiring_items.map((item, i) => {
+                                        const id = item.vehicle_id ?? item.id;
+                                        const name = item.vehicle_name ?? item.name;
+                                        return (
+                                            <div key={`${id}-${item.type}-${i}`} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <AlertTriangle className={`h-4 w-4 ${item.status === 'expired' ? 'text-red-500' : item.status === 'critical' ? 'text-orange-500' : 'text-amber-500'}`} />
+                                                    <div>
+                                                        <Link href={`/fleet-assets/assets/${id}`} className="font-medium text-primary hover:underline">
+                                                            {name}
+                                                        </Link>
+                                                        {item.asset_tag && (
+                                                            <span className="ml-1 text-xs text-muted-foreground">({item.asset_tag})</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant={item.status === 'expired' ? 'destructive' : 'outline'}>{item.type?.replace('_', ' ')}</Badge>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {item.days_remaining != null
+                                                            ? (item.days_remaining < 0 ? `${Math.abs(item.days_remaining)}d overdue` : `${item.days_remaining}d`)
+                                                            : (item.expires_at ?? '---')}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline">{item.type}</Badge>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {item.expires_at ?? '---'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">No upcoming expirations.</p>
@@ -307,6 +363,252 @@ export default function FleetReports({
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Row 5: Incidents */}
+                {(incidentStats.total > 0 || incidentStats.open > 0) && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Shield className="h-4 w-4" />
+                                Incidents (This Month)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-4 lg:grid-cols-[auto,1fr]">
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="rounded-md border p-3 text-center">
+                                        <div className="text-2xl font-bold">{incidentStats.total}</div>
+                                        <div className="text-xs text-muted-foreground">Total Incidents</div>
+                                    </div>
+                                    <div className="rounded-md border p-3 text-center">
+                                        <div className="text-2xl font-bold text-amber-600">{incidentStats.open}</div>
+                                        <div className="text-xs text-muted-foreground">Open / Investigating</div>
+                                    </div>
+                                    {Object.keys(incidentStats.by_severity).length > 0 && (
+                                        <div className="sm:col-span-2 flex flex-wrap gap-1.5">
+                                            {Object.entries(incidentStats.by_severity).map(([severity, count]) => (
+                                                <Badge
+                                                    key={severity}
+                                                    variant={severity === 'critical' || severity === 'major' ? 'destructive' : 'secondary'}
+                                                >
+                                                    {severity}: {count}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                {Object.keys(incidentStats.by_type).length > 0 && (
+                                    <div>
+                                        <HorizontalBarChart
+                                            items={Object.entries(incidentStats.by_type).map(([type, count]) => ({
+                                                label: type.replace(/_/g, ' '),
+                                                value: count,
+                                                color: FLEET_COLORS.danger,
+                                            }))}
+                                            color={FLEET_COLORS.danger}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+                {/* ============================================================ */}
+                {/*  DECISION REPORTS                                              */}
+                {/* ============================================================ */}
+
+                {/* Trends Over Time */}
+                {trends.length > 0 && (
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base"><TrendingUp className="h-4 w-4" /> Trends (Last 6 Months)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Trips</div>
+                                    <MiniBarChart
+                                        data={trends.map((t) => ({ label: t.month.slice(0, 3), value: t.trips }))}
+                                        color={FLEET_COLORS.primary}
+                                    />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Distance (km)</div>
+                                    <MiniBarChart
+                                        data={trends.map((t) => ({ label: t.month.slice(0, 3), value: t.distance_km }))}
+                                        color={FLEET_COLORS.secondary}
+                                    />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Fuel Cost</div>
+                                    <MiniBarChart
+                                        data={trends.map((t) => ({ label: t.month.slice(0, 3), value: t.fuel_cost }))}
+                                        color={FLEET_COLORS.warning}
+                                    />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Incidents</div>
+                                    <MiniBarChart
+                                        data={trends.map((t) => ({ label: t.month.slice(0, 3), value: t.incidents }))}
+                                        color={FLEET_COLORS.danger}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Vehicle Utilisation */}
+                {vehicleUtil.length > 0 && (
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base"><Car className="h-4 w-4" /> Vehicle Utilisation</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="border-b text-left text-muted-foreground">
+                                            <th className="pb-2 pr-3 font-medium">Vehicle</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">Trips</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">km</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">Trips/wk</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">km/wk</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">Idle Days</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">Cost/km</th>
+                                            <th className="pb-2 font-medium">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {vehicleUtil.map((v) => (
+                                            <tr key={v.id} className="border-b border-border/50 last:border-0">
+                                                <td className="py-2 pr-3">
+                                                    <span className="font-medium">{v.name}</span>
+                                                    <span className="text-muted-foreground ml-1">{v.asset_tag}</span>
+                                                </td>
+                                                <td className="py-2 pr-3 text-right">{v.trips}</td>
+                                                <td className="py-2 pr-3 text-right">{v.km}</td>
+                                                <td className="py-2 pr-3 text-right">{v.trips_per_week}</td>
+                                                <td className="py-2 pr-3 text-right">{v.km_per_week}</td>
+                                                <td className="py-2 pr-3 text-right">{v.idle_days ?? '—'}</td>
+                                                <td className="py-2 pr-3 text-right">{v.cost_per_km != null ? formatCurrency(v.cost_per_km) : '—'}</td>
+                                                <td className="py-2">
+                                                    {v.flag === 'underused' && (
+                                                        <Badge className="text-[9px] bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300">
+                                                            <TrendingDown className="mr-0.5 h-2.5 w-2.5" /> Underused
+                                                        </Badge>
+                                                    )}
+                                                    {v.flag === 'overused' && (
+                                                        <Badge className="text-[9px] bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300">
+                                                            <TrendingUp className="mr-0.5 h-2.5 w-2.5" /> Overused
+                                                        </Badge>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Staff Risk */}
+                {staffRisk.length > 0 && (
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base"><User className="h-4 w-4" /> Staff Driving Risk</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="border-b text-left text-muted-foreground">
+                                            <th className="pb-2 pr-3 font-medium">Driver</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">Sessions</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">Incidents</th>
+                                            <th className="pb-2 pr-3 font-medium text-right">Safety Score</th>
+                                            <th className="pb-2 font-medium">Risk</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {staffRisk.map((d) => (
+                                            <tr key={d.id} className="border-b border-border/50 last:border-0">
+                                                <td className="py-2 pr-3 font-medium">{d.name}</td>
+                                                <td className="py-2 pr-3 text-right">{d.sessions}</td>
+                                                <td className="py-2 pr-3 text-right">
+                                                    <span className={d.incidents > 0 ? 'text-red-600 font-semibold' : ''}>{d.incidents}</span>
+                                                </td>
+                                                <td className="py-2 pr-3 text-right">
+                                                    {d.safety_score != null ? (
+                                                        <span className={d.safety_score < 60 ? 'text-red-600 font-semibold' : d.safety_score < 80 ? 'text-amber-600' : 'text-green-600'}>{d.safety_score}/100</span>
+                                                    ) : '—'}
+                                                </td>
+                                                <td className="py-2">
+                                                    <Badge variant={d.risk_flag === 'high' ? 'destructive' : d.risk_flag === 'medium' ? 'outline' : 'secondary'} className="text-[9px]">
+                                                        {d.risk_flag}
+                                                    </Badge>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="mt-2 text-[10px] text-muted-foreground">Safety scores are based on vehicle telematics and may reflect shared vehicle usage.</p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Resident Transport Demand */}
+                {residentDemand.residents.length > 0 && (
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4" /> Resident Transport Demand</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {Object.keys(residentDemand.purpose_breakdown).length > 0 && (
+                                <div>
+                                    <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">By Purpose</div>
+                                    <HorizontalBarChart
+                                        items={Object.entries(residentDemand.purpose_breakdown).map(([label, value]) => ({
+                                            label: label.replace(/_/g, ' '),
+                                            value: value as number,
+                                            color: FLEET_COLORS.primary,
+                                        }))}
+                                        color={FLEET_COLORS.primary}
+                                    />
+                                </div>
+                            )}
+                            <div>
+                                <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Top Residents by Transport Frequency</div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="border-b text-left text-muted-foreground">
+                                                <th className="pb-2 pr-3 font-medium">Resident</th>
+                                                <th className="pb-2 pr-3 font-medium text-right">Total</th>
+                                                <th className="pb-2 pr-3 font-medium text-right">Per Week</th>
+                                                <th className="pb-2 font-medium text-right">Last Transport</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {residentDemand.residents.map((r) => (
+                                                <tr key={r.id} className="border-b border-border/50 last:border-0">
+                                                    <td className="py-2 pr-3 font-medium">{r.name}</td>
+                                                    <td className="py-2 pr-3 text-right">{r.transport_count}</td>
+                                                    <td className="py-2 pr-3 text-right">{r.per_week}</td>
+                                                    <td className="py-2 text-right text-muted-foreground">
+                                                        {r.last_transport ? new Date(r.last_transport).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '—'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </PageShell>
         </AppLayout>
     );

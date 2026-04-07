@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\FamilyPortalSetting;
 use App\Models\TimelineEvent;
+use App\Services\ShiftTimelineService;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
 
 class PortalTimelineController extends Controller
 {
@@ -14,6 +17,10 @@ class PortalTimelineController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        $showShiftSchedule = FamilyPortalSetting::query()
+            ->where('client_id', $client->id)
+            ->value('show_shift_schedule');
+        $showShiftSchedule = $showShiftSchedule === null ? true : (bool) $showShiftSchedule;
 
         $query = TimelineEvent::where('client_id', $client->id)
             ->where('visibility', 'portal')
@@ -23,8 +30,12 @@ class PortalTimelineController extends Controller
                 'reactions',
             ]);
 
-        if ($request->filled('type') && in_array($request->type, ['care', 'visits', 'other'], true)) {
-            $query->where('type', $request->type);
+        if (! $showShiftSchedule) {
+            $query->whereNotIn('type', ShiftTimelineService::shiftEventTypes());
+        }
+
+        if ($request->filled('type') && $request->type !== 'all') {
+            $this->applyTypeFilter($query, (string) $request->type);
         }
 
         $events = $query->orderByDesc('occurred_at')
@@ -78,6 +89,40 @@ class PortalTimelineController extends Controller
             ],
             'events' => $events,
             'filter' => $request->type,
+            'showShiftSchedule' => $showShiftSchedule,
         ]);
+    }
+
+    protected function applyTypeFilter(Builder $query, string $filter): void
+    {
+        $groups = [
+            'shifts' => ShiftTimelineService::shiftEventTypes(),
+            'care' => [
+                'note',
+                'shift_note',
+                'progress_note',
+                'handover',
+                'medication_given',
+                'medication_refused',
+                'medication_missed',
+                'medication_prescribed',
+                'medication_correction',
+            ],
+            'visits' => [
+                'visit_requested',
+                'visit_approved',
+                'visit_cancelled',
+            ],
+        ];
+
+        if ($filter === 'other') {
+            $query->whereNotIn('type', array_merge(...array_values($groups)));
+
+            return;
+        }
+
+        if (array_key_exists($filter, $groups)) {
+            $query->whereIn('type', $groups[$filter]);
+        }
     }
 }

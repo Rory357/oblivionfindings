@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Shift;
 use App\Models\Timesheet;
 use App\Models\User;
@@ -21,6 +23,7 @@ class TimesheetControllerTest extends TestCase
     protected User $coordinator;
     protected Client $client;
     protected Shift $shift;
+    protected Site $site;
 
     protected function setUp(): void
     {
@@ -34,11 +37,12 @@ class TimesheetControllerTest extends TestCase
 
         // Support worker: limited to own timesheets
         $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-        $this->staff->roles()->attach(Role::where('name', 'support_worker')->first());
+        $supportRole = Role::where('name', 'support_worker')->first();
+        $this->staff->roles()->attach($supportRole);
 
         // Another support worker for ownership tests
         $this->otherStaff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-        $this->otherStaff->roles()->attach(Role::where('name', 'support_worker')->first());
+        $this->otherStaff->roles()->attach($supportRole);
 
         // Finance: can approve timesheets but cannot manageAny
         $this->finance = User::factory()->create(['role' => 'finance', 'approved_at' => now()]);
@@ -48,11 +52,40 @@ class TimesheetControllerTest extends TestCase
         $this->coordinator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
         $this->coordinator->roles()->attach(Role::where('name', 'coordinator')->first());
 
-        $this->client = Client::factory()->create();
+        if ($supportRole) {
+            $supportRole->permissions()->syncWithoutDetaching(
+                \App\Models\Permission::query()
+                    ->whereIn('key', ['timesheets.create', 'timesheets.update', 'timesheets.submit'])
+                    ->pluck('id')
+                    ->all()
+            );
+        }
+
+        $this->site = Site::factory()->create(['name' => 'Matai House']);
+        $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
+        ]);
         $this->shift = Shift::factory()->create([
             'user_id' => $this->staff->id,
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
         ]);
+
+        foreach ([$this->admin, $this->staff, $this->otherStaff, $this->finance, $this->coordinator] as $user) {
+            HrEmployeeProfile::query()->create([
+                'tenant_id' => 1,
+                'user_id' => $user->id,
+                'employee_number' => 'EMP-TS-'.$user->id,
+                'work_email' => $user->email,
+                'position_title' => 'Operations',
+                'position_role' => $user->role,
+                'employment_type' => 'full_time',
+                'start_date' => now()->subMonth()->toDateString(),
+                'is_active' => true,
+                'primary_site_id' => $this->site->id,
+                'secondary_site_ids' => [],
+            ]);
+        }
     }
 
     // ---------------------------------------------------------------
@@ -655,7 +688,7 @@ class TimesheetControllerTest extends TestCase
         $response->assertRedirect();
 
         $timesheet = Timesheet::latest('id')->first();
-        $this->assertEquals('draft', $timesheet->status);
+        $this->assertEquals('returned', $timesheet->status);
 
         // Step 2: Submit
         $response = $this->actingAs($this->staff)
@@ -746,6 +779,8 @@ class TimesheetControllerTest extends TestCase
     {
         $timesheet = Timesheet::factory()->create([
             'user_id' => $this->staff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $this->shift->id,
             'status' => 'draft',
         ]);
 
@@ -763,7 +798,7 @@ class TimesheetControllerTest extends TestCase
         $response->assertRedirect();
 
         $timesheet->refresh();
-        $this->assertEquals('draft', $timesheet->status);
+        $this->assertEquals('returned', $timesheet->status);
         $this->assertNotNull($timesheet->returned_at);
         $this->assertEquals($this->admin->id, $timesheet->returned_by);
         $this->assertEquals('Please add break time details', $timesheet->returned_notes);
@@ -810,7 +845,11 @@ class TimesheetControllerTest extends TestCase
 
     public function test_return_for_changes_accepts_return_reason_field(): void
     {
-        $timesheet = Timesheet::factory()->submitted()->create();
+        $timesheet = Timesheet::factory()->submitted()->create([
+            'user_id' => $this->staff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $this->shift->id,
+        ]);
 
         $response = $this->actingAs($this->admin)
             ->post("/timesheets/{$timesheet->id}/return", [
@@ -819,7 +858,7 @@ class TimesheetControllerTest extends TestCase
         $response->assertRedirect();
 
         $timesheet->refresh();
-        $this->assertEquals('draft', $timesheet->status);
+        $this->assertEquals('returned', $timesheet->status);
         $this->assertEquals('Missing information', $timesheet->returned_notes);
     }
 
@@ -1130,8 +1169,21 @@ class TimesheetControllerTest extends TestCase
 
     public function test_bulk_return_returns_submitted_timesheets(): void
     {
-        $t1 = Timesheet::factory()->submitted()->create();
-        $t2 = Timesheet::factory()->submitted()->create();
+        $t1 = Timesheet::factory()->submitted()->create([
+            'user_id' => $this->staff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $this->shift->id,
+        ]);
+        $otherShift = Shift::factory()->create([
+            'user_id' => $this->otherStaff->id,
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $t2 = Timesheet::factory()->submitted()->create([
+            'user_id' => $this->otherStaff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $otherShift->id,
+        ]);
 
         $response = $this->actingAs($this->admin)
             ->post('/timesheets/bulk-return', [
@@ -1144,12 +1196,12 @@ class TimesheetControllerTest extends TestCase
 
         $this->assertDatabaseHas('timesheets', [
             'id' => $t1->id,
-            'status' => 'draft',
+            'status' => 'returned',
             'returned_notes' => 'Bulk returned: need more detail',
         ]);
         $this->assertDatabaseHas('timesheets', [
             'id' => $t2->id,
-            'status' => 'draft',
+            'status' => 'returned',
             'returned_notes' => 'Bulk returned: need more detail',
         ]);
     }
@@ -1269,8 +1321,22 @@ class TimesheetControllerTest extends TestCase
 
     public function test_bulk_return_skips_draft_timesheets(): void
     {
-        $draft = Timesheet::factory()->create(['status' => 'draft']);
-        $submitted = Timesheet::factory()->submitted()->create();
+        $draft = Timesheet::factory()->create([
+            'user_id' => $this->staff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $this->shift->id,
+            'status' => 'draft',
+        ]);
+        $otherShift = Shift::factory()->create([
+            'user_id' => $this->otherStaff->id,
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
+        $submitted = Timesheet::factory()->submitted()->create([
+            'user_id' => $this->otherStaff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $otherShift->id,
+        ]);
 
         $response = $this->actingAs($this->admin)
             ->post('/timesheets/bulk-return', [
@@ -1279,12 +1345,12 @@ class TimesheetControllerTest extends TestCase
             ]);
 
         $response->assertRedirect();
-        // Draft stays as draft (skip), submitted becomes draft (returned)
+        // Draft stays as draft (skip), submitted becomes returned.
         $draft->refresh();
         $submitted->refresh();
         $this->assertEquals('draft', $draft->status);
         $this->assertNull($draft->returned_notes);
-        $this->assertEquals('draft', $submitted->status);
+        $this->assertEquals('returned', $submitted->status);
         $this->assertEquals('Fix it', $submitted->returned_notes);
     }
 
@@ -1775,6 +1841,8 @@ class TimesheetControllerTest extends TestCase
     {
         $timesheet = Timesheet::factory()->create([
             'user_id' => $this->staff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $this->shift->id,
             'status' => 'returned',
         ]);
 
@@ -1903,6 +1971,9 @@ class TimesheetControllerTest extends TestCase
     public function test_return_for_changes_clears_approval_fields(): void
     {
         $timesheet = Timesheet::factory()->submitted()->create([
+            'user_id' => $this->staff->id,
+            'client_id' => $this->client->id,
+            'shift_id' => $this->shift->id,
             'approved_by' => $this->admin->id,
             'approved_at' => now(),
             'decision_notes' => 'Was previously noted',
@@ -1914,7 +1985,7 @@ class TimesheetControllerTest extends TestCase
             ]);
 
         $timesheet->refresh();
-        $this->assertEquals('draft', $timesheet->status);
+        $this->assertEquals('returned', $timesheet->status);
         $this->assertNull($timesheet->approved_by);
         $this->assertNull($timesheet->approved_at);
         $this->assertNull($timesheet->decision_notes);

@@ -1,24 +1,38 @@
+import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import PageShell from '@/components/page-shell';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import listPlugin from '@fullcalendar/list';
 import type { DatesSetArg, EventClickArg } from '@fullcalendar/core';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import listPlugin from '@fullcalendar/list';
+import FullCalendar from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
-    Calendar, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Clock,
-    Heart, MapPin, Stethoscope, Users, Video, X,
+    Calendar,
+    CalendarDays,
+    CalendarPlus,
+    ChevronLeft,
+    ChevronRight,
+    Heart,
+    MapPin,
+    Stethoscope,
+    Users,
+    Video,
+    X,
 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 type VisitRequest = {
@@ -47,15 +61,48 @@ const viewOptions: { key: ViewKey; label: string }[] = [
 ];
 
 const categories = [
-    { dot: 'bg-blue-500', label: 'Support Visits', icon: CalendarDays, bg: 'bg-blue-50 dark:bg-blue-950/40' },
-    { dot: 'bg-green-500', label: 'Family Visits', icon: Users, bg: 'bg-green-50 dark:bg-green-950/40' },
-    { dot: 'bg-amber-500', label: 'GP Visits', icon: Stethoscope, bg: 'bg-amber-50 dark:bg-amber-950/40' },
-    { dot: 'bg-purple-500', label: 'Specialist', icon: Heart, bg: 'bg-purple-50 dark:bg-purple-950/40' },
-    { dot: 'bg-pink-500', label: 'Therapy', icon: Heart, bg: 'bg-pink-50 dark:bg-pink-950/40' },
-    { dot: 'bg-cyan-500', label: 'Activities', icon: Calendar, bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
+    {
+        dot: 'bg-blue-500',
+        label: 'Support Visits',
+        icon: CalendarDays,
+        bg: 'bg-blue-50 dark:bg-blue-950/40',
+    },
+    {
+        dot: 'bg-green-500',
+        label: 'Family Visits',
+        icon: Users,
+        bg: 'bg-green-50 dark:bg-green-950/40',
+    },
+    {
+        dot: 'bg-amber-500',
+        label: 'GP Visits',
+        icon: Stethoscope,
+        bg: 'bg-amber-50 dark:bg-amber-950/40',
+    },
+    {
+        dot: 'bg-purple-500',
+        label: 'Specialist',
+        icon: Heart,
+        bg: 'bg-purple-50 dark:bg-purple-950/40',
+    },
+    {
+        dot: 'bg-pink-500',
+        label: 'Therapy',
+        icon: Heart,
+        bg: 'bg-pink-50 dark:bg-pink-950/40',
+    },
+    {
+        dot: 'bg-cyan-500',
+        label: 'Activities',
+        icon: Calendar,
+        bg: 'bg-cyan-50 dark:bg-cyan-950/40',
+    },
 ];
 
-const visitTypeLabels: Record<string, { label: string; icon: typeof Calendar }> = {
+const visitTypeLabels: Record<
+    string,
+    { label: string; icon: typeof Calendar }
+> = {
     in_person: { label: 'In Person', icon: Users },
     video_call: { label: 'Video Call', icon: Video },
     outing: { label: 'Outing', icon: MapPin },
@@ -103,15 +150,34 @@ const calendarStyles = `
 .calendar-context-menu hr { margin: 0.25rem 0; border-color: hsl(var(--border)); }
 `;
 
-function renderEventContent(eventInfo: { event: any; view: any; timeText: string }) {
+function renderEventContent(eventInfo: {
+    event: any;
+    view: any;
+    timeText: string;
+}) {
     const isTime = eventInfo.view.type.includes('timeGrid');
     const isDay = eventInfo.view.type === 'timeGridDay';
     const props = eventInfo.event.extendedProps;
     return (
         <div className="flex h-full flex-col overflow-hidden">
-            <span className={`truncate font-bold leading-tight ${isDay ? 'text-sm' : 'text-xs'}`}>{eventInfo.event.title}</span>
-            {isTime && <span className={`truncate opacity-70 ${isDay ? 'text-xs' : 'text-[10px]'}`}>{eventInfo.timeText}</span>}
-            {isTime && props.location && <span className="mt-auto flex items-center gap-0.5 truncate text-[10px] opacity-50"><MapPin className="h-2.5 w-2.5 shrink-0" />{props.location}</span>}
+            <span
+                className={`truncate leading-tight font-bold ${isDay ? 'text-sm' : 'text-xs'}`}
+            >
+                {eventInfo.event.title}
+            </span>
+            {isTime && (
+                <span
+                    className={`truncate opacity-70 ${isDay ? 'text-xs' : 'text-[10px]'}`}
+                >
+                    {eventInfo.timeText}
+                </span>
+            )}
+            {isTime && props.location && (
+                <span className="mt-auto flex items-center gap-0.5 truncate text-[10px] opacity-50">
+                    <MapPin className="h-2.5 w-2.5 shrink-0" />
+                    {props.location}
+                </span>
+            )}
         </div>
     );
 }
@@ -132,16 +198,32 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
         notes: '',
     });
 
-    const goToday = useCallback(() => calendarRef.current?.getApi().today(), []);
+    const goToday = useCallback(
+        () => calendarRef.current?.getApi().today(),
+        [],
+    );
     const goPrev = useCallback(() => calendarRef.current?.getApi().prev(), []);
     const goNext = useCallback(() => calendarRef.current?.getApi().next(), []);
-    const changeView = useCallback((v: ViewKey) => { calendarRef.current?.getApi().changeView(v); setCurrentView(v); }, []);
-    const handleDatesSet = useCallback((arg: DatesSetArg) => { setCalTitle(arg.view.title); setCurrentView(arg.view.type as ViewKey); }, []);
+    const changeView = useCallback((v: ViewKey) => {
+        calendarRef.current?.getApi().changeView(v);
+        setCurrentView(v);
+    }, []);
+    const handleDatesSet = useCallback((arg: DatesSetArg) => {
+        setCalTitle(arg.view.title);
+        setCurrentView(arg.view.type as ViewKey);
+    }, []);
     const handleEventClick = useCallback((info: EventClickArg) => {
-        setDetail({ title: info.event.title, start: info.event.start, end: info.event.end, ...info.event.extendedProps });
+        setDetail({
+            title: info.event.title,
+            start: info.event.start,
+            end: info.event.end,
+            ...info.event.extendedProps,
+        });
     }, []);
 
-    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(
+        null,
+    );
 
     useEffect(() => {
         const close = () => setCtxMenu(null);
@@ -151,43 +233,77 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
 
     const handleRightClick = useCallback((e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (!target.closest('.fc-timegrid-slot-lane, .fc-daygrid-day, .fc-timegrid-col')) return;
+        if (
+            !target.closest(
+                '.fc-timegrid-slot-lane, .fc-daygrid-day, .fc-timegrid-col',
+            )
+        )
+            return;
         e.preventDefault();
         setCtxMenu({ x: e.clientX, y: e.clientY });
     }, []);
 
-    const fetchEvents = useCallback(async (info: any, successCallback: any, failureCallback: any) => {
-        try {
-            const res = await fetch(`/portal/clients/${client.id}/calendar/events?start=${info.startStr}&end=${info.endStr}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            successCallback(await res.json());
-        } catch (e) { failureCallback(e); }
-    }, [client.id]);
+    const fetchEvents = useCallback(
+        async (info: any, successCallback: any, failureCallback: any) => {
+            try {
+                const res = await fetch(
+                    `/portal/clients/${client.id}/calendar/events?start=${info.startStr}&end=${info.endStr}`,
+                    {
+                        credentials: 'same-origin',
+                        headers: { Accept: 'application/json' },
+                    },
+                );
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                successCallback(await res.json());
+            } catch (e) {
+                failureCallback(e);
+            }
+        },
+        [client.id],
+    );
 
     const submitVisit = (e: React.FormEvent) => {
         e.preventDefault();
         form.post(`/portal/clients/${client.id}/visit-requests`, {
             preserveScroll: true,
-            onSuccess: () => { setBookingOpen(false); form.reset(); toast.success('Visit request submitted!'); },
+            onSuccess: () => {
+                setBookingOpen(false);
+                form.reset();
+                toast.success('Visit request submitted!');
+            },
             onError: () => toast.error('Please check the form and try again.'),
         });
     };
 
     const cancelVisit = (visitId: number) => {
-        router.post(`/portal/clients/${client.id}/visit-requests/${visitId}/cancel`, {}, {
-            preserveScroll: true,
-            onSuccess: () => toast.success('Visit request cancelled.'),
-        });
+        router.post(
+            `/portal/clients/${client.id}/visit-requests/${visitId}/cancel`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success('Visit request cancelled.'),
+            },
+        );
     };
 
-    const pendingCount = visitRequests.filter(v => v.status === 'pending').length;
+    const pendingCount = visitRequests.filter(
+        (v) => v.status === 'pending',
+    ).length;
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Portal', href: '/portal' },
-            { title: clientName, href: `/portal/clients/${client.id}/dashboard` },
-            { title: 'Calendar', href: `/portal/clients/${client.id}/calendar` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Portal', href: '/portal' },
+                {
+                    title: clientName,
+                    href: `/portal/clients/${client.id}/dashboard`,
+                },
+                {
+                    title: 'Calendar',
+                    href: `/portal/clients/${client.id}/calendar`,
+                },
+            ]}
+        >
             <Head title={`${clientName} - Calendar`} />
             <style dangerouslySetInnerHTML={{ __html: calendarStyles }} />
 
@@ -197,16 +313,25 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                     <div className="hidden w-60 shrink-0 space-y-4 lg:block">
                         <Card className="overflow-hidden">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-semibold">{client.first_name}'s Calendar</CardTitle>
+                                <CardTitle className="text-sm font-semibold">
+                                    {client.first_name}'s Calendar
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-0.5 pb-4">
                                 {categories.map((cat) => {
                                     const Icon = cat.icon;
                                     return (
-                                        <div key={cat.label} className={`flex items-center gap-3 rounded-lg px-3 py-2 ${cat.bg}`}>
-                                            <span className={`h-2.5 w-2.5 rounded-full ${cat.dot}`} />
+                                        <div
+                                            key={cat.label}
+                                            className={`flex items-center gap-3 rounded-lg px-3 py-2 ${cat.bg}`}
+                                        >
+                                            <span
+                                                className={`h-2.5 w-2.5 rounded-full ${cat.dot}`}
+                                            />
                                             <Icon className="h-3.5 w-3.5 opacity-50" />
-                                            <span className="text-sm font-medium">{cat.label}</span>
+                                            <span className="text-sm font-medium">
+                                                {cat.label}
+                                            </span>
                                         </div>
                                     );
                                 })}
@@ -218,57 +343,182 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center justify-between text-sm font-semibold">
                                     Your Visits
-                                    {pendingCount > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">{pendingCount} pending</span>}
+                                    {pendingCount > 0 && (
+                                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                                            {pendingCount} pending
+                                        </span>
+                                    )}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2 pb-4">
-                                {visitRequests.slice(0, 4).map(v => {
-                                    const vt = visitTypeLabels[v.visit_type] ?? visitTypeLabels.in_person;
+                                {visitRequests.slice(0, 4).map((v) => {
+                                    const vt =
+                                        visitTypeLabels[v.visit_type] ??
+                                        visitTypeLabels.in_person!;
                                     return (
-                                        <div key={v.id} className="flex items-center justify-between rounded-lg border p-2">
+                                        <div
+                                            key={v.id}
+                                            className="flex items-center justify-between rounded-lg border p-2"
+                                        >
                                             <div className="min-w-0">
-                                                <p className="text-xs font-medium">{new Date(v.requested_date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-                                                <p className="text-[10px] text-muted-foreground">{vt.label}{v.preferred_time_start ? ` · ${v.preferred_time_start}` : ''}</p>
+                                                <p className="text-xs font-medium">
+                                                    {new Date(
+                                                        v.requested_date +
+                                                            'T00:00:00',
+                                                    ).toLocaleDateString(
+                                                        'en-NZ',
+                                                        {
+                                                            weekday: 'short',
+                                                            day: 'numeric',
+                                                            month: 'short',
+                                                        },
+                                                    )}
+                                                </p>
+                                                <p className="text-[10px] text-muted-foreground">
+                                                    {vt.label}
+                                                    {v.preferred_time_start
+                                                        ? ` · ${v.preferred_time_start}`
+                                                        : ''}
+                                                </p>
                                             </div>
                                             <div className="flex items-center gap-1">
-                                                <Badge className={`border-0 text-[9px] ${statusColors[v.status]}`}>{v.status}</Badge>
+                                                <Badge
+                                                    className={`border-0 text-[9px] ${statusColors[v.status]}`}
+                                                >
+                                                    {v.status}
+                                                </Badge>
                                                 {v.status === 'pending' && (
-                                                    <button onClick={() => cancelVisit(v.id)} className="text-muted-foreground hover:text-red-500"><X className="h-3 w-3" /></button>
+                                                    <button
+                                                        onClick={() =>
+                                                            cancelVisit(v.id)
+                                                        }
+                                                        className="text-muted-foreground hover:text-red-500"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
                                     );
                                 })}
-                                <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
+                                <Dialog
+                                    open={bookingOpen}
+                                    onOpenChange={setBookingOpen}
+                                >
                                     <DialogTrigger asChild>
-                                        <Button size="sm" className="w-full gap-1.5 mt-1">
-                                            <CalendarPlus className="h-3.5 w-3.5" />Request a Visit
+                                        <Button
+                                            size="sm"
+                                            className="mt-1 w-full gap-1.5"
+                                        >
+                                            <CalendarPlus className="h-3.5 w-3.5" />
+                                            Request a Visit
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className="sm:max-w-md">
                                         <DialogHeader>
-                                            <DialogTitle>Request a Visit</DialogTitle>
-                                            <DialogDescription>Submit a visit request to see {client.first_name}.</DialogDescription>
+                                            <DialogTitle>
+                                                Request a Visit
+                                            </DialogTitle>
+                                            <DialogDescription>
+                                                Submit a visit request to see{' '}
+                                                {client.first_name}.
+                                            </DialogDescription>
                                         </DialogHeader>
-                                        <form onSubmit={submitVisit} className="space-y-4">
+                                        <form
+                                            onSubmit={submitVisit}
+                                            className="space-y-4"
+                                        >
                                             <div>
                                                 <Label>Date *</Label>
-                                                <Input type="date" value={form.data.requested_date} onChange={(e) => form.setData('requested_date', e.target.value)} min={new Date().toISOString().split('T')[0]} />
+                                                <Input
+                                                    type="date"
+                                                    value={
+                                                        form.data.requested_date
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'requested_date',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    min={
+                                                        new Date()
+                                                            .toISOString()
+                                                            .split('T')[0]
+                                                    }
+                                                />
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
-                                                <div><Label>From</Label><Input type="time" value={form.data.preferred_time_start} onChange={(e) => form.setData('preferred_time_start', e.target.value)} /></div>
-                                                <div><Label>To</Label><Input type="time" value={form.data.preferred_time_end} onChange={(e) => form.setData('preferred_time_end', e.target.value)} /></div>
+                                                <div>
+                                                    <Label>From</Label>
+                                                    <Input
+                                                        type="time"
+                                                        value={
+                                                            form.data
+                                                                .preferred_time_start
+                                                        }
+                                                        onChange={(e) =>
+                                                            form.setData(
+                                                                'preferred_time_start',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>To</Label>
+                                                    <Input
+                                                        type="time"
+                                                        value={
+                                                            form.data
+                                                                .preferred_time_end
+                                                        }
+                                                        onChange={(e) =>
+                                                            form.setData(
+                                                                'preferred_time_end',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
                                             </div>
                                             <div>
                                                 <Label>Visit Type *</Label>
                                                 <div className="mt-2 grid grid-cols-3 gap-2">
-                                                    {(['in_person', 'video_call', 'outing'] as const).map((type) => {
-                                                        const { label, icon: Icon } = visitTypeLabels[type];
-                                                        const selected = form.data.visit_type === type;
+                                                    {(
+                                                        [
+                                                            'in_person',
+                                                            'video_call',
+                                                            'outing',
+                                                        ] as const
+                                                    ).map((type) => {
+                                                        const visitType =
+                                                            visitTypeLabels[
+                                                                type
+                                                            ] ??
+                                                            visitTypeLabels.in_person!;
+                                                        const {
+                                                            label,
+                                                            icon: Icon,
+                                                        } = visitType;
+                                                        const selected =
+                                                            form.data
+                                                                .visit_type ===
+                                                            type;
                                                         return (
-                                                            <button key={type} type="button" onClick={() => form.setData('visit_type', type)}
-                                                                className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${selected ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/30 text-muted-foreground'}`}>
-                                                                <Icon className="h-5 w-5" />{label}
+                                                            <button
+                                                                key={type}
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    form.setData(
+                                                                        'visit_type',
+                                                                        type,
+                                                                    )
+                                                                }
+                                                                className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${selected ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-primary/30'}`}
+                                                            >
+                                                                <Icon className="h-5 w-5" />
+                                                                {label}
                                                             </button>
                                                         );
                                                     })}
@@ -276,11 +526,39 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                             </div>
                                             <div>
                                                 <Label>Notes</Label>
-                                                <textarea className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" rows={3} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} placeholder="Any special requests..." />
+                                                <textarea
+                                                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                    rows={3}
+                                                    value={form.data.notes}
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'notes',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="Any special requests..."
+                                                />
                                             </div>
                                             <div className="flex justify-end gap-2">
-                                                <Button type="button" variant="outline" onClick={() => setBookingOpen(false)}>Cancel</Button>
-                                                <Button type="submit" disabled={form.processing || !form.data.requested_date}>Submit Request</Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setBookingOpen(false)
+                                                    }
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    type="submit"
+                                                    disabled={
+                                                        form.processing ||
+                                                        !form.data
+                                                            .requested_date
+                                                    }
+                                                >
+                                                    Submit Request
+                                                </Button>
                                             </div>
                                         </form>
                                     </DialogContent>
@@ -293,21 +571,46 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                     <div className="min-w-0 flex-1">
                         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-4">
-                                <h1 className="text-2xl font-bold tracking-tight">{calTitle}</h1>
+                                <h1 className="text-2xl font-bold tracking-tight">
+                                    {calTitle}
+                                </h1>
                                 <div className="flex items-center">
-                                    <button onClick={goPrev} className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted transition-colors"><ChevronLeft className="h-5 w-5" /></button>
-                                    <button onClick={goNext} className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-muted transition-colors"><ChevronRight className="h-5 w-5" /></button>
+                                    <button
+                                        onClick={goPrev}
+                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-muted"
+                                    >
+                                        <ChevronLeft className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                        onClick={goNext}
+                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-muted"
+                                    >
+                                        <ChevronRight className="h-5 w-5" />
+                                    </button>
                                 </div>
-                                <button onClick={goToday} className="rounded-full border px-5 py-1.5 text-sm font-semibold shadow-sm hover:bg-accent transition-colors">Today</button>
+                                <button
+                                    onClick={goToday}
+                                    className="rounded-full border px-5 py-1.5 text-sm font-semibold shadow-sm transition-colors hover:bg-accent"
+                                >
+                                    Today
+                                </button>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button size="sm" className="gap-1.5 lg:hidden" onClick={() => setBookingOpen(true)}>
-                                    <CalendarPlus className="h-3.5 w-3.5" />Request Visit
+                                <Button
+                                    size="sm"
+                                    className="gap-1.5 lg:hidden"
+                                    onClick={() => setBookingOpen(true)}
+                                >
+                                    <CalendarPlus className="h-3.5 w-3.5" />
+                                    Request Visit
                                 </Button>
-                                <div className="inline-flex items-center gap-1 rounded-full border p-1 bg-muted/20">
+                                <div className="inline-flex items-center gap-1 rounded-full border bg-muted/20 p-1">
                                     {viewOptions.map((v) => (
-                                        <button key={v.key} onClick={() => changeView(v.key)}
-                                            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${currentView === v.key ? 'bg-foreground text-background shadow' : 'text-muted-foreground hover:text-foreground'}`}>
+                                        <button
+                                            key={v.key}
+                                            onClick={() => changeView(v.key)}
+                                            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${currentView === v.key ? 'bg-foreground text-background shadow' : 'text-muted-foreground hover:text-foreground'}`}
+                                        >
                                             {v.label}
                                         </button>
                                     ))}
@@ -315,10 +618,17 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border bg-card shadow-sm overflow-hidden" onContextMenu={handleRightClick}>
+                        <div
+                            className="overflow-hidden rounded-2xl border bg-card shadow-sm"
+                            onContextMenu={handleRightClick}
+                        >
                             <FullCalendar
                                 ref={calendarRef}
-                                plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
+                                plugins={[
+                                    dayGridPlugin,
+                                    timeGridPlugin,
+                                    listPlugin,
+                                ]}
                                 initialView="timeGridWeek"
                                 headerToolbar={false}
                                 events={fetchEvents}
@@ -331,13 +641,21 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                 allDaySlot={true}
                                 nowIndicator={true}
                                 eventContent={renderEventContent}
-                                businessHours={{ daysOfWeek: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '18:00' }}
+                                businessHours={{
+                                    daysOfWeek: [1, 2, 3, 4, 5],
+                                    startTime: '08:00',
+                                    endTime: '18:00',
+                                }}
                                 slotDuration="00:30:00"
                                 dayMaxEvents={3}
                                 expandRows={true}
                                 stickyHeaderDates={true}
                                 firstDay={1}
-                                eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false }}
+                                eventTimeFormat={{
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    meridiem: false,
+                                }}
                             />
                         </div>
 
@@ -347,16 +665,111 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                 <CardContent className="p-4">
                                     <div className="flex items-start justify-between">
                                         <div>
-                                            <h3 className="text-sm font-semibold">{detail.title}</h3>
-                                            <p className="mt-1 text-xs text-muted-foreground capitalize">{detail.type?.replace(/_/g, ' ')}{detail.appointment_type ? ` — ${detail.appointment_type.replace(/_/g, ' ')}` : ''}</p>
-                                            {detail.start && <p className="mt-1 text-xs text-muted-foreground">{new Date(detail.start).toLocaleString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{detail.end ? ` — ${new Date(detail.end).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}` : ''}</p>}
-                                            {detail.location && <p className="mt-1 text-xs"><MapPin className="inline h-3 w-3 mr-1" />{detail.location}</p>}
-                                            {detail.provider_name && <p className="mt-0.5 text-xs"><Stethoscope className="inline h-3 w-3 mr-1" />{detail.provider_name}</p>}
-                                            {detail.staff_name && <p className="mt-0.5 text-xs"><Users className="inline h-3 w-3 mr-1" />{detail.staff_name}</p>}
-                                            {detail.description && <p className="mt-2 text-sm text-muted-foreground">{detail.description}</p>}
-                                            {detail.notes && <p className="mt-2 text-sm text-muted-foreground">{detail.notes}</p>}
+                                            <h3 className="text-sm font-semibold">
+                                                {detail.title}
+                                            </h3>
+                                            <p className="mt-1 text-xs text-muted-foreground capitalize">
+                                                {detail.type?.replace(
+                                                    /_/g,
+                                                    ' ',
+                                                )}
+                                                {detail.appointment_type
+                                                    ? ` — ${detail.appointment_type.replace(/_/g, ' ')}`
+                                                    : ''}
+                                            </p>
+                                            {detail.start && (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {new Date(
+                                                        detail.start,
+                                                    ).toLocaleString('en-NZ', {
+                                                        weekday: 'short',
+                                                        day: 'numeric',
+                                                        month: 'short',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                    })}
+                                                    {detail.end
+                                                        ? ` — ${new Date(detail.end).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}`
+                                                        : ''}
+                                                </p>
+                                            )}
+                                            {detail.shift_type && (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    Shift type:{' '}
+                                                    {String(
+                                                        detail.shift_type,
+                                                    ).replace(/_/g, ' ')}
+                                                </p>
+                                            )}
+                                            {detail.service_context && (
+                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                    Service:{' '}
+                                                    {detail.service_context}
+                                                </p>
+                                            )}
+                                            {detail.location && (
+                                                <p className="mt-1 text-xs">
+                                                    <MapPin className="mr-1 inline h-3 w-3" />
+                                                    {detail.location}
+                                                </p>
+                                            )}
+                                            {detail.provider_name && (
+                                                <p className="mt-0.5 text-xs">
+                                                    <Stethoscope className="mr-1 inline h-3 w-3" />
+                                                    {detail.provider_name}
+                                                </p>
+                                            )}
+                                            {detail.staff_name && (
+                                                <p className="mt-0.5 text-xs">
+                                                    <Users className="mr-1 inline h-3 w-3" />
+                                                    {detail.staff_name}
+                                                </p>
+                                            )}
+                                            {(detail.is_sleepover ||
+                                                detail.is_on_call ||
+                                                detail.expected_break_minutes !=
+                                                    null) && (
+                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                    {detail.is_sleepover
+                                                        ? 'Sleepover'
+                                                        : ''}
+                                                    {detail.is_sleepover &&
+                                                    detail.is_on_call
+                                                        ? ' · '
+                                                        : ''}
+                                                    {detail.is_on_call
+                                                        ? 'On-call'
+                                                        : ''}
+                                                    {(detail.is_sleepover ||
+                                                        detail.is_on_call) &&
+                                                    detail.expected_break_minutes !=
+                                                        null
+                                                        ? ' · '
+                                                        : ''}
+                                                    {detail.expected_break_minutes !=
+                                                    null
+                                                        ? `Break ${detail.expected_break_minutes} min`
+                                                        : ''}
+                                                </p>
+                                            )}
+                                            {detail.description && (
+                                                <p className="mt-2 text-sm text-muted-foreground">
+                                                    {detail.description}
+                                                </p>
+                                            )}
+                                            {detail.notes && (
+                                                <p className="mt-2 text-sm text-muted-foreground">
+                                                    {detail.notes}
+                                                </p>
+                                            )}
                                         </div>
-                                        <Button size="sm" variant="ghost" onClick={() => setDetail(null)}>Close</Button>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setDetail(null)}
+                                        >
+                                            Close
+                                        </Button>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -366,17 +779,36 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
 
                 {/* Context Menu */}
                 {ctxMenu && (
-                    <div className="calendar-context-menu" style={{ top: ctxMenu.y, left: ctxMenu.x }} onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => { setCtxMenu(null); setBookingOpen(true); }}>
+                    <div
+                        className="calendar-context-menu"
+                        style={{ top: ctxMenu.y, left: ctxMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={() => {
+                                setCtxMenu(null);
+                                setBookingOpen(true);
+                            }}
+                        >
                             <CalendarPlus className="h-4 w-4 text-green-500" />
                             <span>Request a Visit</span>
                         </button>
                         <hr />
-                        <button onClick={() => { setCtxMenu(null); changeView('timeGridDay'); }}>
+                        <button
+                            onClick={() => {
+                                setCtxMenu(null);
+                                changeView('timeGridDay');
+                            }}
+                        >
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                             <span>View Day</span>
                         </button>
-                        <button onClick={() => { setCtxMenu(null); changeView('listWeek'); }}>
+                        <button
+                            onClick={() => {
+                                setCtxMenu(null);
+                                changeView('listWeek');
+                            }}
+                        >
                             <CalendarDays className="h-4 w-4 text-muted-foreground" />
                             <span>View List</span>
                         </button>

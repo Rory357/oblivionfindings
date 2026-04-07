@@ -6,6 +6,7 @@ use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\FleetGeofenceState;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 
 class FleetGeofenceService
 {
@@ -21,73 +22,84 @@ class FleetGeofenceService
             ->get();
 
         foreach ($geofences as $geofence) {
-            $inside = $this->isInside($geofence, $lat, $lon);
-            $state = FleetGeofenceState::query()
-                ->firstOrNew([
-                    'asset_id' => $asset->id,
-                    'geofence_id' => $geofence->id,
-                ]);
+            DB::transaction(function () use ($asset, $geofence, $lat, $lon, $occurredAt) {
+                $inside = $this->isInside($geofence, $lat, $lon);
 
-            $previous = $state->status;
-            $next = $inside ? 'inside' : 'outside';
+                $state = FleetGeofenceState::query()
+                    ->where('asset_id', $asset->id)
+                    ->where('geofence_id', $geofence->id)
+                    ->lockForUpdate()
+                    ->first();
 
-            if ($previous !== $next) {
-                $state->status = $next;
-                $state->last_changed_at = $occurredAt;
-                if ($inside) {
-                    $state->last_inside_at = $occurredAt;
-                    $state->dwell_started_at = $occurredAt;
-                    $this->signals->emit([
+                if (!$state) {
+                    $state = new FleetGeofenceState([
                         'asset_id' => $asset->id,
                         'geofence_id' => $geofence->id,
-                        'signal_type' => 'geofence.enter',
-                        'severity_hint' => 'low',
-                        'occurred_at' => $occurredAt,
-                        'payload' => [
-                            'geofence_name' => $geofence->name,
-                        ],
-                    ]);
-                } else {
-                    $state->last_outside_at = $occurredAt;
-                    $state->dwell_started_at = null;
-                    $this->signals->emit([
-                        'asset_id' => $asset->id,
-                        'geofence_id' => $geofence->id,
-                        'signal_type' => 'geofence.breach',
-                        'severity_hint' => $geofence->breach_type === 'hard' ? 'high' : 'medium',
-                        'occurred_at' => $occurredAt,
-                        'payload' => [
-                            'geofence_name' => $geofence->name,
-                        ],
                     ]);
                 }
-            }
 
-            if ($inside && $state->dwell_started_at) {
-                $dwellMinutes = $state->dwell_started_at->diffInMinutes($occurredAt);
-                if ($dwellMinutes >= 10) {
-                    $idempotency = hash('sha256', implode('|', [
-                        $asset->id,
-                        $geofence->id,
-                        'dwell',
-                        $state->dwell_started_at->toISOString(),
-                    ]));
-                    $this->signals->emit([
-                        'asset_id' => $asset->id,
-                        'geofence_id' => $geofence->id,
-                        'signal_type' => 'geofence.dwell',
-                        'severity_hint' => 'low',
-                        'occurred_at' => $occurredAt,
-                        'idempotency_key' => $idempotency,
-                        'payload' => [
-                            'geofence_name' => $geofence->name,
-                            'dwell_minutes' => $dwellMinutes,
-                        ],
-                    ]);
+                $previous = $state->status;
+                $next = $inside ? 'inside' : 'outside';
+
+                if ($previous !== $next) {
+                    $state->status = $next;
+                    $state->last_changed_at = $occurredAt;
+                    if ($inside) {
+                        $state->last_inside_at = $occurredAt;
+                        $state->dwell_started_at = $occurredAt;
+                        $this->signals->emit([
+                            'asset_id' => $asset->id,
+                            'geofence_id' => $geofence->id,
+                            'signal_type' => 'geofence.enter',
+                            'severity_hint' => 'low',
+                            'occurred_at' => $occurredAt,
+                            'payload' => [
+                                'geofence_name' => $geofence->name,
+                            ],
+                        ]);
+                    } else {
+                        $state->last_outside_at = $occurredAt;
+                        $state->dwell_started_at = null;
+                        $this->signals->emit([
+                            'asset_id' => $asset->id,
+                            'geofence_id' => $geofence->id,
+                            'signal_type' => 'geofence.breach',
+                            'severity_hint' => $geofence->breach_type === 'hard' ? 'high' : 'medium',
+                            'occurred_at' => $occurredAt,
+                            'payload' => [
+                                'geofence_name' => $geofence->name,
+                            ],
+                        ]);
+                    }
                 }
-            }
 
-            $state->save();
+                if ($inside && $state->dwell_started_at) {
+                    $dwellMinutes = $state->dwell_started_at->diffInMinutes($occurredAt);
+                    $dwellThreshold = (int) config('fleet.signals.dwell_threshold_minutes', 10);
+                    if ($dwellMinutes >= $dwellThreshold) {
+                        $idempotency = hash('sha256', implode('|', [
+                            $asset->id,
+                            $geofence->id,
+                            'dwell',
+                            $state->dwell_started_at->toISOString(),
+                        ]));
+                        $this->signals->emit([
+                            'asset_id' => $asset->id,
+                            'geofence_id' => $geofence->id,
+                            'signal_type' => 'geofence.dwell',
+                            'severity_hint' => 'low',
+                            'occurred_at' => $occurredAt,
+                            'idempotency_key' => $idempotency,
+                            'payload' => [
+                                'geofence_name' => $geofence->name,
+                                'dwell_minutes' => $dwellMinutes,
+                            ],
+                        ]);
+                    }
+                }
+
+                $state->save();
+            });
         }
     }
 

@@ -18,22 +18,35 @@ class PortalScheduleController extends Controller
         abort_unless($user->canAccessClientPortal($client), 403);
 
         $portalSettings = FamilyPortalSetting::where('client_id', $client->id)->first();
-        $showShifts = (bool) $portalSettings?->show_shift_schedule;
+        $showShifts = $portalSettings?->show_shift_schedule ?? true;
 
         $shifts = collect();
 
         if ($showShifts) {
+            $rangeStart = now()->startOfDay();
+            $rangeEnd = now()->addDays(30);
+
             $shifts = Shift::where('client_id', $client->id)
-                ->whereBetween('starts_at', [now()->startOfDay(), now()->addDays(30)])
+                ->where('starts_at', '<', $rangeEnd)
+                ->where('ends_at', '>', $rangeStart)
                 ->orderBy('starts_at')
-                ->with('staff:id,name,profile_photo_path')
+                ->with(['staff:id,name,profile_photo_path', 'serviceContext:id,name,type'])
                 ->get()
                 ->map(fn ($shift) => [
                     'id' => $shift->id,
                     'starts_at' => $shift->starts_at?->toISOString(),
                     'ends_at' => $shift->ends_at?->toISOString(),
                     'status' => $shift->status,
-                    'type' => $shift->type,
+                    'shift_type' => $shift->shift_type ?? 'standard',
+                    'is_sleepover' => (bool) $shift->is_sleepover,
+                    'is_on_call' => (bool) $shift->is_on_call,
+                    'expected_break_minutes' => $shift->expected_break_minutes,
+                    'location' => $shift->location,
+                    'service_context' => $shift->serviceContext ? [
+                        'id' => $shift->serviceContext->id,
+                        'name' => $shift->serviceContext->name,
+                        'type' => $shift->serviceContext->type?->value,
+                    ] : null,
                     'date' => $shift->starts_at?->format('Y-m-d'),
                     'staff' => $shift->staff ? [
                         'id' => $shift->staff->id,

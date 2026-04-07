@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FleetDriverSession extends Model
 {
+    use AuditableChanges;
     protected $fillable = [
         'asset_id',
         'user_id',
@@ -35,5 +37,10 @@ class FleetDriverSession extends Model
     public function trips(): HasMany
     {
         return $this->hasMany(FleetTrip::class, 'driver_session_id');
+    }
+
+    public function signals(): HasMany
+    {
+        return $this->hasMany(FleetSignal::class, 'driver_session_id');
     }
 }

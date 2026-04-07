@@ -14,26 +14,25 @@ class FleetSignalService
     {
         $idempotencyKey = $payload['idempotency_key'] ?? $this->buildIdempotencyKey($payload);
 
-        $existing = FleetSignal::query()
-            ->where('idempotency_key', $idempotencyKey)
-            ->first();
+        $signal = FleetSignal::query()
+            ->firstOrCreate(
+                ['idempotency_key' => $idempotencyKey],
+                [
+                    'asset_id' => $payload['asset_id'],
+                    'asset_tracker_id' => $payload['asset_tracker_id'] ?? null,
+                    'geofence_id' => $payload['geofence_id'] ?? null,
+                    'trip_id' => $payload['trip_id'] ?? null,
+                    'driver_session_id' => $payload['driver_session_id'] ?? null,
+                    'signal_type' => $payload['signal_type'],
+                    'severity_hint' => $payload['severity_hint'] ?? 'low',
+                    'occurred_at' => $payload['occurred_at'] ?? now(),
+                    'payload' => $payload['payload'] ?? null,
+                ]
+            );
 
-        if ($existing) {
-            return $existing;
+        if (!$signal->wasRecentlyCreated) {
+            return $signal;
         }
-
-        $signal = FleetSignal::create([
-            'asset_id' => $payload['asset_id'],
-            'asset_tracker_id' => $payload['asset_tracker_id'] ?? null,
-            'geofence_id' => $payload['geofence_id'] ?? null,
-            'trip_id' => $payload['trip_id'] ?? null,
-            'driver_session_id' => $payload['driver_session_id'] ?? null,
-            'signal_type' => $payload['signal_type'],
-            'severity_hint' => $payload['severity_hint'] ?? 'low',
-            'occurred_at' => $payload['occurred_at'] ?? now(),
-            'idempotency_key' => $idempotencyKey,
-            'payload' => $payload['payload'] ?? null,
-        ]);
 
         $outbox = FleetSignalOutbox::create([
             'fleet_signal_id' => $signal->id,

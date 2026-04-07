@@ -25,7 +25,9 @@ import type {
     EventDropArg,
 } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin, { type EventResizeDoneArg } from '@fullcalendar/interaction';
+import interactionPlugin, {
+    type EventResizeDoneArg,
+} from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -44,7 +46,12 @@ type Props = {
         service_context_id?: number | null;
         site?: { id: number; name: string } | null;
     }>;
-    serviceContexts: Array<{ id: number; name: string; type: string; is_active: boolean }>;
+    serviceContexts: Array<{
+        id: number;
+        name: string;
+        type: string;
+        is_active: boolean;
+    }>;
     defaultServiceContextId?: number | null;
 };
 
@@ -56,14 +63,74 @@ type ShiftForm = {
     starts_at: string;
     ends_at: string;
     location: string;
-    status: 'scheduled' | 'completed' | 'cancelled';
+    status: 'draft' | 'scheduled';
+    shift_type: 'standard' | 'sleepover' | 'on_call' | 'split' | 'travel';
+    is_sleepover: boolean;
+    is_on_call: boolean;
+    expected_break_minutes: number | '';
+    coverage_roles: string[];
     notes: string;
 };
 
 type ShiftViewInfo = {
+    id?: number;
+    eventType?: string;
     client?: string;
     staff?: string;
+    shiftType?: string;
+    status?: string;
+    serviceContext?: string;
+    location?: string;
+    expectedBreakMinutes?: number | null;
+    shiftSeriesId?: number | null;
+    isRecurring?: boolean;
+    replacementStatus?: string | null;
+    hasActiveReplacement?: boolean;
+    tasksTotal?: number;
+    tasksCompleted?: number;
+    incidentsCount?: number;
+    isOpenShift?: boolean;
+    siteId?: number | null;
+    siteName?: string;
+    coverageState?: string | null;
+    coverageGapKind?: string | null;
+    coverageRecommendedFillAction?: string | null;
+    coverageMissingStaff?: number;
+    coverageRequiredStaff?: number | null;
+    coverageAssignedStaff?: number | null;
+    coverageWindowLabel?: string | null;
+    coverageRuleName?: string | null;
+    coverageRuleId?: number | null;
+    coveragePreferredClientId?: number | null;
+    coverageRoleShortages?: Array<{
+        key: string;
+        label?: string | null;
+        missing?: number;
+    }>;
+    coveragePlannedRoleShortages?: Array<{
+        key: string;
+        label?: string | null;
+        missing?: number;
+    }>;
+    coverageContradictions?: string[];
 };
+
+function eventTone(
+    status?: string,
+    isOpenShift?: boolean,
+    hasActiveReplacement?: boolean,
+) {
+    if (status === 'cancelled')
+        return 'border-slate-300 bg-slate-100 text-slate-700';
+    if (status === 'completed')
+        return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    if (hasActiveReplacement)
+        return 'border-amber-200 bg-amber-50 text-amber-900';
+    if (isOpenShift) return 'border-red-200 bg-red-50 text-red-800';
+    if (status === 'in_progress')
+        return 'border-blue-200 bg-blue-50 text-blue-800';
+    return 'border-border bg-background text-foreground';
+}
 
 function pad2(n: number) {
     return String(n).padStart(2, '0');
@@ -83,8 +150,68 @@ function addHours(date: Date, hours: number) {
 
 function getCsrfToken() {
     return (
-        document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
+        document.querySelector(
+            'meta[name="csrf-token"]',
+        ) as HTMLMetaElement | null
     )?.content;
+}
+
+function coverageRolesForAction(viewInfo?: ShiftViewInfo | null) {
+    return (
+        (viewInfo?.coveragePlannedRoleShortages?.length
+            ? viewInfo.coveragePlannedRoleShortages
+            : viewInfo?.coverageRoleShortages) ?? []
+    );
+}
+
+function gapKindLabel(kind?: string | null) {
+    switch (kind) {
+        case 'headcount_open':
+            return 'Open shift gap';
+        case 'headcount_unplanned':
+            return 'Unplanned headcount gap';
+        case 'role_open':
+            return 'Open role gap';
+        case 'role_unplanned':
+            return 'Unplanned role gap';
+        case 'mixed_open':
+            return 'Open shift + role gap';
+        case 'mixed_unplanned':
+            return 'Headcount + role gap';
+        case 'overfill_not_allowed':
+            return 'Overfill not allowed';
+        case 'overfilled_wrong_role_mix':
+            return 'Overfilled role imbalance';
+        case 'overfill_and_role_imbalance':
+            return 'Overfill + role imbalance';
+        default:
+            return 'Coverage gap';
+    }
+}
+
+function fillActionLabel(action?: string | null) {
+    switch (action) {
+        case 'fill_existing_open_shift':
+            return 'Fill existing open shift';
+        case 'retag_or_replace_open_shift':
+            return 'Retag or replace open shift';
+        case 'create_role_specific_shift':
+            return 'Create role-specific cover';
+        case 'create_recurring_cover':
+            return 'Create recurring cover';
+        case 'review_existing_supply':
+            return 'Review existing supply';
+        case 'rebalance_existing_supply':
+            return 'Rebalance existing supply';
+        default:
+            return 'Create cover shift';
+    }
+}
+
+function shouldOfferCreation(action?: string | null) {
+    return !['review_existing_supply', 'rebalance_existing_supply'].includes(
+        action ?? '',
+    );
 }
 
 async function jsonRequest<T>(
@@ -120,7 +247,6 @@ async function jsonRequest<T>(
 
     return res.json();
 }
-
 
 export default function CalendarIndex(props: Props) {
     const defaultServiceContextId = props.defaultServiceContextId ?? null;
@@ -166,13 +292,20 @@ export default function CalendarIndex(props: Props) {
         return m;
     }, [props.clients]);
 
-    const locationForClientId = useCallback((selectedClientId: number | '' | null | undefined): string => {
-        if (selectedClientId === '' || selectedClientId === null || selectedClientId === undefined) {
-            return '';
-        }
+    const locationForClientId = useCallback(
+        (selectedClientId: number | '' | null | undefined): string => {
+            if (
+                selectedClientId === '' ||
+                selectedClientId === null ||
+                selectedClientId === undefined
+            ) {
+                return '';
+            }
 
-        return clientLocationById.get(Number(selectedClientId)) ?? '';
-    }, [clientLocationById]);
+            return clientLocationById.get(Number(selectedClientId)) ?? '';
+        },
+        [clientLocationById],
+    );
 
     const serviceContextOptions = useMemo(() => {
         return (props.serviceContexts ?? []).map((sc) => ({
@@ -191,7 +324,15 @@ export default function CalendarIndex(props: Props) {
         scheduled: number;
         completed: number;
         cancelled: number;
-    }>({ total: 0, hours: 0, scheduled: 0, completed: 0, cancelled: 0 });
+        coverageGaps: number;
+    }>({
+        total: 0,
+        hours: 0,
+        scheduled: 0,
+        completed: 0,
+        cancelled: 0,
+        coverageGaps: 0,
+    });
 
     const calendarRef = useRef<FullCalendar | null>(null);
     const loadEvents = useCallback(
@@ -209,10 +350,13 @@ export default function CalendarIndex(props: Props) {
                     params.set('client_id', clientId);
                 }
 
-                const res = await fetch(`/calendar/events?${params.toString()}`, {
-                    headers: { Accept: 'application/json' },
-                    credentials: 'same-origin',
-                });
+                const res = await fetch(
+                    `/calendar/events?${params.toString()}`,
+                    {
+                        headers: { Accept: 'application/json' },
+                        credentials: 'same-origin',
+                    },
+                );
 
                 if (!res.ok) {
                     throw new Error(`Failed to load events: ${res.status}`);
@@ -228,13 +372,17 @@ export default function CalendarIndex(props: Props) {
                         scheduled: 0,
                         completed: 0,
                         cancelled: 0,
+                        coverageGaps: 0,
                     };
 
                     for (const ev of data ?? []) {
+                        if (ev?.extendedProps?.event_type === 'coverage_gap') {
+                            summary.coverageGaps += 1;
+                            continue;
+                        }
                         summary.total += 1;
 
-                        const status =
-                            ev?.extendedProps?.status ?? 'scheduled';
+                        const status = ev?.extendedProps?.status ?? 'scheduled';
                         if (status === 'completed') summary.completed += 1;
                         else if (status === 'cancelled') summary.cancelled += 1;
                         else summary.scheduled += 1;
@@ -260,7 +408,8 @@ export default function CalendarIndex(props: Props) {
                             prev.hours === summary.hours &&
                             prev.scheduled === summary.scheduled &&
                             prev.completed === summary.completed &&
-                            prev.cancelled === summary.cancelled;
+                            prev.cancelled === summary.cancelled &&
+                            prev.coverageGaps === summary.coverageGaps;
                         return same ? prev : summary;
                     });
                 } catch {
@@ -276,11 +425,14 @@ export default function CalendarIndex(props: Props) {
         [canManageAny, staffId, clientId],
     );
 
-
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const coverageReturnTo =
+        typeof window === 'undefined'
+            ? '/calendar'
+            : `${window.location.pathname}${window.location.search}`;
     const [viewInfo, setViewInfo] = useState<ShiftViewInfo | null>(null);
     const [form, setForm] = useState<ShiftForm>({
         client_id: '',
@@ -290,6 +442,11 @@ export default function CalendarIndex(props: Props) {
         ends_at: '',
         location: '',
         status: 'scheduled',
+        shift_type: 'standard',
+        is_sleepover: false,
+        is_on_call: false,
+        expected_break_minutes: '',
+        coverage_roles: [],
         notes: '',
     });
 
@@ -302,7 +459,9 @@ export default function CalendarIndex(props: Props) {
             canManageAny && clientId !== 'all' ? Number(clientId) : '';
 
         const prefillServiceContext =
-            prefillClient !== '' ? (clientServiceContextById.get(Number(prefillClient)) ?? '') : '';
+            prefillClient !== ''
+                ? (clientServiceContextById.get(Number(prefillClient)) ?? '')
+                : '';
 
         setModalMode('create');
         setError(null);
@@ -310,12 +469,19 @@ export default function CalendarIndex(props: Props) {
         setForm({
             id: undefined,
             client_id: prefillClient,
-            service_context_id: (prefillServiceContext === null ? (defaultServiceContextId ?? '') : prefillServiceContext) as any,
+            service_context_id: (prefillServiceContext === null
+                ? (defaultServiceContextId ?? '')
+                : prefillServiceContext) as any,
             user_id: prefillStaff,
             starts_at: toDatetimeLocalValue(start),
             ends_at: toDatetimeLocalValue(end),
             location: locationForClientId(prefillClient),
             status: 'scheduled',
+            shift_type: 'standard',
+            is_sleepover: false,
+            is_on_call: false,
+            expected_break_minutes: '',
+            coverage_roles: [],
             notes: '',
         });
         setModalOpen(true);
@@ -330,7 +496,67 @@ export default function CalendarIndex(props: Props) {
 
         setModalMode('edit');
         setError(null);
-        setViewInfo({ client: ext.client, staff: ext.staff });
+        setViewInfo({
+            id: Number(arg.event.id),
+            eventType: ext.event_type ?? 'shift',
+            client: ext.client,
+            staff: ext.staff,
+            shiftType: ext.shift_type ?? 'standard',
+            status: ext.status ?? 'scheduled',
+            serviceContext: ext.service_context ?? '',
+            location: ext.location ?? '',
+            expectedBreakMinutes: ext.expected_break_minutes ?? null,
+            shiftSeriesId: ext.shift_series_id ?? null,
+            isRecurring: !!ext.is_recurring,
+            replacementStatus: ext.replacement_status ?? null,
+            hasActiveReplacement: !!ext.has_active_replacement,
+            tasksTotal: ext.tasks_total ?? 0,
+            tasksCompleted: ext.tasks_completed ?? 0,
+            incidentsCount: ext.incidents_count ?? 0,
+            isOpenShift: !!ext.is_open_shift,
+            siteId: ext.site_id ?? null,
+            siteName: ext.site_name ?? null,
+            coverageState: ext.coverage_state ?? null,
+            coverageGapKind: ext.coverage_gap_kind ?? null,
+            coverageRecommendedFillAction:
+                ext.coverage_recommended_fill_action ?? null,
+            coverageMissingStaff: ext.coverage_missing_staff ?? 0,
+            coverageRequiredStaff: ext.coverage_required_staff ?? null,
+            coverageAssignedStaff: ext.coverage_assigned_staff ?? null,
+            coverageWindowLabel: ext.coverage_window_label ?? null,
+            coverageRuleName: ext.rule_name ?? null,
+            coverageRuleId: ext.coverage_rule_id ?? null,
+            coveragePreferredClientId: ext.coverage_preferred_client_id ?? null,
+            coverageRoleShortages: ext.coverage_role_shortages ?? [],
+            coveragePlannedRoleShortages:
+                ext.coverage_planned_role_shortages ?? [],
+            coverageContradictions: ext.coverage_contradictions ?? [],
+        });
+        if (ext.event_type === 'coverage_gap') {
+            setModalMode('edit');
+            setForm({
+                id: undefined,
+                client_id: '',
+                service_context_id: '',
+                user_id: '',
+                starts_at: toDatetimeLocalValue(start),
+                ends_at: toDatetimeLocalValue(end),
+                location: '',
+                status: 'draft',
+                shift_type: 'standard',
+                is_sleepover: false,
+                is_on_call: false,
+                expected_break_minutes: '',
+                coverage_roles: coverageRolesForAction({
+                    coveragePlannedRoleShortages:
+                        ext.coverage_planned_role_shortages ?? [],
+                    coverageRoleShortages: ext.coverage_role_shortages ?? [],
+                }).map((role) => role.key),
+                notes: '',
+            });
+            setModalOpen(true);
+            return;
+        }
         setForm({
             id: Number(arg.event.id),
             client_id: ext.client_id ?? '',
@@ -339,7 +565,12 @@ export default function CalendarIndex(props: Props) {
             starts_at: toDatetimeLocalValue(start),
             ends_at: toDatetimeLocalValue(end),
             location: ext.location ?? '',
-            status: (ext.status ?? 'scheduled') as any,
+            status: ext.status === 'draft' ? 'draft' : 'scheduled',
+            shift_type: (ext.shift_type ?? 'standard') as any,
+            is_sleepover: !!ext.is_sleepover,
+            is_on_call: !!ext.is_on_call,
+            expected_break_minutes: ext.expected_break_minutes ?? '',
+            coverage_roles: ext.coverage_roles ?? [],
             notes: ext.notes ?? '',
         });
         setModalOpen(true);
@@ -362,6 +593,14 @@ export default function CalendarIndex(props: Props) {
                 ends_at: form.ends_at,
                 location: form.location,
                 status: form.status,
+                shift_type: form.shift_type,
+                is_sleepover: form.is_sleepover,
+                is_on_call: form.is_on_call,
+                expected_break_minutes:
+                    form.expected_break_minutes === ''
+                        ? null
+                        : Number(form.expected_break_minutes),
+                coverage_roles: form.coverage_roles,
                 notes: form.notes,
             };
 
@@ -468,13 +707,18 @@ export default function CalendarIndex(props: Props) {
                                 </div>
 
                                 <div className="grid gap-1">
-                                    <Label>{labels?.['client.singular'] ?? 'Client'}</Label>
+                                    <Label>
+                                        {labels?.['client.singular'] ??
+                                            'Client'}
+                                    </Label>
                                     <Select
                                         value={clientId}
                                         onValueChange={(v) => setClientId(v)}
                                     >
                                         <SelectTrigger className="w-[220px]">
-                                            <SelectValue placeholder={`All ${(labels?.['client.plural'] ?? 'Clients').toLowerCase()}`} />
+                                            <SelectValue
+                                                placeholder={`All ${(labels?.['client.plural'] ?? 'Clients').toLowerCase()}`}
+                                            />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">
@@ -498,34 +742,75 @@ export default function CalendarIndex(props: Props) {
                     <CardContent>
                         <div className="mb-4 grid gap-3 rounded-lg border p-3 text-xs sm:grid-cols-5">
                             <div>
-                                <div className="text-muted-foreground">Total</div>
+                                <div className="text-muted-foreground">
+                                    Total
+                                </div>
                                 <div className="mt-1 text-sm font-semibold">
                                     {rangeSummary.total}
                                 </div>
                             </div>
                             <div>
-                                <div className="text-muted-foreground">Hours</div>
+                                <div className="text-muted-foreground">
+                                    Hours
+                                </div>
                                 <div className="mt-1 text-sm font-semibold">
                                     {rangeSummary.hours.toFixed(1)}
                                 </div>
                             </div>
                             <div>
-                                <div className="text-muted-foreground">Scheduled</div>
+                                <div className="text-muted-foreground">
+                                    Scheduled
+                                </div>
                                 <div className="mt-1 text-sm font-semibold">
                                     {rangeSummary.scheduled}
                                 </div>
                             </div>
                             <div>
-                                <div className="text-muted-foreground">Completed</div>
+                                <div className="text-muted-foreground">
+                                    Completed
+                                </div>
                                 <div className="mt-1 text-sm font-semibold">
                                     {rangeSummary.completed}
                                 </div>
                             </div>
                             <div>
-                                <div className="text-muted-foreground">Cancelled</div>
+                                <div className="text-muted-foreground">
+                                    Cancelled
+                                </div>
                                 <div className="mt-1 text-sm font-semibold">
                                     {rangeSummary.cancelled}
                                 </div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">
+                                    Coverage gaps
+                                </div>
+                                <div className="mt-1 text-sm font-semibold text-red-500">
+                                    {rangeSummary.coverageGaps}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mb-4 grid gap-2 rounded-lg border p-3 text-xs text-muted-foreground sm:grid-cols-4">
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-400" />
+                                Open or unassigned shift
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
+                                Replacement in progress
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" />
+                                In progress
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                                Completed
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-300" />
+                                Background coverage gap
                             </div>
                         </div>
 
@@ -561,33 +846,127 @@ export default function CalendarIndex(props: Props) {
                                 }}
                                 events={loadEvents}
                                 eventContent={(arg) => {
-                                    const ext = (arg.event.extendedProps ?? {}) as any;
-                                    const client = ext.client ?? arg.event.title;
+                                    const ext = (arg.event.extendedProps ??
+                                        {}) as any;
+                                    const client =
+                                        ext.client ?? arg.event.title;
                                     const staff = ext.staff;
                                     const loc = ext.location;
+                                    const shiftType = String(
+                                        ext.shift_type ?? 'standard',
+                                    ).replace('_', ' ');
                                     return (
-                                        <div className="min-w-0">
+                                        <div
+                                            className={`min-w-0 rounded-md border px-1.5 py-1 ${eventTone(
+                                                ext.status,
+                                                ext.is_open_shift,
+                                                ext.has_active_replacement,
+                                            )}`}
+                                        >
                                             <div className="truncate text-xs font-medium">
                                                 {client}
                                             </div>
                                             {(staff || loc) && (
                                                 <div className="truncate text-[11px] opacity-80">
                                                     {staff ? staff : null}
-                                                    {staff && loc ? ' · ' : null}
+                                                    {staff && loc
+                                                        ? ' · '
+                                                        : null}
                                                     {loc ? loc : null}
                                                 </div>
                                             )}
+                                            <div className="truncate text-[10px] uppercase opacity-70">
+                                                {shiftType}
+                                            </div>
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {ext.is_open_shift ? (
+                                                    <span className="rounded-full border px-1 py-0.5 text-[9px] font-medium tracking-wide uppercase">
+                                                        Open
+                                                    </span>
+                                                ) : null}
+                                                {ext.is_recurring ? (
+                                                    <span className="rounded-full border px-1 py-0.5 text-[9px] font-medium tracking-wide uppercase">
+                                                        Recurring
+                                                    </span>
+                                                ) : null}
+                                                {ext.has_active_replacement ? (
+                                                    <span className="rounded-full border px-1 py-0.5 text-[9px] font-medium tracking-wide uppercase">
+                                                        Replacement
+                                                    </span>
+                                                ) : null}
+                                                {(ext.incidents_count ?? 0) >
+                                                0 ? (
+                                                    <span className="rounded-full border px-1 py-0.5 text-[9px] font-medium tracking-wide uppercase">
+                                                        {ext.incidents_count}{' '}
+                                                        incident
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                         </div>
                                     );
                                 }}
                                 eventDidMount={(info) => {
-                                    const ext = (info.event.extendedProps ?? {}) as any;
+                                    const ext = (info.event.extendedProps ??
+                                        {}) as any;
                                     const lines = [
-                                        ext.client ? `Client: ${ext.client}` : null,
-                                        ext.service_context ? `Service context: ${ext.service_context}` : null,
-                                        ext.staff ? `Staff: ${ext.staff}` : null,
-                                        ext.location ? `Location: ${ext.location}` : null,
-                                        ext.status ? `Status: ${ext.status}` : null,
+                                        ext.client
+                                            ? `Client: ${ext.client}`
+                                            : null,
+                                        ext.shift_type
+                                            ? `Type: ${String(ext.shift_type).replace('_', ' ')}`
+                                            : null,
+                                        ext.service_context
+                                            ? `Service context: ${ext.service_context}`
+                                            : null,
+                                        ext.staff
+                                            ? `Staff: ${ext.staff}`
+                                            : null,
+                                        ext.location
+                                            ? `Location: ${ext.location}`
+                                            : null,
+                                        ext.is_recurring
+                                            ? 'Recurring series'
+                                            : null,
+                                        ext.has_active_replacement
+                                            ? `Replacement: ${ext.replacement_status ?? 'active'}`
+                                            : null,
+                                        ext.tasks_total != null
+                                            ? `Tasks: ${ext.tasks_completed ?? 0}/${ext.tasks_total}`
+                                            : null,
+                                        ext.incidents_count
+                                            ? `Incidents: ${ext.incidents_count}`
+                                            : null,
+                                        ext.coverage_state === 'under'
+                                            ? `Coverage gap: missing ${ext.coverage_missing_staff ?? 0}`
+                                            : null,
+                                        ext.coverage_gap_kind
+                                            ? `Coverage type: ${gapKindLabel(ext.coverage_gap_kind)}`
+                                            : null,
+                                        (
+                                            ext.coverage_planned_role_shortages ??
+                                            ext.coverage_role_shortages ??
+                                            []
+                                        ).length > 0
+                                            ? `Role demand: ${(
+                                                  ext.coverage_planned_role_shortages ??
+                                                  ext.coverage_role_shortages
+                                              )
+                                                  .map(
+                                                      (role: any) =>
+                                                          `${role.label ?? role.key} x${role.missing ?? 1}`,
+                                                  )
+                                                  .join(', ')}`
+                                            : null,
+                                        ext.expected_break_minutes != null
+                                            ? `Expected break: ${ext.expected_break_minutes}m`
+                                            : null,
+                                        ext.is_sleepover
+                                            ? 'Sleepover shift'
+                                            : null,
+                                        ext.is_on_call ? 'On-call shift' : null,
+                                        ext.status
+                                            ? `Status: ${ext.status}`
+                                            : null,
                                     ].filter(Boolean);
                                     if (lines.length) {
                                         info.el.setAttribute(
@@ -622,11 +1001,13 @@ export default function CalendarIndex(props: Props) {
                 <DialogContent className="sm:max-w-[640px]">
                     <DialogHeader>
                         <DialogTitle>
-                            {modalMode === 'create'
-                                ? `Create ${shiftLabel}`
-                                : canUpdate
-                                  ? `Edit ${shiftLabel}`
-                                  : `${shiftLabel} details`}
+                            {viewInfo?.eventType === 'coverage_gap'
+                                ? 'Coverage gap'
+                                : modalMode === 'create'
+                                  ? `Create ${shiftLabel}`
+                                  : canUpdate
+                                    ? `Edit ${shiftLabel}`
+                                    : `${shiftLabel} details`}
                         </DialogTitle>
                     </DialogHeader>
 
@@ -655,6 +1036,89 @@ export default function CalendarIndex(props: Props) {
                                         {viewInfo.staff}
                                     </div>
                                 )}
+                                {viewInfo.shiftType && (
+                                    <div>
+                                        <span className="text-muted-foreground">
+                                            Type:{' '}
+                                        </span>
+                                        {String(viewInfo.shiftType).replace(
+                                            '_',
+                                            ' ',
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {viewInfo?.eventType === 'coverage_gap' && (
+                            <div className="grid gap-2 rounded-md border border-red-200 bg-red-50/60 p-3 text-sm">
+                                <div className="font-medium text-red-700">
+                                    {gapKindLabel(viewInfo.coverageGapKind)}
+                                </div>
+                                <div className="text-red-700/90">
+                                    {viewInfo.siteName ?? 'Site'} needs{' '}
+                                    {viewInfo.coverageRequiredStaff ?? 0} staff
+                                    in this window and only has{' '}
+                                    {viewInfo.coverageAssignedStaff ?? 0}{' '}
+                                    assigned.
+                                </div>
+                                <div className="text-red-700/90">
+                                    Missing {viewInfo.coverageMissingStaff ?? 0}{' '}
+                                    staff
+                                    {viewInfo.coverageWindowLabel
+                                        ? ` · ${viewInfo.coverageWindowLabel}`
+                                        : ''}
+                                    .
+                                </div>
+                                {coverageRolesForAction(viewInfo).length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {coverageRolesForAction(viewInfo).map(
+                                            (role) => (
+                                                <span
+                                                    key={`coverage-role-${role.key}`}
+                                                    className="rounded-full border border-red-200 bg-white/70 px-2 py-1 text-[11px] font-medium"
+                                                >
+                                                    {role.label ?? role.key}{' '}
+                                                    still needed x
+                                                    {role.missing ?? 1}
+                                                </span>
+                                            ),
+                                        )}
+                                    </div>
+                                ) : null}
+                                {viewInfo.coverageContradictions &&
+                                viewInfo.coverageContradictions.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {viewInfo.coverageContradictions.map(
+                                            (issue) => (
+                                                <span
+                                                    key={`coverage-issue-${issue}`}
+                                                    className="rounded-full border border-red-200 bg-white/70 px-2 py-1 text-[11px] font-medium"
+                                                >
+                                                    {issue ===
+                                                    'headcount_exact_but_role_gap'
+                                                        ? 'Headcount looks full but role demand is still short'
+                                                        : issue ===
+                                                            'partial_window_undercoverage'
+                                                          ? 'Coverage drops away inside the window and needs partial backfill'
+                                                          : issue ===
+                                                              'planned_supply_exact_but_role_gap'
+                                                            ? 'Planned supply still misses the required role mix'
+                                                            : issue ===
+                                                                'preferred_client_drift'
+                                                              ? 'Preferred client context has drifted'
+                                                              : issue ===
+                                                                  'overfill_not_allowed'
+                                                                ? 'This window is overstaffed beyond the allowed limit'
+                                                                : issue ===
+                                                                    'overfilled_but_wrong_role_mix'
+                                                                  ? 'This window is overfilled but still has the wrong role mix'
+                                                                  : issue}
+                                                </span>
+                                            ),
+                                        )}
+                                    </div>
+                                ) : null}
                             </div>
                         )}
 
@@ -676,66 +1140,236 @@ export default function CalendarIndex(props: Props) {
                                         {viewInfo.staff ?? '—'}
                                     </span>
                                 </div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-muted-foreground">
+                                        Type
+                                    </span>
+                                    <span className="font-medium capitalize">
+                                        {String(
+                                            viewInfo.shiftType ?? 'standard',
+                                        ).replace('_', ' ')}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-muted-foreground">
+                                        Status
+                                    </span>
+                                    <span className="font-medium capitalize">
+                                        {String(
+                                            viewInfo.status ?? 'scheduled',
+                                        ).replace('_', ' ')}
+                                    </span>
+                                </div>
+                                {viewInfo.serviceContext && (
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-muted-foreground">
+                                            Service
+                                        </span>
+                                        <span className="font-medium">
+                                            {viewInfo.serviceContext}
+                                        </span>
+                                    </div>
+                                )}
+                                {viewInfo.isRecurring ? (
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-muted-foreground">
+                                            Series
+                                        </span>
+                                        <span className="font-medium">
+                                            Recurring support
+                                        </span>
+                                    </div>
+                                ) : null}
                             </div>
                         )}
 
-                        {(canManageAny || modalMode === 'create') && (
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="grid gap-1">
-                                    <Label>{labels?.['client.singular'] ?? 'Client'}</Label>
-                                    <select
-                                        className="w-full rounded-md border bg-background p-2 text-sm"
-                                        value={String(form.client_id)}
-                                        disabled={
-                                            !canUpdate && modalMode === 'edit'
-                                        }
-                                        onChange={(e) =>
-                                            setForm((s) => {
-                                                const nextClientId =
-                                                    e.target.value === ''
-                                                        ? ''
-                                                        : Number(e.target.value);
-                                                const inherited =
-                                                    nextClientId === ''
-                                                        ? ''
-                                                        : (clientServiceContextById.get(nextClientId) ?? '');
+                        {modalMode === 'edit' &&
+                            viewInfo &&
+                            viewInfo.eventType !== 'coverage_gap' && (
+                                <div className="grid gap-3 rounded-md border p-3 text-sm">
+                                    <div className="flex flex-wrap gap-2">
+                                        {viewInfo.isOpenShift ? (
+                                            <span className="rounded-full border px-2 py-1 text-[11px] font-medium tracking-wide text-red-700 uppercase">
+                                                Open shift
+                                            </span>
+                                        ) : null}
+                                        {viewInfo.isRecurring ? (
+                                            <span className="rounded-full border px-2 py-1 text-[11px] font-medium tracking-wide uppercase">
+                                                Recurring
+                                            </span>
+                                        ) : null}
+                                        {viewInfo.hasActiveReplacement ? (
+                                            <span className="rounded-full border px-2 py-1 text-[11px] font-medium tracking-wide text-amber-700 uppercase">
+                                                Replacement{' '}
+                                                {viewInfo.replacementStatus ??
+                                                    'active'}
+                                            </span>
+                                        ) : null}
+                                    </div>
 
-                                                return {
-                                                    ...s,
-                                                    client_id: nextClientId,
-                                                    // If service context not manually chosen yet, inherit from client
-                                                    service_context_id:
-                                                        s.service_context_id === ''
-                                                            ? (inherited === null ? '' : inherited)
-                                                            : s.service_context_id,
-                                                    location: locationForClientId(nextClientId),
-                                                };
-                                            })
-                                        }
-                                    >
-                                        <option value="">
-                                            Select a client
-                                        </option>
-                                        {clientOptions.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className="grid gap-2 sm:grid-cols-3">
+                                        <div className="rounded-md border p-2">
+                                            <div className="text-xs text-muted-foreground">
+                                                Tasks
+                                            </div>
+                                            <div className="mt-1 font-medium">
+                                                {viewInfo.tasksCompleted ?? 0}/
+                                                {viewInfo.tasksTotal ?? 0}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-md border p-2">
+                                            <div className="text-xs text-muted-foreground">
+                                                Incidents
+                                            </div>
+                                            <div className="mt-1 font-medium">
+                                                {viewInfo.incidentsCount ?? 0}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-md border p-2">
+                                            <div className="text-xs text-muted-foreground">
+                                                Break
+                                            </div>
+                                            <div className="mt-1 font-medium">
+                                                {viewInfo.expectedBreakMinutes !=
+                                                null
+                                                    ? `${viewInfo.expectedBreakMinutes} min`
+                                                    : 'Not set'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2">
+                                        {viewInfo.id ? (
+                                            <a
+                                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                                href={`/operations/shifts/${viewInfo.id}`}
+                                            >
+                                                Open shift workspace
+                                            </a>
+                                        ) : null}
+                                        {viewInfo.shiftSeriesId ? (
+                                            <a
+                                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                                href={`/operations/shifts/series/${viewInfo.shiftSeriesId}`}
+                                            >
+                                                Open recurring series
+                                            </a>
+                                        ) : null}
+                                    </div>
                                 </div>
+                            )}
 
+                        {viewInfo?.eventType !== 'coverage_gap' &&
+                            (canManageAny || modalMode === 'create') && (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="grid gap-1">
+                                        <Label>
+                                            {labels?.['client.singular'] ??
+                                                'Client'}
+                                        </Label>
+                                        <select
+                                            className="w-full rounded-md border bg-background p-2 text-sm"
+                                            value={String(form.client_id)}
+                                            disabled={
+                                                !canUpdate &&
+                                                modalMode === 'edit'
+                                            }
+                                            onChange={(e) =>
+                                                setForm((s) => {
+                                                    const nextClientId =
+                                                        e.target.value === ''
+                                                            ? ''
+                                                            : Number(
+                                                                  e.target
+                                                                      .value,
+                                                              );
+                                                    const inherited =
+                                                        nextClientId === ''
+                                                            ? ''
+                                                            : (clientServiceContextById.get(
+                                                                  nextClientId,
+                                                              ) ?? '');
+
+                                                    return {
+                                                        ...s,
+                                                        client_id: nextClientId,
+                                                        // If service context not manually chosen yet, inherit from client
+                                                        service_context_id:
+                                                            s.service_context_id ===
+                                                            ''
+                                                                ? inherited ===
+                                                                  null
+                                                                    ? ''
+                                                                    : inherited
+                                                                : s.service_context_id,
+                                                        location:
+                                                            locationForClientId(
+                                                                nextClientId,
+                                                            ),
+                                                    };
+                                                })
+                                            }
+                                        >
+                                            <option value="">
+                                                Select a client
+                                            </option>
+                                            {clientOptions.map((c) => (
+                                                <option key={c.id} value={c.id}>
+                                                    {c.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="grid gap-1">
+                                        <Label>Staff</Label>
+                                        <select
+                                            className="w-full rounded-md border bg-background p-2 text-sm"
+                                            value={String(form.user_id)}
+                                            disabled={
+                                                !canUpdate &&
+                                                modalMode === 'edit'
+                                            }
+                                            onChange={(e) =>
+                                                setForm((s) => ({
+                                                    ...s,
+                                                    user_id:
+                                                        e.target.value === ''
+                                                            ? ''
+                                                            : Number(
+                                                                  e.target
+                                                                      .value,
+                                                              ),
+                                                }))
+                                            }
+                                        >
+                                            <option value="">
+                                                Unassigned / open shift
+                                            </option>
+                                            {staffOptions.map((u) => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                        {viewInfo?.eventType !== 'coverage_gap' &&
+                            (canUpdate || modalMode === 'create') && (
                                 <div className="grid gap-1">
-                                    <Label>Staff</Label>
+                                    <Label>Service context</Label>
                                     <select
                                         className="w-full rounded-md border bg-background p-2 text-sm"
-                                        value={String(form.user_id)}
+                                        value={String(form.service_context_id)}
                                         disabled={
                                             !canUpdate && modalMode === 'edit'
                                         }
                                         onChange={(e) =>
                                             setForm((s) => ({
                                                 ...s,
-                                                user_id:
+                                                service_context_id:
                                                     e.target.value === ''
                                                         ? ''
                                                         : Number(
@@ -744,145 +1378,358 @@ export default function CalendarIndex(props: Props) {
                                             }))
                                         }
                                     >
-                                        <option value="">Select staff</option>
-                                        {staffOptions.map((u) => (
-                                            <option key={u.id} value={u.id}>
-                                                {u.label}
-                                            </option>
-                                        ))}
+                                        <option value="">
+                                            Inherit from client (recommended)
+                                        </option>
+                                        {serviceContextOptions
+                                            .filter(
+                                                (sc) =>
+                                                    sc.is_active ||
+                                                    sc.id ===
+                                                        Number(
+                                                            form.service_context_id,
+                                                        ),
+                                            )
+                                            .map((sc) => (
+                                                <option
+                                                    key={sc.id}
+                                                    value={sc.id}
+                                                >
+                                                    {sc.label}
+                                                    {!sc.is_active
+                                                        ? ' (inactive)'
+                                                        : ''}
+                                                </option>
+                                            ))}
                                     </select>
+                                    <div className="text-xs text-muted-foreground">
+                                        If left blank, the shift will inherit
+                                        the selected client’s service context
+                                        (if set).
+                                    </div>
+                                </div>
+                            )}
+
+                        {viewInfo?.eventType !== 'coverage_gap' && (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="grid gap-1">
+                                    <Label>Start</Label>
+                                    <Input
+                                        type="datetime-local"
+                                        value={form.starts_at}
+                                        disabled={
+                                            !canUpdate && modalMode === 'edit'
+                                        }
+                                        onChange={(e) =>
+                                            setForm((s) => ({
+                                                ...s,
+                                                starts_at: e.target.value,
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="grid gap-1">
+                                    <Label>End</Label>
+                                    <Input
+                                        type="datetime-local"
+                                        value={form.ends_at}
+                                        disabled={
+                                            !canUpdate && modalMode === 'edit'
+                                        }
+                                        onChange={(e) =>
+                                            setForm((s) => ({
+                                                ...s,
+                                                ends_at: e.target.value,
+                                            }))
+                                        }
+                                    />
                                 </div>
                             </div>
                         )}
+
+                        {viewInfo?.eventType !== 'coverage_gap' &&
+                            (canUpdate || modalMode === 'create') && (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="grid gap-1">
+                                        <Label>Shift type</Label>
+                                        <select
+                                            className="w-full rounded-md border bg-background p-2 text-sm"
+                                            value={form.shift_type}
+                                            disabled={
+                                                !canUpdate &&
+                                                modalMode === 'edit'
+                                            }
+                                            onChange={(e) =>
+                                                setForm((s) => {
+                                                    const nextType = e.target
+                                                        .value as ShiftForm['shift_type'];
+                                                    return {
+                                                        ...s,
+                                                        shift_type: nextType,
+                                                        is_sleepover:
+                                                            nextType ===
+                                                            'sleepover'
+                                                                ? true
+                                                                : s.is_sleepover,
+                                                        is_on_call:
+                                                            nextType ===
+                                                            'on_call'
+                                                                ? true
+                                                                : s.is_on_call,
+                                                    };
+                                                })
+                                            }
+                                        >
+                                            <option value="standard">
+                                                standard
+                                            </option>
+                                            <option value="sleepover">
+                                                sleepover
+                                            </option>
+                                            <option value="on_call">
+                                                on_call
+                                            </option>
+                                            <option value="split">split</option>
+                                            <option value="travel">
+                                                travel
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <Label>Expected break (minutes)</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={720}
+                                            value={form.expected_break_minutes}
+                                            disabled={
+                                                !canUpdate &&
+                                                modalMode === 'edit'
+                                            }
+                                            onChange={(e) =>
+                                                setForm((s) => ({
+                                                    ...s,
+                                                    expected_break_minutes:
+                                                        e.target.value === ''
+                                                            ? ''
+                                                            : Number(
+                                                                  e.target
+                                                                      .value,
+                                                              ),
+                                                }))
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                         {(canUpdate || modalMode === 'create') && (
-                            <div className="grid gap-1">
-                                <Label>Service context</Label>
-                                <select
-                                    className="w-full rounded-md border bg-background p-2 text-sm"
-                                    value={String(form.service_context_id)}
-                                    disabled={!canUpdate && modalMode === 'edit'}
-                                    onChange={(e) =>
-                                        setForm((s) => ({
-                                            ...s,
-                                            service_context_id:
-                                                e.target.value === ''
-                                                    ? ''
-                                                    : Number(e.target.value),
-                                        }))
-                                    }
-                                >
-                                    <option value="">
-                                        Inherit from client (recommended)
-                                    </option>
-                                    {serviceContextOptions
-                                        .filter((sc) =>
-                                            sc.is_active ||
-                                            sc.id === Number(form.service_context_id),
-                                        )
-                                        .map((sc) => (
-                                            <option key={sc.id} value={sc.id}>
-                                                {sc.label}
-                                                {!sc.is_active ? ' (inactive)' : ''}
-                                            </option>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.is_sleepover}
+                                        disabled={
+                                            !canUpdate && modalMode === 'edit'
+                                        }
+                                        onChange={(e) =>
+                                            setForm((s) => ({
+                                                ...s,
+                                                is_sleepover: e.target.checked,
+                                            }))
+                                        }
+                                    />
+                                    Sleepover allowances apply
+                                </label>
+                                <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.is_on_call}
+                                        disabled={
+                                            !canUpdate && modalMode === 'edit'
+                                        }
+                                        onChange={(e) =>
+                                            setForm((s) => ({
+                                                ...s,
+                                                is_on_call: e.target.checked,
+                                            }))
+                                        }
+                                    />
+                                    On-call allowances apply
+                                </label>
+                            </div>
+                        )}
+
+                        {viewInfo?.eventType !== 'coverage_gap' &&
+                            (canUpdate || modalMode === 'create') && (
+                                <div className="grid gap-1">
+                                    <Label>Coverage roles</Label>
+                                    <div className="grid gap-2 sm:grid-cols-3">
+                                        {(
+                                            [
+                                                [
+                                                    'caregiver',
+                                                    'General caregiver coverage',
+                                                ],
+                                                ['driver', 'Driver coverage'],
+                                                [
+                                                    'med_competent',
+                                                    'Medication-competent coverage',
+                                                ],
+                                            ] as const
+                                        ).map(([role, label]) => (
+                                            <label
+                                                key={role}
+                                                className="flex items-center gap-2 rounded-md border p-3 text-sm"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.coverage_roles.includes(
+                                                        role,
+                                                    )}
+                                                    disabled={
+                                                        !canUpdate &&
+                                                        modalMode === 'edit'
+                                                    }
+                                                    onChange={(e) =>
+                                                        setForm((s) => ({
+                                                            ...s,
+                                                            coverage_roles: e
+                                                                .target.checked
+                                                                ? Array.from(
+                                                                      new Set([
+                                                                          ...s.coverage_roles,
+                                                                          role,
+                                                                      ]),
+                                                                  )
+                                                                : s.coverage_roles.filter(
+                                                                      (value) =>
+                                                                          value !==
+                                                                          role,
+                                                                  ),
+                                                        }))
+                                                    }
+                                                />
+                                                {label}
+                                            </label>
                                         ))}
-                                </select>
-                                <div className="text-xs text-muted-foreground">
-                                    If left blank, the shift will inherit the selected client’s service context (if set).
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Use this when the shift is meant to
+                                        satisfy a specific house coverage role,
+                                        not just general headcount.
+                                    </div>
+                                </div>
+                            )}
+
+                        {viewInfo?.eventType !== 'coverage_gap' && (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="grid gap-1">
+                                    <Label>Location</Label>
+                                    <Input
+                                        value={form.location}
+                                        disabled={
+                                            !canUpdate && modalMode === 'edit'
+                                        }
+                                        onChange={(e) =>
+                                            setForm((s) => ({
+                                                ...s,
+                                                location: e.target.value,
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <div className="grid gap-1">
+                                    <Label>Status</Label>
+                                    <select
+                                        className="w-full rounded-md border bg-background p-2 text-sm"
+                                        value={form.status}
+                                        disabled={
+                                            !canUpdate && modalMode === 'edit'
+                                        }
+                                        onChange={(e) =>
+                                            setForm((s) => ({
+                                                ...s,
+                                                status: e.target.value as any,
+                                            }))
+                                        }
+                                    >
+                                        <option value="draft">draft</option>
+                                        <option value="scheduled">
+                                            scheduled
+                                        </option>
+                                    </select>
+                                    <div className="text-xs text-muted-foreground">
+                                        Start, complete, and cancel actions are
+                                        managed from the shift workflow, not the
+                                        calendar editor.
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        {viewInfo?.eventType !== 'coverage_gap' && (
                             <div className="grid gap-1">
-                                <Label>Start</Label>
-                                <Input
-                                    type="datetime-local"
-                                    value={form.starts_at}
+                                <Label>Notes</Label>
+                                <textarea
+                                    className="min-h-[110px] w-full rounded-md border bg-background p-2 text-sm"
+                                    value={form.notes}
                                     disabled={
                                         !canUpdate && modalMode === 'edit'
                                     }
                                     onChange={(e) =>
                                         setForm((s) => ({
                                             ...s,
-                                            starts_at: e.target.value,
+                                            notes: e.target.value,
                                         }))
                                     }
                                 />
                             </div>
-                            <div className="grid gap-1">
-                                <Label>End</Label>
-                                <Input
-                                    type="datetime-local"
-                                    value={form.ends_at}
-                                    disabled={
-                                        !canUpdate && modalMode === 'edit'
-                                    }
-                                    onChange={(e) =>
-                                        setForm((s) => ({
-                                            ...s,
-                                            ends_at: e.target.value,
-                                        }))
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="grid gap-1">
-                                <Label>Location</Label>
-                                <Input
-                                    value={form.location}
-                                    disabled={
-                                        !canUpdate && modalMode === 'edit'
-                                    }
-                                    onChange={(e) =>
-                                        setForm((s) => ({
-                                            ...s,
-                                            location: e.target.value,
-                                        }))
-                                    }
-                                />
-                            </div>
-                            <div className="grid gap-1">
-                                <Label>Status</Label>
-                                <select
-                                    className="w-full rounded-md border bg-background p-2 text-sm"
-                                    value={form.status}
-                                    disabled={
-                                        !canUpdate && modalMode === 'edit'
-                                    }
-                                    onChange={(e) =>
-                                        setForm((s) => ({
-                                            ...s,
-                                            status: e.target.value as any,
-                                        }))
-                                    }
-                                >
-                                    <option value="scheduled">scheduled</option>
-                                    <option value="completed">completed</option>
-                                    <option value="cancelled">cancelled</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-1">
-                            <Label>Notes</Label>
-                            <textarea
-                                className="min-h-[110px] w-full rounded-md border bg-background p-2 text-sm"
-                                value={form.notes}
-                                disabled={!canUpdate && modalMode === 'edit'}
-                                onChange={(e) =>
-                                    setForm((s) => ({
-                                        ...s,
-                                        notes: e.target.value,
-                                    }))
-                                }
-                            />
-                        </div>
+                        )}
                     </div>
 
                     <DialogFooter className="gap-2 sm:gap-2">
+                        {viewInfo?.eventType === 'coverage_gap' ? (
+                            <>
+                                {shouldOfferCreation(
+                                    viewInfo.coverageRecommendedFillAction,
+                                ) ? (
+                                    <>
+                                        <Button type="button" asChild>
+                                            <a
+                                                href={`/operations/shifts/create?site_id=${encodeURIComponent(String(viewInfo.siteId ?? ''))}&coverage_rule_id=${encodeURIComponent(String(viewInfo.coverageRuleId ?? ''))}&client_id=${encodeURIComponent(String(viewInfo.coveragePreferredClientId ?? ''))}&starts_at=${encodeURIComponent(form.starts_at)}&ends_at=${encodeURIComponent(form.ends_at)}&coverage_rule_name=${encodeURIComponent(String(viewInfo.coverageRuleName ?? 'Coverage gap'))}&coverage_required_staff=${encodeURIComponent(String(viewInfo.coverageRequiredStaff ?? ''))}&coverage_missing_staff=${encodeURIComponent(String(viewInfo.coverageMissingStaff ?? ''))}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(viewInfo)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
+                                            >
+                                                {fillActionLabel(
+                                                    viewInfo.coverageRecommendedFillAction,
+                                                )}
+                                            </a>
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            asChild
+                                        >
+                                            <a
+                                                href={`/operations/shifts/create?site_id=${encodeURIComponent(String(viewInfo.siteId ?? ''))}&coverage_rule_id=${encodeURIComponent(String(viewInfo.coverageRuleId ?? ''))}&client_id=${encodeURIComponent(String(viewInfo.coveragePreferredClientId ?? ''))}&starts_at=${encodeURIComponent(form.starts_at)}&ends_at=${encodeURIComponent(form.ends_at)}&open_shift=1&coverage_rule_name=${encodeURIComponent(String(viewInfo.coverageRuleName ?? 'Coverage gap'))}&coverage_required_staff=${encodeURIComponent(String(viewInfo.coverageRequiredStaff ?? ''))}&coverage_missing_staff=${encodeURIComponent(String(viewInfo.coverageMissingStaff ?? ''))}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(viewInfo)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
+                                            >
+                                                Create open shift
+                                            </a>
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            asChild
+                                        >
+                                            <a
+                                                href={`/operations/shifts/create?site_id=${encodeURIComponent(String(viewInfo.siteId ?? ''))}&coverage_rule_id=${encodeURIComponent(String(viewInfo.coverageRuleId ?? ''))}&client_id=${encodeURIComponent(String(viewInfo.coveragePreferredClientId ?? ''))}&starts_at=${encodeURIComponent(form.starts_at)}&ends_at=${encodeURIComponent(form.ends_at)}&open_shift=1&repeat_weekly=1&repeat_end_date=${encodeURIComponent(new Date(new Date(form.starts_at).getTime() + 1000 * 60 * 60 * 24 * 28).toISOString().slice(0, 10))}&coverage_rule_name=${encodeURIComponent(String(viewInfo.coverageRuleName ?? 'Coverage gap'))}&coverage_required_staff=${encodeURIComponent(String(viewInfo.coverageRequiredStaff ?? ''))}&coverage_missing_staff=${encodeURIComponent(String(viewInfo.coverageMissingStaff ?? ''))}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(viewInfo)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
+                                            >
+                                                Recurring cover
+                                            </a>
+                                        </Button>
+                                    </>
+                                ) : null}
+                            </>
+                        ) : null}
                         <Button
                             type="button"
                             variant="outline"
@@ -890,15 +1737,16 @@ export default function CalendarIndex(props: Props) {
                         >
                             Close
                         </Button>
-                        {(canUpdate || modalMode === 'create') && (
-                            <Button
-                                type="button"
-                                disabled={saving}
-                                onClick={saveShift}
-                            >
-                                {saving ? 'Saving…' : 'Save'}
-                            </Button>
-                        )}
+                        {viewInfo?.eventType !== 'coverage_gap' &&
+                            (canUpdate || modalMode === 'create') && (
+                                <Button
+                                    type="button"
+                                    disabled={saving}
+                                    onClick={saveShift}
+                                >
+                                    {saving ? 'Saving…' : 'Save'}
+                                </Button>
+                            )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

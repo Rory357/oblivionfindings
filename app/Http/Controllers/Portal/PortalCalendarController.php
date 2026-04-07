@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientAppointment;
+use App\Models\FamilyPortalSetting;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
@@ -50,6 +51,10 @@ class PortalCalendarController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
+        $showShiftSchedule = FamilyPortalSetting::query()
+            ->where('client_id', $client->id)
+            ->value('show_shift_schedule');
+        $showShiftSchedule = $showShiftSchedule === null ? true : (bool) $showShiftSchedule;
 
         $start = Carbon::parse($request->query('start', now()->startOfMonth()));
         $end = Carbon::parse($request->query('end', now()->endOfMonth()));
@@ -57,26 +62,35 @@ class PortalCalendarController extends Controller
         $events = collect();
 
         // 1. Shifts (staff visits)
-        $shifts = Shift::where('client_id', $client->id)
-            ->whereBetween('starts_at', [$start, $end])
-            ->whereIn('status', ['scheduled', 'in_progress', 'completed'])
-            ->with('staff:id,name')
-            ->get();
+        if ($showShiftSchedule) {
+            $shifts = Shift::where('client_id', $client->id)
+                ->where('starts_at', '<', $end)
+                ->where('ends_at', '>', $start)
+                ->whereIn('status', ['scheduled', 'in_progress', 'completed'])
+                ->with(['staff:id,name', 'serviceContext:id,name'])
+                ->get();
 
-        foreach ($shifts as $s) {
-            $events->push([
-                'id' => 'shift-' . $s->id,
-                'title' => ($s->staff?->name ?? 'Support Worker') . ' — Visit',
-                'start' => $s->starts_at?->toIso8601String(),
-                'end' => $s->ends_at?->toIso8601String(),
-                'backgroundColor' => $s->status === 'completed' ? '#10b981' : '#3b82f6',
-                'borderColor' => 'transparent',
-                'extendedProps' => [
-                    'type' => 'shift',
-                    'status' => $s->status,
-                    'staff_name' => $s->staff?->name,
-                ],
-            ]);
+            foreach ($shifts as $s) {
+                $events->push([
+                    'id' => 'shift-' . $s->id,
+                    'title' => ($s->staff?->name ?? 'Support Worker') . ' — ' . ucfirst(str_replace('_', ' ', $s->shift_type ?? 'support')),
+                    'start' => $s->starts_at?->toIso8601String(),
+                    'end' => $s->ends_at?->toIso8601String(),
+                    'backgroundColor' => $s->status === 'completed' ? '#10b981' : '#3b82f6',
+                    'borderColor' => 'transparent',
+                    'extendedProps' => [
+                        'type' => 'shift',
+                        'status' => $s->status,
+                        'staff_name' => $s->staff?->name,
+                        'shift_type' => $s->shift_type ?? 'standard',
+                        'service_context' => $s->serviceContext?->name,
+                        'location' => $s->location,
+                        'is_sleepover' => (bool) $s->is_sleepover,
+                        'is_on_call' => (bool) $s->is_on_call,
+                        'expected_break_minutes' => $s->expected_break_minutes,
+                    ],
+                ]);
+            }
         }
 
         // 2. Approved family visit requests

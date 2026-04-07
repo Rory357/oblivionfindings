@@ -216,6 +216,21 @@ class OutingController extends Controller
             'resident_ids.*' => ['integer', 'exists:clients,id'],
         ]);
 
+        // Verify assigned driver has valid eligibility
+        if (!empty($data['driver_user_id'])) {
+            $driverEligible = \App\Domain\Hr\Models\HrDriverEligibility::query()
+                ->where('user_id', $data['driver_user_id'])
+                ->where('status', 'eligible')
+                ->where('licence_expires_at', '>', now())
+                ->exists();
+
+            if (!$driverEligible) {
+                return back()->withErrors([
+                    'driver_user_id' => 'The selected driver does not have valid eligibility or their licence has expired.',
+                ]);
+            }
+        }
+
         $outing = DB::transaction(function () use ($data, $request) {
             $outing = FleetOuting::create([
                 'title' => $data['title'],
@@ -333,6 +348,7 @@ class OutingController extends Controller
                     'transport_needs' => $r->client?->transport_needs,
                     'pre_check_completed' => (bool) $r->pre_check_completed,
                     'medication_packed' => (bool) $r->medication_packed,
+                    'returned_at' => optional($r->returned_at)->toISOString(),
                     'notes' => $r->notes,
                 ])->values(),
                 'created_at' => optional($outing->created_at)->toISOString(),
@@ -345,6 +361,15 @@ class OutingController extends Controller
     {
         if ($outing->status !== 'planned') {
             return back()->with('error', 'Outing can only be started from planned status.');
+        }
+
+        // Safety check: all residents must have pre-check and medication packing completed
+        $residents = $outing->residents()->get();
+        if ($residents->isNotEmpty()) {
+            $unprepared = $residents->filter(fn ($r) => !$r->pre_check_completed);
+            if ($unprepared->isNotEmpty()) {
+                return back()->with('error', 'All residents must have their pre-departure check completed before starting the outing.');
+            }
         }
 
         $outing->update([
@@ -363,6 +388,14 @@ class OutingController extends Controller
             return back()->with('error', 'Outing can only be completed from active status.');
         }
 
+        $unreturnedResidents = $outing->residents()
+            ->whereNull('returned_at')
+            ->count();
+
+        if ($unreturnedResidents > 0) {
+            return back()->with('error', "Cannot complete outing: {$unreturnedResidents} resident(s) not yet marked as returned.");
+        }
+
         $outing->update([
             'status' => 'completed',
             'actual_return' => now(),
@@ -371,6 +404,27 @@ class OutingController extends Controller
         AuditLogger::log('fleet.outing.complete', $outing);
 
         return back()->with('success', 'Outing completed.');
+    }
+
+    public function markResidentReturned(Request $request, FleetOuting $outing, FleetOutingResident $resident)
+    {
+        abort_unless($outing->status === 'active', 422, 'Outing must be active to mark residents as returned.');
+        abort_unless($resident->outing_id === $outing->id, 404);
+
+        $resident->update(['returned_at' => now()]);
+
+        return back()->with('success', 'Resident marked as returned.');
+    }
+
+    public function returnAllResidents(Request $request, FleetOuting $outing)
+    {
+        abort_unless($outing->status === 'active', 422, 'Outing must be active to mark residents as returned.');
+
+        $outing->residents()
+            ->whereNull('returned_at')
+            ->update(['returned_at' => now()]);
+
+        return back()->with('success', 'All residents marked as returned.');
     }
 
     public function cancel(Request $request, FleetOuting $outing)

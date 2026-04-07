@@ -43,7 +43,7 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('reports.viewAny'), 403);
+        abort_unless($auth && ($auth->canDo('operations.reports.view') || $auth->canDo('reports.viewAny')), 403);
 
         return inertia('operations/reports/Index', [
             'reportTypes' => self::REPORT_TYPES,
@@ -53,7 +53,7 @@ class ReportController extends Controller
     public function show(Request $request, $type)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('reports.view'), 403);
+        abort_unless($auth && ($auth->canDo('operations.reports.view') || $auth->canDo('reports.viewAny')), 403);
 
         abort_unless(array_key_exists($type, self::REPORT_TYPES), 404, 'Unknown report type.');
 
@@ -113,18 +113,29 @@ class ReportController extends Controller
     private function staffUtilisation(int $orgId, string $dateFrom, string $dateTo, array $filters): array
     {
         $query = Timesheet::query()
-            ->where('organization_id', $orgId)
-            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->whereHas('client', fn ($q) => $q->where('organization_id', $orgId))
+            ->whereBetween('work_date', [$dateFrom, $dateTo])
             ->when(!empty($filters['staff_id']), fn ($q) => $q->where('user_id', $filters['staff_id']));
 
+        $timesheets = (clone $query)->with('user:id,name')->get();
+
         return [
-            'total_staff' => (clone $query)->distinct('user_id')->count('user_id'),
-            'total_hours' => (float) (clone $query)->sum('total_hours'),
-            'by_staff' => (clone $query)
-                ->selectRaw('user_id, SUM(total_hours) as total_hours, COUNT(*) as shift_count')
+            'total_staff' => $timesheets->pluck('user_id')->filter()->unique()->count(),
+            'total_hours' => round((float) $timesheets->sum(fn (Timesheet $timesheet) => $timesheet->total_hours), 2),
+            'by_staff' => $timesheets
                 ->groupBy('user_id')
-                ->with('user:id,name')
-                ->get(),
+                ->map(function ($group, $userId) {
+                    $first = $group->first();
+
+                    return [
+                        'user_id' => (int) $userId,
+                        'staff_name' => $first?->user?->name,
+                        'total_hours' => round((float) $group->sum(fn (Timesheet $timesheet) => $timesheet->total_hours), 2),
+                        'shift_count' => $group->count(),
+                        'approved_count' => $group->where('status', 'approved')->count(),
+                    ];
+                })
+                ->values(),
         ];
     }
 
@@ -173,6 +184,17 @@ class ReportController extends Controller
                 ->groupBy('client_id')
                 ->with('client:id,first_name,last_name')
                 ->get(),
+            'by_site' => (clone $query)
+                ->selectRaw("COALESCE(site_name_snapshot, 'Unknown site') as site_label, SUM(hours) as total_hours, COUNT(*) as entry_count")
+                ->groupByRaw("COALESCE(site_name_snapshot, 'Unknown site')")
+                ->orderByDesc('total_hours')
+                ->get()
+                ->map(fn ($row) => [
+                    'site' => $row->site_label,
+                    'total_hours' => round((float) $row->total_hours, 2),
+                    'entry_count' => (int) $row->entry_count,
+                ])
+                ->values(),
         ];
     }
 }

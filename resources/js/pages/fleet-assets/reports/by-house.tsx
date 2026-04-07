@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Building2, Car, Fuel, Route, Truck, Users } from 'lucide-react';
+import { Building2, Calendar, Car, Fuel, Route, Truck, Users } from 'lucide-react';
 import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
 
 
@@ -26,20 +26,28 @@ type VehicleDetail = {
 type Props = {
     houses: Array<{ id: number; name: string }>;
     selected_house_id: number | null;
+    selected_month: string;
+    available_months: Array<{ value: string; label: string }>;
     house_summaries: HouseSummary[];
     vehicle_details: VehicleDetail[];
 };
 
 export default function ReportByHouse({
-    houses: rawHouses, selected_house_id, house_summaries: rawSummaries, vehicle_details: rawDetails,
+    houses: rawHouses, selected_house_id, selected_month, available_months, house_summaries: rawSummaries, vehicle_details: rawDetails,
 }: Props) {
     const houses = rawHouses ?? [];
     const summaries = rawSummaries ?? [];
     const details = rawDetails ?? [];
+    const months = available_months ?? [];
+    const currentMonth = selected_month ?? new Date().toISOString().slice(0, 7);
     const selectedSummary = summaries.find((s) => s.id === selected_house_id);
 
     const handleHouseChange = (value: string) => {
-        router.get('/fleet-assets/reports/by-house', { house_id: value === 'all' ? undefined : value }, { preserveState: true });
+        router.get('/fleet-assets/reports/by-house', { house_id: value === 'all' ? undefined : value, month: currentMonth }, { preserveState: true });
+    };
+
+    const handleMonthChange = (value: string) => {
+        router.get('/fleet-assets/reports/by-house', { house_id: selected_house_id ?? undefined, month: value }, { preserveState: true });
     };
 
     return (
@@ -59,16 +67,27 @@ export default function ReportByHouse({
                     backLabel="Back to Reports"
                 />
 
-                {/* House Selector */}
-                <div className="flex items-center gap-3">
-                    <Building2 className="h-5 w-5 text-muted-foreground" />
-                    <Select value={selected_house_id ? String(selected_house_id) : 'all'} onValueChange={handleHouseChange}>
-                        <SelectTrigger className="w-64"><SelectValue placeholder="Select a house" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Houses (Comparison)</SelectItem>
-                            {houses.map((h) => (<SelectItem key={h.id} value={String(h.id)}>{h.name}</SelectItem>))}
-                        </SelectContent>
-                    </Select>
+                {/* Month & House Selectors */}
+                <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-muted-foreground" />
+                        <Select value={currentMonth} onValueChange={handleMonthChange}>
+                            <SelectTrigger className="w-52"><SelectValue placeholder="Select month" /></SelectTrigger>
+                            <SelectContent>
+                                {months.map((m) => (<SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-muted-foreground" />
+                        <Select value={selected_house_id ? String(selected_house_id) : 'all'} onValueChange={handleHouseChange}>
+                            <SelectTrigger className="w-64"><SelectValue placeholder="Select a house" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Houses (Comparison)</SelectItem>
+                                {houses.map((h) => (<SelectItem key={h.id} value={String(h.id)}>{h.name}</SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 {/* Selected House Dark KPI Cards */}
@@ -107,7 +126,7 @@ export default function ReportByHouse({
                                                 </td>
                                                 <td className="px-3 py-2 text-right">{v.trips}</td>
                                                 <td className="px-3 py-2 text-right">{v.distance_km.toLocaleString()}</td>
-                                                <td className="px-3 py-2 text-right">${v.fuel_cost.toLocaleString()}</td>
+                                                <td className="px-3 py-2 text-right">{formatCurrency(v.fuel_cost)}</td>
                                                 <td className="px-3 py-2 text-right">{v.avg_trip_duration_minutes > 0 ? `${v.avg_trip_duration_minutes} min` : '---'}</td>
                                                 <td className="px-3 py-2 text-right text-muted-foreground">{v.last_used ? formatDate(v.last_used) : 'Never'}</td>
                                             </tr>
@@ -170,7 +189,7 @@ export default function ReportByHouse({
                                                 <td className="px-3 py-2 text-right">{s.vehicles_count}</td>
                                                 <td className="px-3 py-2 text-right">{s.trips_this_month}</td>
                                                 <td className="px-3 py-2 text-right">{s.distance_this_month.toLocaleString()}</td>
-                                                <td className="px-3 py-2 text-right">${s.fuel_cost_this_month.toLocaleString()}</td>
+                                                <td className="px-3 py-2 text-right">{formatCurrency(s.fuel_cost_this_month)}</td>
                                                 <td className="px-3 py-2 text-right">{s.transport_logs}</td>
                                             </tr>
                                         ))}

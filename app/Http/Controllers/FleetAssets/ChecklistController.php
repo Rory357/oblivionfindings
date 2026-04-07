@@ -73,6 +73,32 @@ class ChecklistController extends Controller
         return back()->with('success', 'Checklist template created.');
     }
 
+    public function runPage(Request $request)
+    {
+        $templates = FleetChecklistTemplate::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'type' => $t->type,
+                'items' => $t->items,
+            ])->values();
+
+        $assets = \App\Models\Asset::query()
+            ->where('category', 'vehicle')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name', 'asset_tag']);
+
+        return Inertia::render('fleet-assets/maintenance/checklists/run', [
+            'templates' => $templates,
+            'assets' => $assets,
+            'selected_template_id' => $request->input('template_id'),
+        ]);
+    }
+
     public function run(Request $request, FleetChecklistTemplate $template)
     {
         $data = $request->validate([
@@ -81,13 +107,26 @@ class ChecklistController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
+        // Determine pass/fail from required items
+        $passed = true;
+        $templateItems = collect($template->items ?? []);
+        foreach ($templateItems as $index => $item) {
+            if (!empty($item['required'])) {
+                $response = $data['results'][$index] ?? $data['results'][$item['label'] ?? ''] ?? null;
+                if ($response === null || $response === '' || $response === false) {
+                    $passed = false;
+                    break;
+                }
+            }
+        }
+
         $run = FleetChecklistRun::create([
             'template_id' => $template->id,
             'asset_id' => $data['asset_id'],
             'user_id' => $request->user()->id,
             'responses' => $data['results'],
             'notes' => $data['notes'] ?? null,
-            'passed' => true,
+            'passed' => $passed,
             'completed_at' => now(),
         ]);
 

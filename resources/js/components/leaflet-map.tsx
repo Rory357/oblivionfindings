@@ -49,11 +49,14 @@ type LeafletMapProps = {
     onMapClick?: (latlng: { lat: number; lng: number }) => void;
 };
 
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const STREET_TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const STREET_TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
 const DARK_TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const DARK_TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
+
+const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const SATELLITE_TILE_ATTRIBUTION = '&copy; <a href="https://www.esri.com/">Esri</a>, Earthstar Geographics';
 
 // ── Marker styling helpers ──────────────────────────────────────────────────
 
@@ -280,6 +283,8 @@ export default function LeafletMap({
     const polylineLayerRef = useRef<any>(null);
     const geofenceLayerRef = useRef<any>(null);
     const tileLayerRef = useRef<any>(null);
+    const satelliteLayerRef = useRef<any>(null);
+    const layerControlRef = useRef<any>(null);
     const initRef = useRef(false);
     const onMapClickRef = useRef(onMapClick);
 
@@ -318,10 +323,21 @@ export default function LeafletMap({
                 });
 
                 const isDark = resolvedDark;
-                tileLayerRef.current = L.tileLayer(isDark ? DARK_TILE_URL : TILE_URL, {
-                    attribution: isDark ? DARK_TILE_ATTRIBUTION : TILE_ATTRIBUTION,
-                    maxZoom: 19,
-                }).addTo(mapRef.current);
+                const streetUrl = isDark ? DARK_TILE_URL : STREET_TILE_URL;
+                const streetAttr = isDark ? DARK_TILE_ATTRIBUTION : STREET_TILE_ATTRIBUTION;
+
+                const streetLayer = L.tileLayer(streetUrl, { attribution: streetAttr, maxZoom: 19 });
+                const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, { attribution: SATELLITE_TILE_ATTRIBUTION, maxZoom: 19 });
+
+                streetLayer.addTo(mapRef.current);
+                tileLayerRef.current = streetLayer;
+                satelliteLayerRef.current = satelliteLayer;
+
+                layerControlRef.current = L.control.layers(
+                    { 'Street': streetLayer, 'Satellite': satelliteLayer },
+                    {},
+                    { position: 'topright' },
+                ).addTo(mapRef.current);
 
                 markersLayerRef.current = L.layerGroup().addTo(mapRef.current);
                 polylineLayerRef.current = L.layerGroup().addTo(mapRef.current);
@@ -348,15 +364,33 @@ export default function LeafletMap({
         onMapClickRef.current = onMapClick;
     }, [onMapClick]);
 
-    // Swap tile layer when dark mode changes
+    // Swap tile layers when dark mode changes
     useEffect(() => {
         if (!mapRef.current || !tileLayerRef.current || !L || !initRef.current) return;
         const isDark = resolvedDark;
+
+        // Remove existing layers and control
+        if (layerControlRef.current) mapRef.current.removeControl(layerControlRef.current);
         mapRef.current.removeLayer(tileLayerRef.current);
-        tileLayerRef.current = L.tileLayer(isDark ? DARK_TILE_URL : TILE_URL, {
-            attribution: isDark ? DARK_TILE_ATTRIBUTION : TILE_ATTRIBUTION,
-            maxZoom: 19,
-        }).addTo(mapRef.current);
+        if (satelliteLayerRef.current && mapRef.current.hasLayer(satelliteLayerRef.current)) {
+            mapRef.current.removeLayer(satelliteLayerRef.current);
+        }
+
+        const streetUrl = isDark ? DARK_TILE_URL : STREET_TILE_URL;
+        const streetAttr = isDark ? DARK_TILE_ATTRIBUTION : STREET_TILE_ATTRIBUTION;
+
+        const streetLayer = L.tileLayer(streetUrl, { attribution: streetAttr, maxZoom: 19 });
+        const satelliteLayer = L.tileLayer(SATELLITE_TILE_URL, { attribution: SATELLITE_TILE_ATTRIBUTION, maxZoom: 19 });
+
+        streetLayer.addTo(mapRef.current);
+        tileLayerRef.current = streetLayer;
+        satelliteLayerRef.current = satelliteLayer;
+
+        layerControlRef.current = L.control.layers(
+            { 'Street': streetLayer, 'Satellite': satelliteLayer },
+            {},
+            { position: 'topright' },
+        ).addTo(mapRef.current);
     }, [resolvedDark]);
 
     // Update center/zoom

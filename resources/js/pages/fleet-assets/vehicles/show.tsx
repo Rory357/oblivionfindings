@@ -1,5 +1,6 @@
 import { SparklineChart, ProgressRing, FLEET_COLORS } from '@/components/fleet-charts';
 import LeafletMap, { MapGeofence, MapMarker } from '@/components/leaflet-map';
+import FleetTimeline, { type TimelineEntry } from '@/components/fleet-timeline';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +31,7 @@ import {
     Wifi,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { formatDate, formatDateTime, formatDistance } from '@/lib/fleet-utils';
+import { formatDate, formatDateTime, formatDistance, severityColor } from '@/lib/fleet-utils';
 
 
 type EligibleDriver = {
@@ -144,17 +145,8 @@ type Props = {
         schedule_name: string;
         km_trend: number[];
     } | null;
+    timeline?: TimelineEntry[];
 };
-
-function severityColor(severity: string): string {
-    switch (severity) {
-        case 'minor': return 'bg-yellow-500';
-        case 'moderate': return 'bg-orange-500';
-        case 'major': return 'bg-red-600';
-        case 'critical': return 'bg-red-900';
-        default: return 'bg-gray-500';
-    }
-}
 
 function isExpiringSoon(dateStr: string | null): boolean {
     if (!dateStr) return false;
@@ -181,6 +173,7 @@ export default function VehicleShow({
     sites,
     eligible_drivers,
     service_prediction,
+    timeline,
 }: Props) {
     const assignDriverForm = useForm({ primary_driver_user_id: vehicle.primary_driver?.id ? String(vehicle.primary_driver.id) : '' });
     const assignHomeForm = useForm({ home_site_id: vehicle.home_site?.id ? String(vehicle.home_site.id) : '' });
@@ -192,6 +185,14 @@ export default function VehicleShow({
             router.reload({ only: ['state', 'trips', 'signals'] });
         }, 30000);
         return () => window.clearInterval(interval);
+    }, []);
+
+    // Lazy-load timeline on mount
+    const [timelineLoaded, setTimelineLoaded] = useState(!!timeline);
+    useEffect(() => {
+        if (!timelineLoaded) {
+            router.reload({ only: ['timeline'], onSuccess: () => setTimelineLoaded(true) });
+        }
     }, []);
 
     const markers = useMemo<MapMarker[]>(() => {
@@ -688,6 +689,15 @@ export default function VehicleShow({
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* ============================================================ */}
+                {/*  VEHICLE TIMELINE                                             */}
+                {/* ============================================================ */}
+                <FleetTimeline
+                    entries={timeline ?? []}
+                    title="Vehicle Activity"
+                    maxVisible={25}
+                />
 
                 <ConfirmDialog
                     open={showRemoveDriverDialog}

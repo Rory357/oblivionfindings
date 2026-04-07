@@ -14,6 +14,7 @@ import {
     Bookmark,
     Calendar,
     Car,
+    Clock,
     CheckCircle2,
     ClipboardList,
     FileBarChart,
@@ -29,7 +30,7 @@ import {
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { formatCurrency, formatRelativeTime, formatDistance } from '@/lib/fleet-utils';
+import { formatCurrency, formatRelativeTime, formatDistance, severityVariant } from '@/lib/fleet-utils';
 
 
 /* ------------------------------------------------------------------ */
@@ -70,6 +71,9 @@ type Props = {
         total_devices: number;
         online_devices: number;
         recent_bookings_count: number;
+        checked_out_count: number;
+        overdue_count: number;
+        outings_past_return: number;
         upcoming_maintenance_count: number;
         trips_today: number;
         tracked_residents?: number;
@@ -121,25 +125,23 @@ type Props = {
         name: string;
         status: string;
     }>;
+    today_outings?: Array<{
+        id: number;
+        title: string;
+        destination: string;
+        status: string;
+        planned_departure: string | null;
+        asset: { id: number; name: string } | null;
+        driver: { id: number; name: string } | null;
+        resident_count: number;
+    }>;
 };
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-// Using shared formatRelativeTime from fleet-utils
-
-function severityVariant(severity: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (severity) {
-        case 'critical':
-        case 'high':
-            return 'destructive';
-        case 'medium':
-            return 'default';
-        default:
-            return 'secondary';
-    }
-}
+// Using shared formatRelativeTime and severityVariant from fleet-utils
 
 /* ------------------------------------------------------------------ */
 /*  Donut / Ring Chart Component                                       */
@@ -333,6 +335,7 @@ export default function FleetAssetsDashboard({
     fleet_by_site,
     after_hours_trips,
     my_site_vehicles,
+    today_outings,
 }: Props) {
     const stats = rawStats ?? {
         total_vehicles: 0, online_count: 0, offline_count: 0,
@@ -459,11 +462,54 @@ export default function FleetAssetsDashboard({
                 />
 
                 {/* ============================================================ */}
+                {/*  ALERT BANNER                                                 */}
+                {/* ============================================================ */}
+                {((stats.overdue_count ?? 0) > 0 || (stats.critical_alerts ?? 0) > 0 || (stats.outings_past_return ?? 0) > 0) && (
+                    <div className="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 px-4 py-3">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                            <div className="flex-1 space-y-1">
+                                <div className="text-sm font-semibold text-red-800 dark:text-red-300">Attention Required</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {(stats.overdue_count ?? 0) > 0 && (
+                                        <Link href="/fleet-assets/bookings" className="inline-flex items-center gap-1.5 rounded-full bg-red-100 dark:bg-red-900/40 px-3 py-1 text-xs font-medium text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors">
+                                            <Car className="h-3 w-3" />
+                                            {stats.overdue_count} overdue vehicle return{stats.overdue_count !== 1 ? 's' : ''}
+                                        </Link>
+                                    )}
+                                    {(stats.critical_alerts ?? 0) > 0 && (
+                                        <Link href="/fleet-assets/alerts" className="inline-flex items-center gap-1.5 rounded-full bg-red-100 dark:bg-red-900/40 px-3 py-1 text-xs font-medium text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            {stats.critical_alerts} critical alert{stats.critical_alerts !== 1 ? 's' : ''}
+                                        </Link>
+                                    )}
+                                    {(stats.outings_past_return ?? 0) > 0 && (
+                                        <Link href="/fleet-assets/outings" className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors">
+                                            <Clock className="h-3 w-3" />
+                                            {stats.outings_past_return} outing{stats.outings_past_return !== 1 ? 's' : ''} past return time
+                                        </Link>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ============================================================ */}
                 {/*  ROW 1 - KPI Cards                                           */}
                 {/* ============================================================ */}
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     <FleetStatCard label="Vehicles" value={stats.total_vehicles ?? 0} icon={Car} />
                     <FleetStatCard label="Bookings" value={stats.recent_bookings_count ?? 0} icon={Bookmark} color="blue" />
+                    {(stats.checked_out_count > 0 || stats.overdue_count > 0) && (
+                        <FleetStatCard
+                            label={stats.overdue_count > 0 ? 'Overdue Returns' : 'Checked Out'}
+                            value={stats.overdue_count > 0 ? stats.overdue_count : stats.checked_out_count}
+                            icon={Car}
+                            color={stats.overdue_count > 0 ? 'red' : 'amber'}
+                            href="/fleet-assets/bookings"
+                        />
+                    )}
                     <Card className="border bg-purple-50 dark:bg-purple-950/20">
                         <CardContent className="p-4">
                             <div className="flex items-start justify-between">
@@ -658,6 +704,40 @@ export default function FleetAssetsDashboard({
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* ============================================================ */}
+                {/*  TODAY'S OUTINGS                                               */}
+                {/* ============================================================ */}
+                {(today_outings ?? []).length > 0 && (
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2 text-sm"><MapPin className="h-4 w-4" /> Today's Outings</CardTitle>
+                                <Button variant="outline" size="sm" className="h-6 text-[10px]" asChild><Link href="/fleet-assets/outings">View all</Link></Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                {(today_outings ?? []).map((outing) => (
+                                    <Link key={outing.id} href={`/fleet-assets/outings/${outing.id}`} className="flex flex-col gap-1 rounded-lg border p-3 text-xs transition-colors hover:bg-muted/50">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-semibold truncate">{outing.title}</span>
+                                            <Badge variant={outing.status === 'active' ? 'default' : 'outline'} className="text-[9px] shrink-0">
+                                                {outing.status}
+                                            </Badge>
+                                        </div>
+                                        <span className="text-muted-foreground truncate">{outing.destination}</span>
+                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                            {outing.asset && <span>{outing.asset.name}</span>}
+                                            {outing.resident_count > 0 && <span>{outing.resident_count} resident{outing.resident_count !== 1 ? 's' : ''}</span>}
+                                            {outing.planned_departure && <span>{new Date(outing.planned_departure).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}</span>}
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* ============================================================ */}
                 {/*  VEHICLES AT YOUR SITE                                        */}

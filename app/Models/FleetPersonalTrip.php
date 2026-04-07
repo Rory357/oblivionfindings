@@ -50,4 +50,9 @@ class FleetPersonalTrip extends Model
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
     }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
+    }
 }

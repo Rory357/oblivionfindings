@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\FleetDriverSession;
+use App\Models\FleetDrivingMetric;
+use App\Models\FleetIncident;
+use App\Models\FleetTrip;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class StaffController extends Controller
 {
@@ -90,7 +95,105 @@ class StaffController extends Controller
             'myDayItems' => $myDayItems,
             'todayShifts' => $todayShifts,
             'upcomingShifts' => $upcomingShifts,
+            'fleet' => \Inertia\Inertia::optional(fn () => $this->buildFleetData($user)),
         ]);
+    }
+
+    private function buildFleetData(User $user): array
+    {
+        $hasSessions = Schema::hasTable('fleet_driver_sessions');
+        $hasTrips = Schema::hasTable('fleet_trips');
+        $hasMetrics = Schema::hasTable('fleet_driving_metrics');
+        $hasIncidents = Schema::hasTable('fleet_incidents');
+
+        // Driver eligibility
+        $eligibility = $user->hrDriverEligibility;
+        $eligibilityData = $eligibility ? [
+            'licence_class' => $eligibility->licence_class,
+            'licence_expires_at' => optional($eligibility->licence_expires_at)->toDateString(),
+            'can_drive_clients' => $eligibility->can_drive_clients,
+            'can_drive_clients_approved_at' => optional($eligibility->can_drive_clients_approved_at)->toISOString(),
+            'status' => $eligibility->status,
+            'incident_free_since' => optional($eligibility->incident_free_since)->toDateString(),
+            'last_reviewed_at' => optional($eligibility->last_reviewed_at)->toISOString(),
+            'next_review_at' => optional($eligibility->next_review_at)->toISOString(),
+        ] : null;
+
+        // 30-day stats
+        $thirtyDaysAgo = now()->subDays(30);
+
+        $tripCount30d = $hasSessions && $hasTrips
+            ? FleetTrip::query()
+                ->whereHas('driverSession', fn ($q) => $q->where('user_id', $user->id))
+                ->where('started_at', '>=', $thirtyDaysAgo)
+                ->count()
+            : 0;
+
+        $distanceKm30d = $hasSessions && $hasTrips
+            ? (float) FleetTrip::query()
+                ->whereHas('driverSession', fn ($q) => $q->where('user_id', $user->id))
+                ->where('started_at', '>=', $thirtyDaysAgo)
+                ->sum('distance_km')
+            : 0;
+
+        // Safety score (latest period from FleetDrivingMetric — via any asset driven recently)
+        $safetyScore = null;
+        if ($hasMetrics && $hasSessions) {
+            $recentAssetIds = FleetDriverSession::query()
+                ->where('user_id', $user->id)
+                ->where('started_at', '>=', $thirtyDaysAgo)
+                ->pluck('asset_id')
+                ->unique()
+                ->all();
+
+            if ($recentAssetIds) {
+                $safetyScore = FleetDrivingMetric::query()
+                    ->whereIn('asset_id', $recentAssetIds)
+                    ->where('period_start', '>=', $thirtyDaysAgo)
+                    ->avg('score');
+
+                $safetyScore = $safetyScore !== null ? round($safetyScore) : null;
+            }
+        }
+
+        // Incident count (30d)
+        $incidentCount30d = $hasIncidents
+            ? FleetIncident::query()
+                ->where('driver_user_id', $user->id)
+                ->where('occurred_at', '>=', $thirtyDaysAgo)
+                ->count()
+            : 0;
+
+        // Recent trips (last 5)
+        $recentTrips = $hasSessions && $hasTrips
+            ? FleetTrip::query()
+                ->whereHas('driverSession', fn ($q) => $q->where('user_id', $user->id))
+                ->with(['asset:id,name,asset_tag'])
+                ->latest('started_at')
+                ->limit(5)
+                ->get()
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'vehicle' => $t->asset ? ['id' => $t->asset->id, 'name' => $t->asset->name] : null,
+                    'started_at' => optional($t->started_at)->toISOString(),
+                    'ended_at' => optional($t->ended_at)->toISOString(),
+                    'distance_km' => $t->distance_km,
+                    'duration_s' => $t->duration_s,
+                    'status' => $t->status,
+                ])
+                ->values()
+            : collect();
+
+        return [
+            'eligibility' => $eligibilityData,
+            'stats' => [
+                'trips_30d' => $tripCount30d,
+                'distance_km_30d' => round($distanceKm30d, 1),
+                'safety_score' => $safetyScore,
+                'incidents_30d' => $incidentCount30d,
+            ],
+            'recent_trips' => $recentTrips,
+        ];
     }
 
     public function edit(Request $request, User $user)

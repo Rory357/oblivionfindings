@@ -8,7 +8,9 @@ use App\Models\ClientIncident;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\Asset;
+use App\Models\FamilyPortalSetting;
 use App\Models\TimelineEvent;
+use App\Services\ShiftTimelineService;
 use Illuminate\Http\Request;
 
 class PortalClientController extends Controller
@@ -18,6 +20,10 @@ class PortalClientController extends Controller
         $this->authorize('view', $client);
 
         $user = $request->user();
+        $showShiftSchedule = FamilyPortalSetting::query()
+            ->where('client_id', $client->id)
+            ->value('show_shift_schedule');
+        $showShiftSchedule = $showShiftSchedule === null ? true : (bool) $showShiftSchedule;
 
         $client->load(['medicalProfile', 'medications', 'conditions', 'emergencyContacts']);
 
@@ -30,6 +36,7 @@ class PortalClientController extends Controller
         $events = TimelineEvent::query()
             ->where('client_id', $client->id)
             ->where('visibility', 'portal')
+            ->when(! $showShiftSchedule, fn ($query) => $query->whereNotIn('type', ShiftTimelineService::shiftEventTypes()))
             ->orderByDesc('occurred_at')
             ->limit(60)
             ->with(['actor:id,name', 'site:id,name'])
@@ -103,6 +110,7 @@ class PortalClientController extends Controller
                 'occurred_at' => optional($e->occurred_at)->toISOString(),
                 'subject' => $e->subject,
                 'body' => $e->body,
+                'meta' => $e->meta ?? [],
                 'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
                 'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
             ])->values(),

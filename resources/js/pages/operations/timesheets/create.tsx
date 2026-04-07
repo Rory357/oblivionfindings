@@ -1,15 +1,29 @@
-import AppLayout from '@/layouts/app-layout';
 import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 
 type Client = { id: number; first_name: string; last_name: string };
+type LinkedShift = {
+    id: number;
+    client_id: number;
+    starts_at: string;
+    ends_at: string;
+    location?: string | null;
+    status?: string;
+    shift_type?: string | null;
+    is_sleepover?: boolean;
+    is_on_call?: boolean;
+    expected_break_minutes?: number | null;
+    service_context?: { id: number; name: string } | null;
+    staff?: { id: number; name: string; email?: string | null } | null;
+};
 
 type Props = {
     clients: Client[];
-    shift: any | null;
+    shift: LinkedShift | null;
 };
 
 export default function TimesheetCreate({ clients, shift }: Props) {
@@ -19,7 +33,9 @@ export default function TimesheetCreate({ clients, shift }: Props) {
     const defaultClientId = shift?.client_id ?? clients?.[0]?.id ?? '';
     const start = shift?.starts_at ? shift.starts_at.slice(0, 16) : '';
     const end = shift?.ends_at ? shift.ends_at.slice(0, 16) : '';
-    const workDate = shift?.starts_at ? shift.starts_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const workDate = shift?.starts_at
+        ? shift.starts_at.slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
 
     const form = useForm({
         client_id: defaultClientId,
@@ -27,17 +43,35 @@ export default function TimesheetCreate({ clients, shift }: Props) {
         work_date: workDate,
         starts_at: start,
         ends_at: end,
-        break_minutes: 0,
+        break_minutes: shift?.expected_break_minutes ?? 0,
+        mileage_km: 0,
+        sleepover: !!shift?.is_sleepover,
+        on_call: !!shift?.is_on_call,
+        allowance_notes: '',
+        public_holiday: false,
         notes: '',
+        is_residential_billable: false,
     });
 
     return (
-        <AppLayout breadcrumbs={[{ title: labels?.['timesheet.plural'] ?? 'Timesheets', href: '/timesheets' }, { title: 'Create', href: '/timesheets/create' }]}> 
+        <AppLayout
+            breadcrumbs={[
+                {
+                    title: labels?.['timesheet.plural'] ?? 'Timesheets',
+                    href: '/timesheets',
+                },
+                { title: 'Create', href: '/timesheets/create' },
+            ]}
+        >
             <Head title={`Create ${timesheetLabel}`} />
-            <div className="p-4 max-w-2xl space-y-6">
+            <div className="max-w-2xl space-y-6 p-4">
                 <HeadingSmall
                     title={`Create ${timesheetLabel}`}
-                    description={shift ? 'Pre-filled from shift. Adjust actual worked times.' : 'Create a new timesheet.'}
+                    description={
+                        shift
+                            ? 'Pre-filled from shift. Adjust actual worked times.'
+                            : 'Create a new timesheet.'
+                    }
                 />
 
                 <form
@@ -47,13 +81,57 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                     }}
                     className="space-y-4"
                 >
-                    <div className="rounded-md border p-4 space-y-4">
+                    {shift ? (
+                        <div className="rounded-md border bg-muted/20 p-4 text-sm">
+                            <div className="font-medium">
+                                Linked shift #{shift.id}
+                            </div>
+                            <div className="mt-1 text-muted-foreground">
+                                {String(shift.shift_type ?? 'standard').replace(
+                                    '_',
+                                    ' ',
+                                )}
+                                {shift.service_context?.name
+                                    ? ` • ${shift.service_context.name}`
+                                    : ''}
+                                {shift.location ? ` • ${shift.location}` : ''}
+                            </div>
+                            {shift.staff?.name ? (
+                                <div className="mt-1 text-muted-foreground">
+                                    Assigned staff: {shift.staff.name}
+                                </div>
+                            ) : null}
+                            {shift.is_sleepover ||
+                            shift.is_on_call ||
+                            shift.expected_break_minutes ? (
+                                <div className="mt-1 text-muted-foreground">
+                                    {shift.is_sleepover ? 'Sleepover' : null}
+                                    {shift.is_sleepover && shift.is_on_call
+                                        ? ' • '
+                                        : null}
+                                    {shift.is_on_call ? 'On-call' : null}
+                                    {(shift.is_sleepover || shift.is_on_call) &&
+                                    shift.expected_break_minutes
+                                        ? ' • '
+                                        : null}
+                                    {shift.expected_break_minutes
+                                        ? `Planned break ${shift.expected_break_minutes}m`
+                                        : null}
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    <div className="space-y-4 rounded-md border p-4">
                         <div className="space-y-2">
                             <Label>Client</Label>
                             <select
                                 className="w-full rounded-md border bg-background p-2 text-sm"
                                 value={form.data.client_id}
-                                onChange={(e) => form.setData('client_id', e.target.value)}
+                                disabled={!!shift}
+                                onChange={(e) =>
+                                    form.setData('client_id', e.target.value)
+                                }
                             >
                                 {clients.map((c) => (
                                     <option key={c.id} value={c.id}>
@@ -66,14 +144,28 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
                                 <Label>Work date</Label>
-                                <Input type="date" value={form.data.work_date} onChange={(e) => form.setData('work_date', e.target.value)} />
+                                <Input
+                                    type="date"
+                                    value={form.data.work_date}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'work_date',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label>Break (minutes)</Label>
                                 <Input
                                     type="number"
                                     value={form.data.break_minutes}
-                                    onChange={(e) => form.setData('break_minutes', Number(e.target.value))}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'break_minutes',
+                                            Number(e.target.value),
+                                        )
+                                    }
                                 />
                             </div>
                         </div>
@@ -81,11 +173,26 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
                                 <Label>Start</Label>
-                                <Input type="datetime-local" value={form.data.starts_at} onChange={(e) => form.setData('starts_at', e.target.value)} />
+                                <Input
+                                    type="datetime-local"
+                                    value={form.data.starts_at}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'starts_at',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label>End</Label>
-                                <Input type="datetime-local" value={form.data.ends_at} onChange={(e) => form.setData('ends_at', e.target.value)} />
+                                <Input
+                                    type="datetime-local"
+                                    value={form.data.ends_at}
+                                    onChange={(e) =>
+                                        form.setData('ends_at', e.target.value)
+                                    }
+                                />
                             </div>
                         </div>
 
@@ -94,15 +201,114 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                             <textarea
                                 className="w-full rounded-md border bg-background p-2 text-sm"
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 rows={4}
                             />
                         </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label>Mileage (km)</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    value={form.data.mileage_km}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'mileage_km',
+                                            Number(e.target.value),
+                                        )
+                                    }
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Allowance notes</Label>
+                                <Input
+                                    value={form.data.allowance_notes}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'allowance_notes',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="Travel, sleepover or other allowance notes"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={form.data.sleepover}
+                                    disabled={!!shift}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'sleepover',
+                                            e.target.checked,
+                                        )
+                                    }
+                                />
+                                Sleepover
+                            </label>
+                            <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={form.data.on_call}
+                                    disabled={!!shift}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'on_call',
+                                            e.target.checked,
+                                        )
+                                    }
+                                />
+                                On-call
+                            </label>
+                            <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={form.data.public_holiday}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'public_holiday',
+                                            e.target.checked,
+                                        )
+                                    }
+                                />
+                                Public holiday
+                            </label>
+                        </div>
+
+                        <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                            <input
+                                type="checkbox"
+                                checked={form.data.is_residential_billable}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'is_residential_billable',
+                                        e.target.checked,
+                                    )
+                                }
+                            />
+                            Residential billable
+                        </label>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <Button type="submit" disabled={form.processing}>Create</Button>
-                        <Button type="button" variant="outline" onClick={() => history.back()}>Cancel</Button>
+                        <Button type="submit" disabled={form.processing}>
+                            Create
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => history.back()}
+                        >
+                            Cancel
+                        </Button>
                     </div>
                 </form>
             </div>

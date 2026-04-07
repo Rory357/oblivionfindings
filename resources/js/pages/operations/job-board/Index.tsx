@@ -14,7 +14,16 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Briefcase, CalendarDays, CheckCircle2, Clock, Hand, MapPin, Search, UserCheck } from 'lucide-react';
+import {
+    Briefcase,
+    CalendarDays,
+    CheckCircle2,
+    Clock,
+    Hand,
+    MapPin,
+    Search,
+    UserCheck,
+} from 'lucide-react';
 
 const ANY = '__ANY__';
 
@@ -27,8 +36,18 @@ type JobPost = {
     end_time: string;
     location: string | null;
     required_skills: string[];
+    coverage_roles: string[];
     client: { id: number; first_name: string; last_name: string } | null;
     claimed_by: { id: number; name: string } | null;
+    replacement: {
+        id: number;
+        status: string;
+        reason: string;
+        requested_at?: string | null;
+        current_staff?: { id: number; name: string } | null;
+        requested_by?: { id: number; name: string } | null;
+        replacement_staff?: { id: number; name: string } | null;
+    } | null;
 };
 
 type Props = {
@@ -50,7 +69,10 @@ type Props = {
     };
 };
 
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const STATUS_VARIANTS: Record<
+    string,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     open: 'outline',
     claimed: 'secondary',
     approved: 'default',
@@ -60,12 +82,24 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
 
 function formatDate(d: string | null): string {
     if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(d).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
-export default function JobBoardIndex({ jobs = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
+export default function JobBoardIndex({
+    jobs = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
+    filters = {} as any,
+    stats = {} as any,
+}: Props) {
     const updateFilters = (key: string, value: string | null) => {
-        router.get('/operations/job-board', { ...filters, [key]: value }, { preserveState: true, replace: true });
+        router.get(
+            '/operations/job-board',
+            { ...filters, [key]: value },
+            { preserveState: true, replace: true },
+        );
     };
 
     return (
@@ -79,23 +113,45 @@ export default function JobBoardIndex({ jobs = { data: [], links: [], current_pa
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <OpsStatCard label="Open Positions" value={stats?.open ?? 0} icon={Briefcase} color="indigo" />
-                    <OpsStatCard label="Claimed" value={stats?.claimed ?? 0} icon={Hand} color="amber" />
-                    <OpsStatCard label="Filled Today" value={stats?.filled_today ?? 0} icon={CheckCircle2} color="emerald" />
+                    <OpsStatCard
+                        label="Open Positions"
+                        value={stats?.open ?? 0}
+                        icon={Briefcase}
+                        color="indigo"
+                    />
+                    <OpsStatCard
+                        label="Claimed"
+                        value={stats?.claimed ?? 0}
+                        icon={Hand}
+                        color="amber"
+                    />
+                    <OpsStatCard
+                        label="Filled Today"
+                        value={stats?.filled_today ?? 0}
+                        icon={CheckCircle2}
+                        color="emerald"
+                    />
                 </div>
 
                 {/* Filters */}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                        <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
                         <Input
                             placeholder="Search positions..."
                             className="h-9 pl-8 text-sm"
                             defaultValue={filters?.q ?? ''}
-                            onChange={(e) => updateFilters('q', e.target.value || null)}
+                            onChange={(e) =>
+                                updateFilters('q', e.target.value || null)
+                            }
                         />
                     </div>
-                    <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
+                    <Select
+                        value={filters?.status ?? ANY}
+                        onValueChange={(v) =>
+                            updateFilters('status', v === ANY ? null : v)
+                        }
+                    >
                         <SelectTrigger className="h-9 w-[130px] text-xs">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
@@ -103,8 +159,8 @@ export default function JobBoardIndex({ jobs = { data: [], links: [], current_pa
                             <SelectItem value={ANY}>All Status</SelectItem>
                             <SelectItem value="open">Open</SelectItem>
                             <SelectItem value="claimed">Claimed</SelectItem>
-                            <SelectItem value="approved">Approved</SelectItem>
                             <SelectItem value="filled">Filled</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -116,28 +172,52 @@ export default function JobBoardIndex({ jobs = { data: [], links: [], current_pa
                             <Card>
                                 <CardContent className="flex flex-col items-center justify-center py-16">
                                     <Briefcase className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                    <h2 className="text-lg font-semibold text-muted-foreground">No Open Positions</h2>
-                                    <p className="mt-1 text-sm text-muted-foreground/80">All shifts are currently filled. Check back later.</p>
+                                    <h2 className="text-lg font-semibold text-muted-foreground">
+                                        No Open Positions
+                                    </h2>
+                                    <p className="mt-1 text-sm text-muted-foreground/80">
+                                        All shifts are currently filled. Check
+                                        back later.
+                                    </p>
                                 </CardContent>
                             </Card>
                         </div>
                     )}
                     {(jobs?.data ?? []).map((job) => (
-                        <Card key={job.id} className="transition-all hover:border-border hover:shadow-sm">
+                        <Card
+                            key={job.id}
+                            className="transition-all hover:border-border hover:shadow-sm"
+                        >
                             <CardContent className="p-4">
                                 <div className="flex items-start justify-between">
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-semibold">{job.title}</span>
-                                            <Badge variant={STATUS_VARIANTS[job.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">
+                                            <span className="text-sm font-semibold">
+                                                {job.title}
+                                            </span>
+                                            <Badge
+                                                variant={
+                                                    STATUS_VARIANTS[
+                                                        job.status
+                                                    ] ?? 'outline'
+                                                }
+                                                className="h-4 px-1.5 text-[9px] capitalize"
+                                            >
                                                 {job.status}
                                             </Badge>
                                         </div>
                                         {job.client && (
                                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                                {job.client.first_name} {job.client.last_name}
+                                                {job.client.first_name}{' '}
+                                                {job.client.last_name}
                                             </p>
                                         )}
+                                        {job.replacement ? (
+                                            <p className="mt-1 text-xs text-amber-700">
+                                                Replacement request:{' '}
+                                                {job.replacement.reason}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </div>
                                 <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
@@ -147,7 +227,9 @@ export default function JobBoardIndex({ jobs = { data: [], links: [], current_pa
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                         <Clock className="h-3 w-3" />
-                                        <span>{job.start_time} - {job.end_time}</span>
+                                        <span>
+                                            {job.start_time} - {job.end_time}
+                                        </span>
                                     </div>
                                     {job.location && (
                                         <div className="flex items-center gap-1.5">
@@ -155,12 +237,41 @@ export default function JobBoardIndex({ jobs = { data: [], links: [], current_pa
                                             <span>{job.location}</span>
                                         </div>
                                     )}
+                                    {job.replacement?.current_staff ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <UserCheck className="h-3 w-3" />
+                                            <span>
+                                                Covering for:{' '}
+                                                {
+                                                    job.replacement
+                                                        .current_staff.name
+                                                }
+                                            </span>
+                                        </div>
+                                    ) : null}
                                 </div>
                                 {job.required_skills.length > 0 && (
                                     <div className="mt-2 flex flex-wrap gap-1">
                                         {job.required_skills.map((skill) => (
-                                            <Badge key={skill} variant="outline" className="h-4 px-1.5 text-[9px]">
+                                            <Badge
+                                                key={skill}
+                                                variant="outline"
+                                                className="h-4 px-1.5 text-[9px]"
+                                            >
                                                 {skill}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                )}
+                                {job.coverage_roles.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                        {job.coverage_roles.map((role) => (
+                                            <Badge
+                                                key={`${job.id}-${role}`}
+                                                variant="secondary"
+                                                className="h-4 px-1.5 text-[9px]"
+                                            >
+                                                {role.replace(/_/g, ' ')}
                                             </Badge>
                                         ))}
                                     </div>
@@ -168,18 +279,49 @@ export default function JobBoardIndex({ jobs = { data: [], links: [], current_pa
                                 {job.claimed_by && (
                                     <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                                         <UserCheck className="h-3 w-3" />
-                                        <span>Claimed by: {job.claimed_by.name}</span>
+                                        <span>
+                                            Claimed by: {job.claimed_by.name}
+                                        </span>
                                     </div>
                                 )}
+                                {job.replacement?.requested_by ? (
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        Requested by:{' '}
+                                        {job.replacement.requested_by.name}
+                                    </div>
+                                ) : null}
                                 <div className="mt-3 flex gap-2">
                                     {job.status === 'open' && (
-                                        <Button size="sm" className="h-7 flex-1 text-xs">
-                                            <Hand className="mr-1 h-3 w-3" /> Claim
+                                        <Button
+                                            size="sm"
+                                            className="h-7 flex-1 text-xs"
+                                            onClick={() =>
+                                                router.post(
+                                                    `/operations/job-board/${job.id}/claim`,
+                                                    {},
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                        >
+                                            <Hand className="mr-1 h-3 w-3" />{' '}
+                                            Claim
                                         </Button>
                                     )}
                                     {job.status === 'claimed' && (
-                                        <Button size="sm" variant="default" className="h-7 flex-1 text-xs">
-                                            <CheckCircle2 className="mr-1 h-3 w-3" /> Approve
+                                        <Button
+                                            size="sm"
+                                            variant="default"
+                                            className="h-7 flex-1 text-xs"
+                                            onClick={() =>
+                                                router.post(
+                                                    `/operations/job-board/${job.id}/approve`,
+                                                    {},
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                        >
+                                            <CheckCircle2 className="mr-1 h-3 w-3" />{' '}
+                                            Approve
                                         </Button>
                                     )}
                                 </div>
@@ -198,7 +340,14 @@ export default function JobBoardIndex({ jobs = { data: [], links: [], current_pa
                                 variant={link.active ? 'default' : 'outline'}
                                 className="h-7 min-w-[28px] px-2 text-xs"
                                 disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                onClick={() =>
+                                    link.url &&
+                                    router.get(
+                                        link.url,
+                                        {},
+                                        { preserveState: true },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: link.label }}
                             />
                         ))}

@@ -1,6 +1,6 @@
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
@@ -10,15 +10,34 @@ type Timesheet = {
     starts_at: string;
     ends_at: string;
     break_minutes: number;
+    mileage_km?: number | null;
+    sleepover?: boolean;
+    on_call?: boolean;
+    public_holiday?: boolean;
     status: string;
     submitted_at?: string | null;
     client: { id: number; first_name: string; last_name: string };
     staff: { id: number; name: string };
+    shift?: {
+        id: number;
+        shift_type?: string | null;
+        location?: string | null;
+        expected_break_minutes?: number | null;
+        service_context?: { id: number; name: string } | null;
+        status?: string;
+    } | null;
 };
 
 type Props = {
     timesheets: { data: Timesheet[] };
-    filters: { status?: string; from?: string; to?: string; client_id?: string | number; staff_id?: string | number; mode?: string | null };
+    filters: {
+        status?: string;
+        from?: string;
+        to?: string;
+        client_id?: string | number;
+        staff_id?: string | number;
+        mode?: string | null;
+    };
     approvalMode?: boolean;
     clients?: Array<{ id: number; first_name: string; last_name: string }>;
     staff?: Array<{ id: number; name: string; email?: string }>;
@@ -26,17 +45,30 @@ type Props = {
     canCreate: boolean;
 };
 
-export default function TimesheetsIndex({ timesheets, filters, approvalMode, clients = [], staff = [], canApprove, canCreate }: Props) {
+export default function TimesheetsIndex({
+    timesheets,
+    filters,
+    approvalMode,
+    clients = [],
+    staff = [],
+    canApprove,
+    canCreate,
+}: Props) {
     const { labels } = usePage().props as any;
     const timesheetPlural = labels?.['timesheet.plural'] ?? 'Timesheets';
     const isApprovalMode = !!approvalMode;
 
     const [selected, setSelected] = useState<Record<number, boolean>>({});
     const selectedIds = useMemo(
-        () => Object.entries(selected).filter(([, v]) => v).map(([k]) => Number(k)),
+        () =>
+            Object.entries(selected)
+                .filter(([, v]) => v)
+                .map(([k]) => Number(k)),
         [selected],
     );
-    const allSelected = timesheets.data.length > 0 && timesheets.data.every((t) => selected[t.id]);
+    const allSelected =
+        timesheets.data.length > 0 &&
+        timesheets.data.every((t) => selected[t.id]);
 
     const [decisionNotes, setDecisionNotes] = useState('');
     const [returnedNotes, setReturnedNotes] = useState('');
@@ -87,26 +119,38 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: timesheetPlural, href: '/timesheets' }]}>
+        <AppLayout
+            breadcrumbs={[{ title: timesheetPlural, href: '/timesheets' }]}
+        >
             <Head title={timesheetPlural} />
 
-            <div className="p-4 space-y-4">
+            <div className="space-y-4 p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <div className="text-lg font-semibold">{isApprovalMode ? 'Timesheet approvals' : timesheetPlural}</div>
+                        <div className="text-lg font-semibold">
+                            {isApprovalMode
+                                ? 'Timesheet approvals'
+                                : timesheetPlural}
+                        </div>
                         <div className="text-sm text-muted-foreground">
-                            {isApprovalMode ? 'Submitted timesheets waiting for a decision.' : 'Work logs and approvals.'}
+                            {isApprovalMode
+                                ? 'Submitted timesheets waiting for a decision.'
+                                : 'Work logs and approvals.'}
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                         {isApprovalMode ? (
                             <Link href="/operations/timesheets">
-                                <Button variant="outline">All timesheets</Button>
+                                <Button variant="outline">
+                                    All timesheets
+                                </Button>
                             </Link>
                         ) : canApprove ? (
                             <Link href="/operations/timesheets?mode=approvals">
-                                <Button variant="outline">Approval queue</Button>
+                                <Button variant="outline">
+                                    Approval queue
+                                </Button>
                             </Link>
                         ) : null}
 
@@ -121,11 +165,22 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                 <div className="flex flex-wrap items-end gap-2 rounded-md border p-3">
                     {!isApprovalMode ? (
                         <div className="space-y-1">
-                            <div className="text-xs text-muted-foreground">Status</div>
+                            <div className="text-xs text-muted-foreground">
+                                Status
+                            </div>
                             <select
                                 className="rounded-md border bg-background p-2 text-sm"
                                 value={filters.status ?? ''}
-                                onChange={(e) => router.get('/operations/timesheets', { ...filters, status: e.target.value || undefined }, { preserveState: true, replace: true })}
+                                onChange={(e) =>
+                                    router.get(
+                                        '/operations/timesheets',
+                                        {
+                                            ...filters,
+                                            status: e.target.value || undefined,
+                                        },
+                                        { preserveState: true, replace: true },
+                                    )
+                                }
                             >
                                 <option value="">All</option>
                                 <option value="draft">draft</option>
@@ -137,21 +192,64 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                         </div>
                     ) : null}
                     <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">From</div>
-                        <Input type="date" value={filters.from ?? ''} onChange={(e) => router.get('/operations/timesheets', { ...filters, from: e.target.value || undefined }, { preserveState: true, replace: true })} />
+                        <div className="text-xs text-muted-foreground">
+                            From
+                        </div>
+                        <Input
+                            type="date"
+                            value={filters.from ?? ''}
+                            onChange={(e) =>
+                                router.get(
+                                    '/operations/timesheets',
+                                    {
+                                        ...filters,
+                                        from: e.target.value || undefined,
+                                    },
+                                    { preserveState: true, replace: true },
+                                )
+                            }
+                        />
                     </div>
                     <div className="space-y-1">
                         <div className="text-xs text-muted-foreground">To</div>
-                        <Input type="date" value={filters.to ?? ''} onChange={(e) => router.get('/operations/timesheets', { ...filters, to: e.target.value || undefined }, { preserveState: true, replace: true })} />
+                        <Input
+                            type="date"
+                            value={filters.to ?? ''}
+                            onChange={(e) =>
+                                router.get(
+                                    '/operations/timesheets',
+                                    {
+                                        ...filters,
+                                        to: e.target.value || undefined,
+                                    },
+                                    { preserveState: true, replace: true },
+                                )
+                            }
+                        />
                     </div>
                     {isApprovalMode ? (
                         <>
                             <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">Client</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Client
+                                </div>
                                 <select
                                     className="rounded-md border bg-background p-2 text-sm"
                                     value={(filters.client_id as any) ?? ''}
-                                    onChange={(e) => router.get('/operations/timesheets', { ...filters, client_id: e.target.value || undefined }, { preserveState: true, replace: true })}
+                                    onChange={(e) =>
+                                        router.get(
+                                            '/operations/timesheets',
+                                            {
+                                                ...filters,
+                                                client_id:
+                                                    e.target.value || undefined,
+                                            },
+                                            {
+                                                preserveState: true,
+                                                replace: true,
+                                            },
+                                        )
+                                    }
                                 >
                                     <option value="">All</option>
                                     {clients.map((c) => (
@@ -162,11 +260,26 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                 </select>
                             </div>
                             <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">Staff</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Staff
+                                </div>
                                 <select
                                     className="rounded-md border bg-background p-2 text-sm"
                                     value={(filters.staff_id as any) ?? ''}
-                                    onChange={(e) => router.get('/operations/timesheets', { ...filters, staff_id: e.target.value || undefined }, { preserveState: true, replace: true })}
+                                    onChange={(e) =>
+                                        router.get(
+                                            '/operations/timesheets',
+                                            {
+                                                ...filters,
+                                                staff_id:
+                                                    e.target.value || undefined,
+                                            },
+                                            {
+                                                preserveState: true,
+                                                replace: true,
+                                            },
+                                        )
+                                    }
                                 >
                                     <option value="">All</option>
                                     {staff.map((u) => (
@@ -178,23 +291,46 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                             </div>
                         </>
                     ) : null}
-                    <Button variant="outline" onClick={() => router.get('/operations/timesheets', {}, { preserveState: true, replace: true })}>Clear</Button>
+                    <Button
+                        variant="outline"
+                        onClick={() =>
+                            router.get(
+                                '/operations/timesheets',
+                                {},
+                                { preserveState: true, replace: true },
+                            )
+                        }
+                    >
+                        Clear
+                    </Button>
                 </div>
 
                 {isApprovalMode ? (
-                    <div className="rounded-md border p-3 space-y-2">
+                    <div className="space-y-2 rounded-md border p-3">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-sm">
-                                <span className="font-medium">Selected:</span> {selectedIds.length}
+                                <span className="font-medium">Selected:</span>{' '}
+                                {selectedIds.length}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <Button disabled={selectedIds.length === 0} onClick={bulkApprove}>
+                                <Button
+                                    disabled={selectedIds.length === 0}
+                                    onClick={bulkApprove}
+                                >
                                     Approve selected
                                 </Button>
-                                <Button disabled={selectedIds.length === 0} variant="outline" onClick={bulkReturn}>
+                                <Button
+                                    disabled={selectedIds.length === 0}
+                                    variant="outline"
+                                    onClick={bulkReturn}
+                                >
                                     Return selected
                                 </Button>
-                                <Button disabled={selectedIds.length === 0} variant="destructive" onClick={bulkReject}>
+                                <Button
+                                    disabled={selectedIds.length === 0}
+                                    variant="destructive"
+                                    onClick={bulkReject}
+                                >
                                     Reject selected
                                 </Button>
                             </div>
@@ -202,22 +338,31 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
 
                         <div className="grid gap-2 sm:grid-cols-2">
                             <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">Decision notes (optional for approve, required for reject)</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Decision notes (optional for approve,
+                                    required for reject)
+                                </div>
                                 <textarea
                                     className="w-full rounded-md border bg-background p-2 text-sm"
                                     rows={3}
                                     value={decisionNotes}
-                                    onChange={(e) => setDecisionNotes(e.target.value)}
+                                    onChange={(e) =>
+                                        setDecisionNotes(e.target.value)
+                                    }
                                     placeholder="Optional notes for approval, required for rejection"
                                 />
                             </div>
                             <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">Returned notes (required when returning)</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Returned notes (required when returning)
+                                </div>
                                 <textarea
                                     className="w-full rounded-md border bg-background p-2 text-sm"
                                     rows={3}
                                     value={returnedNotes}
-                                    onChange={(e) => setReturnedNotes(e.target.value)}
+                                    onChange={(e) =>
+                                        setReturnedNotes(e.target.value)
+                                    }
                                     placeholder="What needs changing?"
                                 />
                             </div>
@@ -231,18 +376,34 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                             <tr>
                                 {isApprovalMode ? (
                                     <th className="p-3 text-left font-medium">
-                                        <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                                        <input
+                                            type="checkbox"
+                                            checked={allSelected}
+                                            onChange={toggleAll}
+                                        />
                                     </th>
                                 ) : null}
-                                <th className="p-3 text-left font-medium">Date</th>
-                                <th className="p-3 text-left font-medium">Client</th>
-                                <th className="p-3 text-left font-medium">Staff</th>
+                                <th className="p-3 text-left font-medium">
+                                    Date
+                                </th>
+                                <th className="p-3 text-left font-medium">
+                                    Client
+                                </th>
+                                <th className="p-3 text-left font-medium">
+                                    Staff
+                                </th>
                                 {isApprovalMode ? (
-                                    <th className="p-3 text-left font-medium">Submitted</th>
+                                    <th className="p-3 text-left font-medium">
+                                        Submitted
+                                    </th>
                                 ) : (
-                                    <th className="p-3 text-left font-medium">Status</th>
+                                    <th className="p-3 text-left font-medium">
+                                        Status
+                                    </th>
                                 )}
-                                <th className="p-3 text-right font-medium">Actions</th>
+                                <th className="p-3 text-right font-medium">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -253,33 +414,130 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                             <input
                                                 type="checkbox"
                                                 checked={!!selected[t.id]}
-                                                onChange={(e) => setSelected((prev) => ({ ...prev, [t.id]: e.target.checked }))}
+                                                onChange={(e) =>
+                                                    setSelected((prev) => ({
+                                                        ...prev,
+                                                        [t.id]: e.target
+                                                            .checked,
+                                                    }))
+                                                }
                                             />
                                         </td>
                                     ) : null}
                                     <td className="p-3">
-                                        <div className="font-medium">{new Date(t.work_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {new Date(t.starts_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
-                                            {' – '}
-                                            {new Date(t.ends_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
-                                            {t.break_minutes ? ` • break ${t.break_minutes}m` : ''}
+                                        <div className="font-medium">
+                                            {new Date(
+                                                t.work_date,
+                                            ).toLocaleDateString('en-NZ', {
+                                                day: 'numeric',
+                                                month: 'short',
+                                                year: 'numeric',
+                                            })}
                                         </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {new Date(
+                                                t.starts_at,
+                                            ).toLocaleTimeString('en-NZ', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                            })}
+                                            {' – '}
+                                            {new Date(
+                                                t.ends_at,
+                                            ).toLocaleTimeString('en-NZ', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                            })}
+                                            {t.break_minutes
+                                                ? ` • break ${t.break_minutes}m`
+                                                : ''}
+                                        </div>
+                                        {t.shift ? (
+                                            <div className="mt-1 text-[11px] text-muted-foreground">
+                                                {String(
+                                                    t.shift.shift_type ??
+                                                        'standard',
+                                                ).replace('_', ' ')}
+                                                {t.shift.service_context?.name
+                                                    ? ` • ${t.shift.service_context.name}`
+                                                    : ''}
+                                                {t.shift.location
+                                                    ? ` • ${t.shift.location}`
+                                                    : ''}
+                                            </div>
+                                        ) : null}
                                     </td>
                                     <td className="p-3">
-                                        <Link className="underline" href={`/operations/clients/${t.client.id}`}>{t.client.first_name} {t.client.last_name}</Link>
+                                        <Link
+                                            className="underline"
+                                            href={`/operations/clients/${t.client.id}`}
+                                        >
+                                            {t.client.first_name}{' '}
+                                            {t.client.last_name}
+                                        </Link>
                                     </td>
-                                    <td className="p-3">{t.staff?.name ?? '—'}</td>
+                                    <td className="p-3">
+                                        {t.staff?.name ?? '—'}
+                                    </td>
                                     {isApprovalMode ? (
-                                        <td className="p-3">{t.submitted_at ? new Date(t.submitted_at).toLocaleString() : '—'}</td>
+                                        <td className="p-3">
+                                            {t.submitted_at
+                                                ? new Date(
+                                                      t.submitted_at,
+                                                  ).toLocaleString()
+                                                : '—'}
+                                        </td>
                                     ) : (
-                                        <td className="p-3">{t.status}</td>
+                                        <td className="p-3">
+                                            <div>{t.status}</div>
+                                            {t.sleepover ||
+                                            t.on_call ||
+                                            t.public_holiday ||
+                                            (t.mileage_km ?? 0) > 0 ? (
+                                                <div className="mt-1 text-[11px] text-muted-foreground">
+                                                    {t.sleepover
+                                                        ? 'Sleepover'
+                                                        : null}
+                                                    {t.sleepover && t.on_call
+                                                        ? ' • '
+                                                        : null}
+                                                    {t.on_call
+                                                        ? 'On-call'
+                                                        : null}
+                                                    {(t.sleepover ||
+                                                        t.on_call) &&
+                                                    t.public_holiday
+                                                        ? ' • '
+                                                        : null}
+                                                    {t.public_holiday
+                                                        ? 'Public holiday'
+                                                        : null}
+                                                    {(t.sleepover ||
+                                                        t.on_call ||
+                                                        t.public_holiday) &&
+                                                    (t.mileage_km ?? 0) > 0
+                                                        ? ' • '
+                                                        : null}
+                                                    {(t.mileage_km ?? 0) > 0
+                                                        ? `${t.mileage_km}km`
+                                                        : null}
+                                                </div>
+                                            ) : null}
+                                        </td>
                                     )}
                                     <td className="p-3">
                                         <div className="flex justify-end gap-2">
-                                            <Link className="text-xs underline" href={`/operations/timesheets/${t.id}/edit`}>View / Edit</Link>
-                                            {canApprove && t.status === 'submitted' ? (
-                                                <span className="text-xs text-muted-foreground">(needs approval)</span>
+                                            <Link
+                                                className="text-xs underline"
+                                                href={`/operations/timesheets/${t.id}/edit`}
+                                            >
+                                                View / Edit
+                                            </Link>
+                                            {canApprove &&
+                                            t.status === 'submitted' ? (
+                                                <span className="text-xs text-muted-foreground">
+                                                    (needs approval)
+                                                </span>
                                             ) : null}
                                         </div>
                                     </td>
@@ -288,8 +546,13 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
 
                             {timesheets.data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={isApprovalMode ? 6 : 5} className="p-6 text-center text-muted-foreground">
-                                        {isApprovalMode ? 'No submitted timesheets awaiting approval.' : 'No timesheets found.'}
+                                    <td
+                                        colSpan={isApprovalMode ? 6 : 5}
+                                        className="p-6 text-center text-muted-foreground"
+                                    >
+                                        {isApprovalMode
+                                            ? 'No submitted timesheets awaiting approval.'
+                                            : 'No timesheets found.'}
                                     </td>
                                 </tr>
                             ) : null}

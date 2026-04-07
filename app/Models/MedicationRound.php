@@ -31,12 +31,18 @@ class MedicationRound extends Model
         'withheld_count',
         'missed_count',
         'notes',
+        'review_required',
+        'review_reason',
+        'review_flagged_at',
+        'review_flagged_by',
     ];
 
     protected $casts = [
         'round_date' => 'date',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'review_required' => 'boolean',
+        'review_flagged_at' => 'datetime',
         'window_minutes' => 'integer',
         'total_medications' => 'integer',
         'administered_count' => 'integer',
@@ -73,6 +79,11 @@ class MedicationRound extends Model
     public function completedBy()
     {
         return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    public function reviewFlaggedBy()
+    {
+        return $this->belongsTo(User::class, 'review_flagged_by');
     }
 
     public function administrations()

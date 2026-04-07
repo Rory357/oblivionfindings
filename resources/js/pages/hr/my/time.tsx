@@ -1,26 +1,25 @@
-import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageShell from '@/components/page-shell';
+import { KpiCard } from '@/components/recruitment/kpi-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
 import {
+    AlertTriangle,
+    Calendar,
     Clock,
     Loader2,
+    MapPin,
     Play,
     Square,
     Timer,
-    Calendar,
-    MapPin,
     TrendingUp,
-    AlertTriangle,
-    Users,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { useState } from 'react';
-import { KpiCard } from '@/components/recruitment/kpi-card';
+import { toast } from 'sonner';
 
 interface TimeEntry {
     id: number;
@@ -37,6 +36,12 @@ interface TimeEntry {
         id: number;
         starts_at: string;
         ends_at: string;
+        shift_type: string;
+        is_sleepover: boolean;
+        is_on_call: boolean;
+        expected_break_minutes?: number | null;
+        location?: string | null;
+        service_context_name?: string | null;
         client_name: string;
     } | null;
     client_name: string | null;
@@ -55,13 +60,33 @@ interface UpcomingShift {
     starts_at: string;
     ends_at: string;
     shift_type: string;
+    is_sleepover: boolean;
+    is_on_call: boolean;
+    expected_break_minutes?: number | null;
     client_name: string;
     location: string | null;
+    service_context_name?: string | null;
     status: string;
 }
 
 interface Props {
-    activeClock: { id: number; clock_in: string; notes: string | null } | null;
+    activeClock: {
+        id: number;
+        clock_in: string;
+        notes: string | null;
+        shift?: {
+            id: number;
+            starts_at: string;
+            ends_at: string;
+            shift_type: string;
+            is_sleepover: boolean;
+            is_on_call: boolean;
+            expected_break_minutes?: number | null;
+            location?: string | null;
+            service_context_name?: string | null;
+            client_name: string;
+        } | null;
+    } | null;
     todayEntries: TimeEntry[];
     weeklySummary: WeeklySummary;
     upcomingShifts: UpcomingShift[];
@@ -73,31 +98,83 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'My Time', href: '/hr/my/time' },
 ];
 
+const defaultStatusConfig = {
+    className: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+    label: 'Active',
+};
+
 const statusConfig: Record<string, { className: string; label: string }> = {
-    active: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Active' },
-    submitted: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Submitted' },
-    approved: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Approved' },
-    rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
+    active: defaultStatusConfig,
+    submitted: {
+        className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
+        label: 'Submitted',
+    },
+    approved: {
+        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        label: 'Approved',
+    },
+    rejected: {
+        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        label: 'Rejected',
+    },
+};
+
+const defaultShiftTypeConfig = {
+    className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+    label: 'Standard',
 };
 
 const shiftTypeConfig: Record<string, { className: string; label: string }> = {
-    standard: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Standard' },
-    sleepover: { className: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10', label: 'Sleepover' },
-    on_call: { className: 'border-purple-500/30 text-purple-400 bg-purple-500/10', label: 'On-Call' },
-    split: { className: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10', label: 'Split' },
-    travel: { className: 'border-amber-500/30 text-amber-400 bg-amber-500/10', label: 'Travel' },
+    standard: defaultShiftTypeConfig,
+    sleepover: {
+        className: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
+        label: 'Sleepover',
+    },
+    on_call: {
+        className: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+        label: 'On-Call',
+    },
+    split: {
+        className: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10',
+        label: 'Split',
+    },
+    travel: {
+        className: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+        label: 'Travel',
+    },
 };
 
 const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export default function MyTime({ activeClock, todayEntries, weeklySummary, upcomingShifts }: Props) {
+function getShiftTypeConfig(shiftType?: string): {
+    className: string;
+    label: string;
+} {
+    return shiftTypeConfig[shiftType ?? 'standard'] ?? defaultShiftTypeConfig;
+}
+
+function getStatusConfig(status?: string): {
+    className: string;
+    label: string;
+} {
+    return statusConfig[status ?? 'active'] ?? defaultStatusConfig;
+}
+
+export default function MyTime({
+    activeClock,
+    todayEntries,
+    weeklySummary,
+    upcomingShifts,
+}: Props) {
     const [processing, setProcessing] = useState(false);
 
     const todayTotal = todayEntries
         .filter((e) => e.total_hours != null)
         .reduce((sum, e) => sum + (e.total_hours ?? 0), 0);
 
-    const pendingCount = todayEntries.filter((e) => e.status === 'submitted').length;
+    const pendingCount = todayEntries.filter(
+        (e) => e.status === 'submitted',
+    ).length;
 
     const nextShift = upcomingShifts.length > 0 ? upcomingShifts[0] : null;
     const nextShiftLabel = nextShift
@@ -137,7 +214,11 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary, upcom
             <Head title="My Time" />
 
             <PageShell>
-                <PageHeader title="My Time" backHref="/hr/my" backLabel="Back to My HR" />
+                <PageHeader
+                    title="My Time"
+                    backHref="/hr/my"
+                    backLabel="Back to My HR"
+                />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -190,25 +271,117 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary, upcom
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-2">
                                                 <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-400" />
-                                                <span className="text-sm font-medium">Clocked in since {activeClock.clock_in}</span>
+                                                <span className="text-sm font-medium">
+                                                    Clocked in since{' '}
+                                                    {activeClock.clock_in}
+                                                </span>
                                             </div>
+                                            {activeClock.shift ? (
+                                                <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+                                                    <div className="font-medium text-foreground">
+                                                        {activeClock.shift
+                                                            ?.client_name ||
+                                                            'Linked shift'}
+                                                    </div>
+                                                    <div className="mt-1">
+                                                        {
+                                                            getShiftTypeConfig(
+                                                                activeClock
+                                                                    .shift
+                                                                    ?.shift_type,
+                                                            ).label
+                                                        }
+                                                        {activeClock.shift
+                                                            ?.service_context_name
+                                                            ? ` • ${activeClock.shift.service_context_name}`
+                                                            : ''}
+                                                        {activeClock.shift
+                                                            ?.location
+                                                            ? ` • ${activeClock.shift.location}`
+                                                            : ''}
+                                                    </div>
+                                                    {(activeClock.shift
+                                                        .is_sleepover ||
+                                                        activeClock.shift
+                                                            .is_on_call ||
+                                                        activeClock.shift
+                                                            .expected_break_minutes) && (
+                                                        <div className="mt-1">
+                                                            {activeClock.shift
+                                                                .is_sleepover
+                                                                ? 'Sleepover'
+                                                                : null}
+                                                            {activeClock.shift
+                                                                .is_sleepover &&
+                                                            activeClock.shift
+                                                                .is_on_call
+                                                                ? ' • '
+                                                                : null}
+                                                            {activeClock.shift
+                                                                .is_on_call
+                                                                ? 'On-call'
+                                                                : null}
+                                                            {(activeClock.shift
+                                                                .is_sleepover ||
+                                                                activeClock
+                                                                    .shift
+                                                                    .is_on_call) &&
+                                                            activeClock.shift
+                                                                .expected_break_minutes
+                                                                ? ' • '
+                                                                : null}
+                                                            {activeClock.shift
+                                                                .expected_break_minutes
+                                                                ? `Break ${activeClock.shift.expected_break_minutes}m`
+                                                                : null}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : null}
                                             {activeClock.notes && (
-                                                <p className="text-sm text-muted-foreground">{activeClock.notes}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {activeClock.notes}
+                                                </p>
                                             )}
-                                            <Button onClick={handleClockOut} variant="destructive" className="w-full" size="sm" disabled={processing}>
-                                                {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
-                                                {processing ? 'Clocking Out...' : 'Clock Out'}
+                                            <Button
+                                                onClick={handleClockOut}
+                                                variant="destructive"
+                                                className="w-full"
+                                                size="sm"
+                                                disabled={processing}
+                                            >
+                                                {processing ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Square className="mr-2 h-4 w-4" />
+                                                )}
+                                                {processing
+                                                    ? 'Clocking Out...'
+                                                    : 'Clock Out'}
                                             </Button>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-2">
                                                 <div className="h-3 w-3 rounded-full bg-slate-400" />
-                                                <span className="text-sm text-muted-foreground">Not clocked in</span>
+                                                <span className="text-sm text-muted-foreground">
+                                                    Not clocked in
+                                                </span>
                                             </div>
-                                            <Button onClick={() => handleClockIn()} className="w-full" size="sm" disabled={processing}>
-                                                {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-                                                {processing ? 'Clocking In...' : 'Clock In'}
+                                            <Button
+                                                onClick={() => handleClockIn()}
+                                                className="w-full"
+                                                size="sm"
+                                                disabled={processing}
+                                            >
+                                                {processing ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Play className="mr-2 h-4 w-4" />
+                                                )}
+                                                {processing
+                                                    ? 'Clocking In...'
+                                                    : 'Clock In'}
                                             </Button>
                                         </div>
                                     )}
@@ -225,22 +398,54 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary, upcom
                                 </CardHeader>
                                 <CardContent>
                                     <div className="mb-3 text-center">
-                                        <p className="text-3xl font-bold">{weeklySummary.total_hours}h</p>
+                                        <p className="text-3xl font-bold">
+                                            {weeklySummary.total_hours}h
+                                        </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {weeklySummary.week_start} to {weeklySummary.week_end}
+                                            {weeklySummary.week_start} to{' '}
+                                            {weeklySummary.week_end}
                                         </p>
                                     </div>
                                     <div className="flex items-end justify-between gap-1">
-                                        {Object.entries(weeklySummary.daily_hours ?? {}).map(([date, hours], i) => {
-                                            const safeHours = Number(hours) || 0;
-                                            const maxHours = Math.max(10, ...Object.values(weeklySummary.daily_hours ?? {}).map((h) => Number(h) || 0));
-                                            const barHeight = maxHours > 0 ? (safeHours / maxHours) * 50 : 0;
+                                        {Object.entries(
+                                            weeklySummary.daily_hours ?? {},
+                                        ).map(([date, hours], i) => {
+                                            const safeHours =
+                                                Number(hours) || 0;
+                                            const maxHours = Math.max(
+                                                10,
+                                                ...Object.values(
+                                                    weeklySummary.daily_hours ??
+                                                        {},
+                                                ).map((h) => Number(h) || 0),
+                                            );
+                                            const barHeight =
+                                                maxHours > 0
+                                                    ? (safeHours / maxHours) *
+                                                      50
+                                                    : 0;
                                             return (
-                                                <div key={date} className="flex flex-1 flex-col items-center gap-1">
-                                                    <div className="w-full rounded bg-primary/20" style={{ height: `${Math.max(4, barHeight)}px` }}>
-                                                        <div className="w-full rounded bg-primary" style={{ height: `${barHeight}px` }} />
+                                                <div
+                                                    key={date}
+                                                    className="flex flex-1 flex-col items-center gap-1"
+                                                >
+                                                    <div
+                                                        className="w-full rounded bg-primary/20"
+                                                        style={{
+                                                            height: `${Math.max(4, barHeight)}px`,
+                                                        }}
+                                                    >
+                                                        <div
+                                                            className="w-full rounded bg-primary"
+                                                            style={{
+                                                                height: `${barHeight}px`,
+                                                            }}
+                                                        />
                                                     </div>
-                                                    <span className="text-[10px] text-muted-foreground">{dayLabels[i] ?? date.slice(5)}</span>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {dayLabels[i] ??
+                                                            date.slice(5)}
+                                                    </span>
                                                 </div>
                                             );
                                         })}
@@ -252,47 +457,147 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary, upcom
                         {/* Today's Entries */}
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-base">Today's Entries</CardTitle>
+                                <CardTitle className="text-base">
+                                    Today's Entries
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 {todayEntries.length === 0 ? (
                                     <div className="py-12 text-center">
                                         <Clock className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
-                                        <p className="font-medium text-muted-foreground">No time entries recorded today</p>
-                                        <p className="mt-1 text-sm text-muted-foreground">Clock in above to start tracking your hours.</p>
+                                        <p className="font-medium text-muted-foreground">
+                                            No time entries recorded today
+                                        </p>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Clock in above to start tracking
+                                            your hours.
+                                        </p>
                                     </div>
                                 ) : (
                                     <div className="overflow-hidden rounded-b-xl">
                                         <table className="w-full text-sm">
                                             <thead className="border-b bg-muted/50">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left font-medium">In</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Out</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Client</th>
-                                                    <th className="px-4 py-3 text-right font-medium">Break</th>
-                                                    <th className="px-4 py-3 text-right font-medium">Hours</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        In
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Out
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Client
+                                                    </th>
+                                                    <th className="px-4 py-3 text-right font-medium">
+                                                        Break
+                                                    </th>
+                                                    <th className="px-4 py-3 text-right font-medium">
+                                                        Hours
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Status
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y">
                                                 {todayEntries.map((entry) => {
-                                                    const config = statusConfig[entry.status] || statusConfig.active;
+                                                    const config =
+                                                        getStatusConfig(
+                                                            entry.status,
+                                                        );
                                                     return (
-                                                        <tr key={entry.id} className="hover:bg-muted/30">
-                                                            <td className="px-4 py-3">{entry.clock_in}</td>
-                                                            <td className="px-4 py-3">{entry.clock_out ?? '-'}</td>
-                                                            <td className="px-4 py-3 text-muted-foreground">
-                                                                {entry.client_name || entry.shift?.client_name || '-'}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-right text-muted-foreground">
-                                                                {entry.break_minutes > 0 ? `${entry.break_minutes}m` : '-'}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-right font-medium">
-                                                                {entry.total_hours != null ? `${entry.total_hours}h` : '-'}
+                                                        <tr
+                                                            key={entry.id}
+                                                            className="hover:bg-muted/30"
+                                                        >
+                                                            <td className="px-4 py-3">
+                                                                {entry.clock_in}
                                                             </td>
                                                             <td className="px-4 py-3">
-                                                                <Badge variant="outline" className={config.className}>
-                                                                    {config.label}
+                                                                {entry.clock_out ??
+                                                                    '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-muted-foreground">
+                                                                {entry.client_name ||
+                                                                    entry.shift
+                                                                        ?.client_name ||
+                                                                    '-'}
+                                                                {entry.shift && (
+                                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className={`text-[10px] ${getShiftTypeConfig(entry.shift?.shift_type).className}`}
+                                                                        >
+                                                                            {
+                                                                                getShiftTypeConfig(
+                                                                                    entry
+                                                                                        .shift
+                                                                                        ?.shift_type,
+                                                                                )
+                                                                                    .label
+                                                                            }
+                                                                        </Badge>
+                                                                        {entry
+                                                                            .shift
+                                                                            .service_context_name ? (
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="text-[10px]"
+                                                                            >
+                                                                                {
+                                                                                    entry
+                                                                                        .shift
+                                                                                        .service_context_name
+                                                                                }
+                                                                            </Badge>
+                                                                        ) : null}
+                                                                    </div>
+                                                                )}
+                                                                {entry.shift
+                                                                    ?.location ? (
+                                                                    <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                                        <MapPin className="h-3 w-3" />{' '}
+                                                                        {
+                                                                            entry
+                                                                                .shift
+                                                                                .location
+                                                                        }
+                                                                    </div>
+                                                                ) : null}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right text-muted-foreground">
+                                                                {entry.break_minutes >
+                                                                0
+                                                                    ? `${entry.break_minutes}m`
+                                                                    : '-'}
+                                                                {entry.shift
+                                                                    ?.expected_break_minutes ? (
+                                                                    <div className="text-[11px] text-muted-foreground">
+                                                                        planned{' '}
+                                                                        {
+                                                                            entry
+                                                                                .shift
+                                                                                .expected_break_minutes
+                                                                        }
+                                                                        m
+                                                                    </div>
+                                                                ) : null}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right font-medium">
+                                                                {entry.total_hours !=
+                                                                null
+                                                                    ? `${entry.total_hours}h`
+                                                                    : '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={
+                                                                        config.className
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        config.label
+                                                                    }
                                                                 </Badge>
                                                             </td>
                                                         </tr>
@@ -317,10 +622,14 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary, upcom
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {upcomingShifts.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No upcoming shifts in the next 3 days.</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No upcoming shifts in the next 3 days.
+                                    </p>
                                 ) : (
                                     upcomingShifts.map((shift) => {
-                                        const typeConfig = shiftTypeConfig[shift.shift_type] || shiftTypeConfig.standard;
+                                        const typeConfig = getShiftTypeConfig(
+                                            shift.shift_type,
+                                        );
                                         return (
                                             <div
                                                 key={shift.id}
@@ -328,17 +637,59 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary, upcom
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="text-sm font-medium">{shift.client_name || 'Unassigned'}</p>
+                                                        <p className="text-sm font-medium">
+                                                            {shift.client_name ||
+                                                                'Unassigned'}
+                                                        </p>
                                                         <p className="text-xs text-muted-foreground">
-                                                            {shift.starts_at} — {shift.ends_at?.slice(11, 16)}
+                                                            {shift.starts_at} —{' '}
+                                                            {shift.ends_at?.slice(
+                                                                11,
+                                                                16,
+                                                            )}
                                                         </p>
                                                         {shift.location && (
                                                             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                                                                <MapPin className="h-3 w-3" /> {shift.location}
+                                                                <MapPin className="h-3 w-3" />{' '}
+                                                                {shift.location}
+                                                            </p>
+                                                        )}
+                                                        {shift.service_context_name && (
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                {
+                                                                    shift.service_context_name
+                                                                }
+                                                            </p>
+                                                        )}
+                                                        {(shift.is_sleepover ||
+                                                            shift.is_on_call ||
+                                                            shift.expected_break_minutes) && (
+                                                            <p className="mt-1 text-[11px] text-muted-foreground">
+                                                                {shift.is_sleepover
+                                                                    ? 'Sleepover'
+                                                                    : null}
+                                                                {shift.is_sleepover &&
+                                                                shift.is_on_call
+                                                                    ? ' • '
+                                                                    : null}
+                                                                {shift.is_on_call
+                                                                    ? 'On-call'
+                                                                    : null}
+                                                                {(shift.is_sleepover ||
+                                                                    shift.is_on_call) &&
+                                                                shift.expected_break_minutes
+                                                                    ? ' • '
+                                                                    : null}
+                                                                {shift.expected_break_minutes
+                                                                    ? `Break ${shift.expected_break_minutes}m`
+                                                                    : null}
                                                             </p>
                                                         )}
                                                     </div>
-                                                    <Badge variant="outline" className={`shrink-0 text-[10px] ${typeConfig.className}`}>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={`shrink-0 text-[10px] ${typeConfig.className}`}
+                                                    >
                                                         {typeConfig.label}
                                                     </Badge>
                                                 </div>
@@ -347,10 +698,15 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary, upcom
                                                         variant="outline"
                                                         size="sm"
                                                         className="mt-2 w-full"
-                                                        onClick={() => handleClockIn(shift.id)}
+                                                        onClick={() =>
+                                                            handleClockIn(
+                                                                shift.id,
+                                                            )
+                                                        }
                                                         disabled={processing}
                                                     >
-                                                        <Play className="mr-1 h-3 w-3" /> Clock In to This Shift
+                                                        <Play className="mr-1 h-3 w-3" />{' '}
+                                                        Clock In to This Shift
                                                     </Button>
                                                 )}
                                             </div>

@@ -5,8 +5,11 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\FleetVehicleBooking;
+use App\Notifications\Fleet\FleetBookingApprovedNotification;
+use App\Notifications\Fleet\FleetBookingRejectedNotification;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class VehicleBookingController extends Controller
@@ -251,9 +254,43 @@ class VehicleBookingController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $data['user_id'] = $request->user()->id;
-        $data['status'] = 'pending';
-        $booking = FleetVehicleBooking::create($data);
+        // Verify the booking user has valid driver eligibility
+        $eligibility = \App\Domain\Hr\Models\HrDriverEligibility::query()
+            ->where('user_id', $request->user()->id)
+            ->where('status', 'eligible')
+            ->where('licence_expires_at', '>', now())
+            ->first();
+
+        if (!$eligibility) {
+            return back()->withErrors([
+                'driver' => 'You must have valid driver eligibility with a non-expired licence to book a vehicle.',
+            ]);
+        }
+
+        // Server-side overlap prevention with atomic check-and-create
+        $booking = DB::transaction(function () use ($data, $request) {
+            $conflict = FleetVehicleBooking::query()
+                ->where('asset_id', $data['asset_id'])
+                ->whereIn('status', ['pending', 'approved', 'checked_out'])
+                ->where('starts_at', '<', $data['ends_at'])
+                ->where('ends_at', '>', $data['starts_at'])
+                ->lockForUpdate()
+                ->exists();
+
+            if ($conflict) {
+                return null;
+            }
+
+            $data['user_id'] = $request->user()->id;
+            $data['status'] = 'pending';
+            return FleetVehicleBooking::create($data);
+        });
+
+        if (!$booking) {
+            return back()->withErrors([
+                'asset_id' => 'This vehicle is already booked for the selected time period.',
+            ]);
+        }
 
         AuditLogger::log('fleet.booking.create', $booking, [
             'asset_id' => $data['asset_id'],
@@ -274,6 +311,9 @@ class VehicleBookingController extends Controller
 
     public function approve(Request $request, FleetVehicleBooking $booking)
     {
+        abort_if($booking->user_id === $request->user()->id, 403, 'Cannot approve your own booking.');
+        abort_unless($booking->status === 'pending', 422, 'Only pending bookings can be approved.');
+
         $booking->update([
             'status' => 'approved',
             'approved_by_user_id' => $request->user()->id,
@@ -283,11 +323,16 @@ class VehicleBookingController extends Controller
             'booking_id' => $booking->id,
         ]);
 
+        $booking->load('asset:id,name');
+        $booking->user->notify(new FleetBookingApprovedNotification($booking));
+
         return back()->with('success', 'Booking approved.');
     }
 
     public function reject(Request $request, FleetVehicleBooking $booking)
     {
+        abort_unless($booking->status === 'pending', 422, 'Only pending bookings can be rejected.');
+
         $data = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);
@@ -302,11 +347,16 @@ class VehicleBookingController extends Controller
             'reason' => $data['rejection_reason'],
         ]);
 
+        $booking->load('asset:id,name');
+        $booking->user->notify(new FleetBookingRejectedNotification($booking));
+
         return back()->with('success', 'Booking rejected.');
     }
 
     public function checkout(Request $request, FleetVehicleBooking $booking)
     {
+        abort_unless($booking->status === 'approved', 422, 'Only approved bookings can be checked out.');
+
         $data = $request->validate([
             'odometer_out' => ['nullable', 'numeric', 'min:0'],
         ]);
@@ -327,6 +377,8 @@ class VehicleBookingController extends Controller
 
     public function returnVehicle(Request $request, FleetVehicleBooking $booking)
     {
+        abort_unless($booking->status === 'checked_out', 422, 'Only checked-out bookings can be returned.');
+
         $data = $request->validate([
             'odometer_in' => ['nullable', 'numeric', 'min:0'],
             'condition_on_return' => ['nullable', 'string', 'max:50'],
@@ -351,6 +403,12 @@ class VehicleBookingController extends Controller
 
     public function cancel(Request $request, FleetVehicleBooking $booking)
     {
+        abort_unless(
+            in_array($booking->status, ['pending', 'approved', 'checked_out']),
+            422,
+            'This booking cannot be cancelled in its current state.'
+        );
+
         $booking->update([
             'status' => 'cancelled',
         ]);

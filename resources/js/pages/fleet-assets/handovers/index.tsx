@@ -42,8 +42,14 @@ type Handover = {
 
 type Vehicle = { id: number; name: string };
 
+type PaginatedHandovers = {
+    data: Handover[];
+    links?: Array<{ url: string | null; label: string; active: boolean }>;
+    meta?: { current_page: number; last_page: number; total: number };
+};
+
 type Props = {
-    handovers: Handover[];
+    handovers: Handover[] | PaginatedHandovers;
     vehicles: Vehicle[];
     filters: {
         vehicle_id?: string;
@@ -94,8 +100,10 @@ function fuelLabel(level: string | null) {
     return labels[level] ?? level;
 }
 
-export default function HandoverIndex({ handovers, vehicles, filters }: Props) {
-    const allHandovers = handovers ?? [];
+export default function HandoverIndex({ handovers: rawHandovers, vehicles, filters }: Props) {
+    const allHandovers = Array.isArray(rawHandovers) ? rawHandovers : (rawHandovers?.data ?? []);
+    const paginationLinks = !Array.isArray(rawHandovers) ? rawHandovers?.links ?? [] : [];
+    const paginationMeta = !Array.isArray(rawHandovers) ? rawHandovers?.meta ?? {} : {};
     const totalCount = allHandovers.length;
     const pendingCount = allHandovers.filter((h) => h.status === 'pending_acceptance').length;
     const acceptedCount = allHandovers.filter((h) => h.status === 'accepted').length;
@@ -242,6 +250,22 @@ export default function HandoverIndex({ handovers, vehicles, filters }: Props) {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination */}
+                {(paginationMeta.last_page ?? 1) > 1 && paginationLinks.length > 0 && (
+                    <div className="flex items-center justify-center gap-1 pt-4">
+                        {paginationLinks.map((link, i) => (
+                            <Button
+                                key={i}
+                                variant={link.active ? 'default' : 'outline'}
+                                size="sm"
+                                disabled={!link.url}
+                                onClick={() => link.url && router.get(link.url)}
+                                dangerouslySetInnerHTML={{ __html: link.label }}
+                            />
+                        ))}
+                    </div>
+                )}
             </PageShell>
         </AppLayout>
     );

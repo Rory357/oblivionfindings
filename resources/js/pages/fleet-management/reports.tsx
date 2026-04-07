@@ -79,7 +79,7 @@ export default function FleetReports({
         window.location.href = `/fleet/reports/export?period=${period}`;
     };
 
-    const maxDailyTrips = Math.max(...daily_trips.map((d) => d.trips), 1);
+    const maxDailyTrips = Math.max(0, ...daily_trips.map((d) => d.trips)) || 1;
 
     return (
         <AppLayout

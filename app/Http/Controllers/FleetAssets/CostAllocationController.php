@@ -38,7 +38,7 @@ class CostAllocationController extends Controller
         $fuelByAsset = [];
         if ($hasFuelTable) {
             $fuelByAsset = FleetFuelLog::query()
-                ->where('created_at', '>=', $since)
+                ->where('logged_at', '>=', $since)
                 ->selectRaw('asset_id, SUM(total_cost) as total_fuel')
                 ->groupBy('asset_id')
                 ->pluck('total_fuel', 'asset_id')
@@ -60,8 +60,12 @@ class CostAllocationController extends Controller
         // Trip distances by asset (for estimated fuel from distance)
         $tripDistanceByAsset = [];
         if ($hasTripsTable) {
-            $tripDistanceByAsset = FleetTrip::query()
-                ->where('created_at', '>=', $since)
+            $tripQuery = FleetTrip::query()
+                ->where('started_at', '>=', $since);
+            if (Schema::hasColumn('fleet_trips', 'is_personal')) {
+                $tripQuery->where('is_personal', false);
+            }
+            $tripDistanceByAsset = $tripQuery
                 ->selectRaw('asset_id, SUM(distance_km) as total_distance')
                 ->groupBy('asset_id')
                 ->pluck('total_distance', 'asset_id')
@@ -123,7 +127,7 @@ class CostAllocationController extends Controller
                 ->where('created_at', '>=', $since)
                 ->get(['resident_id', 'resident_name', 'asset_id', 'booking_id']);
 
-            $avgCostPerKm = 0.35; // Default NZ average fuel cost per km
+            $avgCostPerKm = (float) config('fleet.avg_cost_per_km');
 
             foreach ($transports as $transport) {
                 $residentId = $transport->resident_id ?? $transport->resident_name;

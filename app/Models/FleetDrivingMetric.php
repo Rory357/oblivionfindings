@@ -21,6 +21,11 @@ class FleetDrivingMetric extends Model
     protected $casts = [
         'period_start' => 'date',
         'period_end' => 'date',
+        'harsh_brake_count' => 'integer',
+        'accel_count' => 'integer',
+        'speeding_events' => 'integer',
+        'idle_minutes' => 'integer',
+        'score' => 'integer',
     ];
 
     public function asset(): BelongsTo

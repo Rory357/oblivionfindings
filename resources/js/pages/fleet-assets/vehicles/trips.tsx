@@ -31,6 +31,8 @@ import {
     MapPin,
     Route,
     Search,
+    User,
+    UserX,
     Zap,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -61,6 +63,7 @@ type Trip = {
     end_latitude: number | null;
     end_longitude: number | null;
     status: string;
+    is_personal: boolean;
     segments: TripSegment[];
 };
 
@@ -370,6 +373,7 @@ export default function VehicleTrips({
                                     <SortHeader field="duration_s">Duration</SortHeader>
                                     <th className="px-4 py-3 text-right font-medium">Max Speed</th>
                                     <SortHeader field="status">Status</SortHeader>
+                                    <th className="px-4 py-3 text-center font-medium">Type</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -464,10 +468,33 @@ function TripRow({
                         {trip.status ?? 'unknown'}
                     </Badge>
                 </td>
+                <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                        {trip.is_personal && (
+                            <Badge className="bg-orange-500 text-white text-[10px]">Personal</Badge>
+                        )}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            title={trip.is_personal ? 'Mark as business' : 'Mark as personal'}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                router.post(`/fleet-assets/trips/${trip.id}/toggle-personal`, {}, { preserveScroll: true });
+                            }}
+                        >
+                            {trip.is_personal ? (
+                                <UserX className="h-4 w-4 text-orange-500" />
+                            ) : (
+                                <User className="h-4 w-4 text-muted-foreground" />
+                            )}
+                        </Button>
+                    </div>
+                </td>
             </tr>
             {expanded && (
                 <tr className="border-b bg-muted/10">
-                    <td colSpan={9} className="p-4">
+                    <td colSpan={10} className="p-4">
                         <div className="grid gap-4 lg:grid-cols-2">
                             {/* Route Map */}
                             <div>

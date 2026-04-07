@@ -91,19 +91,28 @@ class CommunityAccessController extends Controller
                 }
             }
 
-            // Weekly trend
+            // Weekly trend (single grouped query instead of N queries)
             $weekStart = $since->copy();
+            $weekBuckets = [];
             while ($weekStart->lt(now())) {
-                $weekEnd = $weekStart->copy()->addDays(7);
-                $count = FleetOuting::query()
-                    ->where('created_at', '>=', $weekStart)
-                    ->where('created_at', '<', $weekEnd)
-                    ->count();
-                $weeklyTrend[] = [
+                $weekBuckets[] = [
+                    'start' => $weekStart->copy(),
                     'label' => $weekStart->format('d M'),
-                    'value' => $count,
                 ];
-                $weekStart = $weekEnd;
+                $weekStart = $weekStart->copy()->addDays(7);
+            }
+
+            $weeklyCounts = FleetOuting::query()
+                ->where('created_at', '>=', $since)
+                ->selectRaw('FLOOR(DATEDIFF(created_at, ?) / 7) as week_index, COUNT(*) as cnt', [$since->toDateString()])
+                ->groupBy('week_index')
+                ->pluck('cnt', 'week_index');
+
+            foreach ($weekBuckets as $i => $bucket) {
+                $weeklyTrend[] = [
+                    'label' => $bucket['label'],
+                    'value' => (int) ($weeklyCounts[$i] ?? 0),
+                ];
             }
         }
 

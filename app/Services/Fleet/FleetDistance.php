@@ -10,6 +10,11 @@ class FleetDistance
             return 0.0;
         }
 
+        if ($lat1 < -90 || $lat1 > 90 || $lat2 < -90 || $lat2 > 90
+            || $lon1 < -180 || $lon1 > 180 || $lon2 < -180 || $lon2 > 180) {
+            return 0.0;
+        }
+
         $earthRadiusKm = 6371;
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);

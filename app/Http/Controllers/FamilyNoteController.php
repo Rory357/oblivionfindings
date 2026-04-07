@@ -8,6 +8,7 @@ use App\Models\Shift;
 use App\Models\ShiftTask;
 use App\Models\TimelineEvent;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class FamilyNoteController extends Controller
 {
@@ -74,19 +75,49 @@ class FamilyNoteController extends Controller
             'shift_id' => 'required|integer|exists:shifts,id',
         ]);
 
-        $shift = Shift::findOrFail($data['shift_id']);
+        $shift = Shift::query()->findOrFail($data['shift_id']);
         abort_unless($shift->client_id === $client->id, 422);
 
-        ShiftTask::create([
-            'shift_id' => $shift->id,
-            'label' => '📋 ' . $familyNote->title,
-            'is_completed' => false,
-            'sort_order' => ShiftTask::where('shift_id', $shift->id)->max('sort_order') + 1,
-        ]);
+        if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+            throw ValidationException::withMessages([
+                'shift_id' => 'Family notes can only be assigned to active or upcoming shifts.',
+            ]);
+        }
+
+        $taskLabel = 'Family note: ' . $familyNote->title;
+
+        if (! ShiftTask::where('shift_id', $shift->id)->where('label', $taskLabel)->exists()) {
+            ShiftTask::create([
+                'shift_id' => $shift->id,
+                'label' => $taskLabel,
+                'is_completed' => false,
+                'sort_order' => ((int) ShiftTask::where('shift_id', $shift->id)->max('sort_order')) + 1,
+            ]);
+        }
 
         $familyNote->update([
             'assigned_to_shift_id' => $shift->id,
             'status' => $familyNote->status === 'open' ? 'in_progress' : $familyNote->status,
+        ]);
+
+        TimelineEvent::create([
+            'source_type' => FamilyNote::class,
+            'source_id' => $familyNote->id,
+            'occurred_at' => now(),
+            'type' => 'family_note_assigned_to_shift',
+            'actor_user_id' => $request->user()->id,
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'subject' => 'Family note assigned to shift: ' . $familyNote->title,
+            'body' => null,
+            'meta' => [
+                'shift_id' => $shift->id,
+                'shift_starts_at' => optional($shift->starts_at)->toIso8601String(),
+                'shift_status' => $shift->status,
+            ],
+            'visibility' => 'portal',
+            'is_pinned' => false,
+            'created_by' => $request->user()->id,
         ]);
 
         return redirect()->back()->with('success', 'Added to shift checklist.');

@@ -24,6 +24,7 @@ use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\Site;
+use App\Models\Shift;
 use App\Models\User;
 use App\Services\DoseSchedulingService;
 use App\Services\MedicationAlertService;
@@ -851,13 +852,43 @@ class EmarController extends Controller
     public function handovers(Request $request)
     {
         $handovers = MedicationHandover::query()
-            ->with(['outgoingUser:id,name', 'incomingUser:id,name', 'site:id,name'])
+            ->with([
+                'outgoingUser:id,name',
+                'incomingUser:id,name',
+                'site:id,name',
+                'serviceContext:id,name',
+                'shift:id,client_id,user_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,status',
+                'shift.client:id,first_name,last_name',
+                'shift.staff:id,name',
+            ])
             ->latest('handover_at')
             ->paginate(50);
+
+        $shifts = Shift::query()
+            ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceContext:id,name'])
+            ->whereBetween('starts_at', [now()->subDay(), now()->addDays(2)])
+            ->orderBy('starts_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (Shift $shift) => [
+                'id' => $shift->id,
+                'starts_at' => $shift->starts_at?->toISOString(),
+                'ends_at' => $shift->ends_at?->toISOString(),
+                'status' => $shift->status,
+                'shift_type' => $shift->shift_type ?? 'standard',
+                'is_sleepover' => (bool) $shift->is_sleepover,
+                'is_on_call' => (bool) $shift->is_on_call,
+                'location' => $shift->location,
+                'service_context_name' => $shift->serviceContext?->name,
+                'client_name' => trim(($shift->client?->first_name ?? '') . ' ' . ($shift->client?->last_name ?? '')),
+                'staff_name' => $shift->staff?->name,
+            ])
+            ->values();
 
         return Inertia::render('emar/Handovers', [
             'handovers' => $handovers,
             'staff' => $this->getStaffList(),
+            'shifts' => $shifts,
         ]);
     }
 
@@ -1383,7 +1414,7 @@ class EmarController extends Controller
         $validated = $request->validate([
             'incoming_user_id' => 'required|exists:users,id',
             'site_id' => 'nullable|exists:sites,id',
-            'shift_id' => 'nullable|integer',
+            'shift_id' => 'nullable|integer|exists:shifts,id',
             'controlled_drug_counts' => 'nullable|array',
             'controlled_drugs_verified' => 'nullable|boolean',
             'outstanding_medications' => 'nullable|array',
@@ -1412,6 +1443,12 @@ class EmarController extends Controller
         $validated['outgoing_user_id'] = auth()->id();
         $validated['handover_at'] = now();
         $validated['acknowledged'] = false;
+
+        if (!empty($validated['shift_id'])) {
+            $shift = Shift::query()->with('client:id,site_id')->find($validated['shift_id']);
+            $validated['site_id'] = $shift?->client?->site_id ?? ($validated['site_id'] ?? null);
+            $validated['service_context_id'] = $shift?->service_context_id;
+        }
 
         MedicationHandover::create($validated);
 
@@ -1903,6 +1940,7 @@ class EmarController extends Controller
     {
         $validated = $request->validate([
             'incoming_user_id' => 'sometimes|exists:users,id',
+            'shift_id' => 'sometimes|nullable|integer|exists:shifts,id',
             'controlled_drugs_verified' => 'nullable|boolean',
             'general_notes' => 'nullable|string|max:5000',
             'checklist_items' => 'nullable|array',
@@ -1920,6 +1958,12 @@ class EmarController extends Controller
             'stock_issues_identified' => 'nullable|string|max:5000',
             'prescriber_changes_summary' => 'nullable|string|max:5000',
         ]);
+
+        if (!empty($validated['shift_id'])) {
+            $shift = Shift::query()->with('client:id,site_id')->find($validated['shift_id']);
+            $validated['site_id'] = $shift?->client?->site_id ?? $handover->site_id;
+            $validated['service_context_id'] = $shift?->service_context_id;
+        }
 
         $handover->update($validated);
 

@@ -74,7 +74,7 @@ class ShiftControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->get('/shifts');
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('shifts/index')
+            ->component('operations/shifts/index')
             ->has('shifts')
             ->has('filters')
             ->has('clients')
@@ -117,7 +117,7 @@ class ShiftControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->component('shifts/create')
+            ->component('operations/shifts/create')
             ->where('clients.0.id', $this->client->id)
             ->where('clients.0.site.id', $site->id)
             ->where('clients.0.site.name', 'Kauri House')
@@ -139,7 +139,7 @@ class ShiftControllerTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->post('/shifts', $shiftData);
 
-        $response->assertRedirect('/shifts');
+        $response->assertRedirect('/operations/shifts');
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('shifts', [
@@ -298,7 +298,7 @@ class ShiftControllerTest extends TestCase
                 'status' => 'scheduled',
             ]);
 
-        $response->assertRedirect('/shifts');
+        $response->assertRedirect('/operations/shifts');
         $this->assertDatabaseHas('shifts', [
             'id' => $shift->id,
             'location' => 'New Location',
@@ -345,7 +345,7 @@ class ShiftControllerTest extends TestCase
                 ],
             ]);
 
-        $response->assertRedirect('/shifts');
+        $response->assertRedirect('/operations/shifts');
         $this->assertDatabaseHas('shift_tasks', ['id' => $existingTask->id, 'label' => 'Updated Task']);
         $this->assertDatabaseHas('shift_tasks', ['label' => 'New Task', 'shift_id' => $shift->id]);
     }

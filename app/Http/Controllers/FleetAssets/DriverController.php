@@ -68,9 +68,11 @@ class DriverController extends Controller
 
         $drivers = $query->paginate(25)->withQueryString();
 
-        // Get assigned vehicles for these drivers (requires fleet migrations for primary_driver_user_id)
         $driverIds = $drivers->getCollection()->pluck('id')->all();
-        $assignedVehicles = collect();
+        $assignedVehicles = Asset::query()
+            ->whereIn('primary_driver_user_id', $driverIds)
+            ->get(['id', 'name', 'asset_tag', 'primary_driver_user_id'])
+            ->groupBy('primary_driver_user_id');
 
         // Get trip counts per driver
         $tripCounts = FleetDriverSession::query()

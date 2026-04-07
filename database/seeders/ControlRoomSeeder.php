@@ -67,7 +67,20 @@ class ControlRoomSeeder extends Seeder
             ['code' => 'fleet_speeding', 'name' => 'Fleet Speeding', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'medium'],
             ['code' => 'fleet_geofence_exit', 'name' => 'Fleet Geofence Exit', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
             ['code' => 'fleet_geofence_enter', 'name' => 'Fleet Geofence Enter', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'low'],
+            ['code' => 'fleet_geofence_breach', 'name' => 'Fleet Geofence Breach', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
+            ['code' => 'fleet_geofence_dwell', 'name' => 'Fleet Geofence Dwell', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'low'],
             ['code' => 'fleet_device_offline', 'name' => 'Fleet Device Offline', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
+            ['code' => 'fleet_vehicle_offline', 'name' => 'Fleet Vehicle Offline', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'medium'],
+            ['code' => 'fleet_vehicle_overdue', 'name' => 'Fleet Vehicle Overdue Return', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
+            ['code' => 'fleet_incident_reported', 'name' => 'Fleet Incident Reported', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
+            ['code' => 'fleet_incident_investigating', 'name' => 'Fleet Incident Status Change', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'medium'],
+            ['code' => 'fleet_vehicle_sos', 'name' => 'Fleet Vehicle SOS', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'critical'],
+            ['code' => 'fleet_device_tamper', 'name' => 'Fleet Device Tamper', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
+            ['code' => 'fleet_wof_expiring', 'name' => 'Fleet WOF Expiring', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'medium'],
+            ['code' => 'fleet_wof_expired', 'name' => 'Fleet WOF Expired', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'critical'],
+            ['code' => 'fleet_registration_expiring', 'name' => 'Fleet Registration Expiring', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'medium'],
+            ['code' => 'fleet_maintenance_overdue', 'name' => 'Fleet Maintenance Overdue', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
+            ['code' => 'fleet_low_battery', 'name' => 'Fleet Low Battery', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'medium'],
         ];
 
         foreach ($signalTypes as $type) {
@@ -220,7 +233,13 @@ class ControlRoomSeeder extends Seeder
             ['name' => 'Network offline -> Medium', 'signal_type_code' => 'network_offline', 'output_severity' => 'medium', 'output_tier' => 1],
             ['name' => 'Fleet speeding -> Medium', 'signal_type_code' => 'fleet_speeding', 'output_severity' => 'medium', 'output_tier' => 1],
             ['name' => 'Fleet geofence exit -> High', 'signal_type_code' => 'fleet_geofence_exit', 'output_severity' => 'high', 'output_tier' => 2],
+            ['name' => 'Fleet geofence breach -> High', 'signal_type_code' => 'fleet_geofence_breach', 'output_severity' => 'high', 'output_tier' => 2],
             ['name' => 'Fleet device offline -> High', 'signal_type_code' => 'fleet_device_offline', 'output_severity' => 'high', 'output_tier' => 2],
+            ['name' => 'Fleet vehicle overdue -> High', 'signal_type_code' => 'fleet_vehicle_overdue', 'output_severity' => 'high', 'output_tier' => 2],
+            ['name' => 'Fleet incident reported -> High', 'signal_type_code' => 'fleet_incident_reported', 'output_severity' => 'high', 'output_tier' => 2],
+            ['name' => 'Fleet vehicle SOS -> Critical', 'signal_type_code' => 'fleet_vehicle_sos', 'output_severity' => 'critical', 'output_tier' => 3],
+            ['name' => 'Fleet WOF expired -> Critical', 'signal_type_code' => 'fleet_wof_expired', 'output_severity' => 'critical', 'output_tier' => 2],
+            ['name' => 'Fleet maintenance overdue -> High', 'signal_type_code' => 'fleet_maintenance_overdue', 'output_severity' => 'high', 'output_tier' => 1],
         ];
 
         foreach ($rules as $rule) {

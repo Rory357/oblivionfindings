@@ -6,9 +6,16 @@ use App\Http\Requests\StoreSiteRequest;
 use App\Http\Requests\UpdateSiteRequest;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\FleetFuelLog;
+use App\Models\FleetIncident;
+use App\Models\FleetOuting;
+use App\Models\FleetTrip;
+use App\Models\FleetVehicleBooking;
 use App\Models\Site;
 use App\Services\NotificationService;
+use App\Services\ShiftCoverageService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class SiteController extends Controller
 {
@@ -239,6 +246,13 @@ class SiteController extends Controller
                     'id' => $site->primaryContact->id,
                     'name' => $site->primaryContact->name,
                 ] : null,
+                'service_contexts' => $site->serviceContexts->map(fn($context) => [
+                    'id' => $context->id,
+                    'name' => $context->name,
+                    'type' => $context->type,
+                    'is_active' => (bool) $context->is_active,
+                    'description' => $context->description,
+                ])->values(),
                 'onboarding_completed_at' => $site->onboarding_completed_at?->toDateTimeString(),
                 'onboarding_progress' => $site->onboarding_progress,
             ],
@@ -328,10 +342,179 @@ class SiteController extends Controller
                     'certification_required' => (bool) $r->certification_required,
                     'expiry_period_months' => $r->expiry_period_months,
                 ]),
+            'coverageRequirements' => \App\Models\SiteCoverageRequirement::where('site_id', $site->id)
+                ->where('is_active', true)
+                ->with(['serviceContext:id,name,type', 'preferredClient:id,first_name,last_name,site_id'])
+                ->orderByRaw("FIELD(day_of_week, 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')")
+                ->orderBy('starts_time')
+                ->get()
+                ->map(fn($r) => [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'coverage_type' => $r->coverage_type,
+                    'day_of_week' => $r->day_of_week,
+                    'starts_time' => $r->starts_time,
+                    'ends_time' => $r->ends_time,
+                    'minimum_staff' => (int) $r->minimum_staff,
+                    'preferred_client' => $r->preferredClient ? [
+                        'id' => $r->preferredClient->id,
+                        'name' => trim($r->preferredClient->first_name.' '.$r->preferredClient->last_name),
+                    ] : null,
+                    'role_requirements' => $r->role_requirements ?? [],
+                    'allow_overstaffing' => (bool) $r->allow_overstaffing,
+                    'shift_type' => $r->shift_type,
+                    'notes' => $r->notes,
+                    'service_context' => $r->serviceContext ? [
+                        'id' => $r->serviceContext->id,
+                        'name' => $r->serviceContext->name,
+                        'type' => $r->serviceContext->type,
+                    ] : null,
+                ]),
+            'coveragePreview' => app(ShiftCoverageService::class)
+                ->buildSiteSummaries(now()->startOfWeek(), now()->addWeek()->endOfWeek(), $site->id),
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],
+            'fleet' => \Inertia\Inertia::optional(fn () => $this->buildSiteFleetData($site)),
         ]);
+    }
+
+    private function buildSiteFleetData(Site $site): array
+    {
+        $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
+        $hasTrips = Schema::hasTable('fleet_trips');
+        $hasFuel = Schema::hasTable('fleet_fuel_logs');
+        $hasIncidents = Schema::hasTable('fleet_incidents');
+        $hasBookings = Schema::hasTable('fleet_vehicle_bookings');
+        $hasOutings = Schema::hasTable('fleet_outings');
+
+        // Vehicles at this site (home_site_id) with fleet state
+        $vehicles = $hasFleetFields
+            ? Asset::query()
+                ->where('home_site_id', $site->id)
+                ->where('category', 'vehicle')
+                ->with('fleetState')
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($v) => [
+                    'id' => $v->id,
+                    'name' => $v->name,
+                    'asset_tag' => $v->asset_tag,
+                    'status' => $v->status,
+                    'fleet_status' => $v->fleetState?->status,
+                    'speed_kph' => $v->fleetState?->speed_kph,
+                    'last_seen_at' => optional($v->fleetState?->last_seen_at)->toISOString(),
+                    'consent_blocked' => (bool) ($v->fleetState?->consent_blocked ?? false),
+                    'wof_expires_at' => optional($v->wof_expires_at)->toDateString(),
+                    'registration_expires_at' => optional($v->registration_expires_at)->toDateString(),
+                ])
+                ->values()
+            : collect();
+
+        $vehicleIds = $vehicles->pluck('id')->all();
+
+        // Today's bookings for this site
+        $todayBookings = $hasBookings && $vehicleIds
+            ? FleetVehicleBooking::query()
+                ->where(fn ($q) => $q->where('pickup_site_id', $site->id)->orWhere('return_site_id', $site->id))
+                ->whereDate('starts_at', '<=', today())
+                ->whereDate('ends_at', '>=', today())
+                ->whereIn('status', ['approved', 'checked_out'])
+                ->with(['asset:id,name', 'user:id,name'])
+                ->limit(10)
+                ->get()
+                ->map(fn ($b) => [
+                    'id' => $b->id,
+                    'vehicle' => $b->asset ? ['id' => $b->asset->id, 'name' => $b->asset->name] : null,
+                    'booked_by' => $b->user?->name,
+                    'purpose' => $b->purpose,
+                    'status' => $b->status,
+                    'starts_at' => optional($b->starts_at)->toISOString(),
+                    'ends_at' => optional($b->ends_at)->toISOString(),
+                ])
+                ->values()
+            : collect();
+
+        // Active outings for site vehicles
+        $activeOutings = $hasOutings && $vehicleIds
+            ? FleetOuting::query()
+                ->whereIn('asset_id', $vehicleIds)
+                ->whereIn('status', ['planned', 'active'])
+                ->where('planned_departure', '>=', today()->subDay())
+                ->with(['asset:id,name', 'driver:id,name'])
+                ->withCount('residents')
+                ->limit(10)
+                ->get()
+                ->map(fn ($o) => [
+                    'id' => $o->id,
+                    'title' => $o->title,
+                    'destination' => $o->destination,
+                    'status' => $o->status,
+                    'planned_departure' => optional($o->planned_departure)->toISOString(),
+                    'vehicle' => $o->asset ? ['id' => $o->asset->id, 'name' => $o->asset->name] : null,
+                    'driver' => $o->driver ? ['id' => $o->driver->id, 'name' => $o->driver->name] : null,
+                    'residents_count' => $o->residents_count,
+                ])
+                ->values()
+            : collect();
+
+        // Monthly stats
+        $monthStart = now()->startOfMonth();
+
+        $tripsThisMonth = $hasTrips && $vehicleIds
+            ? FleetTrip::whereIn('asset_id', $vehicleIds)->where('started_at', '>=', $monthStart)->count()
+            : 0;
+
+        $distanceThisMonth = $hasTrips && $vehicleIds
+            ? round((float) FleetTrip::whereIn('asset_id', $vehicleIds)->where('started_at', '>=', $monthStart)->sum('distance_km'), 1)
+            : 0;
+
+        $fuelCostThisMonth = $hasFuel && $vehicleIds
+            ? round((float) FleetFuelLog::whereIn('asset_id', $vehicleIds)->where('logged_at', '>=', $monthStart)->sum('total_cost'), 2)
+            : 0;
+
+        $incidentsThisMonth = $hasIncidents && $vehicleIds
+            ? FleetIncident::whereIn('asset_id', $vehicleIds)->where('occurred_at', '>=', $monthStart)->count()
+            : 0;
+
+        // Compliance: vehicles with expiring WOF/Rego
+        $compliance = $vehicles->filter(function ($v) {
+            foreach (['wof_expires_at', 'registration_expires_at'] as $field) {
+                if ($v[$field] && now()->diffInDays(\Carbon\Carbon::parse($v[$field]), false) <= 90) {
+                    return true;
+                }
+            }
+            return false;
+        })->map(function ($v) {
+            $items = [];
+            foreach (['wof_expires_at' => 'WOF', 'registration_expires_at' => 'Registration'] as $field => $label) {
+                if ($v[$field]) {
+                    $days = now()->diffInDays(\Carbon\Carbon::parse($v[$field]), false);
+                    if ($days <= 90) {
+                        $items[] = [
+                            'type' => $label,
+                            'expires_at' => $v[$field],
+                            'days_remaining' => $days,
+                            'status' => $days < 0 ? 'expired' : ($days <= 30 ? 'critical' : 'warning'),
+                        ];
+                    }
+                }
+            }
+            return ['vehicle_name' => $v['name'], 'vehicle_id' => $v['id'], 'items' => $items];
+        })->filter(fn ($v) => count($v['items']) > 0)->values();
+
+        return [
+            'vehicles' => $vehicles,
+            'today_bookings' => $todayBookings,
+            'active_outings' => $activeOutings,
+            'stats' => [
+                'trips_this_month' => $tripsThisMonth,
+                'distance_this_month' => $distanceThisMonth,
+                'fuel_cost_this_month' => $fuelCostThisMonth,
+                'incidents_this_month' => $incidentsThisMonth,
+            ],
+            'compliance' => $compliance,
+        ];
     }
 
     public function create()

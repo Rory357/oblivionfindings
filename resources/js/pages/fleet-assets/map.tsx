@@ -2,6 +2,7 @@ import LeafletMap, { MapGeofence, MapMarker } from '@/components/leaflet-map';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { formatRelativeTime } from '@/lib/fleet-utils';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Car,
@@ -23,6 +24,7 @@ type VehicleMarker = {
     heading_deg: number | null;
     last_seen_at: string | null;
     home_site: string | null;
+    consent_blocked?: boolean;
 };
 
 type HouseMarker = {
@@ -55,22 +57,60 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
     const [showHouses, setShowHouses] = useState(true);
     const [showGeofences, setShowGeofences] = useState(true);
     const [selectedId, setSelectedId] = useState<string | number | null>(null);
+    // Real-time position overrides from WebSocket broadcasts
+    const [realtimePositions, setRealtimePositions] = useState<Record<number, Partial<VehicleMarker>>>({});
 
+    // Fallback: 30-second polling for when Echo/WebSocket is not configured
     useEffect(() => {
         const interval = window.setInterval(() => {
             if (document.hidden) return;
             router.reload({ only: ['vehicle_markers'] });
+            // Clear real-time overrides on full reload to avoid stale data
+            setRealtimePositions({});
         }, 30000);
         return () => window.clearInterval(interval);
     }, []);
 
+    // Real-time WebSocket listener for vehicle position updates
+    // NOTE: Requires Laravel Echo + Reverb/Pusher to be installed and configured.
+    // When Echo is not available, the 30-second polling above acts as fallback.
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).Echo) {
+            const channel = (window as any).Echo.channel('fleet.vehicles');
+            channel.listen('.position.updated', (data: any) => {
+                setRealtimePositions((prev) => ({
+                    ...prev,
+                    [data.assetId]: {
+                        lat: data.latitude,
+                        lng: data.longitude,
+                        speed_kph: data.speed_kph ?? 0,
+                        heading_deg: data.heading_deg ?? null,
+                        status: data.status ?? 'online',
+                    },
+                }));
+            });
+            return () => {
+                channel.stopListening('.position.updated');
+            };
+        }
+    }, []);
+
     const filteredVehicles = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
-        return (vehicle_markers ?? []).filter((v) => {
-            const name = (v.name ?? v.asset_tag ?? '').toLowerCase();
-            return !term || name.includes(term);
-        });
-    }, [vehicle_markers, searchTerm]);
+        return (vehicle_markers ?? [])
+            .filter((v) => {
+                const name = (v.name ?? v.asset_tag ?? '').toLowerCase();
+                return !term || name.includes(term);
+            })
+            .map((v) => {
+                // Merge any real-time position updates from WebSocket
+                const rt = realtimePositions[v.id];
+                if (rt) {
+                    return { ...v, ...rt };
+                }
+                return v;
+            });
+    }, [vehicle_markers, searchTerm, realtimePositions]);
 
     const filteredHouses = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
@@ -87,14 +127,24 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
             filteredVehicles
                 .filter((v) => v.lat && v.lng)
                 .forEach((v) => {
+                    const lastSeen = v.last_seen_at ? formatRelativeTime(v.last_seen_at) : 'unknown';
+                    const staleMinutes = v.last_seen_at
+                        ? Math.floor((Date.now() - new Date(v.last_seen_at).getTime()) / 60000)
+                        : null;
+                    const staleWarning = staleMinutes !== null && staleMinutes > 5
+                        ? `<div style="color:#ef4444;font-weight:600;font-size:11px;">⚠ Last seen ${lastSeen}</div>`
+                        : `<div style="font-size:11px;color:#6b7280;">Seen ${lastSeen}</div>`;
+
                     result.push({
                         id: `v-${v.id}`,
                         lat: Number(v.lat),
                         lng: Number(v.lng),
                         title: v.name ?? v.asset_tag ?? `Vehicle ${v.id}`,
                         type: 'vehicle',
-                        status: v.status,
-                        popup: `Speed: ${v.speed_kph ?? 0} kph`,
+                        status: staleMinutes !== null && staleMinutes > 5 ? 'offline' : v.status,
+                        heading: v.heading_deg ?? undefined,
+                        speed: v.speed_kph ?? 0,
+                        popup: `Speed: ${v.speed_kph ?? 0} km/h${staleWarning}`,
                     });
                 });
         }
@@ -229,15 +279,26 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                                             className={`h-2 w-2 shrink-0 rounded-full ${
                                                 v.status === 'online'
                                                     ? 'bg-green-500'
+                                                    : v.status === 'idle'
+                                                    ? 'bg-yellow-500'
                                                     : 'bg-gray-400'
                                             }`}
                                         />
-                                        <span className="truncate font-medium">
-                                            {v.name ?? v.asset_tag ?? `Vehicle ${v.id}`}
-                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                            <span className="truncate font-medium block">
+                                                {v.name ?? v.asset_tag ?? `Vehicle ${v.id}`}
+                                            </span>
+                                            {v.consent_blocked ? (
+                                                <span className="text-[10px] text-amber-600 dark:text-amber-400">Location hidden (consent)</span>
+                                            ) : v.last_seen_at ? (
+                                                <span className="text-[10px] text-muted-foreground">
+                                                    {formatRelativeTime(v.last_seen_at)}
+                                                </span>
+                                            ) : null}
+                                        </div>
                                         {v.speed_kph ? (
-                                            <span className="ml-auto text-xs text-muted-foreground">
-                                                {v.speed_kph} kph
+                                            <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                                                {v.speed_kph} km/h
                                             </span>
                                         ) : null}
                                     </Link>

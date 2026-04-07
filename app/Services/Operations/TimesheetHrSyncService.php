@@ -3,11 +3,17 @@
 namespace App\Services\Operations;
 
 use App\Models\Timesheet;
-use Carbon\Carbon;
+use App\Services\ShiftOperationalSnapshotService;
 use Illuminate\Support\Facades\Schema;
 
 class TimesheetHrSyncService
 {
+    public function __construct(
+        protected PayrollRateResolver $rateResolver,
+        protected ShiftOperationalSnapshotService $snapshots,
+    ) {
+    }
+
     public function syncToHr(Timesheet $timesheet): void
     {
         if ($timesheet->status !== 'approved') {
@@ -18,10 +24,20 @@ class TimesheetHrSyncService
             return;
         }
 
-        $payType = $this->mapPayType($timesheet);
+        $timesheet->loadMissing([
+            'user.hrEmployeeProfile',
+            'shift.site:id,name',
+            'shift.client:id,first_name,last_name,site_id',
+            'shift.serviceContext:id,name',
+            'client:id,first_name,last_name',
+        ]);
+
+        $timesheet->forceFill($this->snapshots->snapshotForTimesheet($timesheet))->saveQuietly();
+
+        $rate = $this->rateResolver->resolve($timesheet);
         $hours = $this->calculatePayableHours($timesheet);
 
-        \App\Domain\Hr\Models\HrTimeEntry::updateOrCreate(
+        $entry = \App\Domain\Hr\Models\HrTimeEntry::updateOrCreate(
             [
                 'source_type' => 'timesheet',
                 'source_id' => $timesheet->id,
@@ -31,6 +47,7 @@ class TimesheetHrSyncService
                 'user_id' => $timesheet->user_id,
                 'shift_id' => $timesheet->shift_id,
                 'client_id' => $timesheet->client_id,
+                'site_id' => $timesheet->shift_site_id,
                 'entry_date' => $timesheet->work_date,
                 'clock_in' => $timesheet->starts_at,
                 'clock_out' => $timesheet->ends_at,
@@ -38,51 +55,30 @@ class TimesheetHrSyncService
                 'total_hours' => $hours,
                 'entry_type' => 'timesheet',
                 'status' => 'approved',
-                'pay_type' => $payType,
+                'pay_type' => $rate['pay_type'],
                 'is_sleepover' => (bool) $timesheet->sleepover,
                 'is_on_call' => (bool) $timesheet->on_call,
                 'is_public_holiday' => (bool) $timesheet->public_holiday,
                 'mileage_km' => $timesheet->mileage_km ?? 0,
                 'notes' => sprintf(
                     'Shift timesheet — %s',
-                    $timesheet->client?->full_name ?? 'Unknown client'
+                    $timesheet->client_name_snapshot ?? 'Snapshot missing'
                 ),
                 'approved_by' => $timesheet->approved_by,
                 'approved_at' => $timesheet->approved_at,
             ]
         );
 
-        $timesheet->update(['exported_to_payroll_at' => now()]);
+        $timesheet->forceFill([
+            'hr_time_entry_id' => $entry->id,
+            'pay_type' => $rate['pay_type'],
+            'pay_rate' => $rate['pay_rate'],
+        ])->saveQuietly();
     }
 
     public function mapPayType(Timesheet $timesheet): string
     {
-        if ($timesheet->sleepover) {
-            return 'sleepover';
-        }
-        if ($timesheet->on_call) {
-            return 'on_call';
-        }
-        if ($timesheet->public_holiday) {
-            return 'public_holiday';
-        }
-
-        $dayOfWeek = Carbon::parse($timesheet->work_date)->dayOfWeek;
-        if (in_array($dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY])) {
-            return 'weekend';
-        }
-
-        if ($timesheet->starts_at) {
-            $hour = Carbon::parse($timesheet->starts_at)->hour;
-            if ($hour >= 20 || $hour < 6) {
-                return 'night';
-            }
-            if ($hour >= 18) {
-                return 'evening';
-            }
-        }
-
-        return 'standard';
+        return $this->rateResolver->mapPayType($timesheet);
     }
 
     protected function calculatePayableHours(Timesheet $timesheet): float
@@ -91,7 +87,7 @@ class TimesheetHrSyncService
             return 0;
         }
 
-        $minutes = Carbon::parse($timesheet->starts_at)->diffInMinutes(Carbon::parse($timesheet->ends_at));
+        $minutes = $timesheet->starts_at->diffInMinutes($timesheet->ends_at);
         $breakMinutes = $timesheet->break_minutes ?? 0;
 
         return round(($minutes - $breakMinutes) / 60, 2);

@@ -15,6 +15,8 @@ class ShiftSeries extends Model
 
     protected $fillable = [
         'client_id',
+        'site_id',
+        'service_context_id',
         'user_id',
         'start_date',
         'end_date',
@@ -25,6 +27,11 @@ class ShiftSeries extends Model
         'location',
         'notes',
         'status',
+        'shift_type',
+        'is_sleepover',
+        'is_on_call',
+        'expected_break_minutes',
+        'coverage_roles',
         'created_by',
     ];
 
@@ -32,6 +39,10 @@ class ShiftSeries extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'by_weekday' => 'array',
+        'is_sleepover' => 'boolean',
+        'is_on_call' => 'boolean',
+        'expected_break_minutes' => 'integer',
+        'coverage_roles' => 'array',
     ];
 
     public function client()
@@ -39,9 +50,19 @@ class ShiftSeries extends Model
         return $this->belongsTo(Client::class);
     }
 
+    public function site()
+    {
+        return $this->belongsTo(Site::class);
+    }
+
     public function staff()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function serviceContext()
+    {
+        return $this->belongsTo(ServiceContext::class);
     }
 
     public function shifts()

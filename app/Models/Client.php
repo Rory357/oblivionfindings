@@ -253,12 +253,17 @@ class Client extends Model
         ];
     }
 
-    /**
-     * Set NHI number (auto-format to uppercase)
-     */
-    public function setNhiNumberAttribute($value): void
+    protected static function booted(): void
     {
-        $this->attributes['nhi_number'] = $value ? strtoupper($value) : null;
+        static::saving(function (Client $client) {
+            $raw = $client->nhi_number;
+            if ($raw) {
+                $upper = strtoupper($raw);
+                if ($upper !== $raw) {
+                    $client->nhi_number = $upper;
+                }
+            }
+        });
     }
 
     public function onboardingWorkflow()
@@ -279,5 +284,29 @@ class Client extends Model
     public function personalAssets()
     {
         return $this->hasMany(\App\Models\ClientPersonalAsset::class);
+    }
+
+    // ── Fleet relationships ──────────────────────────────────────────────────
+
+    public function fleetTransports()
+    {
+        return $this->hasMany(FleetResidentTransport::class, 'resident_id');
+    }
+
+    public function fleetOutings()
+    {
+        return $this->belongsToMany(FleetOuting::class, 'fleet_outing_residents', 'client_id', 'outing_id')
+            ->withPivot(['pre_check_completed', 'medication_packed', 'notes'])
+            ->withTimestamps();
+    }
+
+    public function fleetOutingResidents()
+    {
+        return $this->hasMany(FleetOutingResident::class);
+    }
+
+    public function fleetMedicationTransitLogs()
+    {
+        return $this->hasMany(FleetMedicationTransitLog::class);
     }
 }

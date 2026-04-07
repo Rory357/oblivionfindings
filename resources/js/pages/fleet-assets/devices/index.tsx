@@ -47,8 +47,15 @@ type Device = {
     asset: { id: number; name: string; asset_tag: string | null } | null;
 };
 
+type PaginatedDevices = {
+    data: Device[];
+    links?: Array<{ url: string | null; label: string; active: boolean }>;
+    meta?: { current_page: number; last_page: number; total: number };
+};
+
 type Props = {
-    devices: Device[];
+    devices: PaginatedDevices | Device[];
+    stats?: { total: number; online: number; offline: number; unpaired: number };
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -60,16 +67,22 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
     }
 }
 
-export default function DevicesIndex({ devices }: Props) {
+export default function DevicesIndex({ devices, stats }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [sortField, setSortField] = useState<string>('');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-    const allDevices = devices ?? [];
-    const totalDevices = allDevices.length;
-    const onlineCount = allDevices.filter((d) => d.status === 'online').length;
-    const offlineCount = allDevices.filter((d) => d.status === 'offline' || d.status === 'stale').length;
-    const unpairedCount = allDevices.filter((d) => !d.asset).length;
+    // Support both paginated and plain array formats
+    const isPaginated = devices && !Array.isArray(devices) && 'data' in devices;
+    const allDevices: Device[] = isPaginated ? (devices as PaginatedDevices).data ?? [] : (devices as Device[]) ?? [];
+    const paginationLinks = isPaginated ? (devices as PaginatedDevices).links ?? [] : [];
+    const paginationMeta = isPaginated ? (devices as PaginatedDevices).meta ?? { current_page: 1, last_page: 1, total: 0 } : { current_page: 1, last_page: 1, total: 0 };
+
+    // Use stats from backend (reflects all devices, not just current page)
+    const totalDevices = stats?.total ?? allDevices.length;
+    const onlineCount = stats?.online ?? allDevices.filter((d) => d.status === 'online').length;
+    const offlineCount = stats?.offline ?? allDevices.filter((d) => d.status === 'offline' || d.status === 'stale').length;
+    const unpairedCount = stats?.unpaired ?? allDevices.filter((d) => !d.asset).length;
     const onlinePct = totalDevices > 0 ? Math.round((onlineCount / totalDevices) * 100) : 0;
 
     function handleSort(field: string) {
@@ -256,6 +269,22 @@ export default function DevicesIndex({ devices }: Props) {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination */}
+                {(paginationMeta.last_page ?? 1) > 1 && (
+                    <div className="flex items-center justify-center gap-1">
+                        {paginationLinks.map((link, i) => (
+                            <Button
+                                key={i}
+                                variant={link.active ? 'default' : 'outline'}
+                                size="sm"
+                                disabled={!link.url}
+                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                dangerouslySetInnerHTML={{ __html: link.label }}
+                            />
+                        ))}
+                    </div>
+                )}
             </PageShell>
         </AppLayout>
     );

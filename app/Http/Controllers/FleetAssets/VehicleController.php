@@ -300,6 +300,11 @@ class VehicleController extends Controller
             'sites' => $sites,
             'eligible_drivers' => $eligibleDrivers,
             'service_prediction' => $this->buildServicePrediction($asset),
+            'timeline' => \Inertia\Inertia::optional(fn () =>
+                app(\App\Services\Fleet\FleetTimelineService::class)
+                    ->forVehicle($asset->id, now()->subDays(14), 40)
+                    ->toArray()
+            ),
         ]);
     }
 
@@ -381,6 +386,17 @@ class VehicleController extends Controller
         ]);
 
         return back()->with('success', 'Vehicle updated successfully.');
+    }
+
+    public function markPersonal(Request $request, FleetTrip $trip)
+    {
+        $trip->update([
+            'is_personal' => !$trip->is_personal,
+            'marked_personal_by' => $request->user()->id,
+            'marked_personal_at' => now(),
+        ]);
+
+        return back()->with('success', $trip->is_personal ? 'Trip marked as personal.' : 'Trip marked as business.');
     }
 
     public function trips(Request $request)
@@ -573,6 +589,7 @@ class VehicleController extends Controller
                     'duration_s' => $trip->duration_s,
                     'max_speed_kph' => $trip->max_speed_kph ?? null,
                     'status' => $trip->status,
+                    'is_personal' => (bool) $trip->is_personal,
                     'start_address' => $trip->start_address,
                     'end_address' => $trip->end_address,
                     'start_latitude' => $trip->start_latitude,
@@ -657,25 +674,31 @@ class VehicleController extends Controller
         $totalCost = round((float) (clone $mtdQuery)->sum('total_cost'), 2);
         $avgCostPerLitre = $totalLitres > 0 ? round($totalCost / $totalLitres, 3) : 0;
 
-        // Per-vehicle efficiency
-        $efficiency = FleetFuelLog::query()
+        // Per-vehicle efficiency (batch-query trip distances to avoid N+1)
+        $fuelByAsset = FleetFuelLog::query()
             ->selectRaw('asset_id, SUM(quantity_litres) as total_litres')
             ->with('asset:id,name')
             ->groupBy('asset_id')
             ->having('total_litres', '>', 0)
-            ->get()
-            ->map(function ($row) {
-                $totalDistance = FleetTrip::query()
-                    ->where('asset_id', $row->asset_id)
-                    ->where('status', 'completed')
-                    ->sum('distance_km');
-                $kmPerLitre = $row->total_litres > 0 ? round((float) $totalDistance / (float) $row->total_litres, 2) : 0;
+            ->get();
+
+        $distanceByAsset = FleetTrip::query()
+            ->whereIn('asset_id', $fuelByAsset->pluck('asset_id'))
+            ->where('status', 'completed')
+            ->selectRaw('asset_id, SUM(distance_km) as total_distance')
+            ->groupBy('asset_id')
+            ->pluck('total_distance', 'asset_id');
+
+        $efficiency = $fuelByAsset
+            ->map(function ($row) use ($distanceByAsset) {
+                $totalDistance = (float) ($distanceByAsset[$row->asset_id] ?? 0);
+                $kmPerLitre = $row->total_litres > 0 ? round($totalDistance / (float) $row->total_litres, 2) : 0;
                 return [
                     'vehicle' => $row->asset?->name ?? 'Unknown',
                     'asset_id' => $row->asset_id,
                     'km_per_litre' => $kmPerLitre,
                     'total_litres' => round((float) $row->total_litres, 1),
-                    'total_distance_km' => round((float) $totalDistance, 1),
+                    'total_distance_km' => round($totalDistance, 1),
                 ];
             })
             ->sortByDesc('km_per_litre')

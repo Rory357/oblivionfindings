@@ -42,6 +42,10 @@ class FleetTelemetryEvent extends Model
         'external_power' => 'boolean',
         'consent_blocked' => 'boolean',
         'raw_payload' => 'array',
+        'accuracy_m' => 'integer',
+        'heading_deg' => 'integer',
+        'altitude_m' => 'integer',
+        'battery_pct' => 'integer',
     ];
 
     public function asset(): BelongsTo

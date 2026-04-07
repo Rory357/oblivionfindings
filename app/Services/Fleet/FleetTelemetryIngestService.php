@@ -2,12 +2,14 @@
 
 namespace App\Services\Fleet;
 
+use App\Events\FleetVehiclePositionUpdated;
 use App\Models\AssetTelemetrySnapshot;
 use App\Models\AssetTracker;
 use App\Models\FleetTelemetryEvent;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Services\Fleet\Telemetry\AdapterRegistry;
 use App\Services\Fleet\FleetDrivingMetricsService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class FleetTelemetryIngestService
@@ -47,15 +49,15 @@ class FleetTelemetryIngestService
 
         $idempotencyKey = $this->buildIdempotencyKey($vendor, $normalized, $payload);
 
-        $existing = FleetTelemetryEvent::query()
-            ->where('idempotency_key', $idempotencyKey)
-            ->first();
-
-        if ($existing) {
-            return ['ok' => true, 'id' => $existing->id, 'duplicate' => true];
-        }
-
         return DB::transaction(function () use ($asset, $tracker, $vendor, $normalized, $payload, $consentBlocked, $idempotencyKey) {
+            $existing = FleetTelemetryEvent::query()
+                ->where('idempotency_key', $idempotencyKey)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                return ['ok' => true, 'id' => $existing->id, 'duplicate' => true];
+            }
             $occurredAt = $normalized['occurred_at'] ?? now();
 
             $event = FleetTelemetryEvent::create([
@@ -130,6 +132,19 @@ class FleetTelemetryIngestService
             $this->trips->handleTelemetry($event, $state, $previousEvent);
             $this->metrics->handleTelemetry($event, $previousEvent, $state);
             $state->save();
+
+            // Broadcast real-time position update via WebSocket (requires Reverb/Pusher)
+            if (!$consentBlocked && $normalized['latitude'] !== null) {
+                broadcast(new FleetVehiclePositionUpdated(
+                    assetId: $asset->id,
+                    latitude: (float) $normalized['latitude'],
+                    longitude: (float) $normalized['longitude'],
+                    speed_kph: $normalized['speed_kph'] ? (float) $normalized['speed_kph'] : null,
+                    heading_deg: $normalized['heading_deg'] ? (int) $normalized['heading_deg'] : null,
+                    status: 'online',
+                    motion_status: $normalized['motion_status'],
+                ))->toOthers();
+            }
 
             if (!empty($normalized['sos_flag'])) {
                 $this->signals->emit([

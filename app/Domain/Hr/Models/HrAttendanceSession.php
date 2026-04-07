@@ -7,6 +7,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\ShiftSafetyInvariantService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -40,6 +41,13 @@ class HrAttendanceSession extends Model
         'break_minutes' => 'integer',
         'meta' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $session): void {
+            app(ShiftSafetyInvariantService::class)->assertAttendanceSession($session);
+        });
+    }
 
     public function user(): BelongsTo
     {
@@ -92,4 +100,3 @@ class HrAttendanceSession extends Model
         return round(max($minutes, 0) / 60, 2);
     }
 }
-

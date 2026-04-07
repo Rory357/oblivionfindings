@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ShiftSafetyInvariantService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,20 +17,34 @@ class ShiftHandover extends Model
         'client_id',
         'outgoing_staff_id',
         'incoming_staff_id',
+        'status',
         'handover_notes',
         'client_mood',
         'tasks_pending',
         'medications_due',
         'incidents_to_note',
+        'follow_up_items',
+        'submitted_at',
+        'submitted_by',
         'acknowledged_at',
+        'acknowledged_by',
     ];
 
     protected $casts = [
         'tasks_pending' => 'array',
         'medications_due' => 'array',
         'incidents_to_note' => 'array',
+        'follow_up_items' => 'array',
+        'submitted_at' => 'datetime',
         'acknowledged_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $handover): void {
+            app(ShiftSafetyInvariantService::class)->assertHandover($handover);
+        });
+    }
 
     public function outgoingShift()
     {
@@ -54,5 +69,15 @@ class ShiftHandover extends Model
     public function incomingStaff()
     {
         return $this->belongsTo(User::class, 'incoming_staff_id');
+    }
+
+    public function submitter()
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function acknowledger()
+    {
+        return $this->belongsTo(User::class, 'acknowledged_by');
     }
 }

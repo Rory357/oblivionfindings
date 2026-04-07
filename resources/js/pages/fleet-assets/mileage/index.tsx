@@ -19,6 +19,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Car,
     Check,
+    CheckCircle,
     Clock,
     DollarSign,
     Download,
@@ -142,6 +143,10 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
 
     const handleReject = (tripId: number) => {
         router.post(`/fleet-assets/mileage/${tripId}/reject`, {}, { preserveScroll: true });
+    };
+
+    const handleMarkPaid = (tripId: number) => {
+        router.post(`/fleet-assets/mileage/${tripId}/mark-paid`, {}, { preserveScroll: true });
     };
 
     return (
@@ -360,6 +365,17 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                                             Reject
                                                                         </Button>
                                                                     </div>
+                                                                )}
+                                                                {trip.status === 'approved' && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => handleMarkPaid(trip.id)}
+                                                                        className="text-xs h-7 text-green-600 hover:text-green-700"
+                                                                    >
+                                                                        <CheckCircle className="mr-1 h-3 w-3" />
+                                                                        Mark Paid
+                                                                    </Button>
                                                                 )}
                                                             </td>
                                                         )}

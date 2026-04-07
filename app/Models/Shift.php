@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Models\ClientIncident;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 
 class Shift extends Model
 {
@@ -15,6 +17,7 @@ class Shift extends Model
     protected $fillable = [
         'shift_series_id',
         'client_id',
+        'site_id',
         'respite_booking_id',
         'service_context_id',
         'user_id',
@@ -24,9 +27,17 @@ class Shift extends Model
         'actual_ends_at',
         'started_by',
         'completed_by',
+        'handover_waiver_reason',
+        'handover_waived_at',
+        'handover_waived_by',
         'location',
         'notes',
         'status',
+        'shift_type',
+        'is_sleepover',
+        'is_on_call',
+        'expected_break_minutes',
+        'coverage_roles',
         'created_by',
     ];
 
@@ -35,11 +46,59 @@ class Shift extends Model
         'ends_at' => 'datetime',
         'actual_starts_at' => 'datetime',
         'actual_ends_at' => 'datetime',
+        'handover_waived_at' => 'datetime',
+        'is_sleepover' => 'boolean',
+        'is_on_call' => 'boolean',
+        'expected_break_minutes' => 'integer',
+        'coverage_roles' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $shift): void {
+            app(\App\Services\ShiftSafetyInvariantService::class)->assertShift($shift);
+        });
+
+        static::updating(function (self $shift): void {
+            if (! $shift->hasApprovedTimesheet()) {
+                return;
+            }
+
+            $payrollCriticalFields = [
+                'client_id',
+                'site_id',
+                'service_context_id',
+                'user_id',
+                'starts_at',
+                'ends_at',
+                'shift_type',
+                'is_sleepover',
+                'is_on_call',
+                'expected_break_minutes',
+            ];
+
+            if ($shift->isDirty($payrollCriticalFields)) {
+                throw ValidationException::withMessages([
+                    'shift' => 'This shift has an approved timesheet and payroll-critical fields can no longer be changed.',
+                ]);
+            }
+
+            if ($shift->isDirty('status') && $shift->status === 'cancelled') {
+                throw ValidationException::withMessages([
+                    'shift' => 'This shift has an approved timesheet and cannot be cancelled.',
+                ]);
+            }
+        });
+    }
 
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function site()
+    {
+        return $this->belongsTo(Site::class);
     }
 
     public function serviceContext()
@@ -67,9 +126,39 @@ class Shift extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function handoverWaiverAuthor()
+    {
+        return $this->belongsTo(User::class, 'handover_waived_by');
+    }
+
     public function timesheets()
     {
         return $this->hasMany(Timesheet::class);
+    }
+
+    public function attendanceSessions()
+    {
+        return $this->hasMany(HrAttendanceSession::class);
+    }
+
+    public function signals()
+    {
+        return $this->hasMany(ShiftSignal::class);
+    }
+
+    public function approvedTimesheets()
+    {
+        return $this->timesheets()->where('status', 'approved');
+    }
+
+    public function formSubmissions()
+    {
+        return $this->hasMany(\App\Models\CustomFormSubmission::class);
+    }
+
+    public function medicationAdministrations()
+    {
+        return $this->hasMany(\App\Models\ClientMedicationAdministration::class);
     }
 
     public function tasks()
@@ -82,15 +171,48 @@ class Shift extends Model
         return $this->hasMany(ClientIncident::class);
     }
 
+    public function residentTransports()
+    {
+        return $this->hasMany(\App\Models\FleetResidentTransport::class);
+    }
+
     public function clientNotes()
     {
         return $this->hasMany(\App\Models\ClientNote::class, 'shift_id');
+    }
+
+    public function outgoingHandovers()
+    {
+        return $this->hasMany(\App\Models\ShiftHandover::class, 'outgoing_shift_id');
+    }
+
+    public function incomingHandovers()
+    {
+        return $this->hasMany(\App\Models\ShiftHandover::class, 'incoming_shift_id');
+    }
+
+    public function replacementRequests()
+    {
+        return $this->hasMany(\App\Models\ShiftReplacementRequest::class)->orderByDesc('requested_at');
     }
 
     public function isEnded(): bool
     {
         $end = $this->actual_ends_at ?? $this->ends_at;
         return $end ? now()->greaterThanOrEqualTo($end) : false;
+    }
+
+    public function hasApprovedTimesheet(): bool
+    {
+        if (! $this->exists) {
+            return false;
+        }
+
+        if ($this->relationLoaded('timesheets')) {
+            return $this->timesheets->contains(fn (Timesheet $timesheet) => $timesheet->status === 'approved');
+        }
+
+        return $this->approvedTimesheets()->exists();
     }
 
 }

@@ -14,15 +14,24 @@ class RosterTemplateShift extends Model
         'roster_template_id',
         'client_id',
         'user_id',
+        'service_context_id',
         'day_of_week',
         'start_time',
         'end_time',
+        'shift_type',
+        'is_sleepover',
+        'is_on_call',
+        'expected_break_minutes',
         'required_skills',
         'location',
-        'service_context_id',
+        'notes',
     ];
 
     protected $casts = [
+        'day_of_week' => 'integer',
+        'is_sleepover' => 'boolean',
+        'is_on_call' => 'boolean',
+        'expected_break_minutes' => 'integer',
         'required_skills' => 'array',
     ];
 
@@ -39,5 +48,10 @@ class RosterTemplateShift extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function serviceContext()
+    {
+        return $this->belongsTo(ServiceContext::class);
     }
 }

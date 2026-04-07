@@ -1,50 +1,71 @@
-import AppLayout from '@/layouts/app-layout';
+import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
+import { DonutChart } from '@/components/ops-stat-card';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { useMemo, useState, useCallback } from 'react';
 import {
-    Building2,
-    Home,
-    Warehouse,
-    MapPin,
-    AlertTriangle,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import {
+    TabsRoot as Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { formatCurrency, formatDateTime, formatDistance } from '@/lib/fleet-utils';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import {
     AlertCircle,
-    CheckCircle2,
-    Calendar,
-    ClipboardCheck,
-    ShieldAlert,
-    Truck,
-    Package,
-    Cpu,
-    BedDouble,
-    DoorOpen,
-    LayoutGrid,
-    FileText,
-    Users,
-    Settings,
-    PlayCircle,
-    Circle,
-    GraduationCap,
-    Plus,
-    Shield,
+    AlertTriangle,
     Award,
-    Star,
-    MessageSquare,
-    Layers,
+    BedDouble,
+    Building2,
+    Calendar,
+    Car,
+    CheckCircle2,
     ChevronDown,
     ChevronUp,
+    Circle,
+    ClipboardCheck,
+    Cpu,
+    DoorOpen,
+    FileText,
+    Fuel,
+    GraduationCap,
+    MapPin,
+    Home,
+    Layers,
+    LayoutGrid,
+    Package,
+    PlayCircle,
+    Plus,
+    Route,
+    Shield,
+    ShieldAlert,
+    Star,
+    Truck,
+    Users,
+    Warehouse,
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+import { useMemo, useState } from 'react';
 
 type Site = {
     id: number;
@@ -71,8 +92,17 @@ type Site = {
     risk_review_date?: string | null;
     primary_contact?: { id: number; name: string } | null;
     onboarding_completed_at?: string | null;
-    onboarding_progress?: Record<string, { completed?: boolean; data?: any; completed_at?: string }>;
-    service_contexts?: Array<{ id: number; name: string; type?: string; is_active: boolean; description?: string }>;
+    onboarding_progress?: Record<
+        string,
+        { completed?: boolean; data?: any; completed_at?: string }
+    >;
+    service_contexts?: Array<{
+        id: number;
+        name: string;
+        type?: string;
+        is_active: boolean;
+        description?: string;
+    }>;
 };
 
 type Contact = {
@@ -113,12 +143,26 @@ type AssetLite = {
     updated_at?: string | null;
 };
 
-type ClientLite = { id: number; first_name: string; last_name: string; status: string };
+type ClientLite = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    status: string;
+};
 type ChecklistItem = { key: string; label: string; done: boolean };
 
 type TypeSpecificData = {
-    rooms?: Array<{ id: number; name: string; assigned_client?: { id: number; name: string } | null }>;
-    resources?: Array<{ id: number; name: string; type: string; capacity?: number }>;
+    rooms?: Array<{
+        id: number;
+        name: string;
+        assigned_client?: { id: number; name: string } | null;
+    }>;
+    resources?: Array<{
+        id: number;
+        name: string;
+        type: string;
+        capacity?: number;
+    }>;
     zones?: Array<{ id: number; name: string; type?: string }>;
 };
 
@@ -139,6 +183,44 @@ type StaffRequirement = {
     expiry_period_months?: number | null;
 };
 
+type CoverageRequirement = {
+    id: number;
+    name: string;
+    coverage_type: 'day' | 'evening' | 'overnight' | 'custom';
+    day_of_week: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+    starts_time: string;
+    ends_time: string;
+    minimum_staff: number;
+    preferred_client?: { id: number; name: string } | null;
+    role_requirements?: Array<{ key: string; minimum: number }>;
+    allow_overstaffing?: boolean;
+    shift_type?: string | null;
+    notes?: string | null;
+    service_context?: { id: number; name: string; type?: string | null } | null;
+};
+
+type SiteFleetData = {
+    vehicles: Array<{
+        id: number; name: string; asset_tag: string; status: string;
+        fleet_status: string | null; speed_kph: number | null; last_seen_at: string | null;
+        consent_blocked: boolean; wof_expires_at: string | null; registration_expires_at: string | null;
+    }>;
+    today_bookings: Array<{
+        id: number; vehicle: { id: number; name: string } | null; booked_by: string | null;
+        purpose: string | null; status: string; starts_at: string | null; ends_at: string | null;
+    }>;
+    active_outings: Array<{
+        id: number; title: string; destination: string; status: string;
+        planned_departure: string | null; vehicle: { id: number; name: string } | null;
+        driver: { id: number; name: string } | null; residents_count: number;
+    }>;
+    stats: { trips_this_month: number; distance_this_month: number; fuel_cost_this_month: number; incidents_this_month: number };
+    compliance: Array<{
+        vehicle_name: string; vehicle_id: number;
+        items: Array<{ type: string; expires_at: string; days_remaining: number; status: string }>;
+    }>;
+};
+
 type Props = {
     site: Site;
     clients: ClientLite[];
@@ -149,11 +231,30 @@ type Props = {
     typeSpecificData: TypeSpecificData;
     vendors?: VendorLite[];
     staffRequirements?: StaffRequirement[];
+    coverageRequirements?: CoverageRequirement[];
+    coveragePreview?: Array<{
+        site_id: number;
+        site_name: string;
+        total_windows: number;
+        under_covered_windows: number;
+        exact_windows: number;
+        overstaffed_windows: number;
+        largest_missing_staff: number;
+        alerts: Array<{
+            rule_name: string;
+            window_label: string;
+            required_staff: number;
+            assigned_staff: number;
+            missing_staff: number;
+            coverage_state: string;
+        }>;
+    }>;
     credentialCount?: number;
     hardwareCount?: number;
     integrationStatus?: Array<{ provider: string; status: string }>;
     can_edit: boolean;
     can?: { createAsset?: boolean };
+    fleet?: SiteFleetData;
 };
 
 const typeIcons = {
@@ -176,21 +277,60 @@ function bytes(n?: number | null): string {
     return `${mb.toFixed(1)} MB`;
 }
 
-export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, vendors = [], staffRequirements = [], credentialCount = 0, hardwareCount = 0, integrationStatus = [], can_edit, can: assetCan }: Props) {
+export default function SiteShow({
+    site,
+    clients,
+    assets,
+    contacts,
+    documents,
+    checklist,
+    typeSpecificData,
+    vendors = [],
+    staffRequirements = [],
+    coverageRequirements = [],
+    coveragePreview = [],
+    credentialCount = 0,
+    hardwareCount = 0,
+    integrationStatus = [],
+    can_edit,
+    can: assetCan,
+    fleet,
+}: Props) {
     const TypeIcon = typeIcons[site.type];
-    const percent = Math.round((checklist.filter((c) => c.done).length / Math.max(1, checklist.length)) * 100);
+    const percent = Math.round(
+        (checklist.filter((c) => c.done).length /
+            Math.max(1, checklist.length)) *
+            100,
+    );
     const page = usePage<any>();
     const canGlobal = page.props?.auth?.can;
-    const canSeeVendorsCredentials = !!(canGlobal?.vendors?.view || canGlobal?.credentials?.view);
+    const canSeeVendorsCredentials = !!(
+        canGlobal?.vendors?.view || canGlobal?.credentials?.view
+    );
+
+    // Fleet tab lazy load
+    const [fleetLoaded, setFleetLoaded] = useState(!!fleet);
+    const loadFleet = () => {
+        if (!fleetLoaded) {
+            router.reload({ only: ['fleet'], onSuccess: () => setFleetLoaded(true) });
+        }
+    };
 
     // Checklist for onboarding
     const isOnboardingComplete = !!site.onboarding_completed_at;
 
     // Collapsible setup completeness — default collapsed when 100%, expanded otherwise
-    const [setupExpanded, setSetupExpanded] = useState(!isOnboardingComplete || percent < 100);
+    const [setupExpanded, setSetupExpanded] = useState(
+        !isOnboardingComplete || percent < 100,
+    );
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: site.name, href: `/sites/${site.id}` }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                { title: site.name, href: `/sites/${site.id}` },
+            ]}
+        >
             <Head title={site.name} />
 
             <PageShell>
@@ -201,34 +341,50 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                         description={site.address || '—'}
                         actions={
                             <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={typeColors[site.type]}>
-                                    <TypeIcon className="w-3 h-3 mr-1" />
+                                <Badge
+                                    variant="outline"
+                                    className={typeColors[site.type]}
+                                >
+                                    <TypeIcon className="mr-1 h-3 w-3" />
                                     {site.display_type}
                                 </Badge>
                                 {site.is_high_risk && (
-                                    <Badge variant="outline" className="border-orange-500/50 text-orange-400 bg-orange-500/10">
-                                        <AlertTriangle className="w-3 h-3 mr-1" />
+                                    <Badge
+                                        variant="outline"
+                                        className="border-orange-500/50 bg-orange-500/10 text-orange-400"
+                                    >
+                                        <AlertTriangle className="mr-1 h-3 w-3" />
                                         High Risk
                                     </Badge>
                                 )}
                                 {site.is_high_needs && (
-                                    <Badge variant="outline" className="border-yellow-500/50 text-yellow-400 bg-yellow-500/10">
-                                        <AlertCircle className="w-3 h-3 mr-1" />
+                                    <Badge
+                                        variant="outline"
+                                        className="border-yellow-500/50 bg-yellow-500/10 text-yellow-400"
+                                    >
+                                        <AlertCircle className="mr-1 h-3 w-3" />
                                         High Needs
                                     </Badge>
                                 )}
                                 <Badge
                                     variant="outline"
-                                    className={site.is_active
-                                        ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                                        : 'border-slate-500/30 text-slate-400'
+                                    className={
+                                        site.is_active
+                                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                                            : 'border-slate-500/30 text-slate-400'
                                     }
                                 >
                                     {site.is_active ? 'Active' : 'Inactive'}
                                 </Badge>
                                 {can_edit && (
-                                    <Button asChild variant="secondary" size="sm">
-                                        <Link href={`/sites/${site.id}/edit`}>Edit</Link>
+                                    <Button
+                                        asChild
+                                        variant="secondary"
+                                        size="sm"
+                                    >
+                                        <Link href={`/sites/${site.id}/edit`}>
+                                            Edit
+                                        </Link>
                                     </Button>
                                 )}
                             </div>
@@ -237,19 +393,24 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
 
                     {/* Onboarding progress banner */}
                     {!isOnboardingComplete && (
-                        <Card className="bg-indigo-500/5 border-indigo-500/20">
+                        <Card className="border-indigo-500/20 bg-indigo-500/5">
                             <CardContent className="flex items-center justify-between py-4">
                                 <div className="flex items-center gap-3">
-                                    <PlayCircle className="w-8 h-8 text-indigo-400" />
+                                    <PlayCircle className="h-8 w-8 text-indigo-400" />
                                     <div>
-                                        <div className="font-medium text-indigo-200">Site Onboarding in Progress</div>
+                                        <div className="font-medium text-indigo-200">
+                                            Site Onboarding in Progress
+                                        </div>
                                         <div className="text-sm text-slate-400">
-                                            Complete the onboarding wizard to set up this site fully
+                                            Complete the onboarding wizard to
+                                            set up this site fully
                                         </div>
                                     </div>
                                 </div>
                                 <Button asChild>
-                                    <Link href={`/sites/${site.id}/onboarding`}>Continue Onboarding</Link>
+                                    <Link href={`/sites/${site.id}/onboarding`}>
+                                        Continue Onboarding
+                                    </Link>
                                 </Button>
                             </CardContent>
                         </Card>
@@ -257,13 +418,22 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                 </div>
 
                 {/* Setup completeness */}
-                <Card className={isOnboardingComplete ? 'border-emerald-500/30 bg-emerald-500/5' : ''}>
-                    <CardHeader className="pb-3 cursor-pointer select-none" onClick={() => setSetupExpanded((v) => !v)}>
+                <Card
+                    className={
+                        isOnboardingComplete
+                            ? 'border-emerald-500/30 bg-emerald-500/5'
+                            : ''
+                    }
+                >
+                    <CardHeader
+                        className="cursor-pointer pb-3 select-none"
+                        onClick={() => setSetupExpanded((v) => !v)}
+                    >
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2">
                                 {isOnboardingComplete ? (
                                     <>
-                                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                        <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                                         <span>Setup Complete</span>
                                     </>
                                 ) : (
@@ -271,33 +441,39 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                 )}
                             </CardTitle>
                             <div className="flex items-center gap-3">
-                                <span className={`text-sm font-medium ${isOnboardingComplete ? 'text-emerald-400' : 'text-slate-300'}`}>
-                                    {checklist.filter((c) => c.done).length} of {checklist.length} items ({percent}%)
+                                <span
+                                    className={`text-sm font-medium ${isOnboardingComplete ? 'text-emerald-400' : 'text-slate-300'}`}
+                                >
+                                    {checklist.filter((c) => c.done).length} of{' '}
+                                    {checklist.length} items ({percent}%)
                                 </span>
                                 {isOnboardingComplete && (
-                                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                                    <Badge
+                                        variant="outline"
+                                        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                                    >
                                         Ready
                                     </Badge>
                                 )}
                                 {setupExpanded ? (
-                                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
                                 ) : (
-                                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                 )}
                             </div>
                         </div>
                         {/* Always-visible progress bar */}
-                        <div className="w-full mt-3">
-                            <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                        <div className="mt-3 w-full">
+                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                                 <div
                                     className={`h-full rounded-full transition-all duration-500 ${
                                         percent === 100
                                             ? 'bg-emerald-500'
                                             : percent >= 70
-                                                ? 'bg-indigo-500'
-                                                : percent >= 40
-                                                    ? 'bg-amber-500'
-                                                    : 'bg-slate-500'
+                                              ? 'bg-indigo-500'
+                                              : percent >= 40
+                                                ? 'bg-amber-500'
+                                                : 'bg-slate-500'
                                     }`}
                                     style={{ width: `${percent}%` }}
                                 />
@@ -313,21 +489,31 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                         <div
                                             key={item.key}
                                             className={`flex items-center gap-2 text-sm ${
-                                                item.done ? 'text-emerald-300' : 'text-slate-500'
+                                                item.done
+                                                    ? 'text-emerald-300'
+                                                    : 'text-slate-500'
                                             }`}
                                         >
-                                            <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-                                                item.done
-                                                    ? 'bg-emerald-500/20 text-emerald-400'
-                                                    : 'bg-muted text-muted-foreground'
-                                            }`}>
+                                            <div
+                                                className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ${
+                                                    item.done
+                                                        ? 'bg-emerald-500/20 text-emerald-400'
+                                                        : 'bg-muted text-muted-foreground'
+                                                }`}
+                                            >
                                                 {item.done ? (
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    <CheckCircle2 className="h-3.5 w-3.5" />
                                                 ) : (
-                                                    <Circle className="w-3.5 h-3.5" />
+                                                    <Circle className="h-3.5 w-3.5" />
                                                 )}
                                             </div>
-                                            <span className={item.done ? '' : 'opacity-70'}>
+                                            <span
+                                                className={
+                                                    item.done
+                                                        ? ''
+                                                        : 'opacity-70'
+                                                }
+                                            >
                                                 {item.label}
                                             </span>
                                         </div>
@@ -335,13 +521,14 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                 </div>
 
                                 {/* Summary */}
-                                <div className="pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+                                <div className="flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
                                     <span>
-                                        {checklist.filter((c) => c.done).length} of {checklist.length} items completed
+                                        {checklist.filter((c) => c.done).length}{' '}
+                                        of {checklist.length} items completed
                                     </span>
                                     {isOnboardingComplete && (
-                                        <span className="text-emerald-400 flex items-center gap-1">
-                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span className="flex items-center gap-1 text-emerald-400">
+                                            <CheckCircle2 className="h-3.5 w-3.5" />
                                             Site is fully configured
                                         </span>
                                     )}
@@ -353,70 +540,160 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
 
                 {/* Main Tabs */}
                 <Tabs defaultValue="overview" className="space-y-4">
-                    <TabsList className="flex h-auto gap-1 overflow-x-auto pb-1 scrollbar-hide w-full justify-start">
-                        <TabsTrigger value="overview" className="flex items-center gap-1">
-                            <LayoutGrid className="w-4 h-4" />
+                    <TabsList className="scrollbar-hide flex h-auto w-full justify-start gap-1 overflow-x-auto pb-1">
+                        <TabsTrigger
+                            value="overview"
+                            className="flex items-center gap-1"
+                        >
+                            <LayoutGrid className="h-4 w-4" />
                             Overview
                         </TabsTrigger>
-                        <TabsTrigger value="clients" className="flex items-center gap-1">
-                            <Users className="w-4 h-4" />
+                        <TabsTrigger
+                            value="clients"
+                            className="flex items-center gap-1"
+                        >
+                            <Users className="h-4 w-4" />
                             Clients ({clients.length})
                         </TabsTrigger>
-                        <TabsTrigger value="assets" className="flex items-center gap-1">
-                            <Package className="w-4 h-4" />
+                        <TabsTrigger
+                            value="assets"
+                            className="flex items-center gap-1"
+                        >
+                            <Package className="h-4 w-4" />
                             Assets ({assets.length})
                         </TabsTrigger>
-                        <TabsTrigger value="contacts" className="flex items-center gap-1">
-                            <FileText className="w-4 h-4" />
+                        <TabsTrigger
+                            value="contacts"
+                            className="flex items-center gap-1"
+                        >
+                            <FileText className="h-4 w-4" />
                             Contacts ({contacts.length})
                         </TabsTrigger>
-                        <TabsTrigger value="documents" className="flex items-center gap-1">
-                            <FileText className="w-4 h-4" />
+                        <TabsTrigger
+                            value="documents"
+                            className="flex items-center gap-1"
+                        >
+                            <FileText className="h-4 w-4" />
                             Documents ({documents.length})
                         </TabsTrigger>
-                        <TabsTrigger value="calendar" className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
+                        <TabsTrigger
+                            value="calendar"
+                            className="flex items-center gap-1"
+                        >
+                            <Calendar className="h-4 w-4" />
                             Calendar
                         </TabsTrigger>
-                        <TabsTrigger value="checklists" className="flex items-center gap-1">
-                            <ClipboardCheck className="w-4 h-4" />
+                        <TabsTrigger
+                            value="checklists"
+                            className="flex items-center gap-1"
+                        >
+                            <ClipboardCheck className="h-4 w-4" />
                             Checklists
                         </TabsTrigger>
-                        <TabsTrigger value="hazards" className="flex items-center gap-1">
-                            <ShieldAlert className="w-4 h-4" />
+                        <TabsTrigger
+                            value="hazards"
+                            className="flex items-center gap-1"
+                        >
+                            <ShieldAlert className="h-4 w-4" />
                             Hazards
                         </TabsTrigger>
+                        <TabsTrigger
+                            value="fleet"
+                            className="flex items-center gap-1"
+                            onClick={loadFleet}
+                        >
+                            <Car className="h-4 w-4" />
+                            Fleet
+                            {fleet && fleet.vehicles.length > 0 && (
+                                <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">{fleet.vehicles.length}</Badge>
+                            )}
+                        </TabsTrigger>
                         {canSeeVendorsCredentials && (
-                            <TabsTrigger value="vendors-credentials" className="flex items-center gap-1">
-                                <Truck className="w-4 h-4" />
+                            <TabsTrigger
+                                value="vendors-credentials"
+                                className="flex items-center gap-1"
+                            >
+                                <Truck className="h-4 w-4" />
                                 Vendors & Credentials
                             </TabsTrigger>
                         )}
-                        <TabsTrigger value="hardware" className="flex items-center gap-1">
-                            <Cpu className="w-4 h-4" />
+                        <TabsTrigger
+                            value="hardware"
+                            className="flex items-center gap-1"
+                        >
+                            <Cpu className="h-4 w-4" />
                             Hardware
                             {hardwareCount > 0 && (
-                                <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{hardwareCount}</Badge>
+                                <Badge
+                                    variant="outline"
+                                    className="ml-1 px-1.5 py-0 text-xs"
+                                >
+                                    {hardwareCount}
+                                </Badge>
                             )}
                         </TabsTrigger>
-                        <TabsTrigger value="type-specific" className="flex items-center gap-1">
-                            {site.type === 'house' && <BedDouble className="w-4 h-4" />}
-                            {site.type === 'head_office' && <DoorOpen className="w-4 h-4" />}
-                            {site.type === 'facility' && <LayoutGrid className="w-4 h-4" />}
-                            {site.type === 'house' ? 'Rooms' : site.type === 'head_office' ? 'Resources' : 'Zones'}
+                        <TabsTrigger
+                            value="type-specific"
+                            className="flex items-center gap-1"
+                        >
+                            {site.type === 'house' && (
+                                <BedDouble className="h-4 w-4" />
+                            )}
+                            {site.type === 'head_office' && (
+                                <DoorOpen className="h-4 w-4" />
+                            )}
+                            {site.type === 'facility' && (
+                                <LayoutGrid className="h-4 w-4" />
+                            )}
+                            {site.type === 'house'
+                                ? 'Rooms'
+                                : site.type === 'head_office'
+                                  ? 'Resources'
+                                  : 'Zones'}
                         </TabsTrigger>
-                        <TabsTrigger value="staff-requirements" className="flex items-center gap-1">
-                            <GraduationCap className="w-4 h-4" />
+                        <TabsTrigger
+                            value="staff-requirements"
+                            className="flex items-center gap-1"
+                        >
+                            <GraduationCap className="h-4 w-4" />
                             Staff Requirements
                             {staffRequirements.length > 0 && (
-                                <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{staffRequirements.length}</Badge>
+                                <Badge
+                                    variant="outline"
+                                    className="ml-1 px-1.5 py-0 text-xs"
+                                >
+                                    {staffRequirements.length}
+                                </Badge>
                             )}
                         </TabsTrigger>
-                        <TabsTrigger value="service-contexts" className="flex items-center gap-1">
-                            <Layers className="w-4 h-4" />
+                        <TabsTrigger
+                            value="shift-coverage"
+                            className="flex items-center gap-1"
+                        >
+                            <Layers className="h-4 w-4" />
+                            Shift Coverage
+                            {coverageRequirements.length > 0 && (
+                                <Badge
+                                    variant="outline"
+                                    className="ml-1 px-1.5 py-0 text-xs"
+                                >
+                                    {coverageRequirements.length}
+                                </Badge>
+                            )}
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="service-contexts"
+                            className="flex items-center gap-1"
+                        >
+                            <Layers className="h-4 w-4" />
                             Services
                             {(site.service_contexts ?? []).length > 0 && (
-                                <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{(site.service_contexts ?? []).length}</Badge>
+                                <Badge
+                                    variant="outline"
+                                    className="ml-1 px-1.5 py-0 text-xs"
+                                >
+                                    {(site.service_contexts ?? []).length}
+                                </Badge>
                             )}
                         </TabsTrigger>
                     </TabsList>
@@ -429,25 +706,66 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                     <CardTitle>Contact Information</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-0 text-sm">
-                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
-                                        <div className="text-slate-400">Phone</div>
-                                        <div>{site.phone || <span className="italic text-slate-500">—</span>}</div>
+                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                        <div className="text-slate-400">
+                                            Phone
+                                        </div>
+                                        <div>
+                                            {site.phone || (
+                                                <span className="text-slate-500 italic">
+                                                    —
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
-                                        <div className="text-slate-400">Email</div>
-                                        <div>{site.email || <span className="italic text-slate-500">—</span>}</div>
+                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                        <div className="text-slate-400">
+                                            Email
+                                        </div>
+                                        <div>
+                                            {site.email || (
+                                                <span className="text-slate-500 italic">
+                                                    —
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
-                                        <div className="text-slate-400">Site Lead</div>
-                                        <div>{site.primary_contact?.name || site.manager_name || <span className="italic text-slate-500">—</span>}</div>
+                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                        <div className="text-slate-400">
+                                            Site Lead
+                                        </div>
+                                        <div>
+                                            {site.primary_contact?.name ||
+                                                site.manager_name || (
+                                                    <span className="text-slate-500 italic">
+                                                        —
+                                                    </span>
+                                                )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
-                                        <div className="text-slate-400">Manager Phone</div>
-                                        <div>{site.manager_phone || <span className="italic text-slate-500">—</span>}</div>
+                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                        <div className="text-slate-400">
+                                            Manager Phone
+                                        </div>
+                                        <div>
+                                            {site.manager_phone || (
+                                                <span className="text-slate-500 italic">
+                                                    —
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
-                                        <div className="text-slate-400">After hours</div>
-                                        <div>{site.after_hours_phone || <span className="italic text-slate-500">—</span>}</div>
+                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                        <div className="text-slate-400">
+                                            After hours
+                                        </div>
+                                        <div>
+                                            {site.after_hours_phone || (
+                                                <span className="text-slate-500 italic">
+                                                    —
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -458,27 +776,46 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm">
                                     <div>
-                                        <div className="text-slate-400">Address</div>
-                                        <div className="mt-1">{site.address || <span className="italic text-slate-500">—</span>}</div>
+                                        <div className="text-slate-400">
+                                            Address
+                                        </div>
+                                        <div className="mt-1">
+                                            {site.address || (
+                                                <span className="text-slate-500 italic">
+                                                    —
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     {site.region && (
                                         <div>
-                                            <div className="text-slate-400">Region</div>
-                                            <div className="mt-1">{site.region}</div>
+                                            <div className="text-slate-400">
+                                                Region
+                                            </div>
+                                            <div className="mt-1">
+                                                {site.region}
+                                            </div>
                                         </div>
                                     )}
-                                    {(site.latitude && site.longitude) && (
+                                    {site.latitude && site.longitude && (
                                         <div>
-                                            <div className="text-slate-400">GPS Coordinates</div>
+                                            <div className="text-slate-400">
+                                                GPS Coordinates
+                                            </div>
                                             <div className="mt-1 font-mono text-xs">
-                                                {site.latitude}, {site.longitude}
+                                                {site.latitude},{' '}
+                                                {site.longitude}
                                             </div>
                                         </div>
                                     )}
                                     {site.access_instructions && (
                                         <div>
-                                            <div className="text-slate-400">Access Instructions</div>
-                                            <div className="mt-1 text-slate-300 whitespace-pre-wrap">{site.access_instructions}</div>
+                                            <div className="text-slate-400">
+                                                Access Instructions
+                                            </div>
+                                            <div className="mt-1 whitespace-pre-wrap text-slate-300">
+                                                {site.access_instructions}
+                                            </div>
                                         </div>
                                     )}
                                 </CardContent>
@@ -490,26 +827,46 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm">
                                     <div>
-                                        <div className="text-slate-400">Emergency plan location</div>
-                                        <div className="mt-1">{site.emergency_plan_location || <span className="italic text-slate-500">—</span>}</div>
+                                        <div className="text-slate-400">
+                                            Emergency plan location
+                                        </div>
+                                        <div className="mt-1">
+                                            {site.emergency_plan_location || (
+                                                <span className="text-slate-500 italic">
+                                                    —
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div>
-                                        <div className="text-slate-400">Medication storage location</div>
-                                        <div className="mt-1">{site.medication_storage_location || <span className="italic text-slate-500">—</span>}</div>
+                                        <div className="text-slate-400">
+                                            Medication storage location
+                                        </div>
+                                        <div className="mt-1">
+                                            {site.medication_storage_location || (
+                                                <span className="text-slate-500 italic">
+                                                    —
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    {(site.is_high_risk || site.is_high_needs) && (
+                                    {(site.is_high_risk ||
+                                        site.is_high_needs) && (
                                         <>
-                                            <div className="pt-2 border-t">
-                                                <div className="text-amber-400 font-medium flex items-center gap-1">
-                                                    <AlertTriangle className="w-4 h-4" />
+                                            <div className="border-t pt-2">
+                                                <div className="flex items-center gap-1 font-medium text-amber-400">
+                                                    <AlertTriangle className="h-4 w-4" />
                                                     Risk Information
                                                 </div>
                                                 {site.risk_notes && (
-                                                    <div className="mt-1 text-slate-300">{site.risk_notes}</div>
+                                                    <div className="mt-1 text-slate-300">
+                                                        {site.risk_notes}
+                                                    </div>
                                                 )}
                                                 {site.risk_review_date && (
                                                     <div className="mt-1 text-xs text-slate-400">
-                                                        Review due: {site.risk_review_date}
+                                                        Review due:{' '}
+                                                        {site.risk_review_date}
                                                     </div>
                                                 )}
                                             </div>
@@ -539,24 +896,40 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             </CardHeader>
                             <CardContent>
                                 {clients.length === 0 ? (
-                                    <div className="text-sm text-slate-400">No clients linked to this site yet.</div>
+                                    <div className="text-sm text-slate-400">
+                                        No clients linked to this site yet.
+                                    </div>
                                 ) : (
                                     <div className="overflow-hidden rounded-xl border">
                                         <table className="w-full text-sm">
                                             <thead className="border-b bg-slate-50/5">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left font-medium">Client</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Client
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Status
+                                                    </th>
                                                     <th className="px-4 py-3" />
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {clients.map((c) => (
-                                                    <tr key={c.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                                        <td className="px-4 py-3 font-medium">{`${c.first_name} ${c.last_name}`.trim()}</td>
-                                                        <td className="px-4 py-3 text-slate-300">{c.status}</td>
+                                                    <tr
+                                                        key={c.id}
+                                                        className="border-b last:border-b-0 hover:bg-muted/50"
+                                                    >
+                                                        <td className="px-4 py-3 font-medium">
+                                                            {`${c.first_name} ${c.last_name}`.trim()}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-slate-300">
+                                                            {c.status}
+                                                        </td>
                                                         <td className="px-4 py-3 text-right">
-                                                            <Link href={`/clients/${c.id}`} className="text-indigo-300 hover:text-indigo-200">
+                                                            <Link
+                                                                href={`/clients/${c.id}`}
+                                                                className="text-indigo-300 hover:text-indigo-200"
+                                                            >
                                                                 View
                                                             </Link>
                                                         </td>
@@ -576,44 +949,97 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Assets at this site</CardTitle>
                                 {assetCan?.createAsset && (
-                                    <Button asChild variant="secondary" size="sm">
-                                        <Link href={`/assets/create?site_id=${site.id}`}>Add Asset</Link>
+                                    <Button
+                                        asChild
+                                        variant="secondary"
+                                        size="sm"
+                                    >
+                                        <Link
+                                            href={`/assets/create?site_id=${site.id}`}
+                                        >
+                                            Add Asset
+                                        </Link>
                                     </Button>
                                 )}
                             </CardHeader>
                             <CardContent>
                                 {assets.length === 0 ? (
-                                    <div className="text-sm text-slate-400">No assets linked to this site yet.</div>
+                                    <div className="text-sm text-slate-400">
+                                        No assets linked to this site yet.
+                                    </div>
                                 ) : (
                                     <div className="overflow-hidden rounded-xl border">
                                         <table className="w-full text-sm">
                                             <thead className="border-b bg-slate-50/5">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left font-medium">Asset</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Owner</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Risk</th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Asset
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Owner
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Status
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Risk
+                                                    </th>
                                                     <th className="px-4 py-3" />
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {assets.map((a) => (
-                                                    <tr key={a.id} className="border-b last:border-b-0 hover:bg-muted/50">
+                                                    <tr
+                                                        key={a.id}
+                                                        className="border-b last:border-b-0 hover:bg-muted/50"
+                                                    >
                                                         <td className="px-4 py-3">
-                                                            <div className="font-medium">{a.name}</div>
+                                                            <div className="font-medium">
+                                                                {a.name}
+                                                            </div>
                                                             <div className="text-xs text-slate-400">
-                                                                {[a.asset_tag, a.category, a.location].filter(Boolean).join(' • ') || '—'}
+                                                                {[
+                                                                    a.asset_tag,
+                                                                    a.category,
+                                                                    a.location,
+                                                                ]
+                                                                    .filter(
+                                                                        Boolean,
+                                                                    )
+                                                                    .join(
+                                                                        ' • ',
+                                                                    ) || '—'}
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3 text-slate-300">
-                                                            <Badge variant="outline" className={a.owner.type === 'client' ? 'border-indigo-500/30 text-indigo-200' : 'border-slate-500/30 text-slate-300'}>
-                                                                {a.owner.type === 'client' ? `Client: ${a.owner.label}` : 'Site-owned'}
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={
+                                                                    a.owner
+                                                                        .type ===
+                                                                    'client'
+                                                                        ? 'border-indigo-500/30 text-indigo-200'
+                                                                        : 'border-slate-500/30 text-slate-300'
+                                                                }
+                                                            >
+                                                                {a.owner
+                                                                    .type ===
+                                                                'client'
+                                                                    ? `Client: ${a.owner.label}`
+                                                                    : 'Site-owned'}
                                                             </Badge>
                                                         </td>
-                                                        <td className="px-4 py-3 text-slate-300">{a.status}</td>
-                                                        <td className="px-4 py-3 text-slate-300">{a.risk_level}</td>
+                                                        <td className="px-4 py-3 text-slate-300">
+                                                            {a.status}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-slate-300">
+                                                            {a.risk_level}
+                                                        </td>
                                                         <td className="px-4 py-3 text-right">
-                                                            <Link href={`/assets/${a.id}`} className="text-indigo-300 hover:text-indigo-200">
+                                                            <Link
+                                                                href={`/assets/${a.id}`}
+                                                                className="text-indigo-300 hover:text-indigo-200"
+                                                            >
                                                                 View
                                                             </Link>
                                                         </td>
@@ -629,12 +1055,20 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
 
                     {/* Contacts Tab */}
                     <TabsContent value="contacts">
-                        <ContactsTab site={site} contacts={contacts} can_edit={can_edit} />
+                        <ContactsTab
+                            site={site}
+                            contacts={contacts}
+                            can_edit={can_edit}
+                        />
                     </TabsContent>
 
                     {/* Documents Tab */}
                     <TabsContent value="documents">
-                        <DocumentsTab site={site} documents={documents} can_edit={can_edit} />
+                        <DocumentsTab
+                            site={site}
+                            documents={documents}
+                            can_edit={can_edit}
+                        />
                     </TabsContent>
 
                     {/* Calendar Tab */}
@@ -643,15 +1077,25 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Site Calendar</CardTitle>
                                 <Button asChild>
-                                    <Link href={`/sites/${site.id}/calendar`}>View Full Calendar</Link>
+                                    <Link href={`/sites/${site.id}/calendar`}>
+                                        View Full Calendar
+                                    </Link>
                                 </Button>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-center py-8 text-slate-400">
-                                    <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                <div className="py-8 text-center text-slate-400">
+                                    <Calendar className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                     <p>Calendar events will appear here</p>
-                                    <Button asChild variant="outline" className="mt-4">
-                                        <Link href={`/sites/${site.id}/calendar`}>Open Calendar</Link>
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="mt-4"
+                                    >
+                                        <Link
+                                            href={`/sites/${site.id}/calendar`}
+                                        >
+                                            Open Calendar
+                                        </Link>
                                     </Button>
                                 </div>
                             </CardContent>
@@ -664,15 +1108,27 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Checklists & Walkthroughs</CardTitle>
                                 <Button asChild>
-                                    <Link href={`/sites/${site.id}/checklists`}>View All Checklists</Link>
+                                    <Link href={`/sites/${site.id}/checklists`}>
+                                        View All Checklists
+                                    </Link>
                                 </Button>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-center py-8 text-slate-400">
-                                    <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                                    <p>Scheduled checklists and completed runs</p>
-                                    <Button asChild variant="outline" className="mt-4">
-                                        <Link href={`/sites/${site.id}/checklists`}>Manage Checklists</Link>
+                                <div className="py-8 text-center text-slate-400">
+                                    <ClipboardCheck className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                                    <p>
+                                        Scheduled checklists and completed runs
+                                    </p>
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="mt-4"
+                                    >
+                                        <Link
+                                            href={`/sites/${site.id}/checklists`}
+                                        >
+                                            Manage Checklists
+                                        </Link>
                                     </Button>
                                 </div>
                             </CardContent>
@@ -685,24 +1141,194 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Hazards Register</CardTitle>
                                 <Button asChild>
-                                    <Link href={`/sites/${site.id}/hazards`}>View All Hazards</Link>
+                                    <Link href={`/sites/${site.id}/hazards`}>
+                                        View All Hazards
+                                    </Link>
                                 </Button>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-center py-8 text-slate-400">
-                                    <ShieldAlert className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                <div className="py-8 text-center text-slate-400">
+                                    <ShieldAlert className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                     <p>Logged hazards and risk assessments</p>
-                                    <div className="flex justify-center gap-2 mt-4">
+                                    <div className="mt-4 flex justify-center gap-2">
                                         <Button asChild variant="outline">
-                                            <Link href={`/sites/${site.id}/hazards`}>View Hazards</Link>
+                                            <Link
+                                                href={`/sites/${site.id}/hazards`}
+                                            >
+                                                View Hazards
+                                            </Link>
                                         </Button>
                                         <Button asChild>
-                                            <Link href={`/sites/${site.id}/hazards?action=add`}>Log Hazard</Link>
+                                            <Link
+                                                href={`/sites/${site.id}/hazards?action=add`}
+                                            >
+                                                Log Hazard
+                                            </Link>
                                         </Button>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
+                    </TabsContent>
+
+                    {/* Fleet Tab */}
+                    <TabsContent value="fleet" className="space-y-4">
+                        {fleet ? (() => {
+                            const fv = fleet.vehicles ?? [];
+                            const fb = fleet.today_bookings ?? [];
+                            const fo = fleet.active_outings ?? [];
+                            const fs = fleet.stats ?? { trips_this_month: 0, distance_this_month: 0, fuel_cost_this_month: 0, incidents_this_month: 0 };
+                            const fc = fleet.compliance ?? [];
+
+                            return (
+                                <>
+                                    {/* Stats */}
+                                    <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+                                        <Card className="border">
+                                            <CardContent className="p-4 text-center">
+                                                <Route className="mx-auto h-4 w-4 text-blue-500 mb-1" />
+                                                <div className="text-lg font-bold">{fs.trips_this_month}</div>
+                                                <div className="text-[10px] text-muted-foreground">Trips this month</div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className="border">
+                                            <CardContent className="p-4 text-center">
+                                                <MapPin className="mx-auto h-4 w-4 text-purple-500 mb-1" />
+                                                <div className="text-lg font-bold">{fs.distance_this_month} <span className="text-xs font-normal text-muted-foreground">km</span></div>
+                                                <div className="text-[10px] text-muted-foreground">Distance this month</div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className="border">
+                                            <CardContent className="p-4 text-center">
+                                                <Fuel className="mx-auto h-4 w-4 text-amber-500 mb-1" />
+                                                <div className="text-lg font-bold">{formatCurrency(fs.fuel_cost_this_month)}</div>
+                                                <div className="text-[10px] text-muted-foreground">Fuel this month</div>
+                                            </CardContent>
+                                        </Card>
+                                        <Card className={`border ${fs.incidents_this_month > 0 ? 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : ''}`}>
+                                            <CardContent className="p-4 text-center">
+                                                <AlertTriangle className={`mx-auto h-4 w-4 mb-1 ${fs.incidents_this_month > 0 ? 'text-red-500' : 'text-muted-foreground'}`} />
+                                                <div className={`text-lg font-bold ${fs.incidents_this_month > 0 ? 'text-red-600' : ''}`}>{fs.incidents_this_month}</div>
+                                                <div className="text-[10px] text-muted-foreground">Incidents this month</div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+
+                                    {/* Vehicles at Site */}
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="flex items-center gap-2 text-base"><Car className="h-4 w-4" /> Vehicles at Site ({fv.length})</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            {fv.length > 0 ? (
+                                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                                    {fv.map((v) => (
+                                                        <Link key={v.id} href={`/fleet-assets/vehicles/${v.id}`} className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
+                                                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${v.fleet_status === 'online' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="text-sm font-medium truncate">{v.name}</div>
+                                                                <div className="text-[10px] text-muted-foreground">
+                                                                    {v.asset_tag}
+                                                                    {v.consent_blocked ? ' · Location hidden' : v.last_seen_at ? ` · ${new Date(v.last_seen_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                                                </div>
+                                                            </div>
+                                                            {v.speed_kph != null && v.speed_kph > 0 && (
+                                                                <span className="text-xs text-muted-foreground shrink-0">{v.speed_kph} km/h</span>
+                                                            )}
+                                                        </Link>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="py-6 text-center text-sm text-muted-foreground">
+                                                    <Car className="mx-auto h-8 w-8 opacity-30 mb-2" />
+                                                    No vehicles assigned to this site
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Today's Activity */}
+                                    {(fb.length > 0 || fo.length > 0) && (
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center gap-2 text-base"><Calendar className="h-4 w-4" /> Today's Activity</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                                {fb.length > 0 && (
+                                                    <div>
+                                                        <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5">Bookings</div>
+                                                        <div className="space-y-1.5">
+                                                            {fb.map((b) => (
+                                                                <Link key={b.id} href={`/fleet-assets/bookings/${b.id}`} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50 transition-colors">
+                                                                    <div className="min-w-0">
+                                                                        <span className="font-medium">{b.vehicle?.name ?? 'Vehicle'}</span>
+                                                                        <span className="text-muted-foreground"> — {b.purpose ?? 'No purpose'}</span>
+                                                                    </div>
+                                                                    <Badge variant={b.status === 'checked_out' ? 'default' : 'outline'} className="text-[10px] shrink-0 ml-2">{b.status.replace(/_/g, ' ')}</Badge>
+                                                                </Link>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {fo.length > 0 && (
+                                                    <div>
+                                                        <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5">Outings</div>
+                                                        <div className="space-y-1.5">
+                                                            {fo.map((o) => (
+                                                                <Link key={o.id} href={`/fleet-assets/outings/${o.id}`} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50 transition-colors">
+                                                                    <div className="min-w-0">
+                                                                        <span className="font-medium">{o.title}</span>
+                                                                        <span className="text-muted-foreground"> → {o.destination}</span>
+                                                                        {o.residents_count > 0 && <span className="text-muted-foreground"> · {o.residents_count} resident{o.residents_count !== 1 ? 's' : ''}</span>}
+                                                                    </div>
+                                                                    <Badge variant={o.status === 'active' ? 'default' : 'outline'} className="text-[10px] shrink-0 ml-2">{o.status}</Badge>
+                                                                </Link>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Compliance Warnings */}
+                                    {fc.length > 0 && (
+                                        <Card className="border-amber-300 dark:border-amber-800">
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="flex items-center gap-2 text-base text-amber-800 dark:text-amber-300">
+                                                    <AlertTriangle className="h-4 w-4" /> Compliance Warnings
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-2">
+                                                    {fc.map((v) => (
+                                                        <div key={v.vehicle_id} className="rounded-md border border-amber-200 dark:border-amber-800 p-3">
+                                                            <Link href={`/fleet-assets/vehicles/${v.vehicle_id}`} className="text-sm font-medium text-primary hover:underline">{v.vehicle_name}</Link>
+                                                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                                {v.items.map((item, i) => (
+                                                                    <Badge
+                                                                        key={i}
+                                                                        variant={item.status === 'expired' ? 'destructive' : 'outline'}
+                                                                        className={`text-[10px] ${item.status === 'critical' ? 'border-red-400 text-red-700 dark:text-red-400' : item.status === 'warning' ? 'border-amber-400 text-amber-700 dark:text-amber-400' : ''}`}
+                                                                    >
+                                                                        {item.type}: {item.status === 'expired' ? 'EXPIRED' : `${item.days_remaining}d remaining`}
+                                                                    </Badge>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </>
+                            );
+                        })() : (
+                            <div className="py-12 text-center text-muted-foreground">
+                                <Truck className="mx-auto h-10 w-10 opacity-30 mb-3" />
+                                <p className="text-sm">Loading fleet data...</p>
+                            </div>
+                        )}
                     </TabsContent>
 
                     {/* Vendors & Credentials Tab */}
@@ -711,31 +1337,59 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             <div className="space-y-4">
                                 <Card>
                                     <CardHeader className="flex flex-row items-center justify-between">
-                                        <CardTitle className="text-base">Vendors ({vendors.length})</CardTitle>
+                                        <CardTitle className="text-base">
+                                            Vendors ({vendors.length})
+                                        </CardTitle>
                                         {canGlobal?.vendors?.view && (
                                             <Button asChild size="sm">
-                                                <Link href={`/sites/${site.id}/vendors`}>Manage Vendors</Link>
+                                                <Link
+                                                    href={`/sites/${site.id}/vendors`}
+                                                >
+                                                    Manage Vendors
+                                                </Link>
                                             </Button>
                                         )}
                                     </CardHeader>
                                     <CardContent>
                                         {vendors.length === 0 ? (
-                                            <p className="text-sm text-slate-400">No vendors registered for this site.</p>
+                                            <p className="text-sm text-slate-400">
+                                                No vendors registered for this
+                                                site.
+                                            </p>
                                         ) : (
                                             <div className="space-y-2">
                                                 {vendors.map((v) => (
-                                                    <div key={v.id} className="flex items-center justify-between p-2 rounded-lg border">
+                                                    <div
+                                                        key={v.id}
+                                                        className="flex items-center justify-between rounded-lg border p-2"
+                                                    >
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="font-medium text-sm">{v.company_name}</span>
+                                                                <span className="text-sm font-medium">
+                                                                    {
+                                                                        v.company_name
+                                                                    }
+                                                                </span>
                                                                 {v.is_preferred && (
-                                                                    <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 text-xs">Preferred</Badge>
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="border-yellow-500/30 text-xs text-yellow-400"
+                                                                    >
+                                                                        Preferred
+                                                                    </Badge>
                                                                 )}
                                                             </div>
-                                                            <div className="text-xs text-slate-400">{v.service_type}</div>
+                                                            <div className="text-xs text-slate-400">
+                                                                {v.service_type}
+                                                            </div>
                                                         </div>
                                                         {v.phone && (
-                                                            <a href={`tel:${v.phone}`} className="text-sm text-indigo-400 hover:text-indigo-300">{v.phone}</a>
+                                                            <a
+                                                                href={`tel:${v.phone}`}
+                                                                className="text-sm text-indigo-400 hover:text-indigo-300"
+                                                            >
+                                                                {v.phone}
+                                                            </a>
                                                         )}
                                                     </div>
                                                 ))}
@@ -746,19 +1400,38 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
 
                                 <Card>
                                     <CardHeader className="flex flex-row items-center justify-between">
-                                        <CardTitle className="text-base">Credentials ({credentialCount})</CardTitle>
+                                        <CardTitle className="text-base">
+                                            Credentials ({credentialCount})
+                                        </CardTitle>
                                         {canGlobal?.credentials?.view && (
-                                            <Button asChild size="sm" variant="secondary">
-                                                <Link href={`/sites/${site.id}/credentials`}>Manage Credentials</Link>
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                variant="secondary"
+                                            >
+                                                <Link
+                                                    href={`/sites/${site.id}/credentials`}
+                                                >
+                                                    Manage Credentials
+                                                </Link>
                                             </Button>
                                         )}
                                     </CardHeader>
                                     <CardContent>
                                         {credentialCount === 0 ? (
-                                            <p className="text-sm text-slate-400">No credentials stored for this site.</p>
+                                            <p className="text-sm text-slate-400">
+                                                No credentials stored for this
+                                                site.
+                                            </p>
                                         ) : (
                                             <p className="text-sm text-slate-300">
-                                                {credentialCount} credential{credentialCount !== 1 ? 's' : ''} securely stored. Open the Credentials Vault to view or manage them.
+                                                {credentialCount} credential
+                                                {credentialCount !== 1
+                                                    ? 's'
+                                                    : ''}{' '}
+                                                securely stored. Open the
+                                                Credentials Vault to view or
+                                                manage them.
                                             </p>
                                         )}
                                     </CardContent>
@@ -771,45 +1444,81 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                     <TabsContent value="hardware">
                         <Card>
                             <CardContent className="p-6">
-                                <div className="flex items-center justify-between mb-4">
+                                <div className="mb-4 flex items-center justify-between">
                                     <div>
-                                        <h3 className="font-medium flex items-center gap-2">
-                                            <Cpu className="w-4 h-4" />
+                                        <h3 className="flex items-center gap-2 font-medium">
+                                            <Cpu className="h-4 w-4" />
                                             Location Hardware & Configuration
                                         </h3>
-                                        <p className="text-sm text-slate-400 mt-1">
-                                            {hardwareCount} device{hardwareCount !== 1 ? 's' : ''} registered
+                                        <p className="mt-1 text-sm text-slate-400">
+                                            {hardwareCount} device
+                                            {hardwareCount !== 1
+                                                ? 's'
+                                                : ''}{' '}
+                                            registered
                                             {integrationStatus.length > 0 && (
-                                                <> · {integrationStatus.length} integration{integrationStatus.length !== 1 ? 's' : ''} active</>
+                                                <>
+                                                    {' '}
+                                                    · {
+                                                        integrationStatus.length
+                                                    }{' '}
+                                                    integration
+                                                    {integrationStatus.length !==
+                                                    1
+                                                        ? 's'
+                                                        : ''}{' '}
+                                                    active
+                                                </>
                                             )}
                                         </p>
                                     </div>
                                     <Button asChild>
-                                        <Link href={`/sites/${site.id}/hardware`}>
+                                        <Link
+                                            href={`/sites/${site.id}/hardware`}
+                                        >
                                             Manage Hardware
                                         </Link>
                                     </Button>
                                 </div>
                                 {integrationStatus.length > 0 && (
-                                    <div className="flex gap-2 mb-4">
+                                    <div className="mb-4 flex gap-2">
                                         {integrationStatus.map((i) => (
-                                            <Badge key={i.provider} variant="outline" className={
-                                                i.status === 'hybrid' ? 'border-emerald-500/30 text-emerald-400' :
-                                                i.status === 'tenant_only' ? 'border-blue-500/30 text-blue-400' :
-                                                'border-slate-500/30 text-slate-400'
-                                            }>
-                                                {i.provider.charAt(0).toUpperCase() + i.provider.slice(1)}: {i.status.replace('_', ' ')}
+                                            <Badge
+                                                key={i.provider}
+                                                variant="outline"
+                                                className={
+                                                    i.status === 'hybrid'
+                                                        ? 'border-emerald-500/30 text-emerald-400'
+                                                        : i.status ===
+                                                            'tenant_only'
+                                                          ? 'border-blue-500/30 text-blue-400'
+                                                          : 'border-slate-500/30 text-slate-400'
+                                                }
+                                            >
+                                                {i.provider
+                                                    .charAt(0)
+                                                    .toUpperCase() +
+                                                    i.provider.slice(1)}
+                                                : {i.status.replace('_', ' ')}
                                             </Badge>
                                         ))}
                                     </div>
                                 )}
-                                {hardwareCount === 0 && integrationStatus.length === 0 && (
-                                    <div className="text-center py-8 text-slate-400">
-                                        <Cpu className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                                        <p>No hardware registered for this site</p>
-                                        <p className="text-sm mt-1">Add devices manually or connect an integration to auto-discover hardware</p>
-                                    </div>
-                                )}
+                                {hardwareCount === 0 &&
+                                    integrationStatus.length === 0 && (
+                                        <div className="py-8 text-center text-slate-400">
+                                            <Cpu className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                                            <p>
+                                                No hardware registered for this
+                                                site
+                                            </p>
+                                            <p className="mt-1 text-sm">
+                                                Add devices manually or connect
+                                                an integration to auto-discover
+                                                hardware
+                                            </p>
+                                        </div>
+                                    )}
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -821,7 +1530,21 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
 
                     {/* Staff Requirements Tab */}
                     <TabsContent value="staff-requirements">
-                        <StaffRequirementsTab site={site} requirements={staffRequirements} can_edit={can_edit} />
+                        <StaffRequirementsTab
+                            site={site}
+                            requirements={staffRequirements}
+                            can_edit={can_edit}
+                        />
+                    </TabsContent>
+                    <TabsContent value="shift-coverage">
+                        <CoverageRequirementsTab
+                            site={site}
+                            requirements={coverageRequirements}
+                            preview={coveragePreview}
+                            clients={clients}
+                            serviceContexts={site.service_contexts ?? []}
+                            can_edit={can_edit}
+                        />
                     </TabsContent>
 
                     {/* Service Contexts Tab */}
@@ -834,40 +1557,73 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                             <Layers className="h-5 w-5 text-violet-600" />
                                             Service Contexts
                                         </CardTitle>
-                                        <p className="text-sm text-muted-foreground mt-1">Services delivered from this site</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Services delivered from this site
+                                        </p>
                                     </div>
                                     <Link href="/settings/service-contexts">
-                                        <Button variant="outline" size="sm">Manage in Settings</Button>
+                                        <Button variant="outline" size="sm">
+                                            Manage in Settings
+                                        </Button>
                                     </Link>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {(site.service_contexts ?? []).length === 0 ? (
-                                    <div className="text-center py-8 text-muted-foreground">
-                                        <Layers className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                                        <p className="font-medium">No service contexts linked</p>
-                                        <p className="text-sm mt-1">Link service contexts to this site in Settings → Service Contexts</p>
+                                    <div className="py-8 text-center text-muted-foreground">
+                                        <Layers className="mx-auto mb-2 h-10 w-10 opacity-30" />
+                                        <p className="font-medium">
+                                            No service contexts linked
+                                        </p>
+                                        <p className="mt-1 text-sm">
+                                            Link service contexts to this site
+                                            in Settings → Service Contexts
+                                        </p>
                                     </div>
                                 ) : (
                                     <div className="grid gap-3 sm:grid-cols-2">
-                                        {(site.service_contexts ?? []).map((ctx: any) => (
-                                            <div key={ctx.id} className="rounded-lg border border-l-4 border-l-violet-500 p-4 space-y-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium">{ctx.name}</span>
-                                                    {ctx.is_active ? (
-                                                        <Badge className="bg-emerald-100 text-emerald-700 text-xs">Active</Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="text-xs">Inactive</Badge>
+                                        {(site.service_contexts ?? []).map(
+                                            (ctx: any) => (
+                                                <div
+                                                    key={ctx.id}
+                                                    className="space-y-2 rounded-lg border border-l-4 border-l-violet-500 p-4"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">
+                                                            {ctx.name}
+                                                        </span>
+                                                        {ctx.is_active ? (
+                                                            <Badge className="bg-emerald-100 text-xs text-emerald-700">
+                                                                Active
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-xs"
+                                                            >
+                                                                Inactive
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    {ctx.type && (
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="text-xs"
+                                                        >
+                                                            {ctx.type.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}
+                                                        </Badge>
+                                                    )}
+                                                    {ctx.description && (
+                                                        <p className="line-clamp-2 text-sm text-muted-foreground">
+                                                            {ctx.description}
+                                                        </p>
                                                     )}
                                                 </div>
-                                                {ctx.type && (
-                                                    <Badge variant="secondary" className="text-xs">{ctx.type.replace(/_/g, ' ')}</Badge>
-                                                )}
-                                                {ctx.description && (
-                                                    <p className="text-sm text-muted-foreground line-clamp-2">{ctx.description}</p>
-                                                )}
-                                            </div>
-                                        ))}
+                                            ),
+                                        )}
                                     </div>
                                 )}
                             </CardContent>
@@ -880,8 +1636,18 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
 }
 
 // Sub-components for cleaner code
-function ContactsTab({ site, contacts, can_edit }: { site: Site; contacts: Contact[]; can_edit: boolean }) {
-    const [editingContactId, setEditingContactId] = useState<number | null>(null);
+function ContactsTab({
+    site,
+    contacts,
+    can_edit,
+}: {
+    site: Site;
+    contacts: Contact[];
+    can_edit: boolean;
+}) {
+    const [editingContactId, setEditingContactId] = useState<number | null>(
+        null,
+    );
     const contactForm = useForm({
         type: 'emergency',
         name: '',
@@ -918,26 +1684,44 @@ function ContactsTab({ site, contacts, can_edit }: { site: Site; contacts: Conta
                 </CardHeader>
                 <CardContent className="space-y-3">
                     {contacts.length === 0 ? (
-                        <div className="text-sm text-slate-400">No contacts yet.</div>
+                        <div className="text-sm text-slate-400">
+                            No contacts yet.
+                        </div>
                     ) : (
                         <div className="space-y-2">
                             {contacts.map((c) => (
-                                <div key={c.id} className="rounded-xl border p-3 text-sm">
+                                <div
+                                    key={c.id}
+                                    className="rounded-xl border p-3 text-sm"
+                                >
                                     <div className="flex items-start justify-between gap-2">
                                         <div>
                                             <div className="font-medium">
                                                 {c.name}{' '}
                                                 {c.is_primary && (
-                                                    <Badge variant="outline" className="ml-2 border-emerald-500/30 text-emerald-300">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="ml-2 border-emerald-500/30 text-emerald-300"
+                                                    >
                                                         Primary
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <div className="text-slate-400">{[c.type, c.role].filter(Boolean).join(' • ') || '—'}</div>
+                                            <div className="text-slate-400">
+                                                {[c.type, c.role]
+                                                    .filter(Boolean)
+                                                    .join(' • ') || '—'}
+                                            </div>
                                         </div>
                                         {can_edit && (
                                             <div className="flex items-center gap-2">
-                                                <Button variant="secondary" size="sm" onClick={() => startEditContact(c)}>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        startEditContact(c)
+                                                    }
+                                                >
                                                     Edit
                                                 </Button>
                                             </div>
@@ -946,7 +1730,11 @@ function ContactsTab({ site, contacts, can_edit }: { site: Site; contacts: Conta
                                     <div className="mt-2 grid gap-1 text-slate-300">
                                         <div>{c.phone || '—'}</div>
                                         <div>{c.email || '—'}</div>
-                                        {c.notes && <div className="mt-1 whitespace-pre-wrap text-slate-400">{c.notes}</div>}
+                                        {c.notes && (
+                                            <div className="mt-1 whitespace-pre-wrap text-slate-400">
+                                                {c.notes}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -958,7 +1746,9 @@ function ContactsTab({ site, contacts, can_edit }: { site: Site; contacts: Conta
             {can_edit && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>{editingContactId ? 'Edit contact' : 'Add contact'}</CardTitle>
+                        <CardTitle>
+                            {editingContactId ? 'Edit contact' : 'Add contact'}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <form
@@ -967,7 +1757,9 @@ function ContactsTab({ site, contacts, can_edit }: { site: Site; contacts: Conta
                                 const url = editingContactId
                                     ? `/sites/${site.id}/contacts/${editingContactId}`
                                     : `/sites/${site.id}/contacts`;
-                                const method = editingContactId ? contactForm.put : contactForm.post;
+                                const method = editingContactId
+                                    ? contactForm.put
+                                    : contactForm.post;
                                 method(url, {
                                     preserveScroll: true,
                                     onSuccess: () => resetContactForm(),
@@ -978,43 +1770,107 @@ function ContactsTab({ site, contacts, can_edit }: { site: Site; contacts: Conta
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
                                     <Label>Type</Label>
-                                    <Input value={contactForm.data.type} onChange={(e) => contactForm.setData('type', e.target.value)} />
+                                    <Input
+                                        value={contactForm.data.type}
+                                        onChange={(e) =>
+                                            contactForm.setData(
+                                                'type',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div>
                                     <Label>Role</Label>
-                                    <Input value={contactForm.data.role} onChange={(e) => contactForm.setData('role', e.target.value)} />
+                                    <Input
+                                        value={contactForm.data.role}
+                                        onChange={(e) =>
+                                            contactForm.setData(
+                                                'role',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div>
                                     <Label>Name</Label>
-                                    <Input value={contactForm.data.name} onChange={(e) => contactForm.setData('name', e.target.value)} />
+                                    <Input
+                                        value={contactForm.data.name}
+                                        onChange={(e) =>
+                                            contactForm.setData(
+                                                'name',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div>
                                     <Label>Phone</Label>
-                                    <Input value={contactForm.data.phone} onChange={(e) => contactForm.setData('phone', e.target.value)} />
+                                    <Input
+                                        value={contactForm.data.phone}
+                                        onChange={(e) =>
+                                            contactForm.setData(
+                                                'phone',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div>
                                     <Label>Email</Label>
-                                    <Input value={contactForm.data.email} onChange={(e) => contactForm.setData('email', e.target.value)} />
+                                    <Input
+                                        value={contactForm.data.email}
+                                        onChange={(e) =>
+                                            contactForm.setData(
+                                                'email',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div className="flex items-end gap-2">
                                     <input
                                         type="checkbox"
                                         checked={contactForm.data.is_primary}
-                                        onChange={(e) => contactForm.setData('is_primary', e.target.checked)}
+                                        onChange={(e) =>
+                                            contactForm.setData(
+                                                'is_primary',
+                                                e.target.checked,
+                                            )
+                                        }
                                     />
                                     <span className="text-sm">Primary</span>
                                 </div>
                             </div>
                             <div>
                                 <Label>Notes</Label>
-                                <Textarea value={contactForm.data.notes} onChange={(e) => contactForm.setData('notes', e.target.value)} />
+                                <Textarea
+                                    value={contactForm.data.notes}
+                                    onChange={(e) =>
+                                        contactForm.setData(
+                                            'notes',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button type="submit" disabled={contactForm.processing}>
-                                    {contactForm.processing ? 'Saving…' : editingContactId ? 'Save changes' : 'Add contact'}
+                                <Button
+                                    type="submit"
+                                    disabled={contactForm.processing}
+                                >
+                                    {contactForm.processing
+                                        ? 'Saving…'
+                                        : editingContactId
+                                          ? 'Save changes'
+                                          : 'Add contact'}
                                 </Button>
                                 {editingContactId && (
-                                    <Button type="button" variant="secondary" onClick={() => resetContactForm()}>
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() => resetContactForm()}
+                                    >
                                         Cancel
                                     </Button>
                                 )}
@@ -1027,7 +1883,15 @@ function ContactsTab({ site, contacts, can_edit }: { site: Site; contacts: Conta
     );
 }
 
-function DocumentsTab({ site, documents, can_edit }: { site: Site; documents: Doc[]; can_edit: boolean }) {
+function DocumentsTab({
+    site,
+    documents,
+    can_edit,
+}: {
+    site: Site;
+    documents: Doc[];
+    can_edit: boolean;
+}) {
     const docForm = useForm({
         file: null as File | null,
         title: '',
@@ -1046,24 +1910,40 @@ function DocumentsTab({ site, documents, can_edit }: { site: Site; documents: Do
                 </CardHeader>
                 <CardContent>
                     {documents.length === 0 ? (
-                        <div className="text-sm text-slate-400">No documents uploaded yet.</div>
+                        <div className="text-sm text-slate-400">
+                            No documents uploaded yet.
+                        </div>
                     ) : (
                         <div className="overflow-hidden rounded-xl border">
                             <table className="w-full text-sm">
                                 <thead className="border-b bg-slate-50/5">
                                     <tr>
-                                        <th className="px-4 py-3 text-left font-medium">Title</th>
-                                        <th className="px-4 py-3 text-left font-medium">Category</th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Title
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Category
+                                        </th>
                                         <th className="px-4 py-3" />
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {documents.map((d) => (
-                                        <tr key={d.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                            <td className="px-4 py-3 font-medium">{d.title || d.original_name}</td>
-                                            <td className="px-4 py-3 text-slate-300">{d.category || '—'}</td>
+                                        <tr
+                                            key={d.id}
+                                            className="border-b last:border-b-0 hover:bg-muted/50"
+                                        >
+                                            <td className="px-4 py-3 font-medium">
+                                                {d.title || d.original_name}
+                                            </td>
+                                            <td className="px-4 py-3 text-slate-300">
+                                                {d.category || '—'}
+                                            </td>
                                             <td className="px-4 py-3 text-right">
-                                                <Link href={`/sites/${site.id}/documents/${d.id}/download`} className="text-indigo-300 hover:text-indigo-200">
+                                                <Link
+                                                    href={`/sites/${site.id}/documents/${d.id}/download`}
+                                                    className="text-indigo-300 hover:text-indigo-200"
+                                                >
                                                     Download
                                                 </Link>
                                             </td>
@@ -1095,16 +1975,40 @@ function DocumentsTab({ site, documents, can_edit }: { site: Site; documents: Do
                         >
                             <div>
                                 <Label>File</Label>
-                                <Input type="file" onChange={(e) => docForm.setData('file', e.target.files?.[0] || null)} />
+                                <Input
+                                    type="file"
+                                    onChange={(e) =>
+                                        docForm.setData(
+                                            'file',
+                                            e.target.files?.[0] || null,
+                                        )
+                                    }
+                                />
                             </div>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
                                     <Label>Title</Label>
-                                    <Input value={docForm.data.title} onChange={(e) => docForm.setData('title', e.target.value)} />
+                                    <Input
+                                        value={docForm.data.title}
+                                        onChange={(e) =>
+                                            docForm.setData(
+                                                'title',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div>
                                     <Label>Category</Label>
-                                    <Input value={docForm.data.category} onChange={(e) => docForm.setData('category', e.target.value)} />
+                                    <Input
+                                        value={docForm.data.category}
+                                        onChange={(e) =>
+                                            docForm.setData(
+                                                'category',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                             </div>
                             <Button type="submit" disabled={docForm.processing}>
@@ -1118,26 +2022,38 @@ function DocumentsTab({ site, documents, can_edit }: { site: Site; documents: Do
     );
 }
 
-function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData }) {
+function TypeSpecificTab({
+    site,
+    data,
+}: {
+    site: Site;
+    data: TypeSpecificData;
+}) {
     if (site.type === 'house') {
         return (
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                        <BedDouble className="w-5 h-5" />
+                        <BedDouble className="h-5 w-5" />
                         Bedrooms
                     </CardTitle>
                     <Button asChild variant="outline" size="sm">
-                        <Link href={`/sites/${site.id}/rooms`}>Manage Rooms</Link>
+                        <Link href={`/sites/${site.id}/rooms`}>
+                            Manage Rooms
+                        </Link>
                     </Button>
                 </CardHeader>
                 <CardContent>
                     {!data.rooms || data.rooms.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400">
-                            <BedDouble className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <div className="py-8 text-center text-slate-400">
+                            <BedDouble className="mx-auto mb-3 h-12 w-12 opacity-50" />
                             <p>No bedrooms configured yet</p>
                             <Button asChild className="mt-4">
-                                <Link href={`/sites/${site.id}/onboarding?step=rooms`}>Add Bedrooms</Link>
+                                <Link
+                                    href={`/sites/${site.id}/onboarding?step=rooms`}
+                                >
+                                    Add Bedrooms
+                                </Link>
                             </Button>
                         </div>
                     ) : (
@@ -1145,13 +2061,22 @@ function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData })
                             {data.rooms.map((room) => (
                                 <Card key={room.id} className="bg-muted/50">
                                     <CardContent className="p-4">
-                                        <div className="font-medium">{room.name}</div>
+                                        <div className="font-medium">
+                                            {room.name}
+                                        </div>
                                         {room.assigned_client ? (
-                                            <Badge variant="outline" className="mt-2 border-indigo-500/30 text-indigo-300">
-                                                Assigned: {room.assigned_client.name}
+                                            <Badge
+                                                variant="outline"
+                                                className="mt-2 border-indigo-500/30 text-indigo-300"
+                                            >
+                                                Assigned:{' '}
+                                                {room.assigned_client.name}
                                             </Badge>
                                         ) : (
-                                            <Badge variant="outline" className="mt-2 border-slate-500/30 text-slate-400">
+                                            <Badge
+                                                variant="outline"
+                                                className="mt-2 border-slate-500/30 text-slate-400"
+                                            >
                                                 Available
                                             </Badge>
                                         )}
@@ -1170,20 +2095,26 @@ function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData })
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                        <DoorOpen className="w-5 h-5" />
+                        <DoorOpen className="h-5 w-5" />
                         Rooms & Resources
                     </CardTitle>
                     <Button asChild variant="outline" size="sm">
-                        <Link href={`/sites/${site.id}/resources`}>Manage Resources</Link>
+                        <Link href={`/sites/${site.id}/resources`}>
+                            Manage Resources
+                        </Link>
                     </Button>
                 </CardHeader>
                 <CardContent>
                     {!data.resources || data.resources.length === 0 ? (
-                        <div className="text-center py-8 text-slate-400">
-                            <DoorOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <div className="py-8 text-center text-slate-400">
+                            <DoorOpen className="mx-auto mb-3 h-12 w-12 opacity-50" />
                             <p>No rooms or resources configured yet</p>
                             <Button asChild className="mt-4">
-                                <Link href={`/sites/${site.id}/onboarding?step=resources`}>Add Resources</Link>
+                                <Link
+                                    href={`/sites/${site.id}/onboarding?step=resources`}
+                                >
+                                    Add Resources
+                                </Link>
                             </Button>
                         </div>
                     ) : (
@@ -1191,10 +2122,16 @@ function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData })
                             {data.resources.map((resource) => (
                                 <Card key={resource.id} className="bg-muted/50">
                                     <CardContent className="p-4">
-                                        <div className="font-medium">{resource.name}</div>
-                                        <div className="text-sm text-slate-400 mt-1 capitalize">{resource.type.replace('_', ' ')}</div>
+                                        <div className="font-medium">
+                                            {resource.name}
+                                        </div>
+                                        <div className="mt-1 text-sm text-slate-400 capitalize">
+                                            {resource.type.replace('_', ' ')}
+                                        </div>
                                         {resource.capacity && (
-                                            <div className="text-xs text-slate-500 mt-1">Capacity: {resource.capacity}</div>
+                                            <div className="mt-1 text-xs text-slate-500">
+                                                Capacity: {resource.capacity}
+                                            </div>
                                         )}
                                     </CardContent>
                                 </Card>
@@ -1211,7 +2148,7 @@ function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData })
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                    <LayoutGrid className="w-5 h-5" />
+                    <LayoutGrid className="h-5 w-5" />
                     Areas & Zones
                 </CardTitle>
                 <Button asChild variant="outline" size="sm">
@@ -1220,11 +2157,15 @@ function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData })
             </CardHeader>
             <CardContent>
                 {!data.zones || data.zones.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">
-                        <LayoutGrid className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <div className="py-8 text-center text-slate-400">
+                        <LayoutGrid className="mx-auto mb-3 h-12 w-12 opacity-50" />
                         <p>No zones configured yet</p>
                         <Button asChild className="mt-4">
-                            <Link href={`/sites/${site.id}/onboarding?step=zones`}>Add Zones</Link>
+                            <Link
+                                href={`/sites/${site.id}/onboarding?step=zones`}
+                            >
+                                Add Zones
+                            </Link>
                         </Button>
                     </div>
                 ) : (
@@ -1232,8 +2173,14 @@ function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData })
                         {data.zones.map((zone) => (
                             <Card key={zone.id} className="bg-muted/50">
                                 <CardContent className="p-4">
-                                    <div className="font-medium">{zone.name}</div>
-                                    {zone.type && <div className="text-sm text-slate-400 mt-1">{zone.type}</div>}
+                                    <div className="font-medium">
+                                        {zone.name}
+                                    </div>
+                                    {zone.type && (
+                                        <div className="mt-1 text-sm text-slate-400">
+                                            {zone.type}
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         ))}
@@ -1245,21 +2192,1153 @@ function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData })
 }
 
 const PRESET_REQUIREMENTS = [
-    { requirement_name: 'First Aid Certificate', category: 'mandatory' as const, description: 'Current first aid certificate (NZQA Level 2 or equivalent)', certification_required: true, expiry_period_months: 24 },
-    { requirement_name: 'Medication Competency', category: 'mandatory' as const, description: 'Competency assessment for medication administration', certification_required: true, expiry_period_months: 12 },
-    { requirement_name: 'Manual Handling', category: 'mandatory' as const, description: 'Safe manual handling and transfer techniques training', certification_required: true, expiry_period_months: 24 },
-    { requirement_name: 'Positive Behaviour Support', category: 'specialist' as const, description: 'PBS training for managing challenging behaviours', certification_required: true, expiry_period_months: 12 },
-    { requirement_name: 'Cultural Safety', category: 'mandatory' as const, description: 'Cultural competency training including Te Tiriti o Waitangi awareness', certification_required: true, expiry_period_months: 36 },
-    { requirement_name: 'Restricted Practices', category: 'specialist' as const, description: 'Training in use and minimisation of restricted practices', certification_required: true, expiry_period_months: 12 },
+    {
+        requirement_name: 'First Aid Certificate',
+        category: 'mandatory' as const,
+        description:
+            'Current first aid certificate (NZQA Level 2 or equivalent)',
+        certification_required: true,
+        expiry_period_months: 24,
+    },
+    {
+        requirement_name: 'Medication Competency',
+        category: 'mandatory' as const,
+        description: 'Competency assessment for medication administration',
+        certification_required: true,
+        expiry_period_months: 12,
+    },
+    {
+        requirement_name: 'Manual Handling',
+        category: 'mandatory' as const,
+        description: 'Safe manual handling and transfer techniques training',
+        certification_required: true,
+        expiry_period_months: 24,
+    },
+    {
+        requirement_name: 'Positive Behaviour Support',
+        category: 'specialist' as const,
+        description: 'PBS training for managing challenging behaviours',
+        certification_required: true,
+        expiry_period_months: 12,
+    },
+    {
+        requirement_name: 'Cultural Safety',
+        category: 'mandatory' as const,
+        description:
+            'Cultural competency training including Te Tiriti o Waitangi awareness',
+        certification_required: true,
+        expiry_period_months: 36,
+    },
+    {
+        requirement_name: 'Restricted Practices',
+        category: 'specialist' as const,
+        description: 'Training in use and minimisation of restricted practices',
+        certification_required: true,
+        expiry_period_months: 12,
+    },
 ];
 
 const categoryConfig = {
-    mandatory: { label: 'Mandatory', color: 'border-red-500/30 text-red-300 bg-red-500/10', icon: Shield },
-    recommended: { label: 'Recommended', color: 'border-amber-500/30 text-amber-300 bg-amber-500/10', icon: Star },
-    specialist: { label: 'Specialist', color: 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10', icon: Award },
+    mandatory: {
+        label: 'Mandatory',
+        color: 'border-red-500/30 text-red-300 bg-red-500/10',
+        icon: Shield,
+    },
+    recommended: {
+        label: 'Recommended',
+        color: 'border-amber-500/30 text-amber-300 bg-amber-500/10',
+        icon: Star,
+    },
+    specialist: {
+        label: 'Specialist',
+        color: 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10',
+        icon: Award,
+    },
 };
 
-function StaffRequirementsTab({ site, requirements, can_edit }: { site: Site; requirements: StaffRequirement[]; can_edit: boolean }) {
+const coverageTypeConfig = {
+    day: {
+        label: 'Day',
+        color: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10',
+    },
+    evening: {
+        label: 'Evening',
+        color: 'border-amber-500/30 text-amber-300 bg-amber-500/10',
+    },
+    overnight: {
+        label: 'Overnight',
+        color: 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10',
+    },
+    custom: {
+        label: 'Custom',
+        color: 'border-slate-500/30 text-slate-300 bg-slate-500/10',
+    },
+};
+
+function weekdayLabel(code: string) {
+    const labels: Record<string, string> = {
+        mon: 'Mon',
+        tue: 'Tue',
+        wed: 'Wed',
+        thu: 'Thu',
+        fri: 'Fri',
+        sat: 'Sat',
+        sun: 'Sun',
+    };
+
+    return labels[code] ?? code;
+}
+
+function coverageTimeLabel(starts: string, ends: string) {
+    return `${starts}-${ends}${ends <= starts ? ' overnight' : ''}`;
+}
+
+function coverageHealthVariant(missingStaff: number) {
+    if (missingStaff > 0) return 'destructive';
+    return 'outline';
+}
+
+function CoverageRequirementsTab({
+    site,
+    requirements,
+    preview,
+    clients,
+    serviceContexts,
+    can_edit,
+}: {
+    site: Site;
+    requirements: CoverageRequirement[];
+    preview: NonNullable<Props['coveragePreview']>;
+    clients: ClientLite[];
+    serviceContexts: NonNullable<Site['service_contexts']>;
+    can_edit: boolean;
+}) {
+    type CoverageRoleRow = {
+        key: 'caregiver' | 'driver' | 'med_competent';
+        minimum: number;
+    };
+
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const form = useForm({
+        name: '',
+        coverage_type: 'day',
+        day_of_week: 'mon',
+        starts_time: '07:00',
+        ends_time: '15:00',
+        minimum_staff: 1,
+        service_context_id: '',
+        preferred_client_id: '',
+        allow_overstaffing: true,
+        role_requirements: [
+            { key: 'caregiver', minimum: 1 },
+        ] as CoverageRoleRow[],
+        shift_type: '',
+        notes: '',
+    });
+
+    const sitePreview = preview[0] ?? null;
+    const coverageSegments = [
+        {
+            label: 'Under-covered',
+            value: sitePreview?.under_covered_windows ?? 0,
+            color: '#ef4444',
+        },
+        {
+            label: 'Exact',
+            value: sitePreview?.exact_windows ?? 0,
+            color: '#10b981',
+        },
+        {
+            label: 'Overstaffed',
+            value: sitePreview?.overstaffed_windows ?? 0,
+            color: '#f59e0b',
+        },
+    ];
+    const stableCoverageRate =
+        sitePreview && sitePreview.total_windows > 0
+            ? Math.round(
+                  ((sitePreview.exact_windows +
+                      sitePreview.overstaffed_windows) /
+                      sitePreview.total_windows) *
+                      100,
+              )
+            : 0;
+    const shortageRate =
+        sitePreview && sitePreview.total_windows > 0
+            ? Math.round(
+                  (sitePreview.under_covered_windows /
+                      sitePreview.total_windows) *
+                      100,
+              )
+            : 0;
+
+    function applyPreset(type: 'day' | 'evening' | 'overnight') {
+        const map = {
+            day: {
+                name: 'Day coverage',
+                starts_time: '07:00',
+                ends_time: '15:00',
+            },
+            evening: {
+                name: 'Evening coverage',
+                starts_time: '15:00',
+                ends_time: '23:00',
+            },
+            overnight: {
+                name: 'Overnight coverage',
+                starts_time: '23:00',
+                ends_time: '07:00',
+            },
+        };
+
+        form.setData({
+            ...form.data,
+            coverage_type: type,
+            name: map[type].name,
+            starts_time: map[type].starts_time,
+            ends_time: map[type].ends_time,
+        });
+    }
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        form.post(`/sites/${site.id}/coverage-requirements`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                form.setData('coverage_type', 'day');
+                form.setData('day_of_week', 'mon');
+                form.setData('starts_time', '07:00');
+                form.setData('ends_time', '15:00');
+                form.setData('minimum_staff', 1);
+                form.setData('preferred_client_id', '');
+                form.setData('allow_overstaffing', true);
+                form.setData('role_requirements', [
+                    { key: 'caregiver', minimum: 1 } as CoverageRoleRow,
+                ]);
+                setDialogOpen(false);
+            },
+        });
+    }
+
+    function deleteRequirement(id: number) {
+        if (!confirm('Remove this coverage requirement?')) return;
+        form.delete(`/sites/${site.id}/coverage-requirements/${id}`, {
+            preserveScroll: true,
+        });
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
+                <Card className="overflow-hidden border-indigo-200/60 bg-gradient-to-br from-white via-indigo-50/70 to-cyan-50/70">
+                    <CardHeader className="pb-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <CardTitle className="flex items-center gap-2 text-base text-slate-950">
+                                    <Layers className="h-4 w-4 text-indigo-500" />
+                                    Coverage health
+                                </CardTitle>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    Demand versus assigned supply for the next
+                                    fortnight at {site.name}.
+                                </p>
+                            </div>
+                            <Badge
+                                variant={
+                                    (sitePreview?.under_covered_windows ?? 0) >
+                                    0
+                                        ? 'destructive'
+                                        : 'secondary'
+                                }
+                                className={
+                                    (sitePreview?.under_covered_windows ?? 0) >
+                                    0
+                                        ? ''
+                                        : 'bg-emerald-100 text-emerald-800'
+                                }
+                            >
+                                {(sitePreview?.under_covered_windows ?? 0) > 0
+                                    ? `${sitePreview?.under_covered_windows ?? 0} windows at risk`
+                                    : 'No projected shortages'}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                                <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+                                    Windows
+                                </p>
+                                <p className="mt-2 text-3xl font-bold text-slate-950">
+                                    {sitePreview?.total_windows ?? 0}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    Active demand windows
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-red-200/70 bg-white/85 p-4 shadow-sm">
+                                <p className="text-[11px] font-semibold tracking-[0.16em] text-red-500 uppercase">
+                                    Under-covered
+                                </p>
+                                <p className="mt-2 text-3xl font-bold text-red-600">
+                                    {sitePreview?.under_covered_windows ?? 0}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    Need action now
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-emerald-200/70 bg-white/85 p-4 shadow-sm">
+                                <p className="text-[11px] font-semibold tracking-[0.16em] text-emerald-600 uppercase">
+                                    Exact
+                                </p>
+                                <p className="mt-2 text-3xl font-bold text-emerald-600">
+                                    {sitePreview?.exact_windows ?? 0}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    Demand matched cleanly
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-amber-200/70 bg-white/85 p-4 shadow-sm">
+                                <p className="text-[11px] font-semibold tracking-[0.16em] text-amber-600 uppercase">
+                                    Largest gap
+                                </p>
+                                <p className="mt-2 text-3xl font-bold text-amber-600">
+                                    {sitePreview?.largest_missing_staff ?? 0}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    Missing staff in one window
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+                            <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                                <div className="flex items-center gap-6">
+                                    <DonutChart
+                                        segments={coverageSegments}
+                                        size={148}
+                                        strokeWidth={18}
+                                        centerLabel="windows"
+                                        centerValue={
+                                            sitePreview?.total_windows ?? 0
+                                        }
+                                    />
+                                    <div className="min-w-0 flex-1 space-y-3">
+                                        {coverageSegments.map((segment) => (
+                                            <div
+                                                key={segment.label}
+                                                className="flex items-center justify-between gap-4 text-sm"
+                                            >
+                                                <span className="flex items-center gap-2 text-slate-700">
+                                                    <span
+                                                        className="h-2.5 w-2.5 rounded-full"
+                                                        style={{
+                                                            backgroundColor:
+                                                                segment.color,
+                                                        }}
+                                                    />
+                                                    {segment.label}
+                                                </span>
+                                                <span className="font-semibold text-slate-950">
+                                                    {segment.value}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                                    <ProgressRing
+                                        value={stableCoverageRate}
+                                        size={104}
+                                        color="#6366f1"
+                                        label="covered"
+                                    />
+                                    <div className="mt-3 text-center">
+                                        <p className="text-sm font-semibold text-slate-950">
+                                            Stable coverage
+                                        </p>
+                                        <p className="text-xs text-slate-600">
+                                            Exact + overstaffed windows
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                                    <ProgressRing
+                                        value={shortageRate}
+                                        size={104}
+                                        color="#ef4444"
+                                        label="risk"
+                                    />
+                                    <div className="mt-3 text-center">
+                                        <p className="text-sm font-semibold text-slate-950">
+                                            Coverage risk
+                                        </p>
+                                        <p className="text-xs text-slate-600">
+                                            Windows below minimum staffing
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {!sitePreview || sitePreview.alerts.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-800">
+                                No projected coverage gaps in the upcoming
+                                fortnight for this site.
+                            </div>
+                        ) : (
+                            <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+                                <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                                    <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">
+                                        Largest gaps
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-600">
+                                        Missing staff by next impacted windows.
+                                    </p>
+                                    <div className="mt-4">
+                                        <HorizontalBarChart
+                                            items={sitePreview.alerts.map(
+                                                (alert) => ({
+                                                    label: `${alert.rule_name} · ${alert.window_label}`,
+                                                    value: alert.missing_staff,
+                                                    color:
+                                                        alert.missing_staff > 1
+                                                            ? '#ef4444'
+                                                            : '#f59e0b',
+                                                    maxValue: Math.max(
+                                                        1,
+                                                        sitePreview.largest_missing_staff,
+                                                    ),
+                                                }),
+                                            )}
+                                            heightPerBar={24}
+                                            color="#6366f1"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {sitePreview.alerts.map((alert, index) => (
+                                        <div
+                                            key={`${alert.rule_name}-${alert.window_label}-${index}`}
+                                            className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm"
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="font-medium text-slate-950">
+                                                        {alert.rule_name}
+                                                    </div>
+                                                    <div className="text-sm text-slate-600">
+                                                        {alert.window_label}
+                                                    </div>
+                                                </div>
+                                                <Badge
+                                                    variant={coverageHealthVariant(
+                                                        alert.missing_staff,
+                                                    )}
+                                                >
+                                                    Missing{' '}
+                                                    {alert.missing_staff}
+                                                </Badge>
+                                            </div>
+                                            <div className="mt-3">
+                                                <HorizontalBarChart
+                                                    items={[
+                                                        {
+                                                            label: 'Required',
+                                                            value: alert.required_staff,
+                                                            color: '#6366f1',
+                                                            maxValue: Math.max(
+                                                                alert.required_staff,
+                                                                alert.assigned_staff,
+                                                            ),
+                                                        },
+                                                        {
+                                                            label: 'Assigned',
+                                                            value: alert.assigned_staff,
+                                                            color: '#10b981',
+                                                            maxValue: Math.max(
+                                                                alert.required_staff,
+                                                                alert.assigned_staff,
+                                                            ),
+                                                        },
+                                                    ]}
+                                                    heightPerBar={22}
+                                                    color="#6366f1"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-3">
+                        <CardTitle className="text-base">
+                            Coverage rules
+                        </CardTitle>
+                        {can_edit && (
+                            <Dialog
+                                open={dialogOpen}
+                                onOpenChange={setDialogOpen}
+                            >
+                                <DialogTrigger asChild>
+                                    <Button size="sm">
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Add rule
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-xl">
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Add coverage requirement
+                                        </DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs text-slate-400">
+                                            Quick presets
+                                        </Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    applyPreset('day')
+                                                }
+                                            >
+                                                Day
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    applyPreset('evening')
+                                                }
+                                            >
+                                                Evening
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    applyPreset('overnight')
+                                                }
+                                            >
+                                                Overnight
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <form
+                                        onSubmit={submit}
+                                        className="space-y-3"
+                                    >
+                                        <div>
+                                            <Label>Name</Label>
+                                            <Input
+                                                value={form.data.name}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'name',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <Label>Coverage type</Label>
+                                                <Select
+                                                    value={
+                                                        form.data.coverage_type
+                                                    }
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'coverage_type',
+                                                            v as any,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="day">
+                                                            Day
+                                                        </SelectItem>
+                                                        <SelectItem value="evening">
+                                                            Evening
+                                                        </SelectItem>
+                                                        <SelectItem value="overnight">
+                                                            Overnight
+                                                        </SelectItem>
+                                                        <SelectItem value="custom">
+                                                            Custom
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div>
+                                                <Label>Day</Label>
+                                                <Select
+                                                    value={
+                                                        form.data.day_of_week
+                                                    }
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'day_of_week',
+                                                            v as any,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {[
+                                                            'mon',
+                                                            'tue',
+                                                            'wed',
+                                                            'thu',
+                                                            'fri',
+                                                            'sat',
+                                                            'sun',
+                                                        ].map((day) => (
+                                                            <SelectItem
+                                                                key={day}
+                                                                value={day}
+                                                            >
+                                                                {weekdayLabel(
+                                                                    day,
+                                                                )}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-3">
+                                            <div>
+                                                <Label>Start</Label>
+                                                <Input
+                                                    type="time"
+                                                    value={
+                                                        form.data.starts_time
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'starts_time',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label>End</Label>
+                                                <Input
+                                                    type="time"
+                                                    value={form.data.ends_time}
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'ends_time',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label>Minimum staff</Label>
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    max={12}
+                                                    value={
+                                                        form.data.minimum_staff
+                                                    }
+                                                    onChange={(e) =>
+                                                        form.setData(
+                                                            'minimum_staff',
+                                                            Number(
+                                                                e.target.value,
+                                                            ),
+                                                        )
+                                                    }
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <Label>
+                                                    Preferred planning client
+                                                </Label>
+                                                <Select
+                                                    value={String(
+                                                        form.data
+                                                            .preferred_client_id ||
+                                                            'none',
+                                                    )}
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'preferred_client_id',
+                                                            v === 'none'
+                                                                ? ''
+                                                                : v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="No preferred client" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">
+                                                            No preferred client
+                                                        </SelectItem>
+                                                        {clients.map(
+                                                            (client) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        client.id
+                                                                    }
+                                                                    value={String(
+                                                                        client.id,
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        client.first_name
+                                                                    }{' '}
+                                                                    {
+                                                                        client.last_name
+                                                                    }
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div>
+                                                <Label>Service context</Label>
+                                                <Select
+                                                    value={String(
+                                                        form.data
+                                                            .service_context_id ||
+                                                            '',
+                                                    )}
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'service_context_id',
+                                                            v === 'none'
+                                                                ? ''
+                                                                : v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Any service" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">
+                                                            Any service
+                                                        </SelectItem>
+                                                        {serviceContexts
+                                                            .filter(
+                                                                (item) =>
+                                                                    item.is_active,
+                                                            )
+                                                            .map((item) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        item.id
+                                                                    }
+                                                                    value={String(
+                                                                        item.id,
+                                                                    )}
+                                                                >
+                                                                    {item.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div>
+                                                <Label>Shift type</Label>
+                                                <Select
+                                                    value={String(
+                                                        form.data.shift_type ||
+                                                            'any',
+                                                    )}
+                                                    onValueChange={(v) =>
+                                                        form.setData(
+                                                            'shift_type',
+                                                            v === 'any'
+                                                                ? ''
+                                                                : v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Any shift type" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="any">
+                                                            Any shift type
+                                                        </SelectItem>
+                                                        <SelectItem value="standard">
+                                                            Standard
+                                                        </SelectItem>
+                                                        <SelectItem value="sleepover">
+                                                            Sleepover
+                                                        </SelectItem>
+                                                        <SelectItem value="on_call">
+                                                            On-call
+                                                        </SelectItem>
+                                                        <SelectItem value="split">
+                                                            Split
+                                                        </SelectItem>
+                                                        <SelectItem value="travel">
+                                                            Travel
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3 rounded-lg border p-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-medium">
+                                                        Role-based demand
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Define which
+                                                        capabilities must be
+                                                        present in this coverage
+                                                        window.
+                                                    </div>
+                                                </div>
+                                                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={
+                                                            form.data
+                                                                .allow_overstaffing
+                                                        }
+                                                        onChange={(e) =>
+                                                            form.setData(
+                                                                'allow_overstaffing',
+                                                                e.target
+                                                                    .checked,
+                                                            )
+                                                        }
+                                                    />
+                                                    Allow overstaffing
+                                                </label>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {form.data.role_requirements.map(
+                                                    (role, index) => (
+                                                        <div
+                                                            key={`${role.key}-${index}`}
+                                                            className="grid gap-2 sm:grid-cols-[1fr_120px_auto]"
+                                                        >
+                                                            <Select
+                                                                value={role.key}
+                                                                onValueChange={(
+                                                                    value,
+                                                                ) => {
+                                                                    const next =
+                                                                        [
+                                                                            ...form
+                                                                                .data
+                                                                                .role_requirements,
+                                                                        ] as CoverageRoleRow[];
+                                                                    next[
+                                                                        index
+                                                                    ] = {
+                                                                        key: value as
+                                                                            | 'caregiver'
+                                                                            | 'driver'
+                                                                            | 'med_competent',
+                                                                        minimum:
+                                                                            next[
+                                                                                index
+                                                                            ]
+                                                                                ?.minimum ??
+                                                                            1,
+                                                                    };
+                                                                    form.setData(
+                                                                        'role_requirements',
+                                                                        next,
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="caregiver">
+                                                                        Caregiver
+                                                                    </SelectItem>
+                                                                    <SelectItem value="driver">
+                                                                        Driver
+                                                                    </SelectItem>
+                                                                    <SelectItem value="med_competent">
+                                                                        Medication
+                                                                        competent
+                                                                    </SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <Input
+                                                                type="number"
+                                                                min={1}
+                                                                max={12}
+                                                                value={
+                                                                    role.minimum
+                                                                }
+                                                                onChange={(
+                                                                    e,
+                                                                ) => {
+                                                                    const next =
+                                                                        [
+                                                                            ...form
+                                                                                .data
+                                                                                .role_requirements,
+                                                                        ] as CoverageRoleRow[];
+                                                                    next[
+                                                                        index
+                                                                    ] = {
+                                                                        key:
+                                                                            next[
+                                                                                index
+                                                                            ]
+                                                                                ?.key ??
+                                                                            'caregiver',
+                                                                        minimum:
+                                                                            Number(
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            ) ||
+                                                                            1,
+                                                                    };
+                                                                    form.setData(
+                                                                        'role_requirements',
+                                                                        next,
+                                                                    );
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                disabled={
+                                                                    form.data
+                                                                        .role_requirements
+                                                                        .length ===
+                                                                    1
+                                                                }
+                                                                onClick={() =>
+                                                                    form.setData(
+                                                                        'role_requirements',
+                                                                        form.data.role_requirements.filter(
+                                                                            (
+                                                                                _,
+                                                                                rowIndex,
+                                                                            ) =>
+                                                                                rowIndex !==
+                                                                                index,
+                                                                        ) as CoverageRoleRow[],
+                                                                    )
+                                                                }
+                                                            >
+                                                                Remove
+                                                            </Button>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    form.setData(
+                                                        'role_requirements',
+                                                        [
+                                                            ...form.data
+                                                                .role_requirements,
+                                                            {
+                                                                key: 'driver',
+                                                                minimum: 1,
+                                                            } as CoverageRoleRow,
+                                                        ] as CoverageRoleRow[],
+                                                    )
+                                                }
+                                            >
+                                                Add role
+                                            </Button>
+                                        </div>
+                                        <div>
+                                            <Label>Notes</Label>
+                                            <Textarea
+                                                value={form.data.notes}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'notes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                rows={3}
+                                            />
+                                        </div>
+                                        <Button
+                                            type="submit"
+                                            disabled={form.processing}
+                                            className="w-full"
+                                        >
+                                            {form.processing
+                                                ? 'Saving…'
+                                                : 'Save coverage rule'}
+                                        </Button>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        )}
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {requirements.length === 0 ? (
+                            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                No house/site coverage rules configured yet. Add
+                                day, evening, or overnight coverage so rostering
+                                can detect true staffing gaps.
+                            </div>
+                        ) : (
+                            requirements.map((requirement) => {
+                                const config =
+                                    coverageTypeConfig[
+                                        requirement.coverage_type
+                                    ] ?? coverageTypeConfig.custom;
+                                return (
+                                    <div
+                                        key={requirement.id}
+                                        className="rounded-lg border p-3"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="font-medium">
+                                                        {requirement.name}
+                                                    </span>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={config.color}
+                                                    >
+                                                        {config.label}
+                                                    </Badge>
+                                                    <Badge variant="outline">
+                                                        Need{' '}
+                                                        {
+                                                            requirement.minimum_staff
+                                                        }
+                                                    </Badge>
+                                                </div>
+                                                <div className="mt-1 text-sm text-muted-foreground">
+                                                    {weekdayLabel(
+                                                        requirement.day_of_week,
+                                                    )}{' '}
+                                                    ·{' '}
+                                                    {coverageTimeLabel(
+                                                        requirement.starts_time,
+                                                        requirement.ends_time,
+                                                    )}
+                                                    {requirement.preferred_client
+                                                        ? ` · Default ${requirement.preferred_client.name}`
+                                                        : ''}
+                                                    {requirement.service_context
+                                                        ? ` · ${requirement.service_context.name}`
+                                                        : ''}
+                                                    {requirement.shift_type
+                                                        ? ` · ${requirement.shift_type.replace('_', ' ')}`
+                                                        : ''}
+                                                </div>
+                                                {requirement.notes ? (
+                                                    <div className="mt-2 text-sm text-muted-foreground">
+                                                        {requirement.notes}
+                                                    </div>
+                                                ) : null}
+                                                {requirement.role_requirements
+                                                    ?.length ? (
+                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                        {requirement.role_requirements.map(
+                                                            (role) => (
+                                                                <Badge
+                                                                    key={`${requirement.id}-${role.key}`}
+                                                                    variant="outline"
+                                                                >
+                                                                    {role.key.replace(
+                                                                        '_',
+                                                                        ' ',
+                                                                    )}{' '}
+                                                                    x
+                                                                    {
+                                                                        role.minimum
+                                                                    }
+                                                                </Badge>
+                                                            ),
+                                                        )}
+                                                        {!requirement.allow_overstaffing ? (
+                                                            <Badge variant="outline">
+                                                                No overfill
+                                                            </Badge>
+                                                        ) : null}
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                            {can_edit ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="shrink-0 text-slate-500 hover:text-red-400"
+                                                    onClick={() =>
+                                                        deleteRequirement(
+                                                            requirement.id,
+                                                        )
+                                                    }
+                                                >
+                                                    Remove
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    );
+}
+
+function StaffRequirementsTab({
+    site,
+    requirements,
+    can_edit,
+}: {
+    site: Site;
+    requirements: StaffRequirement[];
+    can_edit: boolean;
+}) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const form = useForm({
         requirement_name: '',
@@ -1270,14 +3349,21 @@ function StaffRequirementsTab({ site, requirements, can_edit }: { site: Site; re
     });
 
     const grouped = useMemo(() => {
-        const groups: Record<string, StaffRequirement[]> = { mandatory: [], recommended: [], specialist: [] };
+        const groups: Record<
+            'mandatory' | 'recommended' | 'specialist',
+            StaffRequirement[]
+        > = {
+            mandatory: [],
+            recommended: [],
+            specialist: [],
+        };
         requirements.forEach((r) => {
-            if (groups[r.category]) groups[r.category].push(r);
+            groups[r.category].push(r);
         });
         return groups;
     }, [requirements]);
 
-    function applyPreset(preset: typeof PRESET_REQUIREMENTS[0]) {
+    function applyPreset(preset: (typeof PRESET_REQUIREMENTS)[0]) {
         form.setData({
             requirement_name: preset.requirement_name,
             category: preset.category,
@@ -1300,18 +3386,22 @@ function StaffRequirementsTab({ site, requirements, can_edit }: { site: Site; re
 
     function deleteRequirement(id: number) {
         if (!confirm('Remove this requirement?')) return;
-        form.delete(`/sites/${site.id}/staff-requirements/${id}`, { preserveScroll: true });
+        form.delete(`/sites/${site.id}/staff-requirements/${id}`, {
+            preserveScroll: true,
+        });
     }
 
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Staff Competency Requirements</h3>
+                <h3 className="text-lg font-medium">
+                    Staff Competency Requirements
+                </h3>
                 {can_edit && (
                     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                         <DialogTrigger asChild>
                             <Button size="sm">
-                                <Plus className="w-4 h-4 mr-1" />
+                                <Plus className="mr-1 h-4 w-4" />
                                 Add Requirement
                             </Button>
                         </DialogTrigger>
@@ -1322,40 +3412,94 @@ function StaffRequirementsTab({ site, requirements, can_edit }: { site: Site; re
 
                             {/* Preset buttons */}
                             <div className="space-y-2">
-                                <Label className="text-xs text-slate-400">Quick-add common NZ requirements:</Label>
+                                <Label className="text-xs text-slate-400">
+                                    Quick-add common NZ requirements:
+                                </Label>
                                 <div className="flex flex-wrap gap-1">
                                     {PRESET_REQUIREMENTS.filter(
-                                        (p) => !requirements.some((r) => r.requirement_name === p.requirement_name)
+                                        (p) =>
+                                            !requirements.some(
+                                                (r) =>
+                                                    r.requirement_name ===
+                                                    p.requirement_name,
+                                            ),
                                     ).map((p) => (
-                                        <Button key={p.requirement_name} variant="outline" size="sm" className="text-xs" onClick={() => applyPreset(p)}>
+                                        <Button
+                                            key={p.requirement_name}
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => applyPreset(p)}
+                                        >
                                             {p.requirement_name}
                                         </Button>
                                     ))}
                                 </div>
                             </div>
 
-                            <form onSubmit={submit} className="space-y-3 mt-2">
+                            <form onSubmit={submit} className="mt-2 space-y-3">
                                 <div>
                                     <Label>Requirement Name</Label>
-                                    <Input value={form.data.requirement_name} onChange={(e) => form.setData('requirement_name', e.target.value)} required />
+                                    <Input
+                                        value={form.data.requirement_name}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'requirement_name',
+                                                e.target.value,
+                                            )
+                                        }
+                                        required
+                                    />
                                 </div>
                                 <div>
                                     <Label>Category</Label>
-                                    <Select value={form.data.category} onValueChange={(v) => form.setData('category', v)}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <Select
+                                        value={form.data.category}
+                                        onValueChange={(v) =>
+                                            form.setData('category', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="mandatory">Mandatory</SelectItem>
-                                            <SelectItem value="recommended">Recommended</SelectItem>
-                                            <SelectItem value="specialist">Specialist</SelectItem>
+                                            <SelectItem value="mandatory">
+                                                Mandatory
+                                            </SelectItem>
+                                            <SelectItem value="recommended">
+                                                Recommended
+                                            </SelectItem>
+                                            <SelectItem value="specialist">
+                                                Specialist
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div>
                                     <Label>Description</Label>
-                                    <Textarea value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} rows={2} />
+                                    <Textarea
+                                        value={form.data.description}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'description',
+                                                e.target.value,
+                                            )
+                                        }
+                                        rows={2}
+                                    />
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <Switch checked={form.data.certification_required} onCheckedChange={(v) => form.setData('certification_required', v)} />
+                                    <Switch
+                                        checked={
+                                            form.data.certification_required
+                                        }
+                                        onCheckedChange={(v) =>
+                                            form.setData(
+                                                'certification_required',
+                                                v,
+                                            )
+                                        }
+                                    />
                                     <Label>Certification Required</Label>
                                 </div>
                                 <div>
@@ -1364,12 +3508,25 @@ function StaffRequirementsTab({ site, requirements, can_edit }: { site: Site; re
                                         type="number"
                                         min={1}
                                         value={form.data.expiry_period_months}
-                                        onChange={(e) => form.setData('expiry_period_months', e.target.value ? parseInt(e.target.value) : '')}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'expiry_period_months',
+                                                e.target.value
+                                                    ? parseInt(e.target.value)
+                                                    : '',
+                                            )
+                                        }
                                         placeholder="e.g. 12, 24"
                                     />
                                 </div>
-                                <Button type="submit" disabled={form.processing} className="w-full">
-                                    {form.processing ? 'Adding...' : 'Add Requirement'}
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                    className="w-full"
+                                >
+                                    {form.processing
+                                        ? 'Adding...'
+                                        : 'Add Requirement'}
                                 </Button>
                             </form>
                         </DialogContent>
@@ -1380,61 +3537,101 @@ function StaffRequirementsTab({ site, requirements, can_edit }: { site: Site; re
             {requirements.length === 0 ? (
                 <Card>
                     <CardContent className="py-8 text-center">
-                        <GraduationCap className="w-12 h-12 mx-auto mb-3 text-slate-500 opacity-50" />
-                        <p className="text-slate-400">No staff requirements configured for this site</p>
-                        <p className="text-sm text-slate-500 mt-1">Add mandatory, recommended, and specialist competency requirements</p>
+                        <GraduationCap className="mx-auto mb-3 h-12 w-12 text-slate-500 opacity-50" />
+                        <p className="text-slate-400">
+                            No staff requirements configured for this site
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Add mandatory, recommended, and specialist
+                            competency requirements
+                        </p>
                     </CardContent>
                 </Card>
             ) : (
-                (['mandatory', 'recommended', 'specialist'] as const).map((cat) => {
-                    const items = grouped[cat];
-                    if (items.length === 0) return null;
-                    const config = categoryConfig[cat];
-                    const CatIcon = config.icon;
-                    return (
-                        <Card key={cat}>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <CatIcon className="w-4 h-4" />
-                                    {config.label} Requirements
-                                    <Badge variant="outline" className={config.color}>{items.length}</Badge>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {items.map((req) => (
-                                        <div key={req.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="font-medium text-sm">{req.requirement_name}</span>
-                                                    {req.certification_required && (
-                                                        <Badge variant="outline" className="text-xs border-emerald-500/30 text-emerald-300 bg-emerald-500/10">
-                                                            <Award className="w-3 h-3 mr-1" />
-                                                            Certification
-                                                        </Badge>
-                                                    )}
-                                                    {req.expiry_period_months && (
-                                                        <Badge variant="outline" className="text-xs border-slate-500/30 text-slate-400">
-                                                            Renew every {req.expiry_period_months}mo
-                                                        </Badge>
+                (['mandatory', 'recommended', 'specialist'] as const).map(
+                    (cat) => {
+                        const items = grouped[cat];
+                        if (items.length === 0) return null;
+                        const config = categoryConfig[cat];
+                        const CatIcon = config.icon;
+                        return (
+                            <Card key={cat}>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <CatIcon className="h-4 w-4" />
+                                        {config.label} Requirements
+                                        <Badge
+                                            variant="outline"
+                                            className={config.color}
+                                        >
+                                            {items.length}
+                                        </Badge>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {items.map((req) => (
+                                            <div
+                                                key={req.id}
+                                                className="flex items-start justify-between gap-3 rounded-lg border p-3"
+                                            >
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="text-sm font-medium">
+                                                            {
+                                                                req.requirement_name
+                                                            }
+                                                        </span>
+                                                        {req.certification_required && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-300"
+                                                            >
+                                                                <Award className="mr-1 h-3 w-3" />
+                                                                Certification
+                                                            </Badge>
+                                                        )}
+                                                        {req.expiry_period_months && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="border-slate-500/30 text-xs text-slate-400"
+                                                            >
+                                                                Renew every{' '}
+                                                                {
+                                                                    req.expiry_period_months
+                                                                }
+                                                                mo
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    {req.description && (
+                                                        <p className="mt-1 text-sm text-slate-400">
+                                                            {req.description}
+                                                        </p>
                                                     )}
                                                 </div>
-                                                {req.description && (
-                                                    <p className="text-sm text-slate-400 mt-1">{req.description}</p>
+                                                {can_edit && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="shrink-0 text-slate-500 hover:text-red-400"
+                                                        onClick={() =>
+                                                            deleteRequirement(
+                                                                req.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        Remove
+                                                    </Button>
                                                 )}
                                             </div>
-                                            {can_edit && (
-                                                <Button variant="ghost" size="sm" className="text-slate-500 hover:text-red-400 shrink-0" onClick={() => deleteRequirement(req.id)}>
-                                                    Remove
-                                                </Button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    );
-                })
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    },
+                )
             )}
         </div>
     );

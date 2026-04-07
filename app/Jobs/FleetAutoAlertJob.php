@@ -4,7 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Asset;
 use App\Models\AssetTracker;
+use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
+use App\Notifications\Fleet\FleetVehicleOverdueNotification;
 use App\Services\Fleet\FleetSignalService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,10 +19,14 @@ class FleetAutoAlertJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $timeout = 300;
+    public $tries = 2;
+
     public function handle(FleetSignalService $signalService): void
     {
         try {
-            $this->checkOfflineVehicles($signalService);
+            // Offline detection handled by DetectFleetOfflineDevices job
+            $this->checkOverdueBookings($signalService);
             $this->checkWofExpiring($signalService);
             $this->checkRegistrationExpiring($signalService);
             $this->checkMaintenanceOverdue($signalService);
@@ -31,31 +37,34 @@ class FleetAutoAlertJob implements ShouldQueue
         }
     }
 
-    private function checkOfflineVehicles(FleetSignalService $signalService): void
+    private function checkOverdueBookings(FleetSignalService $signalService): void
     {
-        $threshold = now()->subHours(2);
-
-        $offlineStates = FleetVehicleStateSnapshot::query()
-            ->where('status', 'online')
-            ->where('last_seen_at', '<', $threshold)
-            ->with('asset:id,name')
+        $overdueBookings = FleetVehicleBooking::query()
+            ->where('status', 'checked_out')
+            ->where('ends_at', '<', now())
+            ->with(['asset:id,name', 'user'])
             ->get();
 
-        foreach ($offlineStates as $state) {
-            if (!$state->asset) continue;
+        foreach ($overdueBookings as $booking) {
+            if (!$booking->asset || !$booking->user) continue;
 
-            $signalService->emit(
-                assetId: $state->asset_id,
-                signalType: 'vehicle_offline',
-                severityHint: 'medium',
-                occurredAt: now(),
-                context: [
-                    'last_seen_at' => $state->last_seen_at?->toISOString(),
-                    'hours_offline' => $state->last_seen_at?->diffInHours(now()),
+            $hoursOverdue = $booking->ends_at->diffInHours(now());
+            $severity = $hoursOverdue >= 24 ? 'critical' : ($hoursOverdue >= 4 ? 'high' : 'medium');
+
+            $signalService->emit([
+                'asset_id' => $booking->asset_id,
+                'signal_type' => 'vehicle_overdue',
+                'severity_hint' => $severity,
+                'occurred_at' => now(),
+                'idempotency_key' => hash('sha256', "overdue|{$booking->id}|" . now()->toDateString()),
+                'payload' => [
+                    'booking_id' => $booking->id,
+                    'ends_at' => $booking->ends_at->toISOString(),
+                    'hours_overdue' => $hoursOverdue,
                 ],
-            );
+            ]);
 
-            $state->update(['status' => 'offline']);
+            $booking->user->notify(new FleetVehicleOverdueNotification($booking));
         }
     }
 
@@ -75,16 +84,16 @@ class FleetAutoAlertJob implements ShouldQueue
             foreach ($assets as $asset) {
                 $severity = $days <= 1 ? 'critical' : ($days <= 7 ? 'high' : 'medium');
 
-                $signalService->emit(
-                    assetId: $asset->id,
-                    signalType: 'wof_expiring',
-                    severityHint: $severity,
-                    occurredAt: now(),
-                    context: [
+                $signalService->emit([
+                    'asset_id' => $asset->id,
+                    'signal_type' => 'wof_expiring',
+                    'severity_hint' => $severity,
+                    'occurred_at' => now(),
+                    'payload' => [
                         'expires_at' => $asset->wof_expires_at->toDateString(),
                         'days_remaining' => $days,
                     ],
-                );
+                ]);
             }
         }
 
@@ -96,16 +105,16 @@ class FleetAutoAlertJob implements ShouldQueue
             ->get(['id', 'name', 'wof_expires_at']);
 
         foreach ($expired as $asset) {
-            $signalService->emit(
-                assetId: $asset->id,
-                signalType: 'wof_expired',
-                severityHint: 'critical',
-                occurredAt: now(),
-                context: [
+            $signalService->emit([
+                'asset_id' => $asset->id,
+                'signal_type' => 'wof_expired',
+                'severity_hint' => 'critical',
+                'occurred_at' => now(),
+                'payload' => [
                     'expired_at' => $asset->wof_expires_at->toDateString(),
                     'days_overdue' => $asset->wof_expires_at->diffInDays(now()),
                 ],
-            );
+            ]);
         }
     }
 
@@ -124,16 +133,16 @@ class FleetAutoAlertJob implements ShouldQueue
             foreach ($assets as $asset) {
                 $severity = $days <= 1 ? 'critical' : ($days <= 7 ? 'high' : 'medium');
 
-                $signalService->emit(
-                    assetId: $asset->id,
-                    signalType: 'registration_expiring',
-                    severityHint: $severity,
-                    occurredAt: now(),
-                    context: [
+                $signalService->emit([
+                    'asset_id' => $asset->id,
+                    'signal_type' => 'registration_expiring',
+                    'severity_hint' => $severity,
+                    'occurred_at' => now(),
+                    'payload' => [
                         'expires_at' => $asset->registration_expires_at->toDateString(),
                         'days_remaining' => $days,
                     ],
-                );
+                ]);
             }
         }
     }
@@ -148,16 +157,16 @@ class FleetAutoAlertJob implements ShouldQueue
             ->get(['id', 'name', 'maintenance_due_at']);
 
         foreach ($overdue as $asset) {
-            $signalService->emit(
-                assetId: $asset->id,
-                signalType: 'maintenance_overdue',
-                severityHint: 'high',
-                occurredAt: now(),
-                context: [
+            $signalService->emit([
+                'asset_id' => $asset->id,
+                'signal_type' => 'maintenance_overdue',
+                'severity_hint' => 'high',
+                'occurred_at' => now(),
+                'payload' => [
                     'due_at' => $asset->maintenance_due_at->toDateString(),
                     'days_overdue' => $asset->maintenance_due_at->diffInDays(now()),
                 ],
-            );
+            ]);
         }
     }
 
@@ -173,15 +182,15 @@ class FleetAutoAlertJob implements ShouldQueue
         foreach ($lowBattery as $state) {
             if (!$state->asset) continue;
 
-            $signalService->emit(
-                assetId: $state->asset_id,
-                signalType: 'low_battery',
-                severityHint: $state->battery_pct < 5 ? 'critical' : 'medium',
-                occurredAt: now(),
-                context: [
+            $signalService->emit([
+                'asset_id' => $state->asset_id,
+                'signal_type' => 'low_battery',
+                'severity_hint' => $state->battery_pct < 5 ? 'critical' : 'medium',
+                'occurred_at' => now(),
+                'payload' => [
                     'battery_pct' => $state->battery_pct,
                 ],
-            );
+            ]);
         }
     }
 }

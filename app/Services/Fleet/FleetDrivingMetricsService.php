@@ -63,12 +63,12 @@ class FleetDrivingMetricsService
             }
         }
 
-        $metric->update([
-            'harsh_brake_count' => $metric->harsh_brake_count + $harshBrakeCount,
-            'accel_count' => $metric->accel_count + $accelCount,
-            'speeding_events' => $metric->speeding_events + $speedingCount,
-            'idle_minutes' => $metric->idle_minutes + $idleIncrement,
-        ]);
+        if ($harshBrakeCount) $metric->increment('harsh_brake_count', $harshBrakeCount);
+        if ($accelCount) $metric->increment('accel_count', $accelCount);
+        if ($speedingCount) $metric->increment('speeding_events', $speedingCount);
+        if ($idleIncrement) $metric->increment('idle_minutes', $idleIncrement);
+
+        $metric->refresh();
 
         $this->updateScore($metric);
     }

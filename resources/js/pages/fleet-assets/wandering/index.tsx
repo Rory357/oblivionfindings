@@ -31,7 +31,7 @@ import {
     MapPin,
     ShieldAlert,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 type WanderingAlert = {
     id: number;
@@ -83,6 +83,31 @@ function alertTypeLabel(type: string): string {
 
 export default function WanderingAlertsIndex({ alerts, stats, filters }: Props) {
     const alertData = alerts?.data ?? [];
+
+    // Real-time WebSocket listener for wandering alert broadcasts.
+    // NOTE: Requires Laravel Echo + Reverb/Pusher to be installed and configured.
+    // When Echo is not available, the page will rely on manual refresh.
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).Echo) {
+            const channel = (window as any).Echo.channel('fleet.wandering-alerts');
+            channel.listen('.alert.triggered', (data: any) => {
+                // Auto-refresh the page data when a new alert arrives
+                router.reload({ only: ['alerts', 'stats'] });
+
+                // Play audio notification for critical/high severity alerts
+                if (data.severity === 'critical' || data.severity === 'high') {
+                    try {
+                        new Audio('/sounds/alert.mp3').play();
+                    } catch {
+                        // Audio playback may be blocked by browser autoplay policies
+                    }
+                }
+            });
+            return () => {
+                channel.stopListening('.alert.triggered');
+            };
+        }
+    }, []);
 
     // Map markers for alerted residents with location
     const mapMarkers: MapMarker[] = useMemo(() => {

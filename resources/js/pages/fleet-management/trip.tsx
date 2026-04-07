@@ -13,7 +13,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ArrowLeft, CheckCircle, Clock, MapPin, Trash2, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -48,27 +50,14 @@ interface Props {
     can: { manage: boolean };
 }
 
-function formatDateTime(isoString: string | null): string {
-    if (!isoString) return '-';
-    return new Date(isoString).toLocaleString();
-}
-
-function formatDuration(seconds: number | null): string {
-    if (!seconds) return '-';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-}
-
 export default function FleetTrip({ trip, driver_sessions, can }: Props) {
     const [points, setPoints] = useState<{ lat: number; lng: number }[]>([]);
     const [selectedDriver, setSelectedDriver] = useState(
         trip.driver_session_id?.toString() || '',
     );
     const [processing, setProcessing] = useState(false);
+    const [confirmClose, setConfirmClose] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
     useEffect(() => {
         fetch(`/fleet/trips/${trip.id}/playback`)
@@ -90,19 +79,15 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
               : { lat: -36.8485, lng: 174.7633 };
 
     const handleClose = () => {
-        if (confirm('Are you sure you want to close this trip?')) {
-            setProcessing(true);
-            router.post(`/fleet/trips/${trip.id}/close`, {}, {
-                preserveScroll: true,
-                onFinish: () => setProcessing(false),
-            });
-        }
+        setProcessing(true);
+        router.post(`/fleet/trips/${trip.id}/close`, {}, {
+            preserveScroll: true,
+            onFinish: () => setProcessing(false),
+        });
     };
 
     const handleDelete = () => {
-        if (confirm('Are you sure you want to delete this trip? This action cannot be undone.')) {
-            router.delete(`/fleet/trips/${trip.id}`);
-        }
+        router.delete(`/fleet/trips/${trip.id}`);
     };
 
     const handleAssignDriver = () => {
@@ -155,7 +140,7 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                                 <Button
                                     variant="default"
                                     size="sm"
-                                    onClick={handleClose}
+                                    onClick={() => setConfirmClose(true)}
                                     disabled={processing}
                                 >
                                     <CheckCircle className="mr-2 h-4 w-4" />
@@ -166,7 +151,7 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                                 <Button
                                     variant="destructive"
                                     size="sm"
-                                    onClick={handleDelete}
+                                    onClick={() => setConfirmDelete(true)}
                                     disabled={processing}
                                 >
                                     <Trash2 className="mr-2 h-4 w-4" />
@@ -325,6 +310,24 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                     </div>
                 </div>
             </PageShell>
+
+            <ConfirmDialog
+                open={confirmClose}
+                onClose={() => setConfirmClose(false)}
+                onConfirm={handleClose}
+                title="Close Trip"
+                description="Are you sure you want to close this trip?"
+                confirmText="Close Trip"
+                variant="default"
+            />
+            <ConfirmDialog
+                open={confirmDelete}
+                onClose={() => setConfirmDelete(false)}
+                onConfirm={handleDelete}
+                title="Delete Trip"
+                description="Are you sure you want to delete this trip? This action cannot be undone."
+                confirmText="Delete"
+            />
         </AppLayout>
     );
 }

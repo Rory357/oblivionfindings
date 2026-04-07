@@ -22,6 +22,9 @@ class AttendanceController extends Controller
 
         $canManageAny = $auth->canDo('timesheets.manageAny');
         $targetUserId = $canManageAny ? (int) ($request->integer('user_id') ?: $auth->id) : $auth->id;
+        $targetUser = $targetUserId === $auth->id
+            ? $auth
+            : User::query()->find($targetUserId);
 
         $query = HrAttendanceSession::query()
             ->with(['timesheet:id,attendance_session_id,status'])
@@ -37,13 +40,10 @@ class AttendanceController extends Controller
             ->latest('clock_in_at')
             ->first();
 
-        $activeShift = Shift::query()
-            ->where('user_id', $targetUserId)
-            ->whereIn('status', ['scheduled', 'in_progress'])
-            ->where('starts_at', '<=', now()->addHours(12))
-            ->where('ends_at', '>=', now()->subHours(12))
-            ->orderBy('starts_at')
-            ->first(['id', 'starts_at', 'ends_at', 'client_id', 'location', 'status']);
+        $eligibleShifts = $targetUser
+            ? $this->attendanceService->eligibleShiftsForUser($targetUser, now())
+            : collect();
+        $activeShift = $eligibleShifts->count() === 1 ? $eligibleShifts->first() : null;
 
         $staff = $canManageAny
             ? User::query()->staff()->orderBy('name')->get(['id', 'name', 'email'])
@@ -87,20 +87,28 @@ class AttendanceController extends Controller
                 'status' => $activeShift->status,
                 'location' => $activeShift->location,
             ] : null,
+            'eligibleShifts' => $eligibleShifts->map(fn (Shift $shift) => [
+                'id' => $shift->id,
+                'starts_at' => optional($shift->starts_at)->toDateTimeString(),
+                'ends_at' => optional($shift->ends_at)->toDateTimeString(),
+                'status' => $shift->status,
+                'location' => $shift->location,
+                'client_name' => trim((string) ($shift->client?->first_name.' '.$shift->client?->last_name)),
+            ])->values(),
             'staff' => $staff,
             'filters' => [
                 'user_id' => $canManageAny ? $targetUserId : null,
             ],
             'todayHours' => round((float) $todayHours, 2),
             'canManageAny' => $canManageAny,
-            'canClock' => $auth->canDo('timesheets.create'),
+            'canClock' => $this->canClock($auth),
         ]);
     }
 
     public function clockIn(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('timesheets.create'), 403);
+        abort_unless($this->canClock($auth), 403);
 
         $data = $request->validate([
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
@@ -120,7 +128,7 @@ class AttendanceController extends Controller
     public function clockOut(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('timesheets.create'), 403);
+        abort_unless($this->canClock($auth), 403);
 
         $data = $request->validate([
             'session_id' => ['nullable', 'integer', 'exists:hr_attendance_sessions,id'],
@@ -146,5 +154,14 @@ class AttendanceController extends Controller
 
         return redirect()->back()->with('success', 'Clocked out successfully.');
     }
-}
 
+    protected function canClock(?User $auth): bool
+    {
+        return (bool) $auth && (
+            $auth->canDo('timesheets.create')
+            || $auth->canDo('shifts.viewAssigned')
+            || $auth->canDo('shifts.update')
+            || $auth->canDo('shifts.manageAny')
+        );
+    }
+}

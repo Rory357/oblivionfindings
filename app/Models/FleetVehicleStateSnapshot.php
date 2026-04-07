@@ -36,6 +36,8 @@ class FleetVehicleStateSnapshot extends Model
         'speed_kph' => 'decimal:2',
         'ignition' => 'boolean',
         'consent_blocked' => 'boolean',
+        'heading_deg' => 'integer',
+        'battery_pct' => 'integer',
     ];
 
     public function asset(): BelongsTo

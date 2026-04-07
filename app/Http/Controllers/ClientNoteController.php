@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientNote;
-use App\Models\TimelineEvent;
 use Illuminate\Http\Request;
 
 class ClientNoteController extends Controller
@@ -46,25 +45,6 @@ class ClientNoteController extends Controller
             'is_pinned' => (bool)($data['pin'] ?? false) && $type === 'handover',
         ]);
 
-        TimelineEvent::create([
-            'source_type' => ClientNote::class,
-            'source_id' => $note->id,
-            'occurred_at' => $occurredAt,
-            'type' => $type,
-            'actor_user_id' => $user->id,
-            'client_id' => $client->id,
-            'shift_id' => $data['shift_id'] ?? null,
-            'site_id' => $client->site_id,
-            'subject' => $data['subject'] ?? null,
-            'body' => $data['body'],
-            'meta' => array_filter([
-                'goal' => $data['goal'] ?? null,
-            ]),
-            'visibility' => $visibility,
-            'is_pinned' => (bool)($data['pin'] ?? false) && $type === 'handover',
-            'created_by' => $user->id,
-        ]);
-
         return back()->with('status', 'Note added.');
     }
 
@@ -83,7 +63,7 @@ class ClientNoteController extends Controller
         ]);
 
         // Keep timeline event in sync
-        TimelineEvent::query()
+        \App\Models\TimelineEvent::query()
             ->where('source_type', ClientNote::class)
             ->where('source_id', $note->id)
             ->update(['is_pinned' => $note->is_pinned]);

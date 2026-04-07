@@ -17,7 +17,14 @@ class PortalFamilyNoteController extends Controller
         abort_unless($user->canAccessClientPortal($client), 403);
 
         $notes = FamilyNote::forClient($client->id)
-            ->with(['creator:id,name', 'completer:id,name', 'staffResponder:id,name', 'shift:id,starts_at'])
+            ->with([
+                'creator:id,name',
+                'completer:id,name',
+                'staffResponder:id,name',
+                'shift:id,starts_at,ends_at,shift_type,location,service_context_id,user_id',
+                'shift.serviceContext:id,name',
+                'shift.staff:id,name',
+            ])
             ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'cancelled')")
             ->orderByDesc('created_at')
             ->get()
@@ -36,6 +43,15 @@ class PortalFamilyNoteController extends Controller
                 'staff_responded_by_name' => $n->staffResponder?->name,
                 'staff_responded_at' => $n->staff_responded_at?->toISOString(),
                 'assigned_shift_date' => $n->shift?->starts_at?->format('j M'),
+                'assigned_shift' => $n->shift ? [
+                    'id' => $n->shift->id,
+                    'starts_at' => $n->shift->starts_at?->toISOString(),
+                    'ends_at' => $n->shift->ends_at?->toISOString(),
+                    'shift_type' => $n->shift->shift_type ?? 'standard',
+                    'location' => $n->shift->location,
+                    'service_context' => $n->shift->serviceContext?->name,
+                    'staff_name' => $n->shift->staff?->name,
+                ] : null,
                 'creator_name' => $n->creator?->name,
                 'created_by' => $n->created_by,
                 'created_at' => $n->created_at?->toISOString(),

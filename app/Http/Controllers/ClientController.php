@@ -22,6 +22,7 @@ use App\Models\MedicationReview;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
 use App\Models\Shift;
+use App\Models\ShiftSeries;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Models\Site;
@@ -39,6 +40,12 @@ use App\Http\Requests\UpdateClientRequest;
 use App\Models\LocationHardware;
 use App\Models\AssetGeofence;
 use App\Models\ConsentType;
+use App\Models\FleetResidentTransport;
+use App\Models\FleetOuting;
+use App\Models\FleetOutingResident;
+use App\Models\FleetMedicationTransitLog;
+use App\Models\FleetIncident;
+use App\Services\ShiftCoverageService;
 use Illuminate\Support\Facades\Schema;
 
 class ClientController extends Controller
@@ -199,7 +206,17 @@ class ClientController extends Controller
             ->where('client_id', $client->id)
             ->where('starts_at', '>=', now())
             ->whereNotIn('status', ['cancelled'])
-            ->with(['staff:id,name,email'])
+            ->with(['staff:id,name,email', 'serviceContext:id,name,type'])
+            ->withCount([
+                'tasks',
+                'tasks as incomplete_tasks_count' => fn ($query) => $query->where('is_completed', false),
+                'formSubmissions',
+                'medicationAdministrations',
+                'timesheets',
+                'outgoingHandovers',
+                'incomingHandovers',
+                'residentTransports',
+            ])
             ->orderBy('starts_at')
             ->first();
 
@@ -207,9 +224,47 @@ class ClientController extends Controller
             ->where('client_id', $client->id)
             ->where('starts_at', '<', now())
             ->whereNotIn('status', ['cancelled'])
-            ->with(['staff:id,name,email'])
+            ->with(['staff:id,name,email', 'serviceContext:id,name,type'])
+            ->withCount([
+                'tasks',
+                'tasks as incomplete_tasks_count' => fn ($query) => $query->where('is_completed', false),
+                'formSubmissions',
+                'medicationAdministrations',
+                'timesheets',
+                'outgoingHandovers',
+                'incomingHandovers',
+                'residentTransports',
+            ])
             ->orderByDesc('starts_at')
             ->first();
+
+        $recurringShiftSeries = ShiftSeries::query()
+            ->where('client_id', $client->id)
+            ->where('status', '!=', 'cancelled')
+            ->with([
+                'staff:id,name,email',
+                'serviceContext:id,name,type',
+            ])
+            ->withCount([
+                'shifts as remaining_occurrences_count' => fn ($query) => $query
+                    ->where('ends_at', '>=', now()->startOfDay())
+                    ->whereNotIn('status', ['completed', 'cancelled']),
+                'shifts as open_occurrences_count' => fn ($query) => $query
+                    ->where('ends_at', '>=', now()->startOfDay())
+                    ->whereNull('user_id')
+                    ->whereNotIn('status', ['completed', 'cancelled']),
+                'shifts as active_replacements_count' => fn ($query) => $query
+                    ->where('ends_at', '>=', now()->startOfDay())
+                    ->whereHas('replacementRequests', fn ($replacementQuery) => $replacementQuery->active()),
+            ])
+            ->withMin([
+                'shifts as next_starts_at' => fn ($query) => $query
+                    ->where('ends_at', '>=', now()->startOfDay())
+                    ->whereNotIn('status', ['completed', 'cancelled']),
+            ], 'starts_at')
+            ->orderByDesc('updated_at')
+            ->limit(3)
+            ->get();
 
         $documents = ClientDocument::query()
             ->where('client_id', $client->id)
@@ -236,6 +291,15 @@ class ClientController extends Controller
             ->limit(5)
             ->with(['actor:id,name'])
             ->get();
+
+        $siteCoverageSummary = null;
+        if ($client->site_id) {
+            $siteCoverageSummary = collect(app(ShiftCoverageService::class)->buildSiteSummaries(
+                now()->copy()->startOfDay(),
+                now()->copy()->addDays(14)->endOfDay(),
+                $client->site_id,
+            ))->first();
+        }
 
         return inertia('operations/clients/show', [
             'client' => [
@@ -353,23 +417,53 @@ class ClientController extends Controller
                 'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
             ])->values(),
             'shifts_summary' => [
-                'next' => $nextShift ? [
-                    'id' => $nextShift->id,
-                    'starts_at' => optional($nextShift->starts_at)->toISOString(),
-                    'ends_at' => optional($nextShift->ends_at)->toISOString(),
-                    'status' => $nextShift->status,
-                    'location' => $nextShift->location,
-                    'staff' => $nextShift->staff ? ['id' => $nextShift->staff->id, 'name' => $nextShift->staff->name, 'email' => $nextShift->staff->email] : null,
-                ] : null,
-                'last' => $lastShift ? [
-                    'id' => $lastShift->id,
-                    'starts_at' => optional($lastShift->starts_at)->toISOString(),
-                    'ends_at' => optional($lastShift->ends_at)->toISOString(),
-                    'status' => $lastShift->status,
-                    'location' => $lastShift->location,
-                    'staff' => $lastShift->staff ? ['id' => $lastShift->staff->id, 'name' => $lastShift->staff->name, 'email' => $lastShift->staff->email] : null,
-                ] : null,
+                'next' => $this->serializeShiftSummary($nextShift),
+                'last' => $this->serializeShiftSummary($lastShift),
+                'recurring' => $recurringShiftSeries->map(fn (ShiftSeries $series) => [
+                    'id' => $series->id,
+                    'status' => $series->status,
+                    'shift_type' => $series->shift_type ?? 'standard',
+                    'weekdays' => $series->by_weekday ?? [],
+                    'starts_time' => $series->starts_time,
+                    'ends_time' => $series->ends_time,
+                    'next_starts_at' => $series->next_starts_at ? \Carbon\Carbon::parse($series->next_starts_at)->toIso8601String() : null,
+                    'location' => $series->location,
+                    'is_sleepover' => (bool) $series->is_sleepover,
+                    'is_on_call' => (bool) $series->is_on_call,
+                    'service_context' => $series->serviceContext ? [
+                        'id' => $series->serviceContext->id,
+                        'name' => $series->serviceContext->name,
+                        'type' => $series->serviceContext->type?->value,
+                    ] : null,
+                    'staff' => $series->staff ? [
+                        'id' => $series->staff->id,
+                        'name' => $series->staff->name,
+                        'email' => $series->staff->email,
+                    ] : null,
+                    'remaining_occurrences_count' => (int) ($series->remaining_occurrences_count ?? 0),
+                    'open_occurrences_count' => (int) ($series->open_occurrences_count ?? 0),
+                    'active_replacements_count' => (int) ($series->active_replacements_count ?? 0),
+                ])->values(),
             ],
+            'site_coverage' => $siteCoverageSummary ? [
+                'site_id' => (int) $siteCoverageSummary['site_id'],
+                'site_name' => $siteCoverageSummary['site_name'],
+                'total_windows' => (int) $siteCoverageSummary['total_windows'],
+                'under_covered_windows' => (int) $siteCoverageSummary['under_covered_windows'],
+                'exact_windows' => (int) $siteCoverageSummary['exact_windows'],
+                'overstaffed_windows' => (int) $siteCoverageSummary['overstaffed_windows'],
+                'largest_missing_staff' => (int) $siteCoverageSummary['largest_missing_staff'],
+                'alerts' => collect($siteCoverageSummary['alerts'] ?? [])->take(4)->map(fn (array $alert) => [
+                    'rule_name' => $alert['rule_name'],
+                    'window_label' => $alert['window_label'],
+                    'required_staff' => (int) $alert['required_staff'],
+                    'assigned_staff' => (int) $alert['assigned_staff'],
+                    'missing_staff' => (int) $alert['missing_staff'],
+                    'coverage_state' => $alert['coverage_state'],
+                    'starts_at' => $alert['starts_at'] ?? null,
+                    'ends_at' => $alert['ends_at'] ?? null,
+                ])->values(),
+            ] : null,
             'onboarding' => [
                 'checklist' => $this->buildOnboardingChecklist($client),
                 'workflow' => $client->onboardingWorkflow ? [
@@ -500,7 +594,14 @@ class ClientController extends Controller
             'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
             'family_notes_open_count' => \App\Models\FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
             'family_notes' => \App\Models\FamilyNote::where('client_id', $client->id)
-                ->with(['creator:id,name', 'completer:id,name', 'staffResponder:id,name', 'shift:id,starts_at'])
+                ->with([
+                    'creator:id,name',
+                    'completer:id,name',
+                    'staffResponder:id,name',
+                    'shift:id,starts_at,ends_at,shift_type,location,service_context_id,user_id',
+                    'shift.serviceContext:id,name',
+                    'shift.staff:id,name',
+                ])
                 ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'cancelled')")
                 ->orderByDesc('created_at')
                 ->limit(50)
@@ -521,6 +622,15 @@ class ClientController extends Controller
                     'staff_responded_at' => $n->staff_responded_at?->toISOString(),
                     'assigned_shift_date' => $n->shift?->starts_at?->format('j M'),
                     'assigned_to_shift_id' => $n->assigned_to_shift_id,
+                    'assigned_shift' => $n->shift ? [
+                        'id' => $n->shift->id,
+                        'starts_at' => $n->shift->starts_at?->toISOString(),
+                        'ends_at' => $n->shift->ends_at?->toISOString(),
+                        'shift_type' => $n->shift->shift_type ?? 'standard',
+                        'location' => $n->shift->location,
+                        'service_context' => $n->shift->serviceContext?->name,
+                        'staff_name' => $n->shift->staff?->name,
+                    ] : null,
                     'creator_name' => $n->creator?->name,
                     'created_by' => $n->created_by,
                     'created_at' => $n->created_at?->toISOString(),
@@ -644,7 +754,46 @@ class ClientController extends Controller
                 'expired_at' => $c->expires_at?->toIso8601String(),
             ]),
             'missingMandatoryConsents' => $missingMandatory->pluck('name')->values(),
+            'transport' => \Inertia\Inertia::optional(fn () => $this->buildTransportData($client)),
         ]);
+    }
+
+    private function serializeShiftSummary(?Shift $shift): ?array
+    {
+        if (! $shift) {
+            return null;
+        }
+
+        return [
+            'id' => $shift->id,
+            'starts_at' => optional($shift->starts_at)->toISOString(),
+            'ends_at' => optional($shift->ends_at)->toISOString(),
+            'actual_starts_at' => optional($shift->actual_starts_at)->toISOString(),
+            'actual_ends_at' => optional($shift->actual_ends_at)->toISOString(),
+            'status' => $shift->status,
+            'shift_type' => $shift->shift_type ?? 'standard',
+            'is_sleepover' => (bool) $shift->is_sleepover,
+            'is_on_call' => (bool) $shift->is_on_call,
+            'expected_break_minutes' => $shift->expected_break_minutes,
+            'location' => $shift->location,
+            'service_context' => $shift->serviceContext ? [
+                'id' => $shift->serviceContext->id,
+                'name' => $shift->serviceContext->name,
+                'type' => $shift->serviceContext->type?->value,
+            ] : null,
+            'staff' => $shift->staff ? [
+                'id' => $shift->staff->id,
+                'name' => $shift->staff->name,
+                'email' => $shift->staff->email,
+            ] : null,
+            'task_count' => (int) ($shift->tasks_count ?? 0),
+            'incomplete_task_count' => (int) ($shift->incomplete_tasks_count ?? 0),
+            'form_submission_count' => (int) ($shift->form_submissions_count ?? 0),
+            'medication_administration_count' => (int) ($shift->medication_administrations_count ?? 0),
+            'timesheet_count' => (int) ($shift->timesheets_count ?? 0),
+            'handover_count' => (int) (($shift->outgoing_handovers_count ?? 0) + ($shift->incoming_handovers_count ?? 0)),
+            'transport_count' => (int) ($shift->resident_transports_count ?? 0),
+        ];
     }
 
     private function buildCalendarEvents(Client $client): array
@@ -1232,6 +1381,127 @@ class ClientController extends Controller
         } catch (\Throwable $e) {
             return $file->storePublicly($dir, 'public');
         }
+    }
+
+    /**
+     * Build transport data for the client transport tab.
+     */
+    private function buildTransportData(Client $client): array
+    {
+        $hasTransports = Schema::hasTable('fleet_resident_transports');
+        $hasOutings = Schema::hasTable('fleet_outings');
+        $hasMedLogs = Schema::hasTable('fleet_medication_transit_logs');
+        $hasIncidents = Schema::hasTable('fleet_incidents');
+
+        // Stats (30-day window)
+        $thirtyDaysAgo = now()->subDays(30);
+
+        $transportCount30d = $hasTransports
+            ? FleetResidentTransport::where('resident_id', $client->id)
+                ->where('created_at', '>=', $thirtyDaysAgo)
+                ->count()
+            : 0;
+
+        $outingCount30d = $hasOutings
+            ? FleetOutingResident::where('client_id', $client->id)
+                ->where('created_at', '>=', $thirtyDaysAgo)
+                ->count()
+            : 0;
+
+        $incidentCount30d = $hasIncidents && $hasTransports
+            ? FleetIncident::query()
+                ->where('created_at', '>=', $thirtyDaysAgo)
+                ->whereHas('booking', function ($q) use ($client) {
+                    $q->whereHas('transports', fn ($tq) => $tq->where('resident_id', $client->id));
+                })
+                ->count()
+            : 0;
+
+        // Upcoming outings
+        $upcomingOutings = $hasOutings
+            ? FleetOuting::query()
+                ->whereHas('residents', fn ($q) => $q->where('client_id', $client->id))
+                ->whereIn('status', ['planned', 'active'])
+                ->with(['asset:id,name', 'driver:id,name'])
+                ->withCount('residents')
+                ->orderBy('planned_departure')
+                ->limit(5)
+                ->get()
+                ->map(fn ($o) => [
+                    'id' => $o->id,
+                    'title' => $o->title,
+                    'destination' => $o->destination,
+                    'status' => $o->status,
+                    'planned_departure' => optional($o->planned_departure)->toISOString(),
+                    'planned_return' => optional($o->planned_return)->toISOString(),
+                    'vehicle' => $o->asset ? ['id' => $o->asset->id, 'name' => $o->asset->name] : null,
+                    'driver' => $o->driver ? ['id' => $o->driver->id, 'name' => $o->driver->name] : null,
+                    'residents_count' => $o->residents_count,
+                ])
+                ->values()
+            : collect();
+
+        // Transport history (paginated)
+        $transports = $hasTransports
+            ? FleetResidentTransport::query()
+                ->where('resident_id', $client->id)
+                ->with(['asset:id,name,asset_tag', 'driver:id,name', 'shift:id,starts_at,ends_at,shift_type'])
+                ->latest('departed_at')
+                ->limit(20)
+                ->get()
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'transport_type' => $t->transport_type,
+                    'pickup_location' => $t->pickup_location,
+                    'dropoff_location' => $t->dropoff_location,
+                    'departed_at' => optional($t->departed_at)->toISOString(),
+                    'arrived_at' => optional($t->arrived_at)->toISOString(),
+                    'duration_minutes' => $t->duration_minutes,
+                    'status' => $t->status,
+                    'vehicle' => $t->asset ? ['id' => $t->asset->id, 'name' => $t->asset->name] : null,
+                    'driver' => $t->driver ? ['id' => $t->driver->id, 'name' => $t->driver->name] : null,
+                    'shift' => $t->shift ? [
+                        'id' => $t->shift->id,
+                        'starts_at' => optional($t->shift->starts_at)->toISOString(),
+                        'shift_type' => $t->shift->shift_type ?? 'standard',
+                    ] : null,
+                ])
+                ->values()
+            : collect();
+
+        // Medication transit logs
+        $medicationLogs = $hasMedLogs
+            ? FleetMedicationTransitLog::query()
+                ->where('client_id', $client->id)
+                ->with(['packedBy:id,name', 'administeredBy:id,name', 'witnessedBy:id,name'])
+                ->latest('packed_at')
+                ->limit(20)
+                ->get()
+                ->map(fn ($m) => [
+                    'id' => $m->id,
+                    'medication_name' => $m->medication_name,
+                    'is_controlled_drug' => $m->is_controlled_drug,
+                    'packed_at' => optional($m->packed_at)->toISOString(),
+                    'packed_by' => $m->packedBy ? $m->packedBy->name : null,
+                    'administered_at' => optional($m->administered_at)->toISOString(),
+                    'administered_by' => $m->administeredBy ? $m->administeredBy->name : null,
+                    'witnessed_by' => $m->witnessedBy ? $m->witnessedBy->name : null,
+                    'returned_to_house_at' => optional($m->returned_to_house_at)->toISOString(),
+                    'status' => $m->status,
+                ])
+                ->values()
+            : collect();
+
+        return [
+            'stats' => [
+                'transports_30d' => $transportCount30d,
+                'outings_30d' => $outingCount30d,
+                'incidents_30d' => $incidentCount30d,
+            ],
+            'upcoming_outings' => $upcomingOutings,
+            'transport_history' => $transports,
+            'medication_logs' => $medicationLogs,
+        ];
     }
 
     /**

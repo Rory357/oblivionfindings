@@ -11,8 +11,11 @@ class FleetDriverSessionController extends Controller
 {
     public function store(Request $request, Asset $asset)
     {
+        abort_unless($asset->category === 'vehicle', 404, 'Asset is not a vehicle.');
+
         $request->validate([
             'started_at' => ['nullable', 'date'],
+            'source' => ['nullable', 'string', 'in:manual,auto,device'],
         ]);
 
         $session = FleetDriverSession::create([
