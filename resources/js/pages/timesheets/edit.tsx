@@ -1,9 +1,24 @@
+/**
+ * @deprecated LEGACY PAGE — Not rendered by any controller.
+ * The active timesheet edit is at: pages/operations/timesheets/edit.tsx
+ * Rendered by: TimesheetController::edit → inertia('operations/timesheets/edit')
+ * This file is kept as reference only. Do not develop against this file.
+ */
 import AppLayout from '@/layouts/app-layout';
-import HeadingSmall from '@/components/heading-small';
+import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
+import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
+import { ShiftStatusBadge } from '@/components/shift-status-badge';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { FileText, CalendarDays, Clock, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 type Client = { id: number; first_name: string; last_name: string };
 
@@ -14,6 +29,23 @@ type Props = {
     canSubmit: boolean;
     canEdit: boolean;
 };
+
+function getWorkflowGuidance(status: string): { message: string; variant: 'info' | 'warning' | 'success' } | null {
+    switch (status) {
+        case 'draft':
+            return { message: 'This timesheet is a draft. Fill in the details and submit for approval when ready.', variant: 'info' };
+        case 'submitted':
+            return { message: 'This timesheet has been submitted and is awaiting manager review.', variant: 'info' };
+        case 'returned':
+            return { message: 'This timesheet was returned for changes. Review the notes above and resubmit.', variant: 'warning' };
+        case 'approved':
+            return { message: 'This timesheet has been approved.', variant: 'success' };
+        case 'rejected':
+            return { message: 'This timesheet was rejected. See the decision notes for details.', variant: 'warning' };
+        default:
+            return null;
+    }
+}
 
 export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmit, canEdit }: Props) {
     const { labels } = usePage().props as any;
@@ -36,115 +68,191 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
 
     const status: string = timesheet.status ?? 'draft';
     const editable = !!canEdit;
+    const clientName = (() => {
+        const c = clients.find((c) => c.id === Number(timesheet.client_id));
+        return c ? `${c.first_name} ${c.last_name}` : `Timesheet #${timesheet.id}`;
+    })();
+
+    const guidance = getWorkflowGuidance(status);
+
+    const shiftHours = (() => {
+        if (!timesheet.starts_at || !timesheet.ends_at) return '—';
+        const s = new Date(timesheet.starts_at).getTime();
+        const e = new Date(timesheet.ends_at).getTime();
+        if (Number.isNaN(s) || Number.isNaN(e) || e <= s) return '—';
+        const raw = (e - s) / (1000 * 60 * 60);
+        const net = raw - (timesheet.break_minutes ?? 0) / 60;
+        return `${net.toFixed(1)}h`;
+    })();
 
     return (
         <AppLayout
             breadcrumbs={[
                 { title: labels?.['timesheet.plural'] ?? 'Timesheets', href: '/timesheets' },
-                { title: `${timesheetLabel} #${timesheet.id}`, href: `/timesheets/${timesheet.id}/edit` },
+                { title: `${clientName} — ${timesheet.work_date}`, href: `/timesheets/${timesheet.id}/edit` },
             ]}
         >
-            <Head title={`${timesheetLabel} #${timesheet.id}`} />
+            <Head title={`${timesheetLabel} — ${clientName}`} />
 
-            <div className="p-4 max-w-2xl space-y-6">
-                <HeadingSmall
-                    title={`${timesheetLabel} #${timesheet.id}`}
-                    description={timesheet.shift ? 'Linked to a shift.' : 'Manual timesheet.'}
+            <PageShell>
+                <FleetHero
+                    title={clientName}
+                    description={`${timesheetLabel} #${timesheet.id} — ${timesheet.work_date}`}
+                    icon={<FileText className="h-7 w-7 text-white" />}
+                    backHref="/timesheets"
+                    backLabel="All timesheets"
+                    stats={[
+                        { label: 'Net Hours', value: shiftHours },
+                        { label: 'Break', value: `${timesheet.break_minutes ?? 0}m` },
+                    ]}
+                    actions={
+                        <TimesheetStatusBadge status={status} showIcon className="border-white/30 bg-white/10 text-white" />
+                    }
                 />
 
+                {/* Status-specific banners */}
+                {status === 'returned' && timesheet.returned_notes ? (
+                    <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        <div>
+                            <div className="text-xs font-medium text-amber-700 dark:text-amber-400">Returned — changes requested</div>
+                            <div className="mt-1 text-sm text-amber-800 dark:text-amber-300 whitespace-pre-wrap">{timesheet.returned_notes}</div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {(status === 'approved' || status === 'rejected') && timesheet.decision_notes ? (
+                    <div className={`flex items-start gap-3 rounded-xl border p-4 ${status === 'approved' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10'}`}>
+                        {status === 'approved' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />}
+                        <div>
+                            <div className={`text-xs font-medium ${status === 'approved' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                                {status === 'approved' ? 'Approved' : 'Rejected'} — decision notes
+                            </div>
+                            <div className={`mt-1 text-sm whitespace-pre-wrap ${status === 'approved' ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300'}`}>
+                                {timesheet.decision_notes}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {/* Workflow guidance */}
+                {guidance && status !== 'returned' && !(status === 'approved' && timesheet.decision_notes) && !(status === 'rejected' && timesheet.decision_notes) ? (
+                    <div className={`flex items-center gap-3 rounded-xl border p-4 ${
+                        guidance.variant === 'warning' ? 'border-amber-500/30 bg-amber-500/10' :
+                        guidance.variant === 'success' ? 'border-emerald-500/30 bg-emerald-500/10' :
+                        'border-blue-500/30 bg-blue-500/10'
+                    }`}>
+                        {guidance.variant === 'warning' ? <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" /> :
+                         guidance.variant === 'success' ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" /> :
+                         <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />}
+                        <span className={`text-sm ${
+                            guidance.variant === 'warning' ? 'text-amber-800 dark:text-amber-300' :
+                            guidance.variant === 'success' ? 'text-emerald-800 dark:text-emerald-300' :
+                            'text-blue-800 dark:text-blue-300'
+                        }`}>
+                            {guidance.message}
+                        </span>
+                    </div>
+                ) : null}
+
+                {/* Linked shift context */}
+                {timesheet.shift ? (
+                    <Card className="border-primary/10">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                <CalendarDays className="h-3.5 w-3.5" />
+                                Linked Shift
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-wrap items-center gap-3 text-sm">
+                                <Link href={`/shifts/${timesheet.shift.id}`} className="font-medium underline">
+                                    Shift #{timesheet.shift.id}
+                                </Link>
+                                {timesheet.shift.status ? (
+                                    <ShiftStatusBadge status={timesheet.shift.status} />
+                                ) : null}
+                                {timesheet.shift.location ? (
+                                    <span className="text-muted-foreground">{timesheet.shift.location}</span>
+                                ) : null}
+                                {timesheet.shift.service_context_name ? (
+                                    <Badge variant="outline" className="text-[10px]">{timesheet.shift.service_context_name}</Badge>
+                                ) : null}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                {/* Edit form */}
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
                         if (!editable) return;
                         form.put(`/timesheets/${timesheet.id}`);
                     }}
-                    className="space-y-4"
+                    className="max-w-2xl space-y-6"
                 >
-                    <div className="rounded-md border p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm font-medium">Status</div>
-                            <div className="text-xs rounded-full border px-2 py-1">
-                                {status}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Client</Label>
+                                <Select
+                                    value={String(form.data.client_id)}
+                                    onValueChange={(v) => form.setData('client_id', v)}
+                                    disabled={!editable}
+                                >
+                                    <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                                    <SelectContent>
+                                        {clients.map((c) => (
+                                            <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </div>
 
-                        {status === 'returned' && timesheet.returned_notes ? (
-                            <div className="rounded-md border bg-muted/30 p-3">
-                                <div className="text-xs font-medium">Returned notes</div>
-                                <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                    {timesheet.returned_notes}
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Work date</Label>
+                                    <Input type="date" value={form.data.work_date} onChange={(e) => form.setData('work_date', e.target.value)} disabled={!editable} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Break (minutes)</Label>
+                                    <Input type="number" value={form.data.break_minutes} onChange={(e) => form.setData('break_minutes', Number(e.target.value))} disabled={!editable} />
                                 </div>
                             </div>
-                        ) : null}
 
-                        {status === 'approved' || status === 'rejected' ? (
-                            timesheet.decision_notes ? (
-                                <div className="rounded-md border bg-muted/30 p-3">
-                                    <div className="text-xs font-medium">Decision notes</div>
-                                    <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                        {timesheet.decision_notes}
-                                    </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Start</Label>
+                                    <Input type="datetime-local" value={form.data.starts_at} onChange={(e) => form.setData('starts_at', e.target.value)} disabled={!editable} />
                                 </div>
-                            ) : null
-                        ) : null}
-
-                        <div className="space-y-2">
-                            <Label>Client</Label>
-                            <select
-                                className="w-full rounded-md border bg-background p-2 text-sm"
-                                value={form.data.client_id}
-                                onChange={(e) => form.setData('client_id', e.target.value)}
-                                disabled={!editable}
-                            >
-                                {clients.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.first_name} {c.last_name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label>Work date</Label>
-                                <Input type="date" value={form.data.work_date} onChange={(e) => form.setData('work_date', e.target.value)} disabled={!editable} />
+                                <div className="space-y-2">
+                                    <Label>End</Label>
+                                    <Input type="datetime-local" value={form.data.ends_at} onChange={(e) => form.setData('ends_at', e.target.value)} disabled={!editable} />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Break (minutes)</Label>
-                                <Input type="number" value={form.data.break_minutes} onChange={(e) => form.setData('break_minutes', Number(e.target.value))} disabled={!editable} />
-                            </div>
-                        </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                                <Label>Start</Label>
-                                <Input type="datetime-local" value={form.data.starts_at} onChange={(e) => form.setData('starts_at', e.target.value)} disabled={!editable} />
+                                <Label>Notes</Label>
+                                <Textarea value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={4} disabled={!editable} />
                             </div>
-                            <div className="space-y-2">
-                                <Label>End</Label>
-                                <Input type="datetime-local" value={form.data.ends_at} onChange={(e) => form.setData('ends_at', e.target.value)} disabled={!editable} />
+
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    checked={form.data.is_residential_billable}
+                                    onCheckedChange={(v) => form.setData('is_residential_billable', Boolean(v))}
+                                    disabled={!editable}
+                                />
+                                <Label className="text-sm">Residential / home-support shift billable</Label>
                             </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Notes</Label>
-                            <textarea className="w-full rounded-md border bg-background p-2 text-sm" value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={4} disabled={!editable} />
-                        </div>
-
-                        <label className="flex items-center gap-2 text-sm">
-                            <Input
-                                type="checkbox"
-                                className="h-4 w-4"
-                                checked={form.data.is_residential_billable}
-                                onChange={(e) => form.setData('is_residential_billable', e.target.checked)}
-                                disabled={!editable}
-                            />
-                            Residential / home-support shift billable
-                        </label>
-                    </div>
+                        </CardContent>
+                    </Card>
 
                     {Object.keys(form.errors).length > 0 && (
-                        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
                             <p className="font-medium">Please fix the following errors:</p>
                             <ul className="mt-1 list-disc pl-5">
                                 {Object.entries(form.errors).map(([field, message]) => (
@@ -155,83 +263,83 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
                     )}
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button type="submit" disabled={form.processing || !editable}>Save</Button>
-
+                        {editable ? <Button type="submit" disabled={form.processing}>Save</Button> : null}
                         {canSubmit && (status === 'draft' || status === 'returned') ? (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => router.post(`/timesheets/${timesheet.id}/submit`)}
-                            >
+                            <Button type="button" variant="outline" onClick={() => router.post(`/timesheets/${timesheet.id}/submit`)}>
                                 Submit for approval
                             </Button>
                         ) : null}
-
-                        {canApprove && status === 'submitted' ? (
-                            <>
-                                <div className="w-full" />
-                                <div className="w-full rounded-md border p-4 space-y-3">
-                                    <div className="text-sm font-medium">Manager decision</div>
-                                    <div className="space-y-2">
-                                        <Label>Decision notes (optional for approve, required for reject)</Label>
-                                        <textarea
-                                            className="w-full rounded-md border bg-background p-2 text-sm"
-                                            rows={3}
-                                            value={decision.data.decision_notes}
-                                            onChange={(e) => decision.setData('decision_notes', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Return notes (required to return)</Label>
-                                        <textarea
-                                            className="w-full rounded-md border bg-background p-2 text-sm"
-                                            rows={3}
-                                            value={decision.data.returned_notes}
-                                            onChange={(e) => decision.setData('returned_notes', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => {
-                                                decision.post(`/timesheets/${timesheet.id}/approve`, {
-                                                    preserveScroll: true,
-                                                });
-                                            }}
-                                        >
-                                            Approve
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => {
-                                                decision.post(`/timesheets/${timesheet.id}/reject`, {
-                                                    preserveScroll: true,
-                                                });
-                                            }}
-                                        >
-                                            Reject
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => {
-                                                decision.post(`/timesheets/${timesheet.id}/return`, {
-                                                    preserveScroll: true,
-                                                });
-                                            }}
-                                        >
-                                            Return for changes
-                                        </Button>
-                                    </div>
-                                </div>
-                            </>
-                        ) : null}
-                        <Button type="button" variant="outline" onClick={() => history.back()}>Back</Button>
+                        <Button type="button" variant="ghost" onClick={() => history.back()}>Back</Button>
                     </div>
                 </form>
-            </div>
+
+                {/* Manager decision panel — visually separated */}
+                {canApprove && status === 'submitted' ? (
+                    <Card className="max-w-2xl border-primary/30 shadow-md">
+                        <CardHeader className="bg-primary/5">
+                            <CardTitle className="text-base">Manager Decision</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Decision notes (optional for approve, required for reject)</Label>
+                                <Textarea rows={3} value={decision.data.decision_notes} onChange={(e) => decision.setData('decision_notes', e.target.value)} placeholder="Optional notes for approval, required for rejection" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Return notes (required to return)</Label>
+                                <Textarea rows={3} value={decision.data.returned_notes} onChange={(e) => decision.setData('returned_notes', e.target.value)} placeholder="What needs changing?" />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Button onClick={() => decision.post(`/timesheets/${timesheet.id}/approve`, { preserveScroll: true })} disabled={decision.processing}>
+                                    Approve
+                                </Button>
+                                <Button variant="outline" onClick={() => decision.post(`/timesheets/${timesheet.id}/return`, { preserveScroll: true })} disabled={decision.processing}>
+                                    Return for changes
+                                </Button>
+                                <Button variant="destructive" onClick={() => decision.post(`/timesheets/${timesheet.id}/reject`, { preserveScroll: true })} disabled={decision.processing}>
+                                    Reject
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                {/* Payroll/export info if available */}
+                {timesheet.exported_to_payroll_at ? (
+                    <Card className="max-w-2xl border-emerald-500/20">
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                                <div>
+                                    <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Exported to payroll</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Exported {new Date(timesheet.exported_to_payroll_at).toLocaleString()}
+                                        {timesheet.payroll_reference ? ` · Ref: ${timesheet.payroll_reference}` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                {/* Reconciliation status if present */}
+                {timesheet.reconciliation_status && timesheet.reconciliation_status !== 'clear' ? (
+                    <Card className={`max-w-2xl ${timesheet.reconciliation_status === 'blocked' ? 'border-red-500/20' : 'border-amber-500/20'}`}>
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                                <AlertTriangle className={`h-4 w-4 shrink-0 ${timesheet.reconciliation_status === 'blocked' ? 'text-red-600' : 'text-amber-600'}`} />
+                                <div>
+                                    <div className={`text-sm font-medium ${timesheet.reconciliation_status === 'blocked' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                                        Reconciliation: {timesheet.reconciliation_status === 'blocked' ? 'Blocked' : 'Needs review'}
+                                    </div>
+                                    {timesheet.reconciliation_findings?.summary ? (
+                                        <div className="mt-1 text-xs text-muted-foreground">{timesheet.reconciliation_findings.summary}</div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
+            </PageShell>
         </AppLayout>
     );
 }

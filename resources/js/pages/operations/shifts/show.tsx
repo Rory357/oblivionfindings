@@ -1,5 +1,8 @@
 import ShiftFormsCard from '@/components/operations/shift-forms-card';
 import ShiftMedicationCard from '@/components/operations/shift-medication-card';
+import FleetHero from '@/components/fleet-hero';
+import { ShiftStatusBadge } from '@/components/shift-status-badge';
+import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,8 +25,10 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import PageShell from '@/components/page-shell';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { CalendarDays, Clock, MapPin, User, AlertTriangle, CheckCircle2, ArrowRight, FileText, Handshake, ClipboardCheck } from 'lucide-react';
 
 type Task = {
     id: number;
@@ -146,6 +151,21 @@ type Props = {
             claimed_by?: { id: number; name: string } | null;
             approved_by?: { id: number; name: string } | null;
         } | null;
+    } | null;
+    linkedTimesheet?: {
+        id: number;
+        status: string;
+        work_date: string;
+        starts_at: string;
+        ends_at: string;
+        exported_to_payroll_at?: string | null;
+        payroll_reference?: string | null;
+        reconciliation_status?: string | null;
+    } | null;
+    handoverSummary?: {
+        id: number;
+        status: string;
+        incoming_staff_name?: string | null;
     } | null;
     transports: Array<{
         id: number;
@@ -375,6 +395,8 @@ export default function ShiftShow({
     forms,
     medications,
     medicationWitnesses,
+    linkedTimesheet,
+    handoverSummary,
     transports,
     replacementRequest,
     assignmentCandidates = [],
@@ -573,188 +595,208 @@ export default function ShiftShow({
                 },
             ]}
         >
-            <Head title={`Shift - ${name}`} />
+            <Head title={`Shift — ${name}`} />
 
-            <div className="space-y-4 p-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <div className="text-lg font-semibold">Shift</div>
-                        <div className="text-sm text-muted-foreground">
-                            {new Date(shift.starts_at).toLocaleString()} -{' '}
-                            {new Date(shift.ends_at).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                            })}
-                            {shift.location ? <> | {shift.location}</> : null}
-                        </div>
-                        <div className="mt-1 text-sm">
-                            Client:{' '}
-                            <Link
-                                className="underline"
-                                href={`/operations/clients/${shift.client.id}`}
-                            >
-                                {name}
-                            </Link>
-                            <span className="mx-2">|</span>
-                            Staff:{' '}
-                            <span className="font-medium">
-                                {shift.staff?.name ?? 'Unassigned'}
+            <PageShell>
+                {/* Hero header */}
+                <FleetHero
+                    title={name}
+                    description={new Date(shift.starts_at).toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    icon={<CalendarDays className="h-7 w-7 text-white" />}
+                    backHref="/shifts"
+                    backLabel="All shifts"
+                    stats={[
+                        { label: 'Duration', value: (() => { const s = new Date(shift.starts_at).getTime(); const e = new Date(shift.ends_at).getTime(); return (Number.isNaN(s) || Number.isNaN(e) || e <= s) ? '—' : `${((e - s) / 3600000).toFixed(1)}h`; })() },
+                        { label: 'Tasks', value: `${tasks.filter(t => t.is_completed).length}/${tasks.length}` },
+                        { label: 'Notes', value: notes.length },
+                    ]}
+                    actions={
+                        <ShiftStatusBadge status={shift.status} showIcon className="border-white/30 bg-white/10 text-white" />
+                    }
+                >
+                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/70">
+                        <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {new Date(shift.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {' – '}
+                            {new Date(shift.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {shift.location ? <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{shift.location}</span> : null}
+                        <span className="inline-flex items-center gap-1"><User className="h-3.5 w-3.5" />{shift.staff?.name ?? 'Unassigned'}</span>
+                        {shift.service_context ? <Badge variant="outline" className="border-white/20 bg-white/10 text-white text-[10px]">{shift.service_context.name}</Badge> : null}
+                        {shift.is_sleepover ? <Badge variant="outline" className="border-white/20 bg-white/10 text-white text-[10px]">Sleepover</Badge> : null}
+                        {shift.is_on_call ? <Badge variant="outline" className="border-white/20 bg-white/10 text-white text-[10px]">On-call</Badge> : null}
+                        {shift.shift_type ? <Badge variant="outline" className="border-white/20 bg-white/10 text-white text-[10px]">{shift.shift_type}</Badge> : null}
+                        {shift.actual_starts_at ? (
+                            <span className="text-white/50">
+                                Actual: {new Date(shift.actual_starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {shift.actual_ends_at ? `–${new Date(shift.actual_ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
                             </span>
-                            <span className="mx-2">|</span>
-                            Status:{' '}
-                            <span className="font-medium">{shift.status}</span>
-                            {shift.actual_starts_at ? (
-                                <>
-                                    <span className="mx-2">|</span>
-                                    Actual:{' '}
-                                    <span className="font-medium">
-                                        {new Date(
-                                            shift.actual_starts_at,
-                                        ).toLocaleTimeString([], {
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                        })}
-                                    </span>
-                                    {shift.actual_ends_at ? (
-                                        <>
-                                            {' - '}
-                                            <span className="font-medium">
-                                                {new Date(
-                                                    shift.actual_ends_at,
-                                                ).toLocaleTimeString([], {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                })}
-                                            </span>
-                                        </>
-                                    ) : null}
-                                </>
-                            ) : null}
-                            {shift.service_context ? (
-                                <>
-                                    <span className="mx-2">|</span>
-                                    Service context:{' '}
-                                    <span className="font-medium">
-                                        {shift.service_context.name}
-                                    </span>
-                                </>
-                            ) : null}
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        {canStartShift ? (
-                            <Button
-                                size="sm"
-                                onClick={() =>
-                                    router.patch(
-                                        `/operations/shifts/${shift.id}/start`,
-                                        {},
-                                        { preserveScroll: true },
-                                    )
-                                }
-                            >
-                                Start
-                            </Button>
-                        ) : null}
-
-                        {canCompleteShift ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setCompleteOpen(true)}
-                            >
-                                Complete
-                            </Button>
-                        ) : null}
-
-                        {can.create_incident ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setIncidentOpen(true)}
-                            >
-                                Report incident
-                            </Button>
-                        ) : null}
-
-                        {auth?.can?.timesheets?.create ||
-                        auth?.can?.timesheets?.manageAny ? (
-                            <Link
-                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                href={`/operations/timesheets/create?shift_id=${shift.id}`}
-                            >
-                                Timesheet
-                            </Link>
-                        ) : null}
-
-                        {auth?.can?.shifts?.update ? (
-                            <Link
-                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                href={`/operations/shifts/${shift.id}/edit`}
-                            >
-                                Edit
-                            </Link>
-                        ) : null}
-
-                        {auth?.can?.shifts?.manageAny &&
-                        shift.status !== 'completed' &&
-                        shift.status !== 'cancelled' ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                    router.patch(
-                                        `/operations/shifts/${shift.id}/cancel`,
-                                        {},
-                                        { preserveScroll: true },
-                                    )
-                                }
-                            >
-                                Cancel occurrence
-                            </Button>
-                        ) : null}
-
-                        {auth?.can?.shifts?.manageAny &&
-                        shift.status === 'cancelled' ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                    router.patch(
-                                        `/operations/shifts/${shift.id}/reopen`,
-                                        {},
-                                        { preserveScroll: true },
-                                    )
-                                }
-                            >
-                                Reopen occurrence
-                            </Button>
-                        ) : null}
-
-                        {shift.shift_series_id ? (
-                            <Link
-                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                href={`/operations/shifts/series/${shift.shift_series_id}`}
-                            >
-                                Recurring series
-                            </Link>
                         ) : null}
                     </div>
+                </FleetHero>
+
+                {/* Workflow guidance */}
+                {shift.status === 'in_progress' ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                        <span className="text-sm text-amber-800 dark:text-amber-300">Shift is in progress. Complete the shift when finished — a timesheet will be created automatically.</span>
+                    </div>
+                ) : shift.status === 'scheduled' ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+                        <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />
+                        <span className="text-sm text-blue-800 dark:text-blue-300">Shift is scheduled. Staff can clock in or start the shift when it begins.</span>
+                    </div>
+                ) : shift.status === 'cancelled' ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+                        <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                        <span className="text-sm text-red-800 dark:text-red-300">This shift has been cancelled. Downstream records may have been affected.</span>
+                    </div>
+                ) : null}
+
+                {/* Action bar */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {canStartShift ? (
+                        <Button onClick={() => router.patch(`/operations/shifts/${shift.id}/start`, {}, { preserveScroll: true })}>
+                            Start shift
+                        </Button>
+                    ) : null}
+                    {canCompleteShift ? (
+                        <Button variant={canStartShift ? 'outline' : 'default'} onClick={() => setCompleteOpen(true)}>
+                            Complete shift
+                        </Button>
+                    ) : null}
+                    {can.create_incident ? (
+                        <Button variant="outline" onClick={() => setIncidentOpen(true)}>
+                            Report incident
+                        </Button>
+                    ) : null}
+                    {(auth?.can?.timesheets?.create || auth?.can?.timesheets?.manageAny) ? (
+                        <Button variant="outline" asChild>
+                            <Link href={`/operations/timesheets/create?shift_id=${shift.id}`}>
+                                Create timesheet
+                            </Link>
+                        </Button>
+                    ) : null}
+                    {auth?.can?.shifts?.update ? (
+                        <Button variant="ghost" asChild>
+                            <Link href={`/operations/shifts/${shift.id}/edit`}>Edit</Link>
+                        </Button>
+                    ) : null}
+                    {auth?.can?.shifts?.manageAny && shift.status !== 'completed' && shift.status !== 'cancelled' ? (
+                        <Button variant="outline" onClick={() => router.patch(`/operations/shifts/${shift.id}/cancel`, {}, { preserveScroll: true })}>
+                            Cancel occurrence
+                        </Button>
+                    ) : null}
+                    {auth?.can?.shifts?.manageAny && shift.status === 'cancelled' ? (
+                        <Button variant="outline" onClick={() => router.patch(`/operations/shifts/${shift.id}/reopen`, {}, { preserveScroll: true })}>
+                            Reopen occurrence
+                        </Button>
+                    ) : null}
+                    {shift.shift_series_id ? (
+                        <Button variant="ghost" asChild>
+                            <Link href={`/operations/shifts/series/${shift.shift_series_id}`}>Recurring series</Link>
+                        </Button>
+                    ) : null}
                 </div>
 
-                <Card>
+                {/* Integration cards */}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <Card className="transition-shadow hover:shadow-md">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                <FileText className="h-3.5 w-3.5" />
+                                Linked Timesheet
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {linkedTimesheet ? (
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <Link href={`/operations/timesheets/${linkedTimesheet.id}/edit`} className="font-medium underline text-sm">
+                                            Timesheet #{linkedTimesheet.id}
+                                        </Link>
+                                        <TimesheetStatusBadge status={linkedTimesheet.status} />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        {new Date(linkedTimesheet.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        {' – '}
+                                        {new Date(linkedTimesheet.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    {linkedTimesheet.exported_to_payroll_at ? (
+                                        <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10 text-[10px]">Exported to payroll</Badge>
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No timesheet linked yet.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="transition-shadow hover:shadow-md">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                <Handshake className="h-3.5 w-3.5" />
+                                Handover
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {handoverSummary ? (
+                                <div className="space-y-1">
+                                    <Badge variant="outline" className={
+                                        handoverSummary.status === 'acknowledged' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
+                                        handoverSummary.status === 'submitted' ? 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' :
+                                        'border-slate-500/30 text-slate-400 bg-slate-500/10'
+                                    }>
+                                        {handoverSummary.status.charAt(0).toUpperCase() + handoverSummary.status.slice(1)}
+                                    </Badge>
+                                    {handoverSummary.incoming_staff_name ? (
+                                        <p className="text-xs text-muted-foreground">Incoming: {handoverSummary.incoming_staff_name}</p>
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No handover required.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="transition-shadow hover:shadow-md">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                <ClipboardCheck className="h-3.5 w-3.5" />
+                                Task Progress
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {tasks.length > 0 ? (
+                                <div className="space-y-2">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-2xl font-bold tabular-nums">{tasks.filter(t => t.is_completed).length}</span>
+                                        <span className="text-sm text-muted-foreground">/ {tasks.length} completed</span>
+                                    </div>
+                                    <div className="h-1.5 w-full rounded-full bg-muted">
+                                        <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${(tasks.filter(t => t.is_completed).length / tasks.length) * 100}%` }} />
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No tasks assigned.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <Card className="border-primary/10">
                     <CardHeader>
                         <CardTitle className="text-base">
-                            Operational summary
+                            Operational Summary
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-3 md:grid-cols-4">
-                        <div className="rounded-md border p-3">
-                            <div className="text-xs text-muted-foreground uppercase">
+                        <div className="rounded-lg border p-3">
+                            <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                                 Shift type
                             </div>
-                            <div className="mt-1 text-sm font-medium">
+                            <div className="mt-1 text-sm font-semibold">
                                 {(shift.shift_type ?? 'standard')
                                     .split('_')
                                     .join(' ')}
@@ -2581,7 +2623,7 @@ export default function ShiftShow({
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageShell>
         </AppLayout>
     );
 }

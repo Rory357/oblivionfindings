@@ -406,6 +406,21 @@ class ShiftController extends Controller
             ] : null,
             'assignmentCandidates' => $assignmentCandidates,
             'coverage' => $coverage,
+            'linkedTimesheet' => Timesheet::where('shift_id', $shift->id)
+                ->select(['id', 'status', 'work_date', 'starts_at', 'ends_at', 'exported_to_payroll_at', 'payroll_reference', 'reconciliation_status'])
+                ->first(),
+            'handoverSummary' => (function () use ($shift) {
+                $h = ShiftHandover::where('outgoing_shift_id', $shift->id)
+                    ->select(['id', 'status', 'incoming_staff_id'])
+                    ->with(['incomingStaff:id,name'])
+                    ->latest()
+                    ->first();
+                return $h ? [
+                    'id' => $h->id,
+                    'status' => $h->status,
+                    'incoming_staff_name' => $h->incomingStaff?->name,
+                ] : null;
+            })(),
             'can' => [
                 'add_note' => $auth->canDo('timeline.create'),
                 'create_incident' => $auth->canDo('incidents.create'),
