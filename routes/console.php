@@ -23,6 +23,9 @@ use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
 use App\Jobs\PruneFleetTelemetry;
 use App\Jobs\SendEventReminderJob;
+use App\Jobs\EscalateUnresolvedEligibilityJob;
+use App\Jobs\RecalculateFutureShiftEligibility;
+use App\Jobs\ReconcileTimesheetsJob;
 use App\Jobs\ShiftAutoAlertJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
@@ -132,7 +135,19 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('01:00');
 
-// Calculate wellbeing indicators (fatigue, overtime): daily at 02:00
+// Re-evaluate eligibility for future shifts (detect newly blocked): daily at 01:30
+app(Schedule::class)
+    ->job(new RecalculateFutureShiftEligibility)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('01:30');
+
+// Escalate unresolved invalid future shifts (24h+ after first detection): daily at 08:30
+app(Schedule::class)
+    ->job(new EscalateUnresolvedEligibilityJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:30');
+
+// Calculate wellbeing indicators (fatigue, overtime) + notify on red escalation: daily at 02:00
 app(Schedule::class)
     ->job(new CalculateWellbeingIndicatorsJob)
     ->timezone('Pacific/Auckland')
@@ -219,6 +234,13 @@ app(Schedule::class)
     ->job(new SendRoadmapDigestJob)
     ->timezone('Pacific/Auckland')
     ->weeklyOn(1, '07:30');
+
+// Timesheet reconciliation: re-sync draft timesheets and re-evaluate submitted timesheets
+app(Schedule::class)
+    ->job(new ReconcileTimesheetsJob)
+    ->timezone('Pacific/Auckland')
+    ->hourly()
+    ->withoutOverlapping();
 
 // Orphan detection: completed shifts without timesheets, attendance gaps, broken linkage
 app(Schedule::class)

@@ -429,6 +429,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/shifts', [ShiftController::class, 'store'])
         ->middleware('permission:shifts.create')
         ->name('operations.shifts.store');
+    Route::get('/shifts/eligibility-preview', [ShiftController::class, 'eligibilityPreview'])
+        ->middleware('permission:shifts.create|shifts.update')
+        ->name('operations.shifts.eligibility_preview');
 
     // Recurring shifts (weekly series)
     Route::get('/shifts/series', [ShiftSeriesController::class, 'index'])
@@ -568,6 +571,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Manager/Admin approval queue
     Route::middleware('permission:timesheets.approve|timesheets.manageAny')->group(function () {
         Route::get('/timesheets/approvals', [TimesheetController::class, 'approvals'])->name('operations.timesheets.approvals');
+        Route::get('/timesheets/payroll-adjustments', [TimesheetController::class, 'payrollAdjustmentsPending'])->name('operations.timesheets.payrollAdjustments');
+        Route::post('/timesheets/amendments/{amendment}/mark-processed', [TimesheetController::class, 'markPayrollAdjustmentProcessed'])->name('operations.timesheets.markPayrollProcessed');
         Route::post('/timesheets/bulk-approve', [TimesheetController::class, 'bulkApprove'])->name('operations.timesheets.bulkApprove');
         Route::post('/timesheets/bulk-return', [TimesheetController::class, 'bulkReturnForChanges'])->name('operations.timesheets.bulkReturn');
         Route::post('/timesheets/bulk-reject', [TimesheetController::class, 'bulkReject'])->name('operations.timesheets.bulkReject');

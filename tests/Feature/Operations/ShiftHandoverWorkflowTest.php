@@ -284,7 +284,6 @@ class ShiftHandoverWorkflowTest extends TestCase
         $response = $this->actingAs($this->outgoingStaff)
             ->patch("/operations/shifts/{$outgoingShift->id}/complete", [
                 'final_note_body' => 'Shift summary is complete.',
-                'create_timesheet' => false,
             ]);
 
         $response->assertSessionHasErrors(['handover_waiver_reason']);
@@ -301,7 +300,6 @@ class ShiftHandoverWorkflowTest extends TestCase
         $response = $this->actingAs($this->outgoingStaff)
             ->patch("/operations/shifts/{$shift->id}/complete", [
                 'final_note_body' => 'Shift completed without a follow-on shift.',
-                'create_timesheet' => false,
             ]);
 
         $response->assertSessionHas('success');
@@ -320,7 +318,6 @@ class ShiftHandoverWorkflowTest extends TestCase
             ->patch("/operations/shifts/{$shift->id}/complete", [
                 'final_note_body' => 'Shift summary with waiver.',
                 'handover_waiver_reason' => 'Incoming shift was delayed and manager was briefed verbally.',
-                'create_timesheet' => false,
             ]);
 
         $response->assertSessionHas('success');

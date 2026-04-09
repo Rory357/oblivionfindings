@@ -13,6 +13,11 @@ use Illuminate\Support\Collection;
 
 class ComplianceMatrixService
 {
+    public function __construct(
+        protected LiveComplianceValidator $liveValidator = new LiveComplianceValidator(),
+    ) {
+    }
+
     /**
      * Evaluate all active employees against compliance matrix.
      */
@@ -66,21 +71,63 @@ class ComplianceMatrixService
     }
 
     /**
-     * Check if a user can be assigned to a shift (real-time).
+     * Check if a user can be assigned to a shift.
+     *
+     * Uses a hybrid approach:
+     *   1. Check cached compliance status (fast, from nightly evaluation)
+     *   2. For hard-stop requirements, also validate against live source records
+     *      to catch credentials that expired since the last nightly run
+     *
+     * A hard-stop blocks if EITHER the cached status OR the live check fails.
      */
     public function canAssignToShift(User $user, ?Shift $shift = null): array
     {
-        $hardStopFailures = $this->getHardStopFailures($user);
-        if ($hardStopFailures->isNotEmpty()) {
+        // 1. Cached hard-stop failures (existing behaviour).
+        $cachedFailures = $this->getHardStopFailures($user);
+
+        // 2. Live hard-stop validation against source records.
+        $liveResult = $this->liveValidator->validateHardStops($user);
+
+        // Merge: combine cached and live failures, deduplicate by requirement code.
+        $allFailures = collect($cachedFailures->toArray());
+
+        if (! $liveResult['passed']) {
+            $existingCodes = $allFailures->pluck('code')->flip();
+
+            foreach ($liveResult['failures'] as $liveFail) {
+                if (! $existingCodes->has($liveFail['code'])) {
+                    // Live found a failure the cache missed — use the specific message.
+                    $allFailures->push([
+                        'requirement' => $liveFail['requirement'],
+                        'code' => $liveFail['code'],
+                        'status' => 'expired',
+                        'reason' => $liveFail['reason'],
+                        'expires_at' => $liveFail['expires_at'],
+                    ]);
+                } else {
+                    // Both cache and live failed — upgrade the cached entry with the specific reason.
+                    $allFailures = $allFailures->map(function (array $f) use ($liveFail) {
+                        if ($f['code'] === $liveFail['code'] && ! isset($f['reason'])) {
+                            $f['reason'] = $liveFail['reason'];
+                            $f['expires_at'] = $liveFail['expires_at'] ?? $f['expires_at'];
+                        }
+                        return $f;
+                    });
+                }
+            }
+        }
+
+        if ($allFailures->isNotEmpty()) {
             return [
                 'allowed' => false,
                 'blocked' => true,
-                'failures' => $hardStopFailures->toArray(),
+                'failures' => $allFailures->values()->toArray(),
                 'warnings' => [],
             ];
         }
 
         $warnings = $this->getSoftWarnings($user);
+
         return [
             'allowed' => true,
             'blocked' => false,
@@ -222,7 +269,7 @@ class ComplianceMatrixService
             case 'background_check':
                 $check = $user->staffBackgroundChecks()
                     ->where('check_type', 'police_check')
-                    ->where('status', 'cleared')
+                    ->whereIn('status', ['clear', 'cleared'])
                     ->orderByDesc('completed_at')
                     ->first();
 

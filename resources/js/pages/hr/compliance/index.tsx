@@ -20,6 +20,7 @@ interface StaffStatus {
     expiring_soon_count: number;
     not_started_count: number;
     compliance_percent: number;
+    future_shifts_affected?: number;
 }
 
 interface Requirement {
@@ -189,6 +190,7 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                     <th className="px-4 py-3 text-center font-medium">Expired</th>
                                     <th className="px-4 py-3 text-center font-medium">Expiring</th>
                                     <th className="px-4 py-3 text-center font-medium">Not Started</th>
+                                    <th className="px-4 py-3 text-center font-medium">Shifts Affected</th>
                                     <th className="px-4 py-3" />
                                 </tr>
                             </thead>
@@ -250,6 +252,15 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                                 <span className="text-muted-foreground">0</span>
                                             )}
                                         </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {staff.future_shifts_affected && staff.future_shifts_affected > 0 ? (
+                                                <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                                                    {staff.future_shifts_affected} shift{staff.future_shifts_affected !== 1 ? 's' : ''}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-muted-foreground">&mdash;</span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-right">
                                             <Button variant="ghost" size="sm" asChild>
                                                 <Link href={`/hr/compliance/staff/${staff.user_id}`}>View</Link>
@@ -259,7 +270,7 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                 ))}
                                 {staffStatuses.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                                        <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                                             <Shield className="mx-auto mb-3 h-12 w-12 opacity-30" />
                                             <p className="text-base font-medium">No compliance records found</p>
                                             <p className="mt-1 text-sm">

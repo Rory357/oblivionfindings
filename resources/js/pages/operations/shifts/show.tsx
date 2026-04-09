@@ -3,6 +3,10 @@ import ShiftMedicationCard from '@/components/operations/shift-medication-card';
 import FleetHero from '@/components/fleet-hero';
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
+import { EligibilityStatusBadge, deriveEligibilityStatus } from '@/components/eligibility/eligibility-status-badge';
+import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
+import { OverrideConfirmationDialog } from '@/components/eligibility/override-confirmation-dialog';
+import type { OverrideableWarning } from '@/components/eligibility/override-confirmation-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -306,6 +310,7 @@ type Props = {
         request_replacement: boolean;
         cancel_replacement: boolean;
         assign_shift?: boolean;
+        override_eligibility?: boolean;
         view_transport?: boolean;
     };
 };
@@ -410,8 +415,6 @@ export default function ShiftShow({
         auth?.can?.shifts?.manageAny;
     const canActShift =
         auth?.can?.shifts?.update || auth?.can?.shifts?.manageAny;
-    const canCreateTimesheet =
-        auth?.can?.timesheets?.create || auth?.can?.timesheets?.manageAny;
     const canStartShift = canActShift && shift.status === 'scheduled';
     const canCompleteShift = canActShift && shift.status === 'in_progress';
     const [tasks, setTasks] = useState<Task[]>(shift.tasks ?? []);
@@ -425,6 +428,20 @@ export default function ShiftShow({
             return false;
         }
     });
+    // Override dialog state
+    const [overrideOpen, setOverrideOpen] = useState(false);
+    const [overrideCandidate, setOverrideCandidate] = useState<{
+        id: number;
+        name: string;
+        warnings: OverrideableWarning[];
+    } | null>(null);
+    const [overrideProcessing, setOverrideProcessing] = useState(false);
+
+    // Session-flashed eligibility data (persisted after failed assignment attempt)
+    const pageProps = usePage().props as any;
+    const flashedEligibility = pageProps.flash?.eligibility_result ?? null;
+    const flashedWarnings: string[] = pageProps.flash?.assignment_warnings ?? [];
+
     const [incidentOpen, setIncidentOpen] = useState(false);
     const incidentForm = useForm({
         template_id: '',
@@ -479,14 +496,12 @@ export default function ShiftShow({
         allow_incomplete_tasks: boolean;
         incomplete_tasks_reason: string;
         handover_waiver_reason: string;
-        create_timesheet: boolean;
     }>({
         final_note_subject: 'Shift summary',
         final_note_body: '',
         allow_incomplete_tasks: false,
         incomplete_tasks_reason: '',
         handover_waiver_reason: '',
-        create_timesheet: true,
     });
 
     const noteForm = useForm<{
@@ -1231,13 +1246,40 @@ export default function ShiftShow({
                                 urgency of any uncovered site demand linked to
                                 this shift.
                             </div>
+
+                            {/* Persistent alert banner for session-flashed eligibility failures */}
+                            {flashedEligibility && !flashedEligibility.is_eligible ? (
+                                <EligibilityAlertBanner
+                                    type="blocked"
+                                    reasons={flashedEligibility.blocked_reasons ?? []}
+                                />
+                            ) : null}
+                            {flashedWarnings.length > 0 && (!flashedEligibility || flashedEligibility.is_eligible) ? (
+                                <EligibilityAlertBanner
+                                    type="warnings"
+                                    reasons={flashedWarnings}
+                                    title="Assignment warnings"
+                                />
+                            ) : null}
+
                             {assignmentCandidates.length === 0 ? (
                                 <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
                                     No assignment recommendations available for
                                     this shift.
                                 </div>
                             ) : (
-                                assignmentCandidates.map((candidate) => (
+                                assignmentCandidates.map((candidate) => {
+                                    const { status: eligStatus, warningCount } = deriveEligibilityStatus({
+                                        is_eligible: candidate.is_eligible,
+                                        blocked_reasons: candidate.blocked_reasons,
+                                        warning_reasons: candidate.warning_reasons,
+                                    });
+                                    const isAlreadyAssigned = shift.user_id === candidate.id;
+                                    const hasOverrideableWarnings = candidate.is_eligible
+                                        && candidate.warning_reasons.length > 0
+                                        && can.override_eligibility;
+
+                                    return (
                                     <div
                                         key={candidate.id}
                                         className="rounded-md border p-3"
@@ -1268,28 +1310,10 @@ export default function ShiftShow({
                                             </div>
 
                                             <div className="flex flex-wrap gap-2">
-                                                <Badge
-                                                    variant={
-                                                        candidate.is_eligible
-                                                            ? 'secondary'
-                                                            : 'destructive'
-                                                    }
-                                                >
-                                                    {candidate.is_eligible
-                                                        ? 'Eligible'
-                                                        : 'Blocked'}
-                                                </Badge>
-                                                {candidate.warning_reasons
-                                                    .length > 0 ? (
-                                                    <Badge variant="outline">
-                                                        {
-                                                            candidate
-                                                                .warning_reasons
-                                                                .length
-                                                        }{' '}
-                                                        warning
-                                                    </Badge>
-                                                ) : null}
+                                                <EligibilityStatusBadge
+                                                    status={eligStatus}
+                                                    warningCount={warningCount}
+                                                />
                                                 {candidate.has_tight_turnaround ? (
                                                     <Badge variant="outline">
                                                         Tight turnaround
@@ -1334,7 +1358,7 @@ export default function ShiftShow({
 
                                         {candidate.blocked_reasons.length >
                                         0 ? (
-                                            <div className="mt-2 space-y-1 text-xs text-red-700">
+                                            <div className="mt-2 space-y-1 text-xs text-red-700 dark:text-red-400">
                                                 {candidate.blocked_reasons.map(
                                                     (reason) => (
                                                         <div key={reason}>
@@ -1347,7 +1371,7 @@ export default function ShiftShow({
 
                                         {candidate.warning_reasons.length >
                                         0 ? (
-                                            <div className="mt-2 space-y-1 text-xs text-amber-700">
+                                            <div className="mt-2 space-y-1 text-xs text-amber-700 dark:text-amber-400">
                                                 {candidate.warning_reasons.map(
                                                     (reason) => (
                                                         <div key={reason}>
@@ -1378,44 +1402,89 @@ export default function ShiftShow({
                                         ) : null}
 
                                         <div className="mt-3 flex flex-wrap gap-2">
-                                            <Button
-                                                size="sm"
-                                                variant={
-                                                    shift.user_id ===
-                                                    candidate.id
-                                                        ? 'outline'
-                                                        : 'default'
-                                                }
-                                                disabled={
-                                                    !candidate.is_eligible ||
-                                                    shift.user_id ===
-                                                        candidate.id
-                                                }
-                                                onClick={() =>
-                                                    router.post(
-                                                        `/operations/shifts/${shift.id}/assign`,
-                                                        {
-                                                            user_id:
-                                                                candidate.id,
-                                                            return_to: `/operations/shifts/${shift.id}`,
-                                                        },
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
-                                                    )
-                                                }
-                                            >
-                                                {shift.user_id === candidate.id
-                                                    ? 'Assigned'
-                                                    : 'Assign'}
-                                            </Button>
+                                            {/* Clean pass or already assigned: direct assign */}
+                                            {!hasOverrideableWarnings ? (
+                                                <Button
+                                                    size="sm"
+                                                    variant={isAlreadyAssigned ? 'outline' : 'default'}
+                                                    disabled={!candidate.is_eligible || isAlreadyAssigned}
+                                                    onClick={() =>
+                                                        router.post(
+                                                            `/operations/shifts/${shift.id}/assign`,
+                                                            {
+                                                                user_id: candidate.id,
+                                                                return_to: `/operations/shifts/${shift.id}`,
+                                                            },
+                                                            { preserveScroll: true },
+                                                        )
+                                                    }
+                                                >
+                                                    {isAlreadyAssigned ? 'Assigned' : 'Assign'}
+                                                </Button>
+                                            ) : (
+                                                /* Has overrideable warnings: open dialog first */
+                                                <Button
+                                                    size="sm"
+                                                    disabled={isAlreadyAssigned}
+                                                    variant={isAlreadyAssigned ? 'outline' : 'default'}
+                                                    className={!isAlreadyAssigned ? 'bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-700 dark:hover:bg-yellow-600' : ''}
+                                                    onClick={() => {
+                                                        setOverrideCandidate({
+                                                            id: candidate.id,
+                                                            name: candidate.name,
+                                                            warnings: candidate.warning_reasons.map((msg) => ({
+                                                                rule: 'unknown',
+                                                                message: msg,
+                                                                overrideable: true,
+                                                            })),
+                                                        });
+                                                        setOverrideOpen(true);
+                                                    }}
+                                                >
+                                                    {isAlreadyAssigned ? 'Assigned' : 'Assign with override'}
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
-                                ))
+                                    );
+                                })
                             )}
                         </CardContent>
                     </Card>
                 ) : null}
+
+                {/* Override confirmation dialog */}
+                <OverrideConfirmationDialog
+                    open={overrideOpen}
+                    onOpenChange={(next) => {
+                        setOverrideOpen(next);
+                        if (!next) setOverrideCandidate(null);
+                    }}
+                    warnings={overrideCandidate?.warnings ?? []}
+                    staffName={overrideCandidate?.name}
+                    processing={overrideProcessing}
+                    onConfirm={(reason) => {
+                        if (!overrideCandidate) return;
+                        setOverrideProcessing(true);
+                        router.post(
+                            `/operations/shifts/${shift.id}/assign`,
+                            {
+                                user_id: overrideCandidate.id,
+                                override_acknowledged: true,
+                                override_reason: reason,
+                                return_to: `/operations/shifts/${shift.id}`,
+                            },
+                            {
+                                preserveScroll: true,
+                                onFinish: () => {
+                                    setOverrideProcessing(false);
+                                    setOverrideOpen(false);
+                                    setOverrideCandidate(null);
+                                },
+                            },
+                        );
+                    }}
+                />
 
                 {transports.length > 0 || can.view_transport ? (
                     <Card>
@@ -2037,30 +2106,11 @@ export default function ShiftShow({
                                 </div>
                             </div>
 
-                            {canCreateTimesheet ? (
-                                <div className="flex items-center justify-between rounded-lg border p-3">
-                                    <div>
-                                        <div className="text-sm font-medium">
-                                            Create timesheet
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            Creates a draft timesheet for this
-                                            shift automatically.
-                                        </div>
-                                    </div>
-                                    <Checkbox
-                                        checked={
-                                            completeForm.data.create_timesheet
-                                        }
-                                        onCheckedChange={(v) =>
-                                            completeForm.setData(
-                                                'create_timesheet',
-                                                Boolean(v),
-                                            )
-                                        }
-                                    />
+                            <div className="rounded-lg border border-dashed p-3">
+                                <div className="text-xs text-muted-foreground">
+                                    A draft timesheet will be created automatically when this shift is completed.
                                 </div>
-                            ) : null}
+                            </div>
                         </div>
 
                         <DialogFooter>

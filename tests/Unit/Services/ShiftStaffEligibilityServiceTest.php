@@ -47,7 +47,7 @@ class ShiftStaffEligibilityServiceTest extends TestCase
             'coverage_roles' => ['caregiver'],
         ]);
 
-        $result = $this->service->evaluate($shift, $staff);
+        $result = $this->service->evaluate($shift, $staff)->toArray();
 
         $this->assertTrue($result['is_eligible']);
         $this->assertSame([], $result['blocked_reasons']);
@@ -61,7 +61,7 @@ class ShiftStaffEligibilityServiceTest extends TestCase
             'coverage_roles' => ['driver'],
         ]);
 
-        $result = $this->service->evaluate($shift, $staff);
+        $result = $this->service->evaluate($shift, $staff)->toArray();
 
         $this->assertFalse($result['is_eligible']);
         $this->assertSame(['Driver'], $result['missing_roles']);
@@ -90,7 +90,7 @@ class ShiftStaffEligibilityServiceTest extends TestCase
             'next_check_at' => now()->addDay(),
         ]);
 
-        $result = $this->service->evaluate($this->makeShift(), $staff);
+        $result = $this->service->evaluate($this->makeShift(), $staff)->toArray();
 
         $this->assertFalse($result['is_eligible']);
         $this->assertTrue($result['has_compliance_block']);
@@ -121,7 +121,7 @@ class ShiftStaffEligibilityServiceTest extends TestCase
             'created_by' => $staff->id,
         ]);
 
-        $result = $this->service->evaluate($shift, $staff);
+        $result = $this->service->evaluate($shift, $staff)->toArray();
 
         $this->assertFalse($result['is_eligible']);
         $this->assertTrue($result['has_time_off']);
@@ -161,7 +161,7 @@ class ShiftStaffEligibilityServiceTest extends TestCase
             'created_by' => $alreadyAssigned->id,
         ]);
 
-        $result = $this->service->evaluate($shift->fresh(), $staff);
+        $result = $this->service->evaluate($shift->fresh(), $staff)->toArray();
 
         $this->assertFalse($result['is_eligible']);
         $this->assertTrue($result['would_overfill_coverage']);
@@ -182,7 +182,7 @@ class ShiftStaffEligibilityServiceTest extends TestCase
             'status' => 'eligible',
         ]);
 
-        $initial = $this->service->evaluate($shift, $staff);
+        $initial = $this->service->evaluate($shift, $staff)->toArray();
         $this->assertTrue($initial['is_eligible']);
 
         $staff->hrDriverEligibility()->update([
@@ -190,7 +190,7 @@ class ShiftStaffEligibilityServiceTest extends TestCase
             'can_drive_clients' => false,
         ]);
 
-        $rechecked = $this->service->evaluate($shift->fresh(), $staff->fresh());
+        $rechecked = $this->service->evaluate($shift->fresh(), $staff->fresh())->toArray();
 
         $this->assertFalse($rechecked['is_eligible']);
         $this->assertSame(['Driver'], $rechecked['missing_roles']);

@@ -93,6 +93,7 @@ class JobBoardController extends Controller
                     'id' => $position->claimer->id,
                     'name' => $position->claimer->name,
                 ] : null,
+                'eligibility' => $this->getPositionEligibility($position),
             ]),
             'filters' => $filters,
             'stats' => [
@@ -174,14 +175,14 @@ class JobBoardController extends Controller
         }
 
         $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($position->shift, $auth);
-        if (! $eligibility['is_eligible']) {
+        if ($eligibility->hasBlocks()) {
             return redirect()->back()->withErrors([
-                'claim' => $eligibility['blocked_reasons'][0] ?? 'You cannot claim this shift.',
+                'claim' => $eligibility->blocking_reasons[0] ?? 'You cannot claim this shift.',
             ]);
         }
 
-        if (! empty($eligibility['warning_reasons'])) {
-            session()->flash('job_board_claim_warnings', $eligibility['warning_reasons']);
+        if ($eligibility->hasWarnings()) {
+            session()->flash('job_board_claim_warnings', $eligibility->warnings);
         }
 
         $reservation = app(CoverageReservationService::class)->reserveForAssignment($position->shift, $auth, 'job_board_claim');
@@ -243,14 +244,14 @@ class JobBoardController extends Controller
 
         try {
             $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($position->shift, $assignee);
-            if (! $eligibility['is_eligible']) {
+            if ($eligibility->hasBlocks()) {
                 return redirect()->back()->withErrors([
-                    'position' => $eligibility['blocked_reasons'][0] ?? 'Cannot approve this claim for the selected worker.',
-                ])->with('compliance_warnings', $eligibility['compliance_warnings'] ?? []);
+                    'position' => $eligibility->blocking_reasons[0] ?? 'Cannot approve this claim for the selected worker.',
+                ])->with('compliance_warnings', $eligibility->toArray()['compliance_warnings'] ?? []);
             }
 
-            if (! empty($eligibility['warning_reasons'])) {
-                session()->flash('compliance_warnings', $eligibility['warning_reasons']);
+            if ($eligibility->hasWarnings()) {
+                session()->flash('compliance_warnings', $eligibility->warnings);
             }
         } catch (\Throwable $e) {
             Log::warning('Eligibility check failed during job board approval', ['error' => $e->getMessage()]);
@@ -363,5 +364,30 @@ class JobBoardController extends Controller
         }
 
         return 'Open support shift';
+    }
+
+    /**
+     * Lightweight eligibility check for a claimed position.
+     * Only runs when a claimer exists to avoid unnecessary work.
+     */
+    protected function getPositionEligibility($position): ?array
+    {
+        if (! $position->claimer || ! $position->shift) {
+            return null;
+        }
+
+        try {
+            $result = app(ShiftStaffEligibilityService::class)
+                ->evaluate($position->shift, $position->claimer);
+
+            return [
+                'is_eligible' => $result->is_allowed,
+                'blocked_reasons' => $result->blocking_reasons,
+                'warning_count' => count($result->warnings),
+                'first_warning' => $result->warnings[0] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

@@ -1,3 +1,4 @@
+import { EligibilityStatusBadge, deriveEligibilityStatus } from '@/components/eligibility/eligibility-status-badge';
 import { OpsStatCard } from '@/components/ops-stat-card';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
@@ -39,6 +40,12 @@ type JobPost = {
     coverage_roles: string[];
     client: { id: number; first_name: string; last_name: string } | null;
     claimed_by: { id: number; name: string } | null;
+    eligibility: {
+        is_eligible: boolean;
+        blocked_reasons: string[];
+        warning_count: number;
+        first_warning: string | null;
+    } | null;
     replacement: {
         id: number;
         status: string;
@@ -277,11 +284,30 @@ export default function JobBoardIndex({
                                     </div>
                                 )}
                                 {job.claimed_by && (
-                                    <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                                        <UserCheck className="h-3 w-3" />
-                                        <span>
-                                            Claimed by: {job.claimed_by.name}
-                                        </span>
+                                    <div className="mt-2 space-y-1">
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                            <UserCheck className="h-3 w-3" />
+                                            <span>Claimed by: {job.claimed_by.name}</span>
+                                            {job.eligibility ? (
+                                                <EligibilityStatusBadge
+                                                    status={job.eligibility.is_eligible
+                                                        ? (job.eligibility.warning_count > 0 ? 'warnings' : 'eligible')
+                                                        : 'blocked'}
+                                                    warningCount={job.eligibility.warning_count}
+                                                    className="ml-1"
+                                                />
+                                            ) : null}
+                                        </div>
+                                        {job.eligibility && !job.eligibility.is_eligible && job.eligibility.blocked_reasons.length > 0 ? (
+                                            <div className="text-xs text-red-600 dark:text-red-400">
+                                                {job.eligibility.blocked_reasons[0]}
+                                            </div>
+                                        ) : null}
+                                        {job.eligibility?.first_warning ? (
+                                            <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                                                {job.eligibility.first_warning}
+                                            </div>
+                                        ) : null}
                                     </div>
                                 )}
                                 {job.replacement?.requested_by ? (
@@ -310,8 +336,9 @@ export default function JobBoardIndex({
                                     {job.status === 'claimed' && (
                                         <Button
                                             size="sm"
-                                            variant="default"
+                                            variant={job.eligibility && !job.eligibility.is_eligible ? 'destructive' : 'default'}
                                             className="h-7 flex-1 text-xs"
+                                            disabled={job.eligibility ? !job.eligibility.is_eligible : false}
                                             onClick={() =>
                                                 router.post(
                                                     `/operations/job-board/${job.id}/approve`,
@@ -321,7 +348,7 @@ export default function JobBoardIndex({
                                             }
                                         >
                                             <CheckCircle2 className="mr-1 h-3 w-3" />{' '}
-                                            Approve
+                                            {job.eligibility && !job.eligibility.is_eligible ? 'Blocked' : 'Approve'}
                                         </Button>
                                     )}
                                 </div>

@@ -106,7 +106,6 @@ class ShiftLifecycleHardeningTest extends TestCase
         $this->actingAs($this->staff)
             ->patch("/shifts/{$shift->id}/complete", [
                 'final_note_body' => 'Still working through the open attendance session.',
-                'create_timesheet' => false,
             ])
             ->assertSessionHasErrors(['status']);
 
@@ -153,9 +152,8 @@ class ShiftLifecycleHardeningTest extends TestCase
         $this->actingAs($this->staff)
             ->patch("/shifts/{$shift->id}/complete", [
                 'final_note_body' => 'Shift completed with attendance-confirmed timings.',
-                'create_timesheet' => true,
             ])
-            ->assertSessionHas('success', 'Shift completed.');
+            ->assertSessionHas('success', 'Shift completed. Draft timesheet created.');
 
         $shift->refresh();
 

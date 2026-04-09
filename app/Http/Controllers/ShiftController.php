@@ -12,6 +12,7 @@ use App\Models\FleetResidentTransport;
 use App\Models\IncidentTemplate;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\ShiftEligibilityOverride;
 use App\Models\ShiftHandover;
 use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftTask;
@@ -432,6 +433,7 @@ class ShiftController extends Controller
                 'request_replacement' => $this->canRequestReplacement($auth, $shift),
                 'cancel_replacement' => $latestReplacement ? $this->canCancelReplacement($auth, $latestReplacement) : false,
                 'assign_shift' => $auth->canDo('shifts.manageAny'),
+                'override_eligibility' => $auth->canDo('shifts.overrideEligibility'),
                 'view_transport' => $auth->canDo('fleet.viewAny') || $auth->canDo('assets.viewAny'),
             ],
         ]);
@@ -557,6 +559,46 @@ class ShiftController extends Controller
         ]);
     }
 
+    /**
+     * Lightweight eligibility preview for the create/edit form.
+     * Returns EligibilityResult as JSON without persisting anything.
+     */
+    public function eligibilityPreview(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('shifts.create') || $auth->canDo('shifts.update')), 403);
+
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'starts_at' => ['required', 'date'],
+            'ends_at' => ['required', 'date', 'after:starts_at'],
+            'site_id' => ['nullable', 'integer'],
+            'shift_type' => ['nullable', 'string'],
+            'coverage_roles' => ['nullable', 'array'],
+            'shift_id' => ['nullable', 'integer'],
+        ]);
+
+        $assignee = User::findOrFail($data['user_id']);
+        $tempShift = new Shift([
+            'user_id' => $data['user_id'],
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'],
+            'site_id' => $data['site_id'] ?? null,
+            'shift_type' => $data['shift_type'] ?? 'standard',
+            'coverage_roles' => $data['coverage_roles'] ?? [],
+        ]);
+
+        // If editing an existing shift, set the ID so conflict detection can exclude it.
+        if (! empty($data['shift_id'])) {
+            $tempShift->id = (int) $data['shift_id'];
+            $tempShift->exists = true;
+        }
+
+        $result = app(ShiftStaffEligibilityService::class)->evaluate($tempShift, $assignee);
+
+        return response()->json($result->toArray());
+    }
+
     public function store(Request $request)
     {
         $auth = $request->user();
@@ -619,16 +661,26 @@ class ShiftController extends Controller
                 $data['service_context_id'] ?? null
             );
 
-        $blockingConflicts = app(ShiftConflictService::class)->findBlockingStaffConflicts(
-            ! empty($data['user_id']) ? (int) $data['user_id'] : null,
-            $startsAt,
-            $endsAt,
-        );
+        // Full eligibility check when assigning staff during creation.
+        // Covers conflicts, compliance, fatigue, availability, leave, site, and driver checks.
+        if (! empty($data['user_id'])) {
+            try {
+                $assignee = User::findOrFail($data['user_id']);
+                $tempShift = new Shift(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
+                $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($tempShift, $assignee);
 
-        if ($blockingConflicts->isNotEmpty()) {
-            return back()->withErrors([
-                'starts_at' => app(ShiftConflictService::class)->blockingMessage($blockingConflicts),
-            ])->withInput();
+                if ($eligibility->hasBlocks()) {
+                    return back()->withErrors([
+                        'user_id' => $eligibility->blocking_reasons[0] ?? 'This staff member cannot be assigned to this shift.',
+                    ])->withInput();
+                }
+
+                if ($eligibility->hasWarnings()) {
+                    session()->flash('assignment_warnings', $eligibility->warnings);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Eligibility check failed during shift creation', ['error' => $e->getMessage()]);
+            }
         }
 
         $reservation = app(CoverageReservationService::class)->validateToken(
@@ -919,18 +971,41 @@ class ShiftController extends Controller
                 throw $e;
             }
         } else {
-            $conflicts = $this->shiftHasConflict(
-                ! empty($data['user_id']) ? (int) $data['user_id'] : null,
-                (int) $data['client_id'],
-                $startsAt,
-                $endsAt,
-                $shift->id,
-            );
+            // Full eligibility check when staff is assigned or shift times change.
+            // Use array_key_exists to distinguish "user_id not sent" from "user_id sent as null (unassign)".
+            $explicitlySetUserId = array_key_exists('user_id', $data);
+            $resolvedUserId = $explicitlySetUserId ? $data['user_id'] : $shift->user_id;
+            $userChanged = $resolvedUserId && ((int) $resolvedUserId !== (int) $shift->user_id);
+            $timesChanged = (array_key_exists('starts_at', $data) && $startsAt->ne($shift->starts_at))
+                         || (array_key_exists('ends_at', $data) && $endsAt->ne($shift->ends_at));
 
-            if ($conflicts) {
-                return back()->withErrors([
-                    'starts_at' => 'This staff member already has another shift during that time.',
-                ])->withInput();
+            if ($resolvedUserId && ($userChanged || $timesChanged)) {
+                try {
+                    $assignee = User::findOrFail($resolvedUserId);
+                    $evalShift = clone $shift;
+                    $evalShift->fill(Arr::except($data, ['tasks', 'series_scope', 'coverage_reservation_token', 'coverage_rule_id']));
+                    $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($evalShift, $assignee);
+
+                    if ($eligibility->hasBlocks()) {
+                        return back()->withErrors([
+                            'user_id' => $eligibility->blocking_reasons[0] ?? 'This staff member cannot be assigned to this shift.',
+                        ])->withInput();
+                    }
+
+                    if ($eligibility->hasWarnings()) {
+                        session()->flash('assignment_warnings', $eligibility->warnings);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Eligibility check failed during shift update', ['error' => $e->getMessage()]);
+                }
+            } elseif (! $resolvedUserId) {
+                // Open shift (no assignee) — only check client-level conflicts for overlaps.
+                $conflicts = $this->shiftHasConflict(null, (int) $data['client_id'], $startsAt, $endsAt, $shift->id);
+                if ($conflicts) {
+                    return back()->withErrors([
+                        'starts_at' => 'This client already has another shift during that time.',
+                    ])->withInput();
+                }
             }
 
             try {
@@ -1053,7 +1128,35 @@ class ShiftController extends Controller
         }
 
         if ($shift->status === 'completed') {
-            return back()->with('success', 'Shift already completed.');
+            // Even on re-entry, ensure a timesheet exists (idempotent).
+            $existing = Timesheet::where('shift_id', $shift->id)
+                ->where('user_id', $shift->user_id)
+                ->exists();
+
+            if ($existing) {
+                return back()->with('success', 'Shift already completed.');
+            }
+
+            // Timesheet missing for completed shift — attempt recovery.
+            try {
+                $result = $this->syncDraftTimesheetFromShift($shift, $auth->id);
+
+                if ($result['success']) {
+                    return back()->with('success', 'Shift already completed. Missing draft timesheet has been created.');
+                }
+
+                $this->notifyTimesheetCreationFailure($shift, $result['reason'] ?? 'Unknown error');
+
+                return back()->with('warning', 'Shift already completed, but timesheet creation failed and requires follow-up.');
+            } catch (\Throwable $e) {
+                Log::error('Timesheet recovery failed for completed shift', [
+                    'shift_id' => $shift->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->notifyTimesheetCreationFailure($shift, $e->getMessage());
+
+                return back()->with('warning', 'Shift already completed, but timesheet creation failed and requires follow-up.');
+            }
         }
 
         if ($shift->status !== 'in_progress') {
@@ -1068,7 +1171,6 @@ class ShiftController extends Controller
             'final_note_body' => ['nullable', 'string', 'max:20000'],
             'allow_incomplete_tasks' => ['nullable', 'boolean'],
             'incomplete_tasks_reason' => ['nullable', 'string', 'max:2000'],
-            'create_timesheet' => ['nullable', 'boolean'],
             'handover_waiver_reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -1145,11 +1247,16 @@ class ShiftController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($auth, $shift, $data, $incompleteTasks, $allowIncomplete, $finalBody, $handoverRequirement, $handoverWaiverReason, $actualStartAt, $actualEndAt) {
+        $timesheetResult = ['success' => false, 'reason' => 'Not attempted', 'timesheet' => null];
+
+        DB::transaction(function () use ($auth, $shift, $data, $incompleteTasks, $allowIncomplete, $finalBody, $handoverRequirement, $handoverWaiverReason, $actualStartAt, $actualEndAt, &$timesheetResult) {
             $now = now();
             $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
 
             if ($shift->status === 'completed') {
+                // Already completed — still ensure timesheet exists.
+                $timesheetResult = $this->syncDraftTimesheetFromShift($shift, $auth->id);
+
                 return;
             }
 
@@ -1226,10 +1333,21 @@ class ShiftController extends Controller
                 ]
             );
 
-            // Auto-create timesheet (optional)
-            $wantTimesheet = (bool)($data['create_timesheet'] ?? true);
-            if ($wantTimesheet) {
-                $this->syncDraftTimesheetFromShift($shift->fresh(), $auth->id);
+            // Always create draft timesheet on shift completion.
+            try {
+                $timesheetResult = $this->syncDraftTimesheetFromShift($shift->fresh(), $auth->id);
+            } catch (\Throwable $e) {
+                $timesheetResult = [
+                    'success' => false,
+                    'reason' => $e->getMessage(),
+                    'timesheet' => null,
+                ];
+
+                Log::error('Timesheet creation failed on shift completion', [
+                    'shift_id' => $shift->id,
+                    'user_id' => $shift->user_id,
+                    'error' => $e->getMessage(),
+                ]);
             }
         });
 
@@ -1246,11 +1364,22 @@ class ShiftController extends Controller
                     'handover_required' => ($handoverRequirement['requires_handover'] ?? false) ? true : null,
                     'handover_id' => $handoverRequirement['matched_handover']?->id,
                     'handover_waiver_reason' => $handoverWaiverReason !== '' ? $handoverWaiverReason : null,
+                    'timesheet_created' => $timesheetResult['success'],
                 ]
             );
         }
 
-        return back()->with('success', 'Shift completed.');
+        // Notify manager if timesheet creation failed.
+        if (! $timesheetResult['success']) {
+            $this->notifyTimesheetCreationFailure($shift->fresh() ?? $shift, $timesheetResult['reason'] ?? 'Unknown error');
+        }
+
+        $flashKey = $timesheetResult['success'] ? 'success' : 'warning';
+        $flashMessage = $timesheetResult['success']
+            ? 'Shift completed. Draft timesheet created.'
+            : 'Shift completed, but timesheet creation failed and requires follow-up.';
+
+        return back()->with($flashKey, $flashMessage);
     }
 
     public function cancelOccurrence(Request $request, Shift $shift, ShiftCancellationService $cancellationService)
@@ -1300,10 +1429,19 @@ class ShiftController extends Controller
         return back()->with('success', 'Shift occurrence reopened.');
     }
 
-    protected function syncDraftTimesheetFromShift(Shift $shift, int $actorId): void
+    /**
+     * Create or update a draft timesheet from a completed shift.
+     *
+     * Idempotent: uses firstOrNew on (shift_id, user_id) so re-running
+     * will not create duplicates. Returns a result array so the caller
+     * can provide accurate user feedback and trigger follow-up actions.
+     *
+     * @return array{success: bool, reason: string|null, timesheet: \App\Models\Timesheet|null}
+     */
+    protected function syncDraftTimesheetFromShift(Shift $shift, int $actorId): array
     {
         if (! $shift->user_id || ! $shift->client_id) {
-            return;
+            return ['success' => false, 'reason' => 'Shift is missing assigned staff or client.', 'timesheet' => null];
         }
 
         $shift->loadMissing([
@@ -1319,7 +1457,7 @@ class ShiftController extends Controller
         $endsAt = $shift->actual_ends_at ?? $shift->ends_at;
 
         if (! $startsAt || ! $endsAt) {
-            return;
+            return ['success' => false, 'reason' => 'Shift has no start/end times to base timesheet on.', 'timesheet' => null];
         }
 
         $matchingAttendanceSessions = $shift->attendanceSessions
@@ -1335,7 +1473,8 @@ class ShiftController extends Controller
         ]);
 
         if ($timesheet->exists && ! in_array($timesheet->status, ['draft', 'returned'], true)) {
-            return;
+            // Timesheet already exists in a non-editable state — nothing to do, not an error.
+            return ['success' => true, 'reason' => null, 'timesheet' => $timesheet];
         }
 
         $snapshot = app(ShiftOperationalSnapshotService::class)->snapshotForShift($shift, $shift->staff);
@@ -1369,6 +1508,36 @@ class ShiftController extends Controller
         $timesheet->save();
 
         app(TimesheetReconciliationService::class)->reconcile($timesheet, $uniqueAttendanceSession);
+
+        return ['success' => true, 'reason' => null, 'timesheet' => $timesheet];
+    }
+
+    protected function notifyTimesheetCreationFailure(Shift $shift, string $reason): void
+    {
+        $staffProfile = \App\Domain\Hr\Models\HrEmployeeProfile::where('user_id', $shift->user_id)
+            ->where('is_active', true)
+            ->first(['manager_user_id']);
+
+        $manager = $staffProfile?->manager_user_id
+            ? \App\Models\User::find($staffProfile->manager_user_id)
+            : null;
+
+        if (! $manager) {
+            $manager = \App\Models\User::whereHas('roles', fn ($q) => $q->where('name', 'provider_manager'))
+                ->first();
+        }
+
+        if (! $manager) {
+            return;
+        }
+
+        $manager->notify(new \App\Notifications\TimesheetCreationFailedNotification(
+            shiftId: $shift->id,
+            staffName: $shift->staff?->name ?? 'Unknown',
+            shiftDate: $shift->starts_at?->format('D j M, g:i A') ?? 'Unknown',
+            siteName: $shift->site?->name ?? 'Unknown site',
+            reason: $reason,
+        ));
     }
 
     protected function normalizeShiftData(array $data): array
@@ -1409,34 +1578,66 @@ class ShiftController extends Controller
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
             'return_to' => ['nullable', 'string'],
+            'override_acknowledged' => ['nullable', 'boolean'],
+            'override_reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
         // Only allow assigning staff users
         abort_unless(User::staff()->whereKey($data['user_id'])->exists(), 404);
 
-        // HR Compliance check: block assignment if hard-stop failures exist
+        // Full eligibility check: block assignment if any hard-stop rule fails.
+        $overrideData = null;
         try {
             $assignee = User::findOrFail($data['user_id']);
             $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($shift, $assignee);
 
-            if (! $eligibility['is_eligible']) {
+            if ($eligibility->hasBlocks()) {
                 return back()->withErrors([
-                    'user_id' => $eligibility['blocked_reasons'][0] ?? 'This staff member cannot be assigned to the shift.',
-                ])->with('compliance_warnings', $eligibility['compliance_warnings'] ?? []);
+                    'user_id' => $eligibility->blocking_reasons[0] ?? 'This staff member cannot be assigned to the shift.',
+                ])->with('compliance_warnings', $eligibility->toArray()['compliance_warnings'] ?? []);
             }
 
-            if (! empty($eligibility['warning_reasons'])) {
-                session()->flash('assignment_warnings', $eligibility['warning_reasons']);
+            if ($eligibility->hasWarnings()) {
+                if (empty($data['override_acknowledged'])) {
+                    // Return warnings to the UI for manager acknowledgement.
+                    return back()
+                        ->with('eligibility_result', $eligibility->toArray())
+                        ->with('assignment_warnings', $eligibility->warnings)
+                        ->withInput();
+                }
+
+                // Override acknowledged — validate permission and reason.
+                if (! empty($eligibility->overrideable_warnings)) {
+                    abort_unless(
+                        $auth->canDo('shifts.overrideEligibility'),
+                        403,
+                        'You do not have permission to override eligibility warnings.',
+                    );
+
+                    if (empty(trim($data['override_reason'] ?? ''))) {
+                        return back()->withErrors([
+                            'override_reason' => 'A reason is required when overriding eligibility warnings.',
+                        ])->with('eligibility_result', $eligibility->toArray())->withInput();
+                    }
+
+                    $overrideData = [
+                        'user_id' => (int) $data['user_id'],
+                        'overridden_by' => $auth->id,
+                        'override_reason' => trim($data['override_reason']),
+                        'rules_overridden' => collect($eligibility->overrideable_warnings)->pluck('rule')->values()->all(),
+                        'acknowledged_warnings' => $eligibility->overrideable_warnings,
+                    ];
+                }
             }
         } catch (\Throwable $e) {
-            // Don't block assignment if compliance service fails
-            Log::warning('Compliance check failed during shift assignment', ['error' => $e->getMessage()]);
+            // Don't block assignment if eligibility service fails
+            Log::warning('Eligibility check failed during shift assignment', ['error' => $e->getMessage()]);
         }
 
         $reservation = app(CoverageReservationService::class)->reserveForAssignment($shift, $auth, 'assignment');
         $originalUserId = $shift->user_id;
         try {
-            DB::transaction(function () use ($shift, $data, $reservation) {
+            DB::transaction(function () use ($shift, $data, $reservation, $overrideData) {
                 $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
                 if (in_array($shift->status, ['completed', 'cancelled'], true)) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
@@ -1448,6 +1649,13 @@ class ShiftController extends Controller
                     'user_id' => $data['user_id'],
                     'status' => $shift->status === 'draft' ? 'scheduled' : $shift->status,
                 ]);
+
+                if ($overrideData) {
+                    ShiftEligibilityOverride::create([
+                        'shift_id' => $shift->id,
+                        ...$overrideData,
+                    ]);
+                }
 
                 app(CoverageReservationService::class)->fulfill($reservation, $shift);
             });

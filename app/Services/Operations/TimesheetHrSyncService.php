@@ -37,6 +37,12 @@ class TimesheetHrSyncService
         $rate = $this->rateResolver->resolve($timesheet);
         $hours = $this->calculatePayableHours($timesheet);
 
+        // For HR time entry, use dominant_type when mixed so the entry
+        // carries a meaningful single classification alongside the cost.
+        $hrPayType = $rate['pay_type'] === 'mixed'
+            ? ($rate['dominant_type'] ?? 'standard')
+            : $rate['pay_type'];
+
         $entry = \App\Domain\Hr\Models\HrTimeEntry::updateOrCreate(
             [
                 'source_type' => 'timesheet',
@@ -55,7 +61,7 @@ class TimesheetHrSyncService
                 'total_hours' => $hours,
                 'entry_type' => 'timesheet',
                 'status' => 'approved',
-                'pay_type' => $rate['pay_type'],
+                'pay_type' => $hrPayType,
                 'is_sleepover' => (bool) $timesheet->sleepover,
                 'is_on_call' => (bool) $timesheet->on_call,
                 'is_public_holiday' => (bool) $timesheet->public_holiday,

@@ -150,6 +150,16 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\StaffCredential::class);
     }
 
+    public function staffTrainingRecords()
+    {
+        return $this->hasMany(\App\Models\StaffTrainingRecord::class);
+    }
+
+    public function staffBackgroundChecks()
+    {
+        return $this->hasMany(\App\Models\StaffBackgroundCheck::class);
+    }
+
     public function complianceStatuses()
     {
         return $this->hasMany(\App\Domain\Hr\Models\HrStaffComplianceStatus::class);

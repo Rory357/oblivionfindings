@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrPayrollRun;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Timesheet;
+use App\Models\TimesheetAmendment;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\Operations\BillingService;
@@ -822,6 +823,79 @@ class TimesheetController extends Controller
             $staff,
             $location,
         );
+    }
+
+    /**
+     * Payroll adjustments pending queue: approved amendments on payroll-linked
+     * timesheets that have not yet been applied / processed.
+     */
+    public function payrollAdjustmentsPending(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+
+        $amendments = TimesheetAmendment::query()
+            ->where('status', TimesheetAmendment::STATUS_APPROVED)
+            ->where('payroll_adjustment_required', true)
+            ->whereNull('applied_at')
+            ->with([
+                'timesheet:id,shift_id,user_id,client_id,work_date,starts_at,ends_at,status,staff_name_snapshot,client_name_snapshot,shift_site_name_snapshot,payroll_reference,exported_to_payroll_at',
+                'timesheet.shift:id,starts_at,ends_at',
+                'requestedBy:id,name',
+                'reviewedBy:id,name',
+            ])
+            ->orderBy('reviewed_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return inertia('operations/timesheets/payroll-adjustments', [
+            'amendments' => $amendments->through(fn (TimesheetAmendment $a) => [
+                'id' => $a->id,
+                'timesheet_id' => $a->timesheet_id,
+                'staff_name' => $a->timesheet?->staff_name_snapshot ?? 'Unknown',
+                'client_name' => $a->timesheet?->client_name_snapshot ?? '',
+                'site_name' => $a->timesheet?->shift_site_name_snapshot ?? '',
+                'work_date' => $a->timesheet?->work_date?->toDateString(),
+                'original_values' => $a->original_values,
+                'proposed_values' => $a->proposed_values,
+                'reason' => $a->reason,
+                'requested_by' => $a->requestedBy?->name,
+                'reviewed_by' => $a->reviewedBy?->name,
+                'reviewed_at' => $a->reviewed_at?->toIso8601String(),
+                'payroll_reference' => $a->timesheet?->payroll_reference,
+                'timesheet_url' => url("/operations/timesheets/{$a->timesheet_id}/edit"),
+            ]),
+        ]);
+    }
+
+    /**
+     * Mark a payroll-linked amendment as processed (payroll adjustment handled externally).
+     */
+    public function markPayrollAdjustmentProcessed(Request $request, TimesheetAmendment $amendment)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+
+        if ($amendment->status !== TimesheetAmendment::STATUS_APPROVED) {
+            return back()->with('error', 'Only approved amendments can be marked as processed.');
+        }
+
+        if (! $amendment->payroll_adjustment_required) {
+            return back()->with('error', 'This amendment does not require payroll adjustment.');
+        }
+
+        if ($amendment->applied_at) {
+            return back()->with('success', 'This adjustment has already been marked as processed.');
+        }
+
+        $amendment->update(['applied_at' => now()]);
+
+        \App\Services\AuditLogger::log('timesheet.amendment.payroll_processed', $amendment->timesheet, [
+            'amendment_id' => $amendment->id,
+            'processed_by' => $auth->id,
+        ]);
+
+        return back()->with('success', 'Payroll adjustment marked as processed.');
     }
 
     protected function assertApprovalAllowed(Timesheet $timesheet, User $auth): void

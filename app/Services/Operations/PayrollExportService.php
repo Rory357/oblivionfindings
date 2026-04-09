@@ -262,10 +262,21 @@ class PayrollExportService
     {
         $rate = $this->rateResolver->resolve($timesheet);
         $hours = round(max(((int) $segment['segment_minutes'] - (int) $segment['allocated_break_minutes']), 0) / 60, 2);
+
+        // When the resolver returns mixed rate segments, use the payroll_cost
+        // it already computed (weighted across bands). For single-rate types,
+        // use the flat calculation.
         $estimatedPay = match ($rate['pay_type']) {
             'sleepover' => (float) $rate['pay_rate'],
+            'mixed' => (float) $rate['payroll_cost'],
             default => round($hours * (float) $rate['pay_rate'], 2),
         };
+
+        // For display/export, surface the dominant type when mixed.
+        $displayPayType = $rate['pay_type'] === 'mixed'
+            ? 'mixed (' . ($rate['dominant_type'] ?? 'standard') . ')'
+            : $rate['pay_type'];
+
         $legacyFallbackUsed = blank($timesheet->staff_name_snapshot) || blank($timesheet->client_name_snapshot);
 
         return [
@@ -289,9 +300,10 @@ class PayrollExportService
             'sleepover' => $timesheet->sleepover ? 'Yes' : 'No',
             'on_call' => $timesheet->on_call ? 'Yes' : 'No',
             'public_holiday' => $timesheet->public_holiday ? 'Yes' : 'No',
-            'pay_type' => $rate['pay_type'],
+            'pay_type' => $displayPayType,
             'pay_rate' => $rate['pay_rate'],
             'estimated_pay' => $estimatedPay,
+            'rate_segments' => $rate['segments'] ?? null,
             'coverage_roles' => implode(', ', (array) ($timesheet->coverage_roles_snapshot ?? [])),
             'snapshot_safe' => $timesheet->is_snapshot_complete ? 'Yes' : 'No',
             'legacy_fallback_used' => $legacyFallbackUsed ? 'Yes' : 'No',

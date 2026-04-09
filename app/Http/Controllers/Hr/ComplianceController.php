@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Services\ComplianceMatrixService;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -89,9 +90,23 @@ class ComplianceController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        // Pre-load future shift counts for staff on this page (lightweight aggregate)
+        $pageUserIds = $staffPaginated->getCollection()->pluck('id');
+        $futureShiftCounts = $pageUserIds->isNotEmpty()
+            ? Shift::query()
+                ->whereIn('user_id', $pageUserIds)
+                ->where('status', 'scheduled')
+                ->where('starts_at', '>', now())
+                ->where('starts_at', '<', now()->addDays(14))
+                ->selectRaw('user_id, COUNT(*) as shift_count')
+                ->groupBy('user_id')
+                ->pluck('shift_count', 'user_id')
+            : collect();
+
         // Transform paginated data to match frontend StaffStatus interface
-        $staffPaginated->getCollection()->transform(function ($staffUser) use ($totalRequirements) {
+        $staffPaginated->getCollection()->transform(function ($staffUser) use ($totalRequirements, $futureShiftCounts) {
             $total = max($staffUser->compliant_count + $staffUser->expired_count + $staffUser->expiring_soon_count + $staffUser->not_started_count, 1);
+            $hasIssues = $staffUser->expired_count > 0 || $staffUser->expiring_soon_count > 0;
             return [
                 'user_id' => $staffUser->id,
                 'user_name' => $staffUser->name,
@@ -104,6 +119,7 @@ class ComplianceController extends Controller
                 'compliance_percent' => $total > 0
                     ? (int) round(($staffUser->compliant_count / $total) * 100)
                     : 0,
+                'future_shifts_affected' => $hasIssues ? (int) ($futureShiftCounts->get($staffUser->id, 0)) : 0,
             ];
         });
 

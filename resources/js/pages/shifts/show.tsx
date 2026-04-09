@@ -187,13 +187,11 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
         final_note_body: string;
         allow_incomplete_tasks: boolean;
         incomplete_tasks_reason: string;
-        create_timesheet: boolean;
     }>({
         final_note_subject: 'Shift summary',
         final_note_body: '',
         allow_incomplete_tasks: false,
         incomplete_tasks_reason: '',
-        create_timesheet: true,
     });
 
     const noteForm = useForm<{ type: string; subject: string; goal: string; body: string; visibility: string; pin: boolean; shift_id: number }>(
@@ -543,18 +541,11 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                                 </div>
                             </div>
 
-                            {canCreateTimesheet ? (
-                                <div className="flex items-center justify-between rounded-lg border p-3">
-                                    <div>
-                                        <div className="text-sm font-medium">Create timesheet</div>
-                                        <div className="text-xs text-muted-foreground">Creates a draft timesheet for this shift automatically.</div>
-                                    </div>
-                                    <Checkbox
-                                        checked={completeForm.data.create_timesheet}
-                                        onCheckedChange={(v) => completeForm.setData('create_timesheet', Boolean(v))}
-                                    />
+                            <div className="rounded-lg border border-dashed p-3">
+                                <div className="text-xs text-muted-foreground">
+                                    A draft timesheet will be created automatically when this shift is completed.
                                 </div>
-                            ) : null}
+                            </div>
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setCompleteOpen(false)}>Cancel</Button>

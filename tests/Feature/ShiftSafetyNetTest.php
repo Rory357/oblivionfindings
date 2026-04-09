@@ -127,12 +127,11 @@ class ShiftSafetyNetTest extends TestCase
 
         $payload = [
             'final_note_body' => 'Shift wrapped up safely.',
-            'create_timesheet' => false,
         ];
 
         $this->actingAs($this->staff)
             ->patch("/shifts/{$shift->id}/complete", $payload)
-            ->assertSessionHas('success', 'Shift completed.');
+            ->assertSessionHas('success', 'Shift completed. Draft timesheet created.');
 
         $this->actingAs($this->staff)
             ->patch("/shifts/{$shift->id}/complete", $payload)

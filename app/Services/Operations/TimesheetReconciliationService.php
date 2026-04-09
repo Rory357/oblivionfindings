@@ -152,10 +152,18 @@ class TimesheetReconciliationService
                 );
 
             if ($attendanceExpected) {
+                // Completed shifts with no attendance evidence are a hard-stop
+                // for approval — payroll cannot be trusted without clock evidence.
+                $isCompleted = $shift->status === 'completed';
+                $severity = $isCompleted ? self::SEVERITY_HIGH : self::SEVERITY_MEDIUM;
+                $message = $isCompleted
+                    ? 'This timesheet cannot be approved because the completed shift has no attendance evidence.'
+                    : 'This timesheet has no valid linked attendance evidence for the linked shift.';
+
                 $findings[] = $this->finding(
                     'attendance_missing',
-                    self::SEVERITY_MEDIUM,
-                    'This timesheet has no valid linked attendance evidence for the linked shift.',
+                    $severity,
+                    $message,
                     [
                         'shift_id' => $timesheet->shift_id,
                         'shift_status' => $shift?->status,
@@ -187,10 +195,15 @@ class TimesheetReconciliationService
         if ($attendanceMinutes !== null) {
             $difference = abs($attendanceMinutes - $timesheetMinutes);
             if ($difference >= self::DURATION_REVIEW_TOLERANCE_MINUTES) {
+                $isBlocking = $difference >= self::DURATION_BLOCK_TOLERANCE_MINUTES;
+                $message = $isBlocking
+                    ? "This timesheet cannot be approved because attendance is materially inconsistent with claimed hours ({$difference} min difference)."
+                    : 'Timesheet duration differs from attendance duration — review before approving.';
+
                 $findings[] = $this->finding(
                     'attendance_vs_timesheet_duration_mismatch',
-                    $difference >= self::DURATION_BLOCK_TOLERANCE_MINUTES ? self::SEVERITY_HIGH : self::SEVERITY_MEDIUM,
-                    'Timesheet duration materially differs from attendance duration.',
+                    $isBlocking ? self::SEVERITY_HIGH : self::SEVERITY_MEDIUM,
+                    $message,
                     [
                         'attendance_duration_minutes' => $attendanceMinutes,
                         'timesheet_duration_minutes' => $timesheetMinutes,

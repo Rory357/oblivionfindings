@@ -1,4 +1,5 @@
 import HeadingSmall from '@/components/heading-small';
+import { EligibilityStatusBadge } from '@/components/eligibility/eligibility-status-badge';
 import { KpiCard } from '@/components/recruitment/kpi-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,11 +29,15 @@ import {
     BarChart3,
     Calendar,
     CalendarOff,
+    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Plus,
+    ShieldAlert,
+    ShieldCheck,
     TrendingUp,
     Users,
+    XCircle,
 } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
 import {
@@ -258,6 +263,28 @@ type Props = {
         onLeaveCount: number;
         complianceExpiring: number;
         complianceExpired: number;
+    };
+    eligibilityAlerts: {
+        counts: {
+            eligible: number;
+            warnings: number;
+            blocked: number;
+            overrides: number;
+        };
+        blocked: Array<{
+            id: number;
+            starts_at: string;
+            staff: string;
+            site: string;
+            reason: string;
+        }>;
+        warnings: Array<{
+            id: number;
+            starts_at: string;
+            staff: string;
+            site: string;
+            reason: string;
+        }>;
     };
 };
 
@@ -2120,6 +2147,105 @@ export default function RosteringIndex(props: Props) {
                                                     )}
                                                 </CardContent>
                                             </Card>
+
+                                            {/* ── Eligibility Alerts ─────────────────── */}
+                                            {props.canManageAny ? (
+                                                <Card className={
+                                                    props.eligibilityAlerts.counts.blocked > 0
+                                                        ? 'border-red-500/20'
+                                                        : props.eligibilityAlerts.counts.warnings > 0
+                                                            ? 'border-yellow-500/20'
+                                                            : ''
+                                                }>
+                                                    <CardHeader className="pb-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <CardTitle className="text-base">
+                                                                Eligibility alerts
+                                                            </CardTitle>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                Next 14 days
+                                                            </div>
+                                                        </div>
+                                                    </CardHeader>
+                                                    <CardContent className="space-y-4">
+                                                        {/* Stat row */}
+                                                        <div className="grid grid-cols-4 gap-3">
+                                                            <div className="rounded-md border p-2 text-center">
+                                                                <div className="text-lg font-bold text-green-600">{props.eligibilityAlerts.counts.eligible}</div>
+                                                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Eligible</div>
+                                                            </div>
+                                                            <div className="rounded-md border p-2 text-center">
+                                                                <div className="text-lg font-bold text-yellow-600">{props.eligibilityAlerts.counts.warnings}</div>
+                                                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Warnings</div>
+                                                            </div>
+                                                            <div className="rounded-md border p-2 text-center">
+                                                                <div className="text-lg font-bold text-red-600">{props.eligibilityAlerts.counts.blocked}</div>
+                                                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Blocked</div>
+                                                            </div>
+                                                            <div className="rounded-md border p-2 text-center">
+                                                                <div className="text-lg font-bold text-muted-foreground">{props.eligibilityAlerts.counts.overrides}</div>
+                                                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Overrides (7d)</div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Blocked shifts table */}
+                                                        {props.eligibilityAlerts.blocked.length > 0 ? (
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-red-700 dark:text-red-400">
+                                                                    <XCircle className="size-3" />
+                                                                    Blocked shifts — requires action
+                                                                </div>
+                                                                <div className="divide-y rounded-md border border-red-200 dark:border-red-800">
+                                                                    {props.eligibilityAlerts.blocked.map((s) => (
+                                                                        <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="font-medium">{new Date(s.starts_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                                                                                <div className="truncate text-xs text-muted-foreground">{s.staff} · {s.site}</div>
+                                                                                <div className="truncate text-xs text-red-600 dark:text-red-400">{s.reason}</div>
+                                                                            </div>
+                                                                            <Button size="sm" variant="outline" asChild>
+                                                                                <Link href={`/operations/shifts/${s.id}`}>View</Link>
+                                                                            </Button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : null}
+
+                                                        {/* Warning shifts table */}
+                                                        {props.eligibilityAlerts.warnings.length > 0 ? (
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-yellow-700 dark:text-yellow-400">
+                                                                    <AlertTriangle className="size-3" />
+                                                                    Warning shifts — review recommended
+                                                                </div>
+                                                                <div className="divide-y rounded-md border border-yellow-200 dark:border-yellow-800">
+                                                                    {props.eligibilityAlerts.warnings.map((s) => (
+                                                                        <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="font-medium">{new Date(s.starts_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                                                                                <div className="truncate text-xs text-muted-foreground">{s.staff} · {s.site}</div>
+                                                                                <div className="truncate text-xs text-yellow-600 dark:text-yellow-400">{s.reason}</div>
+                                                                            </div>
+                                                                            <Button size="sm" variant="outline" asChild>
+                                                                                <Link href={`/operations/shifts/${s.id}`}>Review</Link>
+                                                                            </Button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : null}
+
+                                                        {/* Clean state */}
+                                                        {props.eligibilityAlerts.counts.blocked === 0 && props.eligibilityAlerts.counts.warnings === 0 ? (
+                                                            <div className="flex items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                                                                <CheckCircle2 className="size-4 text-green-500" />
+                                                                All upcoming shifts have eligible staff assigned.
+                                                            </div>
+                                                        ) : null}
+                                                    </CardContent>
+                                                </Card>
+                                            ) : null}
 
                                             <Card
                                                 className={

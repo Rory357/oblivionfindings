@@ -1,10 +1,13 @@
 import HeadingSmall from '@/components/heading-small';
+import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
+import { EligibilityStatusBadge } from '@/components/eligibility/eligibility-status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Loader2 } from 'lucide-react';
 
 type Client = {
     id: number;
@@ -123,6 +126,68 @@ export default function ShiftEdit({
         }
     }
 
+    // ── Eligibility preview ─────────────────────────────────────────
+    const [eligPreview, setEligPreview] = useState<any>(null);
+    const [eligLoading, setEligLoading] = useState(false);
+    const eligAbort = useRef<AbortController | null>(null);
+    const eligTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const fetchEligibility = useCallback(() => {
+        const userId = form.data.user_id;
+        const startsAt = form.data.starts_at;
+        const endsAt = form.data.ends_at;
+
+        if (!userId || !startsAt || !endsAt) {
+            setEligPreview(null);
+            return;
+        }
+
+        if (eligTimer.current) clearTimeout(eligTimer.current);
+        eligTimer.current = setTimeout(async () => {
+            eligAbort.current?.abort();
+            const controller = new AbortController();
+            eligAbort.current = controller;
+            setEligLoading(true);
+
+            try {
+                const params = new URLSearchParams({
+                    user_id: String(userId),
+                    starts_at: startsAt,
+                    ends_at: endsAt,
+                    shift_id: String(shift.id),
+                });
+
+                if (shift.site_id) params.set('site_id', String(shift.site_id));
+                if (form.data.shift_type) params.set('shift_type', form.data.shift_type);
+                if (form.data.coverage_roles?.length) {
+                    form.data.coverage_roles.forEach((r: string) => params.append('coverage_roles[]', r));
+                }
+
+                const res = await fetch(`/operations/shifts/eligibility-preview?${params}`, {
+                    signal: controller.signal,
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error('preview failed');
+                const data = await res.json();
+                if (!controller.signal.aborted) setEligPreview(data);
+            } catch {
+                // Abort or network error — silently ignore
+            } finally {
+                if (!controller.signal.aborted) setEligLoading(false);
+            }
+        }, 500);
+    }, [form.data.user_id, form.data.starts_at, form.data.ends_at, form.data.shift_type, form.data.coverage_roles, shift.id, shift.site_id]);
+
+    useEffect(() => {
+        fetchEligibility();
+        return () => {
+            eligAbort.current?.abort();
+            if (eligTimer.current) clearTimeout(eligTimer.current);
+        };
+    }, [fetchEligibility]);
+    // ── End eligibility preview ──────────────────────────────────────
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -139,6 +204,31 @@ export default function ShiftEdit({
                     title={`Edit ${shiftLabel}`}
                     description="Update an appointment / shift."
                 />
+
+                {/* Eligibility status for current assignment */}
+                {form.data.user_id && eligLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="size-3 animate-spin" />
+                        Checking eligibility...
+                    </div>
+                ) : null}
+                {form.data.user_id && !eligLoading && eligPreview ? (
+                    <>
+                        {eligPreview.blocked_reasons?.length > 0 ? (
+                            <EligibilityAlertBanner
+                                type="blocked"
+                                reasons={eligPreview.blocked_reasons}
+                                title="Current assignee is no longer eligible"
+                            />
+                        ) : eligPreview.warning_reasons?.length > 0 ? (
+                            <EligibilityAlertBanner
+                                type="warnings"
+                                reasons={eligPreview.warning_reasons}
+                                title="Current assignee has eligibility warnings"
+                            />
+                        ) : null}
+                    </>
+                ) : null}
 
                 <form
                     onSubmit={(e) => {
@@ -560,6 +650,15 @@ export default function ShiftEdit({
                             </div>
                         </div>
                     </div>
+
+                    {/* Submission error banner for eligibility failures */}
+                    {form.errors.user_id ? (
+                        <EligibilityAlertBanner
+                            type="blocked"
+                            reasons={[form.errors.user_id]}
+                            title="Assignment blocked"
+                        />
+                    ) : null}
 
                     <div className="flex items-center gap-2">
                         <Button type="submit" disabled={form.processing}>

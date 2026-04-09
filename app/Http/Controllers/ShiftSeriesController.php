@@ -9,9 +9,11 @@ use App\Models\ServiceContext;
 use App\Services\NotificationService;
 use App\Services\CoverageReservationService;
 use App\Models\ShiftTask;
+use App\Models\User;
 use App\Services\ShiftConflictService;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftReplacementService;
+use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
 use Carbon\Carbon;
@@ -355,6 +357,49 @@ class ShiftSeriesController extends Controller
             return back()->withErrors([
                 'repeat' => 'This recurring pattern overlaps itself. Adjust the weekdays or times before saving.',
             ]);
+        }
+
+        // Sampled eligibility check across representative occurrences when staff is assigned.
+        // Checks first, mid, last, and one-per-week to catch fatigue accumulation.
+        if (! empty($data['user_id']) && ! empty($occurrenceWindows)) {
+            try {
+                $assignee = User::findOrFail($data['user_id']);
+                $shiftTemplate = [
+                    'user_id' => $data['user_id'],
+                    'site_id' => $data['site_id'] ?? null,
+                    'shift_type' => $data['shift_type'] ?? 'standard',
+                    'is_sleepover' => $data['is_sleepover'] ?? false,
+                    'is_on_call' => $data['is_on_call'] ?? false,
+                    'coverage_roles' => $data['coverage_roles'] ?? [],
+                    'service_context_id' => $data['service_context_id'] ?? null,
+                ];
+
+                $samplerResult = app(ShiftSeriesEligibilitySampler::class)
+                    ->evaluate($occurrenceWindows, $assignee, $shiftTemplate);
+
+                if (! $samplerResult['passed']) {
+                    $blockedDate = $samplerResult['blocked_at']['date'] ?? 'a future occurrence';
+                    $blockedReason = $samplerResult['blocked_at']['reasons'][0]
+                        ?? 'This staff member cannot be assigned to this series.';
+
+                    return back()->withErrors([
+                        'user_id' => "This recurring series cannot be created because the occurrence on {$blockedDate} is blocked: {$blockedReason}",
+                    ])->withInput();
+                }
+
+                if (! empty($samplerResult['warnings'])) {
+                    $allWarnings = collect($samplerResult['warnings'])
+                        ->flatMap(fn (array $w) => $w['messages'])
+                        ->unique()
+                        ->values()
+                        ->all();
+                    session()->flash('assignment_warnings', $allWarnings);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Eligibility check failed during series creation', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         foreach ($occurrences as $date) {

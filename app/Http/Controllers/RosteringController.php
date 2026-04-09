@@ -6,11 +6,14 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
 use App\Models\Shift;
+use App\Models\ShiftEligibilityOverride;
 use App\Models\StaffTimeOff;
 use App\Models\User;
 use App\Services\ShiftCoverageService;
+use App\Services\ShiftStaffEligibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class RosteringController extends Controller
 {
@@ -383,6 +386,12 @@ class RosteringController extends Controller
             ->sortBy('next_starts_at')
             ->values();
 
+        // ── Eligibility dashboard: 14-day lookahead ──────────────────
+        $eligibilityAlerts = ['counts' => ['eligible' => 0, 'warnings' => 0, 'blocked' => 0, 'overrides' => 0], 'blocked' => [], 'warnings' => []];
+        if ($canManageAny) {
+            $eligibilityAlerts = $this->buildEligibilityAlerts();
+        }
+
         return inertia('operations/rostering/index', [
             'canManageAny' => $canManageAny,
             'weekStart' => $weekStart->toDateString(),
@@ -462,6 +471,9 @@ class RosteringController extends Controller
 
             // HR compliance badges per staff member
             'complianceBadges' => $canManageAny ? $this->getComplianceBadges($auth->tenant_id) : [],
+
+            // Eligibility dashboard (14-day lookahead)
+            'eligibilityAlerts' => $eligibilityAlerts,
 
             // Analytics data
             'analytics' => [
@@ -701,6 +713,81 @@ class RosteringController extends Controller
             'starts_at' => optional($shift->starts_at)->toIso8601String(),
             'ends_at' => optional($shift->ends_at)->toIso8601String(),
             'shift_series_id' => $shift->shift_series_id,
+        ];
+    }
+
+    /**
+     * Build eligibility alert data for the rostering dashboard.
+     *
+     * Evaluates future assigned shifts in the next 14 days and returns
+     * counts + up to 10 blocked / 10 warning shifts for the summary tables.
+     */
+    protected function buildEligibilityAlerts(): array
+    {
+        $eligibility = app(ShiftStaffEligibilityService::class);
+
+        $futureShifts = Shift::query()
+            ->whereIn('status', ['scheduled'])
+            ->whereNotNull('user_id')
+            ->where('starts_at', '>', now())
+            ->where('starts_at', '<', now()->addDays(14))
+            ->with(['staff:id,name', 'site:id,name'])
+            ->orderBy('starts_at')
+            ->get();
+
+        $blocked = [];
+        $warnings = [];
+        $eligibleCount = 0;
+
+        foreach ($futureShifts as $shift) {
+            if (! $shift->staff) {
+                $eligibleCount++;
+                continue;
+            }
+
+            try {
+                $result = $eligibility->evaluate($shift, $shift->staff);
+            } catch (\Throwable $e) {
+                Log::warning('Eligibility dashboard check failed', [
+                    'shift_id' => $shift->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $eligibleCount++;
+                continue;
+            }
+
+            if ($result->hasBlocks()) {
+                $blocked[] = [
+                    'id' => $shift->id,
+                    'starts_at' => $shift->starts_at?->toIso8601String(),
+                    'staff' => $shift->staff->name,
+                    'site' => $shift->site?->name ?? 'Unknown',
+                    'reason' => $result->blocking_reasons[0] ?? 'Eligibility check failed',
+                ];
+            } elseif ($result->hasWarnings()) {
+                $warnings[] = [
+                    'id' => $shift->id,
+                    'starts_at' => $shift->starts_at?->toIso8601String(),
+                    'staff' => $shift->staff->name,
+                    'site' => $shift->site?->name ?? 'Unknown',
+                    'reason' => $result->warnings[0] ?? 'Eligibility warning',
+                ];
+            } else {
+                $eligibleCount++;
+            }
+        }
+
+        $overrideCount = ShiftEligibilityOverride::where('created_at', '>=', now()->subDays(7))->count();
+
+        return [
+            'counts' => [
+                'eligible' => $eligibleCount,
+                'warnings' => count($warnings),
+                'blocked' => count($blocked),
+                'overrides' => $overrideCount,
+            ],
+            'blocked' => array_slice($blocked, 0, 10),
+            'warnings' => array_slice($warnings, 0, 10),
         ];
     }
 }

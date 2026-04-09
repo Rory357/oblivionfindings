@@ -383,7 +383,6 @@ class ShiftControllerTest extends TestCase
         // Try to complete without any notes
         $response = $this->actingAs($this->staff)
             ->patch("/shifts/{$shift->id}/complete", [
-                'create_timesheet' => false,
             ]);
 
         $response->assertSessionHasErrors(['final_note_body']);
@@ -401,7 +400,6 @@ class ShiftControllerTest extends TestCase
             ->patch("/shifts/{$shift->id}/complete", [
                 'final_note_subject' => 'Shift Summary',
                 'final_note_body' => 'Completed all tasks successfully',
-                'create_timesheet' => false,
             ]);
 
         $response->assertSessionHas('success');

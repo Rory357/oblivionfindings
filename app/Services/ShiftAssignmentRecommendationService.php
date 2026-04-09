@@ -51,7 +51,7 @@ class ShiftAssignmentRecommendationService
                     return max(0, $existingShift->ends_at->diffInMinutes($existingShift->starts_at));
                 });
 
-            $eligibility = $this->eligibility->evaluate($shift, $user);
+            $eligibility = $this->eligibility->evaluate($shift, $user)->toArray();
             $roleCoverageBonus = collect($eligibility['matched_roles'] ?? [])
                 ->sum(fn (array $role) => (int) ($role['minimum'] ?? 1) * ($roleGapPriority > 0 ? 12 : 6));
             $siteFamiliarity = $siteId

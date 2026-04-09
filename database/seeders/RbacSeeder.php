@@ -211,6 +211,7 @@ class RbacSeeder extends Seeder
             ['key' => 'shifts.create', 'description' => 'Create shifts', 'group' => 'shifts', 'module' => 'Operations'],
             ['key' => 'shifts.update', 'description' => 'Update shifts', 'group' => 'shifts', 'module' => 'Operations'],
             ['key' => 'shifts.manageAny', 'description' => 'Manage any staff shifts', 'group' => 'shifts', 'module' => 'Operations'],
+            ['key' => 'shifts.overrideEligibility', 'description' => 'Override eligibility warnings for shift assignment', 'group' => 'shifts', 'module' => 'Operations'],
             ['key' => 'shifts.tasks.updateSelf', 'description' => 'Complete tasks on own shifts', 'group' => 'shifts', 'module' => 'Operations'],
 
             // Timesheets
@@ -463,7 +464,7 @@ class RbacSeeder extends Seeder
             'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'controlRoom.reports.view',
             'calendar.viewAny', 'compliance.view', 'timeline.viewAny', 'timeline.create', 'timeline.pin',
             'summaries.viewAny', 'summaries.generate', 'unifi.manage',
-            'shifts.viewAny', 'shifts.create', 'shifts.update', 'shifts.manageAny',
+            'shifts.viewAny', 'shifts.create', 'shifts.update', 'shifts.manageAny', 'shifts.overrideEligibility',
             'timesheets.viewAny', 'timesheets.create', 'timesheets.update', 'timesheets.approve', 'timesheets.manageAny',
             'clients.viewAny', 'clients.create', 'clients.update', 'clients.assignments.update', 'clients.onboarding.manage',
             'medications.view', 'medications.orders.manage', 'medications.administer.record',
@@ -521,7 +522,7 @@ class RbacSeeder extends Seeder
             'respite.stays.manage', 'respite.resources.manage', 'respite.procedures.manage',
             'respite.calendar.view', 'respite.evidence.view',
             'risks.viewAny', 'risks.create', 'risks.update', 'risks.delete',
-            'shifts.viewAny', 'shifts.create', 'shifts.update',
+            'shifts.viewAny', 'shifts.create', 'shifts.update', 'shifts.overrideEligibility',
             'timesheets.viewAny', 'timesheets.approve',
             'timeline.viewAny', 'timeline.create', 'timeline.pin',
             'summaries.viewAny', 'summaries.generate', 'calendar.viewAny', 'rag.ask.any',
