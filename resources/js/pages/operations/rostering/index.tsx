@@ -20,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { Tabs } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
@@ -30,6 +31,7 @@ import {
     Calendar,
     CalendarOff,
     CheckCircle2,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Plus,
@@ -982,8 +984,8 @@ export default function RosteringIndex(props: Props) {
                     </div>
                 </div>
 
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+                {/* KPI Cards — 3 critical always visible, rest collapsible */}
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                     <KpiCard
                         label="Total Shifts"
                         value={props.stats.total}
@@ -998,12 +1000,6 @@ export default function RosteringIndex(props: Props) {
                         color="bg-red-500/10 text-red-500"
                     />
                     <KpiCard
-                        label="Staff Rostered"
-                        value={props.analytics.staffRostered}
-                        icon={Users}
-                        color="bg-emerald-500/10 text-emerald-500"
-                    />
-                    <KpiCard
                         label="Coverage Rate"
                         value={props.analytics.coverageRate}
                         icon={TrendingUp}
@@ -1011,221 +1007,205 @@ export default function RosteringIndex(props: Props) {
                         description="Filled / Total"
                         color="bg-blue-500/10 text-blue-500"
                     />
-                    <KpiCard
-                        label="On Leave"
-                        value={props.analytics.onLeaveCount}
-                        icon={CalendarOff}
-                        description="Approved this week"
-                        color="bg-amber-500/10 text-amber-500"
-                    />
-                    <KpiCard
-                        label="Coverage Gaps"
-                        value={props.stats.coverage_gaps ?? 0}
-                        icon={AlertTriangle}
-                        description="Demand exceeds supply"
-                        color="bg-red-500/10 text-red-500"
-                    />
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                This week
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="text-sm text-slate-600">
-                                {props.weekStart} → {ymd(addDays(startDate, 6))}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Badge variant="outline">
-                                    Total: {props.stats.total}
-                                </Badge>
-                                <Badge
-                                    variant={
-                                        props.stats.open > 0
-                                            ? 'default'
-                                            : 'outline'
-                                    }
+                <Collapsible>
+                    <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="group flex items-center gap-1 text-xs text-muted-foreground">
+                            <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                            <span className="group-data-[state=open]:hidden">Show all metrics</span>
+                            <span className="hidden group-data-[state=open]:inline">Hide metrics</span>
+                        </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-1">
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                            <KpiCard
+                                label="Staff Rostered"
+                                value={props.analytics.staffRostered}
+                                icon={Users}
+                                color="bg-emerald-500/10 text-emerald-500"
+                            />
+                            <KpiCard
+                                label="On Leave"
+                                value={props.analytics.onLeaveCount}
+                                icon={CalendarOff}
+                                description="Approved this week"
+                                color="bg-amber-500/10 text-amber-500"
+                            />
+                            <KpiCard
+                                label="Coverage Gaps"
+                                value={props.stats.coverage_gaps ?? 0}
+                                icon={AlertTriangle}
+                                description="Demand exceeds supply"
+                                color="bg-red-500/10 text-red-500"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium">
+                                        This week
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    <div className="text-sm text-slate-600">
+                                        {props.weekStart} → {ymd(addDays(startDate, 6))}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Badge variant="outline">
+                                            Total: {props.stats.total}
+                                        </Badge>
+                                        <Badge
+                                            variant={
+                                                props.stats.open > 0
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
+                                        >
+                                            Open: {props.stats.open}
+                                        </Badge>
+                                        <Badge variant="outline">
+                                            Scheduled: {props.stats.scheduled}
+                                        </Badge>
+                                        <Badge variant="outline">
+                                            In progress: {props.stats.in_progress}
+                                        </Badge>
+                                        <Badge variant="outline">
+                                            Draft: {props.stats.draft}
+                                        </Badge>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium">
+                                        Operational signals
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex flex-wrap gap-2">
+                                    <Badge
+                                        variant={
+                                            props.stats.incidents > 0
+                                                ? 'destructive'
+                                                : 'outline'
+                                        }
+                                    >
+                                        Incidents: {props.stats.incidents}
+                                    </Badge>
+                                    <Badge
+                                        variant={
+                                            props.stats.timesheets_pending > 0
+                                                ? 'default'
+                                                : 'outline'
+                                        }
+                                    >
+                                        Timesheets pending:{' '}
+                                        {props.stats.timesheets_pending}
+                                    </Badge>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium">
+                                        Overlaps
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex flex-wrap gap-2">
+                                    <Badge
+                                        variant={
+                                            props.stats.staff_overlaps > 0
+                                                ? 'destructive'
+                                                : 'outline'
+                                        }
+                                    >
+                                        Staff overlaps: {props.stats.staff_overlaps}
+                                    </Badge>
+                                    <Badge
+                                        variant={
+                                            props.stats.client_overlaps > 0
+                                                ? 'destructive'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {clientSingular} overlaps:{' '}
+                                        {props.stats.client_overlaps}
+                                    </Badge>
+                                    <Badge
+                                        variant={
+                                            props.stats.time_off_conflicts > 0
+                                                ? 'destructive'
+                                                : 'outline'
+                                        }
+                                    >
+                                        Time-off conflicts:{' '}
+                                        {props.stats.time_off_conflicts}
+                                    </Badge>
+                                    <Badge
+                                        variant={
+                                            (props.stats.coverage_gaps ?? 0) > 0
+                                                ? 'destructive'
+                                                : 'outline'
+                                        }
+                                    >
+                                        Coverage gaps: {props.stats.coverage_gaps ?? 0}
+                                    </Badge>
+                                </CardContent>
+                            </Card>
+
+                </div>
+                    </CollapsibleContent>
+                </Collapsible>
+
+                {/* Filters — always visible */}
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                            Filters
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        {props.canManageAny ? (
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <Select
+                                    value={props.filters.staff_id ? String(props.filters.staff_id) : 'all'}
+                                    onValueChange={(v) => updateFilter({ staff_id: v === 'all' ? null : Number(v) })}
                                 >
-                                    Open: {props.stats.open}
-                                </Badge>
-                                <Badge variant="outline">
-                                    Scheduled: {props.stats.scheduled}
-                                </Badge>
-                                <Badge variant="outline">
-                                    In progress: {props.stats.in_progress}
-                                </Badge>
-                                <Badge variant="outline">
-                                    Draft: {props.stats.draft}
-                                </Badge>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All staff" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All staff</SelectItem>
+                                        {props.staff.map((s) => (
+                                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Select
+                                    value={props.filters.client_id ? String(props.filters.client_id) : 'all'}
+                                    onValueChange={(v) => updateFilter({ client_id: v === 'all' ? null : Number(v) })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={`All ${clientPlural.toLowerCase()}`} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">{`All ${clientPlural.toLowerCase()}`}</SelectItem>
+                                        {props.clients.map((c) => (
+                                            <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Operational signals
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-wrap gap-2">
-                            <Badge
-                                variant={
-                                    props.stats.incidents > 0
-                                        ? 'destructive'
-                                        : 'outline'
-                                }
-                            >
-                                Incidents: {props.stats.incidents}
-                            </Badge>
-                            <Badge
-                                variant={
-                                    props.stats.timesheets_pending > 0
-                                        ? 'default'
-                                        : 'outline'
-                                }
-                            >
-                                Timesheets pending:{' '}
-                                {props.stats.timesheets_pending}
-                            </Badge>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Overlaps
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-wrap gap-2">
-                            <Badge
-                                variant={
-                                    props.stats.staff_overlaps > 0
-                                        ? 'destructive'
-                                        : 'outline'
-                                }
-                            >
-                                Staff overlaps: {props.stats.staff_overlaps}
-                            </Badge>
-                            <Badge
-                                variant={
-                                    props.stats.client_overlaps > 0
-                                        ? 'destructive'
-                                        : 'outline'
-                                }
-                            >
-                                {clientSingular} overlaps:{' '}
-                                {props.stats.client_overlaps}
-                            </Badge>
-                            <Badge
-                                variant={
-                                    props.stats.time_off_conflicts > 0
-                                        ? 'destructive'
-                                        : 'outline'
-                                }
-                            >
-                                Time-off conflicts:{' '}
-                                {props.stats.time_off_conflicts}
-                            </Badge>
-                            <Badge
-                                variant={
-                                    (props.stats.coverage_gaps ?? 0) > 0
-                                        ? 'destructive'
-                                        : 'outline'
-                                }
-                            >
-                                Coverage gaps: {props.stats.coverage_gaps ?? 0}
-                            </Badge>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Filters
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {props.canManageAny ? (
-                                <div className="grid grid-cols-1 gap-2">
-                                    <Select
-                                        value={
-                                            props.filters.staff_id
-                                                ? String(props.filters.staff_id)
-                                                : 'all'
-                                        }
-                                        onValueChange={(v) =>
-                                            updateFilter({
-                                                staff_id:
-                                                    v === 'all'
-                                                        ? null
-                                                        : Number(v),
-                                            })
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="All staff" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All staff
-                                            </SelectItem>
-                                            {props.staff.map((s) => (
-                                                <SelectItem
-                                                    key={s.id}
-                                                    value={String(s.id)}
-                                                >
-                                                    {s.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-
-                                    <Select
-                                        value={
-                                            props.filters.client_id
-                                                ? String(
-                                                      props.filters.client_id,
-                                                  )
-                                                : 'all'
-                                        }
-                                        onValueChange={(v) =>
-                                            updateFilter({
-                                                client_id:
-                                                    v === 'all'
-                                                        ? null
-                                                        : Number(v),
-                                            })
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue
-                                                placeholder={`All ${clientPlural.toLowerCase()}`}
-                                            />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">{`All ${clientPlural.toLowerCase()}`}</SelectItem>
-                                            {props.clients.map((c) => (
-                                                <SelectItem
-                                                    key={c.id}
-                                                    value={String(c.id)}
-                                                >
-                                                    {c.first_name} {c.last_name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            ) : (
-                                <div className="text-sm text-slate-600">
-                                    You’re viewing your assigned shifts.
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                        ) : (
+                            <div className="text-sm text-slate-600">
+                                You are viewing your assigned shifts.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <Tabs
                     tabs={[

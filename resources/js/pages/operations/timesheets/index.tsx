@@ -72,6 +72,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
     const [decisionNotes, setDecisionNotes] = useState('');
     const [returnedNotes, setReturnedNotes] = useState('');
     const [bulkError, setBulkError] = useState<string | null>(null);
+    const [bulkAction, setBulkAction] = useState<'approve' | 'return' | 'reject' | null>(null);
 
     const toggleAll = () => {
         if (allSelected) { setSelected({}); return; }
@@ -83,21 +84,30 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
     const bulkApprove = () => {
         if (selectedIds.length === 0) return;
         setBulkError(null);
-        router.post('/timesheets/bulk-approve', { ids: selectedIds, decision_notes: decisionNotes || null }, { preserveScroll: true });
+        router.post('/timesheets/bulk-approve', { ids: selectedIds, decision_notes: decisionNotes || null }, {
+            preserveScroll: true,
+            onSuccess: () => { setSelected({}); setDecisionNotes(''); setBulkError(null); setBulkAction(null); },
+        });
     };
 
     const bulkReturn = () => {
         if (selectedIds.length === 0) return;
         if (!returnedNotes.trim()) { setBulkError('Return notes are required when returning timesheets.'); return; }
         setBulkError(null);
-        router.post('/timesheets/bulk-return', { ids: selectedIds, returned_notes: returnedNotes }, { preserveScroll: true });
+        router.post('/timesheets/bulk-return', { ids: selectedIds, returned_notes: returnedNotes }, {
+            preserveScroll: true,
+            onSuccess: () => { setSelected({}); setReturnedNotes(''); setBulkError(null); setBulkAction(null); },
+        });
     };
 
     const bulkReject = () => {
         if (selectedIds.length === 0) return;
         if (!decisionNotes.trim()) { setBulkError('Decision notes are required to reject timesheets.'); return; }
         setBulkError(null);
-        router.post('/timesheets/bulk-reject', { ids: selectedIds, decision_notes: decisionNotes }, { preserveScroll: true });
+        router.post('/timesheets/bulk-reject', { ids: selectedIds, decision_notes: decisionNotes }, {
+            preserveScroll: true,
+            onSuccess: () => { setSelected({}); setDecisionNotes(''); setBulkError(null); setBulkAction(null); },
+        });
     };
 
     const stats = useMemo(() => {
@@ -119,16 +129,6 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                     title={isApprovalMode ? 'Timesheet Approvals' : timesheetPlural}
                     description={isApprovalMode ? 'Submitted timesheets waiting for a decision.' : 'Work logs, approvals, and timesheet management.'}
                     icon={<FileText className="h-7 w-7 text-white" />}
-                    stats={
-                        isApprovalMode
-                            ? [{ label: 'Pending', value: stats.submitted }]
-                            : [
-                                { label: 'Total', value: stats.total },
-                                { label: 'Draft', value: stats.draft },
-                                { label: 'Submitted', value: stats.submitted },
-                                { label: 'Approved', value: stats.approved },
-                            ]
-                    }
                     actions={
                         <div className="flex items-center gap-2">
                             {isApprovalMode ? (
@@ -212,40 +212,6 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                         Clear
                     </Button>
                 </div>
-
-                {/* Bulk approval panel */}
-                {isApprovalMode ? (
-                    <div className="rounded-xl border border-primary/20 bg-card p-4 space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-sm">
-                                <span className="font-medium">Selected:</span> {selectedIds.length} of {timesheets.data.length}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Button size="sm" disabled={selectedIds.length === 0} onClick={bulkApprove}>Approve selected</Button>
-                                <Button size="sm" disabled={selectedIds.length === 0} variant="outline" onClick={bulkReturn}>Return selected</Button>
-                                <Button size="sm" disabled={selectedIds.length === 0} variant="destructive" onClick={bulkReject}>Reject selected</Button>
-                            </div>
-                        </div>
-
-                        {bulkError ? (
-                            <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
-                                <AlertCircle className="h-4 w-4 shrink-0" />
-                                {bulkError}
-                            </div>
-                        ) : null}
-
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">Decision notes (optional for approve, required for reject)</Label>
-                                <Textarea rows={3} value={decisionNotes} onChange={(e) => { setDecisionNotes(e.target.value); setBulkError(null); }} placeholder="Optional notes for approval, required for rejection" />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">Return notes (required when returning)</Label>
-                                <Textarea rows={3} value={returnedNotes} onChange={(e) => { setReturnedNotes(e.target.value); setBulkError(null); }} placeholder="What needs changing?" />
-                            </div>
-                        </div>
-                    </div>
-                ) : null}
 
                 {/* Table */}
                 {timesheets.data.length > 0 ? (
@@ -341,6 +307,72 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                         description={isApprovalMode ? 'No submitted timesheets awaiting approval.' : 'No timesheets found for the current filters.'}
                     />
                 )}
+
+                {/* Sticky bulk action bar — only visible when rows are selected in approval mode */}
+                {isApprovalMode && selectedIds.length > 0 ? (
+                    <div className="sticky bottom-0 z-10 -mx-5 border-t bg-card/95 p-4 shadow-lg backdrop-blur-sm supports-[backdrop-filter]:bg-card/80 sm:-mx-8">
+                        <div className="mx-auto space-y-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="text-sm">
+                                    <span className="font-medium">Selected:</span> {selectedIds.length} of {timesheets.data.length}
+                                </div>
+                                {bulkAction === null ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button size="sm" onClick={() => setBulkAction('approve')}>Approve selected</Button>
+                                        <Button size="sm" variant="outline" onClick={() => setBulkAction('return')}>Return selected</Button>
+                                        <Button size="sm" variant="destructive" onClick={() => setBulkAction('reject')}>Reject selected</Button>
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            {bulkError ? (
+                                <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                    {bulkError}
+                                </div>
+                            ) : null}
+
+                            {bulkAction === 'approve' ? (
+                                <div className="space-y-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-muted-foreground">Decision notes (optional)</Label>
+                                        <Textarea rows={2} value={decisionNotes} onChange={(e) => { setDecisionNotes(e.target.value); setBulkError(null); }} placeholder="Optional notes for this approval" />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" onClick={bulkApprove}>Confirm approval</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => { setBulkAction(null); setBulkError(null); }}>Cancel</Button>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {bulkAction === 'reject' ? (
+                                <div className="space-y-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-muted-foreground">Rejection reason (required)</Label>
+                                        <Textarea rows={2} value={decisionNotes} onChange={(e) => { setDecisionNotes(e.target.value); setBulkError(null); }} placeholder="Explain why these timesheets are being rejected" />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="destructive" onClick={bulkReject}>Confirm rejection</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => { setBulkAction(null); setBulkError(null); }}>Cancel</Button>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {bulkAction === 'return' ? (
+                                <div className="space-y-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs text-muted-foreground">Return notes — explain what needs changing (required)</Label>
+                                        <Textarea rows={2} value={returnedNotes} onChange={(e) => { setReturnedNotes(e.target.value); setBulkError(null); }} placeholder="What needs to be corrected before resubmission?" />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" onClick={bulkReturn}>Confirm return</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => { setBulkAction(null); setBulkError(null); }}>Cancel</Button>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                ) : null}
             </PageShell>
         </AppLayout>
     );

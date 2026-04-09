@@ -490,6 +490,31 @@ export default function ShiftShow({
     const submittedFormCount = forms?.submissions?.length ?? 0;
     const coverageReturnTo = `/operations/shifts/${shift.id}`;
 
+    // Tab state — all content stays mounted, visibility controlled via CSS
+    const showCoverage = !!coverage;
+    const showAssignment = !!can.assign_shift;
+    const showTransport = transports.length > 0 || !!can.view_transport;
+    const showReplacement = !!replacementRequest || (!!can.request_replacement && !!shift.user_id);
+    const showMedications = !!can.view_medication;
+    const showForms = !!can.view_forms;
+
+    const shiftTabs = useMemo(() => {
+        const tabs: Array<{ key: string; label: string }> = [];
+        tabs.push({ key: 'tasks', label: `Tasks${tasks.length ? ` (${tasks.length})` : ''}` });
+        tabs.push({ key: 'notes', label: `Notes${(notes.length + handover.length) ? ` (${notes.length + handover.length})` : ''}` });
+        tabs.push({ key: 'incidents', label: `Incidents${incidents.length ? ` (${incidents.length})` : ''}` });
+        if (showCoverage) tabs.push({ key: 'coverage', label: 'Coverage' });
+        if (showAssignment) tabs.push({ key: 'assignment', label: 'Assignment' });
+        if (showMedications) tabs.push({ key: 'medications', label: 'Medications' });
+        if (showForms) tabs.push({ key: 'forms', label: 'Forms' });
+        if (showTransport) tabs.push({ key: 'transport', label: 'Transport' });
+        if (showReplacement) tabs.push({ key: 'replacement', label: 'Replacement' });
+        return tabs;
+    }, [tasks.length, notes.length, handover.length, incidents.length, showCoverage, showAssignment, showMedications, showForms, showTransport, showReplacement]);
+
+    const [activeTab, setActiveTab] = useState('tasks');
+    const resolvedActiveTab = shiftTabs.some(t => t.key === activeTab) ? activeTab : shiftTabs[0]?.key ?? 'tasks';
+
     const completeForm = useForm<{
         final_note_subject: string;
         final_note_body: string;
@@ -862,6 +887,62 @@ export default function ShiftShow({
                     </CardContent>
                 </Card>
 
+                {/* ── Tab bar ── */}
+                <div className="flex flex-wrap gap-1 rounded-xl border bg-background p-1">
+                    {shiftTabs.map((tab) => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm outline-none transition-all hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring ${
+                                resolvedActiveTab === tab.key
+                                    ? 'bg-muted font-medium text-foreground shadow-sm'
+                                    : 'text-muted-foreground'
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* ── Tab panels (all mounted, visibility via CSS) ── */}
+
+                {/* Tasks tab */}
+                <div className={resolvedActiveTab !== 'tasks' ? 'hidden' : ''}>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Tasks</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {tasks.map((t) => (
+                                <div
+                                    key={t.id}
+                                    className="flex items-center gap-3 rounded-md border p-3"
+                                >
+                                    <Checkbox
+                                        checked={t.is_completed}
+                                        disabled={!canMarkTasks}
+                                        onCheckedChange={(v) =>
+                                            toggleTask(t, Boolean(v))
+                                        }
+                                    />
+                                    <div
+                                        className={`text-sm ${t.is_completed ? 'text-muted-foreground line-through' : ''}`}
+                                    >
+                                        {t.label}
+                                    </div>
+                                </div>
+                            ))}
+                            {!tasks.length ? (
+                                <div className="text-sm text-muted-foreground">
+                                    No tasks added for this shift.
+                                </div>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Coverage tab */}
+                <div className={resolvedActiveTab !== 'coverage' ? 'hidden' : ''}>
                 {coverage ? (
                     <Card>
                         <CardHeader>
@@ -1231,7 +1312,10 @@ export default function ShiftShow({
                         </CardContent>
                     </Card>
                 ) : null}
+                </div>
 
+                {/* Assignment tab */}
+                <div className={resolvedActiveTab !== 'assignment' ? 'hidden' : ''}>
                 {can.assign_shift ? (
                     <Card>
                         <CardHeader>
@@ -1485,7 +1569,10 @@ export default function ShiftShow({
                         );
                     }}
                 />
+                </div>
 
+                {/* Transport tab */}
+                <div className={resolvedActiveTab !== 'transport' ? 'hidden' : ''}>
                 {transports.length > 0 || can.view_transport ? (
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between gap-3">
@@ -1591,7 +1678,10 @@ export default function ShiftShow({
                         </CardContent>
                     </Card>
                 ) : null}
+                </div>
 
+                {/* Replacement tab */}
+                <div className={resolvedActiveTab !== 'replacement' ? 'hidden' : ''}>
                 {replacementRequest ||
                 (can.request_replacement && shift.user_id) ? (
                     <Card>
@@ -1888,7 +1978,330 @@ export default function ShiftShow({
                         </CardContent>
                     </Card>
                 ) : null}
+                </div>
 
+                {/* Medications tab */}
+                <div className={resolvedActiveTab !== 'medications' ? 'hidden' : ''}>
+                {can.view_medication ? (
+                    <ShiftMedicationCard
+                        clientId={shift.client.id}
+                        shiftId={shift.id}
+                        shiftStatus={shift.status}
+                        canRecord={can.record_medication}
+                        summary={medications}
+                        witnesses={medicationWitnesses}
+                    />
+                ) : null}
+                </div>
+
+                {/* Forms tab */}
+                <div className={resolvedActiveTab !== 'forms' ? 'hidden' : ''}>
+                {can.view_forms ? (
+                    <ShiftFormsCard
+                        shiftId={shift.id}
+                        canSubmit={can.submit_form}
+                        forms={forms.available}
+                        submissions={forms.submissions}
+                    />
+                ) : null}
+                </div>
+
+                {/* Notes tab (includes handover + notes) */}
+                <div className={resolvedActiveTab !== 'notes' ? 'hidden' : 'space-y-4'}>
+                {handover.length ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">
+                                Recent handover
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {handover.map((h) => (
+                                <div
+                                    key={h.id}
+                                    className="rounded-md border p-3"
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="text-sm font-medium">
+                                            {h.subject || 'Handover'}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {h.occurred_at
+                                                ? new Date(
+                                                      h.occurred_at,
+                                                  ).toLocaleString()
+                                                : ''}
+                                        </div>
+                                    </div>
+                                    {h.body ? (
+                                        <div className="mt-2 text-sm whitespace-pre-wrap">
+                                            {h.body}
+                                        </div>
+                                    ) : null}
+                                    <div className="mt-2 text-xs text-muted-foreground">
+                                        {h.actor?.name
+                                            ? `By ${h.actor.name}`
+                                            : ''}
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Shift notes</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {can.add_note ? (
+                            <div className="rounded-md border p-3">
+                                <div className="text-sm font-medium">
+                                    Add note
+                                </div>
+                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label>Type</Label>
+                                        <Select
+                                            value={noteForm.data.type}
+                                            onValueChange={(v) => {
+                                                noteForm.setData('type', v);
+                                                const tpl = templates.find(
+                                                    (t) => t.key === v,
+                                                );
+                                                if (
+                                                    tpl &&
+                                                    noteForm.data.body.trim() ===
+                                                        ''
+                                                ) {
+                                                    noteForm.setData(
+                                                        'body',
+                                                        tpl.body,
+                                                    );
+                                                }
+                                                noteForm.setData(
+                                                    'pin',
+                                                    v === 'handover',
+                                                );
+                                            }}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {templates.map((t) => (
+                                                    <SelectItem
+                                                        key={t.key}
+                                                        value={t.key}
+                                                    >
+                                                        {t.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {noteForm.data.type !== 'handover' ? (
+                                        <div>
+                                            <Label>Subject (optional)</Label>
+                                            <Input
+                                                value={noteForm.data.subject}
+                                                onChange={(e) =>
+                                                    noteForm.setData(
+                                                        'subject',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    ) : null}
+                                </div>
+
+                                {noteForm.data.type === 'progress_note' ? (
+                                    <div className="mt-3">
+                                        <Label>Goal/outcome (optional)</Label>
+                                        <Input
+                                            value={noteForm.data.goal}
+                                            onChange={(e) =>
+                                                noteForm.setData(
+                                                    'goal',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                ) : null}
+
+                                <div className="mt-3">
+                                    <Label>Note</Label>
+                                    <Textarea
+                                        rows={5}
+                                        value={noteForm.data.body}
+                                        onChange={(e) =>
+                                            noteForm.setData(
+                                                'body',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap items-center gap-3">
+                                    {noteForm.data.type === 'handover' ? (
+                                        <div className="text-xs text-muted-foreground">
+                                            Handovers are stored as structured
+                                            internal records.
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <Checkbox
+                                                checked={
+                                                    noteForm.data.visibility ===
+                                                    'portal'
+                                                }
+                                                onCheckedChange={(v) =>
+                                                    noteForm.setData(
+                                                        'visibility',
+                                                        v
+                                                            ? 'portal'
+                                                            : 'internal',
+                                                    )
+                                                }
+                                            />
+                                            <span>Share in portal</span>
+                                        </div>
+                                    )}
+
+                                    <Button
+                                        onClick={() => {
+                                            const onSuccess = () =>
+                                                noteForm.reset();
+
+                                            if (
+                                                noteForm.data.type ===
+                                                'handover'
+                                            ) {
+                                                noteForm.transform((data) => ({
+                                                    handover_notes: data.body,
+                                                    client_id: shift.client.id,
+                                                }));
+                                                noteForm.post(
+                                                    `/operations/shifts/${shift.id}/handover`,
+                                                    {
+                                                        preserveScroll: true,
+                                                        onSuccess,
+                                                    },
+                                                );
+
+                                                return;
+                                            }
+
+                                            noteForm.transform((data) => data);
+                                            noteForm.post(
+                                                `/operations/clients/${shift.client.id}/notes`,
+                                                {
+                                                    preserveScroll: true,
+                                                    onSuccess,
+                                                },
+                                            );
+                                        }}
+                                        disabled={
+                                            noteForm.processing ||
+                                            !noteForm.data.body
+                                        }
+                                    >
+                                        {noteForm.data.type === 'handover'
+                                            ? 'Submit handover'
+                                            : 'Add'}
+                                    </Button>
+                                </div>
+                                {activeTemplate?.body &&
+                                noteForm.data.body.trim() === '' ? (
+                                    <div className="mt-2 text-xs text-muted-foreground">
+                                        Tip: selecting a type will insert a
+                                        quick template.
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
+
+                        {notes.map((n) => (
+                            <div key={n.id} className="rounded-md border p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="text-sm font-medium">
+                                        {n.subject || n.type}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {n.occurred_at
+                                            ? new Date(
+                                                  n.occurred_at,
+                                              ).toLocaleString()
+                                            : ''}
+                                    </div>
+                                </div>
+                                {n.meta?.goal ? (
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        Goal: {n.meta.goal}
+                                    </div>
+                                ) : null}
+                                {n.body ? (
+                                    <div className="mt-2 text-sm whitespace-pre-wrap">
+                                        {n.body}
+                                    </div>
+                                ) : null}
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                    {n.actor?.name ? `By ${n.actor.name}` : ''}
+                                </div>
+                            </div>
+                        ))}
+                        {!notes.length ? (
+                            <div className="text-sm text-muted-foreground">
+                                No notes for this shift yet.
+                            </div>
+                        ) : null}
+                    </CardContent>
+                </Card>
+                </div>
+
+                {/* Incidents tab */}
+                <div className={resolvedActiveTab !== 'incidents' ? 'hidden' : ''}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">
+                            Shift incidents
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        {(incidents || []).map((i: any) => (
+                            <div
+                                key={i.id}
+                                className="flex items-center justify-between rounded-md border p-3"
+                            >
+                                <div>
+                                    <div className="text-sm font-medium">
+                                        {i.type} &bull; {i.severity}
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        {i.status} &bull; {i.occurred_at}
+                                    </div>
+                                </div>
+                                <Link
+                                    href={`/incidents/${i.id}`}
+                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                >
+                                    Open
+                                </Link>
+                            </div>
+                        ))}
+                        {!(incidents || []).length && (
+                            <div className="text-sm text-muted-foreground">
+                                No incidents for this shift.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+                </div>
+
+                {/* ── Modals (outside tab structure) ── */}
                 <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
                     <DialogContent className="sm:max-w-2xl">
                         <DialogHeader>
@@ -2333,346 +2746,6 @@ export default function ShiftShow({
                     </DialogContent>
                 </Dialog>
 
-                {handover.length ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Recent handover
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {handover.map((h) => (
-                                <div
-                                    key={h.id}
-                                    className="rounded-md border p-3"
-                                >
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="text-sm font-medium">
-                                            {h.subject || 'Handover'}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {h.occurred_at
-                                                ? new Date(
-                                                      h.occurred_at,
-                                                  ).toLocaleString()
-                                                : ''}
-                                        </div>
-                                    </div>
-                                    {h.body ? (
-                                        <div className="mt-2 text-sm whitespace-pre-wrap">
-                                            {h.body}
-                                        </div>
-                                    ) : null}
-                                    <div className="mt-2 text-xs text-muted-foreground">
-                                        {h.actor?.name
-                                            ? `By ${h.actor.name}`
-                                            : ''}
-                                    </div>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                ) : null}
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Tasks</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        {tasks.map((t) => (
-                            <div
-                                key={t.id}
-                                className="flex items-center gap-3 rounded-md border p-3"
-                            >
-                                <Checkbox
-                                    checked={t.is_completed}
-                                    disabled={!canMarkTasks}
-                                    onCheckedChange={(v) =>
-                                        toggleTask(t, Boolean(v))
-                                    }
-                                />
-                                <div
-                                    className={`text-sm ${t.is_completed ? 'text-muted-foreground line-through' : ''}`}
-                                >
-                                    {t.label}
-                                </div>
-                            </div>
-                        ))}
-                        {!tasks.length ? (
-                            <div className="text-sm text-muted-foreground">
-                                No tasks added for this shift.
-                            </div>
-                        ) : null}
-                    </CardContent>
-                </Card>
-
-                {can.view_medication ? (
-                    <ShiftMedicationCard
-                        clientId={shift.client.id}
-                        shiftId={shift.id}
-                        shiftStatus={shift.status}
-                        canRecord={can.record_medication}
-                        summary={medications}
-                        witnesses={medicationWitnesses}
-                    />
-                ) : null}
-
-                {can.view_forms ? (
-                    <ShiftFormsCard
-                        shiftId={shift.id}
-                        canSubmit={can.submit_form}
-                        forms={forms.available}
-                        submissions={forms.submissions}
-                    />
-                ) : null}
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Shift notes</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {can.add_note ? (
-                            <div className="rounded-md border p-3">
-                                <div className="text-sm font-medium">
-                                    Add note
-                                </div>
-                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Type</Label>
-                                        <Select
-                                            value={noteForm.data.type}
-                                            onValueChange={(v) => {
-                                                noteForm.setData('type', v);
-                                                const tpl = templates.find(
-                                                    (t) => t.key === v,
-                                                );
-                                                if (
-                                                    tpl &&
-                                                    noteForm.data.body.trim() ===
-                                                        ''
-                                                ) {
-                                                    noteForm.setData(
-                                                        'body',
-                                                        tpl.body,
-                                                    );
-                                                }
-                                                // pin default for handover
-                                                noteForm.setData(
-                                                    'pin',
-                                                    v === 'handover',
-                                                );
-                                            }}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {templates.map((t) => (
-                                                    <SelectItem
-                                                        key={t.key}
-                                                        value={t.key}
-                                                    >
-                                                        {t.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {noteForm.data.type !== 'handover' ? (
-                                        <div>
-                                            <Label>Subject (optional)</Label>
-                                            <Input
-                                                value={noteForm.data.subject}
-                                                onChange={(e) =>
-                                                    noteForm.setData(
-                                                        'subject',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    ) : null}
-                                </div>
-
-                                {noteForm.data.type === 'progress_note' ? (
-                                    <div className="mt-3">
-                                        <Label>Goal/outcome (optional)</Label>
-                                        <Input
-                                            value={noteForm.data.goal}
-                                            onChange={(e) =>
-                                                noteForm.setData(
-                                                    'goal',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                ) : null}
-
-                                <div className="mt-3">
-                                    <Label>Note</Label>
-                                    <Textarea
-                                        rows={5}
-                                        value={noteForm.data.body}
-                                        onChange={(e) =>
-                                            noteForm.setData(
-                                                'body',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-
-                                <div className="mt-3 flex flex-wrap items-center gap-3">
-                                    {noteForm.data.type === 'handover' ? (
-                                        <div className="text-xs text-muted-foreground">
-                                            Handovers are stored as structured
-                                            internal records.
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2 text-xs">
-                                            <Checkbox
-                                                checked={
-                                                    noteForm.data.visibility ===
-                                                    'portal'
-                                                }
-                                                onCheckedChange={(v) =>
-                                                    noteForm.setData(
-                                                        'visibility',
-                                                        v
-                                                            ? 'portal'
-                                                            : 'internal',
-                                                    )
-                                                }
-                                            />
-                                            <span>Share in portal</span>
-                                        </div>
-                                    )}
-
-                                    <Button
-                                        onClick={() => {
-                                            const onSuccess = () =>
-                                                noteForm.reset();
-
-                                            if (
-                                                noteForm.data.type ===
-                                                'handover'
-                                            ) {
-                                                noteForm.transform((data) => ({
-                                                    handover_notes: data.body,
-                                                    client_id: shift.client.id,
-                                                }));
-                                                noteForm.post(
-                                                    `/operations/shifts/${shift.id}/handover`,
-                                                    {
-                                                        preserveScroll: true,
-                                                        onSuccess,
-                                                    },
-                                                );
-
-                                                return;
-                                            }
-
-                                            noteForm.transform((data) => data);
-                                            noteForm.post(
-                                                `/operations/clients/${shift.client.id}/notes`,
-                                                {
-                                                    preserveScroll: true,
-                                                    onSuccess,
-                                                },
-                                            );
-                                        }}
-                                        disabled={
-                                            noteForm.processing ||
-                                            !noteForm.data.body
-                                        }
-                                    >
-                                        {noteForm.data.type === 'handover'
-                                            ? 'Submit handover'
-                                            : 'Add'}
-                                    </Button>
-                                </div>
-                                {activeTemplate?.body &&
-                                noteForm.data.body.trim() === '' ? (
-                                    <div className="mt-2 text-xs text-muted-foreground">
-                                        Tip: selecting a type will insert a
-                                        quick template.
-                                    </div>
-                                ) : null}
-                            </div>
-                        ) : null}
-
-                        {notes.map((n) => (
-                            <div key={n.id} className="rounded-md border p-3">
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="text-sm font-medium">
-                                        {n.subject || n.type}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {n.occurred_at
-                                            ? new Date(
-                                                  n.occurred_at,
-                                              ).toLocaleString()
-                                            : ''}
-                                    </div>
-                                </div>
-                                {n.meta?.goal ? (
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        Goal: {n.meta.goal}
-                                    </div>
-                                ) : null}
-                                {n.body ? (
-                                    <div className="mt-2 text-sm whitespace-pre-wrap">
-                                        {n.body}
-                                    </div>
-                                ) : null}
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                    {n.actor?.name ? `By ${n.actor.name}` : ''}
-                                </div>
-                            </div>
-                        ))}
-                        {!notes.length ? (
-                            <div className="text-sm text-muted-foreground">
-                                No notes for this shift yet.
-                            </div>
-                        ) : null}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Shift incidents
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        {(incidents || []).map((i: any) => (
-                            <div
-                                key={i.id}
-                                className="flex items-center justify-between rounded-md border p-3"
-                            >
-                                <div>
-                                    <div className="text-sm font-medium">
-                                        {i.type} • {i.severity}
-                                    </div>
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        {i.status} • {i.occurred_at}
-                                    </div>
-                                </div>
-                                <Link
-                                    href={`/incidents/${i.id}`}
-                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                >
-                                    Open
-                                </Link>
-                            </div>
-                        ))}
-                        {!(incidents || []).length && (
-                            <div className="text-sm text-muted-foreground">
-                                No incidents for this shift.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
             </PageShell>
         </AppLayout>
     );

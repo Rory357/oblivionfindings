@@ -22,9 +22,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { FileText, CheckCircle2, XCircle, Send, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
-import { Input } from '@/components/ui/input';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Timesheet {
@@ -242,43 +251,16 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                                         <CheckCircle2 className="mr-1 h-3 w-3" />
                                                                         {processing === ts.id ? 'Approving...' : 'Approve'}
                                                                     </Button>
-                                                                    {rejectId === ts.id ? (
-                                                                        <div className="flex items-center gap-1">
-                                                                            <Input
-                                                                                placeholder="Reason..."
-                                                                                value={rejectReason}
-                                                                                onChange={(e) => setRejectReason(e.target.value)}
-                                                                                className="h-8 w-[150px] text-xs"
-                                                                            />
-                                                                            <Button
-                                                                                variant="destructive"
-                                                                                size="sm"
-                                                                                disabled={processing === ts.id || !rejectReason.trim()}
-                                                                                onClick={() => handleReject(ts.id)}
-                                                                            >
-                                                                                {processing === ts.id ? 'Rejecting...' : 'Reject'}
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                disabled={processing === ts.id}
-                                                                                onClick={() => { setRejectId(null); setRejectReason(''); }}
-                                                                            >
-                                                                                Cancel
-                                                                            </Button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-                                                                            disabled={processing === ts.id}
-                                                                            onClick={() => setRejectId(ts.id)}
-                                                                        >
-                                                                            <XCircle className="mr-1 h-3 w-3" />
-                                                                            Reject
-                                                                        </Button>
-                                                                    )}
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                                                        disabled={processing === ts.id}
+                                                                        onClick={() => setRejectId(ts.id)}
+                                                                    >
+                                                                        <XCircle className="mr-1 h-3 w-3" />
+                                                                        Reject
+                                                                    </Button>
                                                                 </>
                                                             )}
                                                             {ts.rejection_reason && ts.status === 'rejected' && (
@@ -329,6 +311,42 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+
+                {/* Reject Dialog */}
+                <Dialog open={rejectId !== null} onOpenChange={(open) => { if (!open) { setRejectId(null); setRejectReason(''); } }}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Reject Timesheet</DialogTitle>
+                            <DialogDescription>
+                                {(() => {
+                                    const ts = rejectId ? timesheets.data.find((t) => t.id === rejectId) : null;
+                                    return ts
+                                        ? `${ts.user_name} — ${formatDate(ts.period_start)} to ${formatDate(ts.period_end)} (${ts.total_hours}h)`
+                                        : 'Provide a reason for rejecting this timesheet.';
+                                })()}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-2 py-2">
+                            <Label>Reason for rejection (required)</Label>
+                            <Textarea
+                                rows={3}
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                placeholder="Explain why this timesheet is being rejected"
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => { setRejectId(null); setRejectReason(''); }}>Cancel</Button>
+                            <Button
+                                variant="destructive"
+                                disabled={!rejectReason.trim() || processing === rejectId}
+                                onClick={() => rejectId && handleReject(rejectId)}
+                            >
+                                {processing === rejectId ? 'Rejecting...' : 'Reject'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </PageShell>
         </AppLayout>
     );

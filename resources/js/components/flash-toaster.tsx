@@ -14,6 +14,7 @@ export default function FlashToaster() {
 
     const errors = (usePage().props as any).errors as Record<string, any> | undefined;
     const last = useRef<string>('');
+    const seq = useRef(0);
 
     useEffect(() => {
         if (!flash) return;
@@ -28,8 +29,10 @@ export default function FlashToaster() {
         const [level, message] = entries[0] ?? [];
         if (!level || !message) return;
 
-        // De-dupe across Inertia navigations
-        const signature = `${level}:${message}`;
+        // De-dupe within the same render cycle but allow identical
+        // messages from separate server responses (incremented seq).
+        seq.current += 1;
+        const signature = `${level}:${message}:${seq.current}`;
         if (signature === last.current) return;
         last.current = signature;
 

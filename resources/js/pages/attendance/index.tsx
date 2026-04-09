@@ -11,7 +11,8 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState, useMemo } from 'react';
-import { Clock, Timer, CalendarDays, Activity } from 'lucide-react';
+import { Clock, Timer, CalendarDays, Activity, Info } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 type Session = {
     id: number;
@@ -117,11 +118,6 @@ export default function AttendanceIndex({
                     title="Attendance"
                     description="Clock in and out of shifts, and track attendance sessions."
                     icon={<Timer className="h-7 w-7 text-white" />}
-                    stats={[
-                        { label: 'Today', value: `${todayHours.toFixed(1)}h` },
-                        { label: 'Sessions', value: sessionCount },
-                        { label: 'Synced', value: syncedCount },
-                    ]}
                     actions={
                         canManageAny ? (
                             <Select
@@ -154,7 +150,14 @@ export default function AttendanceIndex({
                         color={openSession ? 'emerald' : 'slate'}
                     />
                     <OpsStatCard label="Sessions" value={sessionCount} icon={Timer} color="blue" />
-                    <OpsStatCard label="Eligible Shifts" value={eligibleShifts.length} icon={CalendarDays} color="violet" />
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div>
+                                <OpsStatCard label="Eligible Shifts" value={eligibleShifts.length} icon={CalendarDays} color="violet" />
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>Assigned shifts within the clock-in window</TooltipContent>
+                    </Tooltip>
                 </div>
 
                 {/* Clock action card */}
@@ -201,7 +204,7 @@ export default function AttendanceIndex({
                                                     router.post('/attendance/clock-out', {
                                                         session_id: openSession.id,
                                                         break_minutes: Number(breakMinutes || 0),
-                                                    })
+                                                    }, { preserveScroll: true })
                                                 }
                                             >
                                                 Clock out
@@ -227,7 +230,7 @@ export default function AttendanceIndex({
                                                 onClick={() =>
                                                     router.post('/attendance/clock-in', {
                                                         shift_id: selectedShiftId ? Number(selectedShiftId) : null,
-                                                    })
+                                                    }, { preserveScroll: true })
                                                 }
                                                 disabled={eligibleShifts.length > 1 && !selectedShiftId}
                                             >
@@ -255,7 +258,17 @@ export default function AttendanceIndex({
                                         <th className="px-4 py-3 text-left font-medium">Clock Out</th>
                                         <th className="px-4 py-3 text-right font-medium">Break</th>
                                         <th className="px-4 py-3 text-right font-medium">Hours</th>
-                                        <th className="px-4 py-3 text-left font-medium">Timesheet</th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="inline-flex cursor-default items-center gap-1">
+                                                        Timesheet
+                                                        <Info className="h-3 w-3 text-muted-foreground" />
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Linked to a timesheet for payroll processing</TooltipContent>
+                                            </Tooltip>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
