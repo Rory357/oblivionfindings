@@ -10,6 +10,7 @@ use App\Models\DataBreachLog;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Timesheet;
+use App\Services\HealthSafety\HsGovernanceService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -17,7 +18,8 @@ use Illuminate\Support\Facades\Schema;
 class DashboardAggregatorService
 {
     public function __construct(
-        protected ?RoadmapDashboardService $roadmapDashboardService = null
+        protected ?RoadmapDashboardService $roadmapDashboardService = null,
+        protected ?HsGovernanceService $hsGovernanceService = null,
     ) {}
 
     public function captureSnapshot(string $periodType, ?Carbon $start = null, ?Carbon $end = null): DashboardSnapshot
@@ -42,6 +44,7 @@ class DashboardAggregatorService
             'control_room' => fn () => $this->getControlRoomMetrics($range),
             'incidents' => fn () => $this->getIncidentMetrics($range),
             'safeguarding' => fn () => $this->getSafeguardingMetrics($range),
+            'hs_backbone' => fn () => $this->getHsBackboneMetrics($range),
         ];
 
         foreach ($widgetMethods as $key => $callback) {
@@ -484,6 +487,15 @@ class DashboardAggregatorService
             'asset_incidents' => $recentIncidents,
             'status' => $overdueInspections > 5 ? 'warning' : 'good',
         ];
+    }
+
+    public function getHsBackboneMetrics(array $range): array
+    {
+        if (! $this->hsGovernanceService) {
+            return ['status' => 'unavailable', 'reason' => 'HsGovernanceService not injected'];
+        }
+
+        return $this->hsGovernanceService->getWidgetData($range);
     }
 
     protected function determineStatus(int $value, array $thresholds): string

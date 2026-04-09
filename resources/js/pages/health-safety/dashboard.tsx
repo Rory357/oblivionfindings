@@ -66,6 +66,35 @@ type Props = {
         status: string;
         site_name: string;
     }>;
+    backbone?: {
+        events: {
+            open_events: number;
+            open_events_high_critical: number;
+            events_period: number;
+            worksafe_notifiable_open: number;
+            events_by_severity: Record<string, number>;
+        };
+        investigations: {
+            active_investigations: number;
+            overdue_investigations: number;
+            awaiting_review: number;
+        };
+        corrective_actions: {
+            open_actions: number;
+            overdue_actions: number;
+            awaiting_verification: number;
+        };
+        risk_assessments: {
+            active_assessments: number;
+            high_extreme_active: number;
+            due_for_review: number;
+        };
+        training: {
+            total_requirements: number;
+            blocking_requirements: number;
+            staff_non_compliant: number;
+        };
+    };
 };
 
 /* ------------------------------------------------------------------ */
@@ -296,6 +325,7 @@ export default function HealthSafetyDashboard({
     recent_incidents,
     recent_hazards,
     recent_fleet_incidents = [],
+    backbone,
 }: Props) {
 
     /* -------------------------------------------------------------- */
@@ -615,6 +645,97 @@ export default function HealthSafetyDashboard({
                         </Card>
                     ))}
                 </div>
+
+                {/* ------------------------------------------------ */}
+                {/*  H&S Backbone Status (PR5)                       */}
+                {/* ------------------------------------------------ */}
+                {backbone && (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {/* Investigations */}
+                        <Link href="/health-safety/events?status=investigating" className="group" preserveScroll>
+                            <Card className="transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5">
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-medium text-muted-foreground">Active Investigations</span>
+                                        <Activity className="h-4 w-4 text-purple-500" />
+                                    </div>
+                                    <div className="mt-2 text-2xl font-bold">{backbone.investigations.active_investigations}</div>
+                                    <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                                        {backbone.investigations.overdue_investigations > 0 && (
+                                            <span className="text-red-600 font-medium">{backbone.investigations.overdue_investigations} overdue</span>
+                                        )}
+                                        {backbone.investigations.awaiting_review > 0 && (
+                                            <span className="text-amber-600">{backbone.investigations.awaiting_review} awaiting review</span>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+
+                        {/* Corrective Actions */}
+                        <Link href={backbone.corrective_actions.overdue_actions > 0 ? '/health-safety/corrective-actions?overdue=true' : '/health-safety/corrective-actions'} className="group">
+                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.corrective_actions.overdue_actions > 0 ? 'border-red-200 bg-red-50/40' : ''}`}>
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-medium text-muted-foreground">Open Corrective Actions</span>
+                                        <Clock className="h-4 w-4 text-amber-500" />
+                                    </div>
+                                    <div className="mt-2 text-2xl font-bold">{backbone.corrective_actions.open_actions}</div>
+                                    <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                                        {backbone.corrective_actions.overdue_actions > 0 && (
+                                            <span className="text-red-600 font-medium">{backbone.corrective_actions.overdue_actions} overdue</span>
+                                        )}
+                                        {backbone.corrective_actions.awaiting_verification > 0 && (
+                                            <span className="text-blue-600">{backbone.corrective_actions.awaiting_verification} awaiting verification</span>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+
+                        {/* Risk Assessments */}
+                        <Link href={backbone.risk_assessments.due_for_review > 0 ? '/health-safety/risk-assessments?due_for_review=true' : '/health-safety/risk-assessments?status=active'} className="group">
+                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.risk_assessments.due_for_review > 0 ? 'border-amber-200 bg-amber-50/40' : ''}`}>
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-medium text-muted-foreground">Active Risk Assessments</span>
+                                        <Shield className="h-4 w-4 text-blue-500" />
+                                    </div>
+                                    <div className="mt-2 text-2xl font-bold">{backbone.risk_assessments.active_assessments}</div>
+                                    <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                                        {backbone.risk_assessments.high_extreme_active > 0 && (
+                                            <span className="text-orange-600 font-medium">{backbone.risk_assessments.high_extreme_active} high/extreme</span>
+                                        )}
+                                        {backbone.risk_assessments.due_for_review > 0 && (
+                                            <span className="text-amber-600">{backbone.risk_assessments.due_for_review} due for review</span>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+
+                        {/* H&S Events Summary */}
+                        <Link href="/health-safety/events?status=open" className="group">
+                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.events.worksafe_notifiable_open > 0 ? 'border-red-200 bg-red-50/40' : ''}`}>
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-medium text-muted-foreground">Open H&S Events</span>
+                                        <FileWarning className="h-4 w-4 text-slate-500" />
+                                    </div>
+                                    <div className="mt-2 text-2xl font-bold">{backbone.events.open_events}</div>
+                                    <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                                        {backbone.events.open_events_high_critical > 0 && (
+                                            <span className="text-red-600 font-medium">{backbone.events.open_events_high_critical} high/critical</span>
+                                        )}
+                                        {backbone.events.worksafe_notifiable_open > 0 && (
+                                            <span className="text-red-700 font-semibold">{backbone.events.worksafe_notifiable_open} WorkSafe notifiable</span>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                    </div>
+                )}
 
                 {/* ------------------------------------------------ */}
                 {/*  Charts Row 2: Hazard Risk + Drill Compliance    */}

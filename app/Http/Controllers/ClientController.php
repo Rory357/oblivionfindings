@@ -45,6 +45,7 @@ use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetIncident;
+use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\ShiftCoverageService;
 use Illuminate\Support\Facades\Schema;
 
@@ -755,6 +756,7 @@ class ClientController extends Controller
             ]),
             'missingMandatoryConsents' => $missingMandatory->pluck('name')->values(),
             'transport' => \Inertia\Inertia::optional(fn () => $this->buildTransportData($client)),
+            'hs_summary' => \Inertia\Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
         ]);
     }
 

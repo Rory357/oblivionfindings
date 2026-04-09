@@ -10,6 +10,7 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\HealthSafety\HsVisibilityService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -533,6 +534,7 @@ class ControlRoomAlertController extends Controller
                 'categories' => \App\Models\ControlRoom\ConfigOption::forGroup('category'),
                 'resolution_codes' => \App\Models\ControlRoom\ConfigOption::forGroup('resolution_code'),
             ],
+            'linked_hs_event' => app(HsVisibilityService::class)->forControlRoomAlert($alert),
         ]);
     }
 

@@ -7,6 +7,8 @@ use App\Http\Controllers\HealthSafety\ReturnToWorkController;
 use App\Http\Controllers\HealthSafety\LoneWorkerController;
 use App\Http\Controllers\HealthSafety\PpeController;
 use App\Http\Controllers\HealthSafety\HealthSafetyDashboardController;
+use App\Http\Controllers\HealthSafety\HsEventController;
+use App\Http\Controllers\HealthSafety\HsGovernanceReportController;
 use App\Http\Controllers\HealthSafety\FirstAidController;
 use App\Http\Controllers\HealthSafety\RestraintController;
 use App\Http\Controllers\HealthSafety\SafeWorkProcedureController;
@@ -28,8 +30,25 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
     // ── Phase 4: Dashboard & Analytics ──────────────────────────────────
     Route::middleware('permission:hazards.view')->group(function () {
-    Route::get('/', [HealthSafetyDashboardController::class, 'index'])->name('dashboard');
-    Route::get('/analytics', [HealthSafetyDashboardController::class, 'analytics'])->name('analytics');
+        Route::get('/', [HealthSafetyDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/analytics', [HealthSafetyDashboardController::class, 'analytics'])->name('analytics');
+    });
+
+    // ── PR5: H&S Backbone Views (Events, Actions, Risk Assessments) ──
+    Route::middleware('permission:hazards.view')->group(function () {
+        Route::get('/events', [HsEventController::class, 'index'])->name('events.index');
+        Route::get('/events/{hsEvent}', [HsEventController::class, 'show'])->name('events.show');
+        Route::get('/corrective-actions', [HsEventController::class, 'correctiveActions'])->name('corrective-actions.index');
+        Route::get('/risk-assessments', [HsEventController::class, 'riskAssessments'])->name('risk-assessments.index');
+    });
+
+    // ── PR6: Governance & Compliance Reports ──
+    Route::middleware('permission:governance.view')->prefix('reports')->name('reports.')->group(function () {
+        Route::get('/board-summary', [HsGovernanceReportController::class, 'boardSummary'])->name('board-summary');
+        Route::get('/worksafe-register', [HsGovernanceReportController::class, 'worksafeRegister'])->name('worksafe-register');
+        Route::get('/investigation-outcomes', [HsGovernanceReportController::class, 'investigationOutcomes'])->name('investigation-outcomes');
+        Route::get('/corrective-action-traceability', [HsGovernanceReportController::class, 'correctiveActionTraceability'])->name('corrective-action-traceability');
+        Route::get('/risk-assessment-register', [HsGovernanceReportController::class, 'riskAssessmentRegister'])->name('risk-assessment-register');
     });
 
     // ── Phase 5A: First Aid Register ────────────────────────────────────

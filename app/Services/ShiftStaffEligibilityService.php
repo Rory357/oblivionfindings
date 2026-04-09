@@ -10,6 +10,7 @@ use App\Services\Eligibility\EligibilityResult;
 use App\Services\Eligibility\Rules\AvailabilityRule;
 use App\Services\Eligibility\Rules\DriverLicenceExpiryRule;
 use App\Services\Eligibility\Rules\FatigueRule;
+use App\Services\Eligibility\Rules\HsTrainingRule;
 use App\Services\Eligibility\Rules\SiteAssignmentRule;
 
 class ShiftStaffEligibilityService
@@ -23,6 +24,7 @@ class ShiftStaffEligibilityService
         protected FatigueRule $fatigueRule,
         protected SiteAssignmentRule $siteAssignmentRule,
         protected DriverLicenceExpiryRule $driverLicenceRule,
+        protected HsTrainingRule $hsTrainingRule,
     ) {}
 
     /**
@@ -53,6 +55,7 @@ class ShiftStaffEligibilityService
         $checks = array_merge($checks, $this->fatigueRule->evaluateAll($shift, $user));
         $checks[] = $this->siteAssignmentRule->evaluate($shift, $user);
         $checks[] = $this->driverLicenceRule->evaluate($shift, $user);
+        $checks = array_merge($checks, $this->hsTrainingRule->evaluateAll($shift, $user));
 
         return EligibilityResult::fromChecks($checks);
     }

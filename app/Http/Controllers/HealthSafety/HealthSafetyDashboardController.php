@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\WorkplaceInjury;
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Services\HealthSafety\HsDashboardService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,9 @@ use Inertia\Inertia;
 
 class HealthSafetyDashboardController extends Controller
 {
+    public function __construct(
+        private readonly HsDashboardService $dashboardService,
+    ) {}
     /**
      * H&S Dashboard with KPIs, trends, and recent activity.
      */
@@ -173,6 +177,9 @@ class HealthSafetyDashboardController extends Controller
                 'site_name' => $h->site?->name,
             ]);
 
+        // ── H&S Backbone summary (PR5 addition — additive) ──
+        $backboneSummary = $this->dashboardService->getDashboardSummary($thirtyDaysAgo);
+
         return Inertia::render('health-safety/dashboard', [
             'kpis' => $kpis,
             'incident_trends' => $incidentTrends,
@@ -186,6 +193,7 @@ class HealthSafetyDashboardController extends Controller
                 ->orderByDesc('occurred_at')
                 ->limit(5)
                 ->get(),
+            'backbone' => $backboneSummary,
         ]);
     }
 

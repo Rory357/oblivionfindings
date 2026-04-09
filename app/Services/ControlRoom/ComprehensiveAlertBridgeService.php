@@ -253,6 +253,10 @@ class ComprehensiveAlertBridgeService
         $context   = $data['context'] ?? [];
 
         // ── Deduplication: same source + alert_type + entity key within 30 minutes ──
+        // Escalation bypass: if the caller signals a severity escalation,
+        // only suppress if an alert of equal-or-higher severity already exists.
+        $isEscalation = ! empty($context['severity_escalation']);
+
         $dedupQuery = ControlRoomAlert::query()
             ->where('source', $source)
             ->where('alert_type', $alertType)
@@ -266,12 +270,21 @@ class ComprehensiveAlertBridgeService
             $dedupQuery->whereNull('client_id')->whereNull('asset_id');
         }
 
+        if ($isEscalation) {
+            // Only suppress if an alert at this severity or higher already exists
+            $severityOrder = ['low' => 0, 'medium' => 1, 'high' => 2, 'critical' => 3];
+            $currentRank = $severityOrder[$severity] ?? 0;
+            $atOrAbove = array_keys(array_filter($severityOrder, fn ($r) => $r >= $currentRank));
+            $dedupQuery->whereIn('severity', $atOrAbove);
+        }
+
         if ($dedupQuery->exists()) {
             Log::debug('ComprehensiveAlertBridge: duplicate suppressed', [
                 'source'     => $source,
                 'alert_type' => $alertType,
                 'client_id'  => $clientId,
                 'asset_id'   => $assetId,
+                'is_escalation' => $isEscalation,
             ]);
 
             return null;

@@ -12,6 +12,7 @@ use App\Models\FleetOuting;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
 use App\Models\Site;
+use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\NotificationService;
 use App\Services\ShiftCoverageService;
 use Illuminate\Http\Request;
@@ -376,6 +377,7 @@ class SiteController extends Controller
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],
             'fleet' => \Inertia\Inertia::optional(fn () => $this->buildSiteFleetData($site)),
+            'hs_summary' => \Inertia\Inertia::optional(fn () => app(HsModuleSummaryService::class)->forSite($site->id)),
         ]);
     }
 

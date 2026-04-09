@@ -5,9 +5,13 @@ namespace App\Providers;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Models\AssetMaintenanceLog;
+use App\Models\ClientIncident;
 use App\Models\ClientNote;
 use App\Models\FleetFuelLog;
+use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
+use App\Models\RestraintEvent;
+use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\SiteHazard;
@@ -15,19 +19,25 @@ use App\Models\SiteChecklistRun;
 use App\Models\ClientLedgerEntry;
 use App\Models\HouseLedgerEntry;
 use App\Models\Timesheet;
+use App\Models\WorkplaceInjury;
 use App\Observers\AssetMaintenanceLogObserver;
+use App\Observers\ClientIncidentObserver;
 use App\Observers\ClientLedgerEntryObserver;
 use App\Observers\ClientNoteObserver;
 use App\Observers\FleetFuelLogObserver;
+use App\Observers\FleetIncidentObserver;
 use App\Observers\HouseLedgerEntryObserver;
 use App\Observers\FleetWorkOrderObserver;
 use App\Observers\HrCourseEnrollmentObserver;
 use App\Observers\HrExpenseClaimObserver;
+use App\Observers\RestraintEventObserver;
+use App\Observers\SafeguardingConcernObserver;
 use App\Observers\ShiftObserver;
 use App\Observers\SiteObserver;
 use App\Observers\SiteHazardObserver;
 use App\Observers\SiteChecklistRunObserver;
 use App\Observers\TimesheetMileageObserver;
+use App\Observers\WorkplaceInjuryObserver;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
 use App\Services\AuditLogger;
@@ -65,6 +75,13 @@ class AppServiceProvider extends ServiceProvider
         Site::observe(SiteObserver::class);
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);
+
+        // H&S → Control Room bridge observers
+        ClientIncident::observe(ClientIncidentObserver::class);
+        SafeguardingConcern::observe(SafeguardingConcernObserver::class);
+        FleetIncident::observe(FleetIncidentObserver::class);
+        WorkplaceInjury::observe(WorkplaceInjuryObserver::class);
+        RestraintEvent::observe(RestraintEventObserver::class);
 
         // Financial event observers — operational costs → GL
         FleetFuelLog::observe(FleetFuelLogObserver::class);

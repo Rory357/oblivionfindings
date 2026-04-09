@@ -13,6 +13,21 @@ class RiskEventLink extends Model
 
     protected $table = 'risk_event_links';
 
+    /**
+     * Supported event types and their model classes.
+     *
+     * This map defines the governance-linkable event sources.
+     * Adding a new type here enables RiskRegisterEntry linkage
+     * to that source via the event() resolver.
+     */
+    public const EVENT_TYPE_MAP = [
+        'incident' => \App\Models\ClientIncident::class,
+        'alert' => \App\Models\ControlRoomAlert::class,
+        'safeguarding' => \App\Models\SafeguardingConcern::class,
+        'breach' => \App\Models\DataBreachLog::class,
+        'hs_event' => \App\Models\HsEvent::class,
+    ];
+
     protected $fillable = [
         'risk_register_entry_id',
         'event_type',
@@ -42,16 +57,17 @@ class RiskEventLink extends Model
 
     public function event()
     {
-        // Note: This requires careful implementation based on event_type
-        $modelClass = match($this->event_type) {
-            'incident' => \App\Models\ClientIncident::class,
-            'alert' => \App\Models\ControlRoomAlert::class,
-            'safeguarding' => \App\Models\SafeguardingConcern::class,
-            'breach' => \App\Models\DataBreachLog::class,
-            default => null,
-        };
-        
+        $modelClass = self::EVENT_TYPE_MAP[$this->event_type] ?? null;
+
         return $modelClass ? $modelClass::find($this->event_id) : null;
+    }
+
+    /**
+     * Check if a given event type is supported for governance linking.
+     */
+    public static function supportsEventType(string $type): bool
+    {
+        return isset(self::EVENT_TYPE_MAP[$type]);
     }
 
     public function scopeByType($query, string $type)
