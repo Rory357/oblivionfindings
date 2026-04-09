@@ -33,6 +33,8 @@ class HrPayrollRun extends Model
         'validation_errors',
         'journal_id',
         'gl_posted_at',
+        'cost_allocated_at',
+        'oncost_allocated_at',
         'created_by',
     ];
 
@@ -48,6 +50,8 @@ class HrPayrollRun extends Model
         'export_profile_id' => 'integer',
         'journal_id' => 'integer',
         'gl_posted_at' => 'datetime',
+        'cost_allocated_at' => 'datetime',
+        'oncost_allocated_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */

@@ -2,16 +2,32 @@
 
 namespace App\Providers;
 
+use App\Domain\Hr\Models\HrCourseEnrollment;
+use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Models\AssetMaintenanceLog;
 use App\Models\ClientNote;
+use App\Models\FleetFuelLog;
+use App\Models\FleetWorkOrder;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Models\SiteChecklistRun;
+use App\Models\ClientLedgerEntry;
+use App\Models\HouseLedgerEntry;
+use App\Models\Timesheet;
+use App\Observers\AssetMaintenanceLogObserver;
+use App\Observers\ClientLedgerEntryObserver;
 use App\Observers\ClientNoteObserver;
+use App\Observers\FleetFuelLogObserver;
+use App\Observers\HouseLedgerEntryObserver;
+use App\Observers\FleetWorkOrderObserver;
+use App\Observers\HrCourseEnrollmentObserver;
+use App\Observers\HrExpenseClaimObserver;
 use App\Observers\ShiftObserver;
 use App\Observers\SiteObserver;
 use App\Observers\SiteHazardObserver;
 use App\Observers\SiteChecklistRunObserver;
+use App\Observers\TimesheetMileageObserver;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
 use App\Services\AuditLogger;
@@ -49,6 +65,16 @@ class AppServiceProvider extends ServiceProvider
         Site::observe(SiteObserver::class);
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);
+
+        // Financial event observers — operational costs → GL
+        FleetFuelLog::observe(FleetFuelLogObserver::class);
+        FleetWorkOrder::observe(FleetWorkOrderObserver::class);
+        AssetMaintenanceLog::observe(AssetMaintenanceLogObserver::class);
+        HrExpenseClaim::observe(HrExpenseClaimObserver::class);
+        HrCourseEnrollment::observe(HrCourseEnrollmentObserver::class);
+        Timesheet::observe(TimesheetMileageObserver::class);
+        HouseLedgerEntry::observe(HouseLedgerEntryObserver::class);
+        ClientLedgerEntry::observe(ClientLedgerEntryObserver::class);
 
         // Register Socialite providers (Microsoft + Google)
         Event::listen(
@@ -94,6 +120,10 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(
             \App\Domain\Finance\Events\JournalPosted::class,
             \App\Listeners\Finance\LogJournalPosted::class
+        );
+        Event::listen(
+            \App\Domain\Finance\Events\JournalPosted::class,
+            \App\Listeners\Finance\AllocatePayrollCosts::class
         );
         Event::listen(
             \App\Domain\Roadmap\Events\InitiativeScored::class,

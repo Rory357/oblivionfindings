@@ -1,0 +1,230 @@
+import FleetHero from '@/components/fleet-hero';
+import { FleetStatCard } from '@/components/fleet-stat-card';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { formatCurrency } from '@/lib/fleet-utils';
+import type { BreadcrumbItem } from '@/types';
+import { Head, Link } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    BarChart3,
+    Building2,
+    DollarSign,
+    TrendingDown,
+    Users,
+} from 'lucide-react';
+
+type Insight = { type: string; severity: string; message: string; data: Record<string, any> };
+type SiteSummary = {
+    site_id: number;
+    site_name: string;
+    total_cost: string;
+    cost_per_resident: string;
+    avg_residents: string;
+    staffing: { wages: string; employer_oncost: string; total_staffing_cost: string; oncost_pct_of_wages: string };
+};
+
+type Props = {
+    kpis: {
+        period: { from: string; to: string };
+        site_kpis: {
+            avg_cost_per_resident: string;
+            total_cost: string;
+            cost_trend_pct: string;
+            highest_cost_site: { site_name: string; cost_per_resident: string } | null;
+            underfunded_count?: number;
+            sites_ranked: Array<{ site_id: number; site_name: string; total_cost: string; cost_per_resident: string }>;
+        };
+        client_kpis: {
+            client_count: number;
+            avg_client_cost: string;
+            highest_cost_client: { client_name: string; total_cost: string } | null;
+            underfunded_count: number;
+            top_outliers: Array<{ client_id: number; client_name: string; total_cost: string; weekly_gap: string; is_underfunded: boolean }>;
+        };
+        staffing_kpis: {
+            total_wages: string;
+            total_employer_oncost: string;
+            total_staffing_cost: string;
+            oncost_pct_of_wages: string;
+            staffing_pct_of_total_cost: string;
+        };
+    };
+    insights: Insight[];
+    siteSummaries: { sites: SiteSummary[] };
+    filters: { from: string; to: string };
+};
+
+const $ = (v: string | number) => formatCurrency(Number(v));
+const pct = (v: string | number) => `${Number(v).toFixed(1)}%`;
+
+const severityColor: Record<string, string> = {
+    critical: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800 dark:text-red-300',
+    warning: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300',
+    info: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-300',
+};
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Executive Dashboard' },
+];
+
+export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummaries, filters }: Props) {
+    const { site_kpis, client_kpis, staffing_kpis } = kpis;
+    const overBudgetCount = insights.filter(i => i.type === 'over_budget').length;
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Executive Financial Dashboard" />
+
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero */}
+                <FleetHero
+                    title="Executive Financial Dashboard"
+                    description="Organisation-wide financial overview and risk indicators"
+                    icon={<BarChart3 className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Sites', value: site_kpis.sites_ranked.length },
+                        { label: 'Clients', value: client_kpis.client_count },
+                    ]}
+                />
+
+                {/* Hero Cards */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <FleetStatCard
+                        label="Total Cost"
+                        value={$(site_kpis.total_cost)}
+                        icon={DollarSign}
+                        color="purple"
+                        subtitle={`${pct(site_kpis.cost_trend_pct)} vs previous`}
+                    />
+                    <FleetStatCard
+                        label="Underfunded Clients"
+                        value={client_kpis.underfunded_count}
+                        icon={client_kpis.underfunded_count > 0 ? AlertTriangle : Users}
+                        color={client_kpis.underfunded_count > 0 ? 'red' : 'cyan'}
+                        subtitle={`of ${client_kpis.client_count} total`}
+                    />
+                    <FleetStatCard
+                        label="Over-Budget Sites"
+                        value={overBudgetCount}
+                        icon={overBudgetCount > 0 ? AlertTriangle : Building2}
+                        color={overBudgetCount > 0 ? 'amber' : 'blue'}
+                        subtitle={`of ${site_kpis.sites_ranked.length} sites`}
+                    />
+                    <FleetStatCard
+                        label="Total Staffing"
+                        value={$(staffing_kpis.total_staffing_cost)}
+                        icon={TrendingDown}
+                        color="cyan"
+                        subtitle={`${pct(staffing_kpis.staffing_pct_of_total_cost)} of total`}
+                    />
+                </div>
+
+                {/* Insights */}
+                {insights.length > 0 && (
+                    <div className="space-y-2">
+                        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Top Risks & Issues</h2>
+                        <div className="space-y-2">
+                            {insights.map((insight, i) => (
+                                <div key={i} className={`flex items-start gap-3 rounded-lg border p-3 ${severityColor[insight.severity] || severityColor.info}`}>
+                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <span className="text-sm">{insight.message}</span>
+                                    <Badge variant={insight.severity === 'critical' ? 'destructive' : 'secondary'} className="ml-auto shrink-0 text-[10px]">
+                                        {insight.severity}
+                                    </Badge>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Sites + Clients Side by Side */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Highest Cost Sites */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Sites by Cost</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {siteSummaries.sites.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Site</TableHead>
+                                            <TableHead className="text-right">Total</TableHead>
+                                            <TableHead className="text-right">Per Resident</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {siteSummaries.sites.slice(0, 10).map((site) => (
+                                            <TableRow key={site.site_id}>
+                                                <TableCell>
+                                                    <Link href={`/finance/sites/${site.site_id}/financial-dashboard`} className="font-medium text-primary hover:underline">
+                                                        {site.site_name}
+                                                    </Link>
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">{$(site.total_cost)}</TableCell>
+                                                <TableCell className="text-right tabular-nums">{$(site.cost_per_resident)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
+                                    <Building2 className="h-8 w-8 text-muted-foreground/40" />
+                                    <p className="mt-2">No site cost data</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Highest Cost / Underfunded Clients */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Client Cost Outliers</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {client_kpis.top_outliers.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Client</TableHead>
+                                            <TableHead className="text-right">Total Cost</TableHead>
+                                            <TableHead className="text-right">Weekly Gap</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {client_kpis.top_outliers.slice(0, 10).map((c) => (
+                                            <TableRow key={c.client_id}>
+                                                <TableCell>
+                                                    <Link href={`/finance/clients/${c.client_id}/financials`} className="font-medium text-primary hover:underline">
+                                                        {c.client_name}
+                                                    </Link>
+                                                    {c.is_underfunded && (
+                                                        <Badge variant="destructive" className="ml-2 text-[10px]">Underfunded</Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right tabular-nums">{$(c.total_cost)}</TableCell>
+                                                <TableCell className={`text-right tabular-nums ${Number(c.weekly_gap) > 0 ? 'text-red-600' : ''}`}>
+                                                    {$(c.weekly_gap)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
+                                    <Users className="h-8 w-8 text-muted-foreground/40" />
+                                    <p className="mt-2">No client cost data</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </AppLayout>
+    );
+}

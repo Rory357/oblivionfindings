@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +20,7 @@ class AssetMaintenanceLog extends Model
         'cost',
         'notes',
         'next_due_at',
+        'journal_id',
     ];
 
     protected $casts = [
@@ -35,5 +37,10 @@ class AssetMaintenanceLog extends Model
     public function performedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'performed_by_user_id');
+    }
+
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,6 +32,7 @@ class HrExpenseClaim extends Model
         'paid_at',
         'rejection_reason',
         'notes',
+        'journal_id',
         'created_by',
     ];
 
@@ -63,6 +65,11 @@ class HrExpenseClaim extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 
     /* ------------------------------------------------------------------ */

@@ -1,6 +1,11 @@
 <?php
 
 use App\Domain\Finance\Http\Controllers\AccountingIntegrationController;
+use App\Domain\Finance\Http\Controllers\BudgetForecastApiController;
+use App\Domain\Finance\Http\Controllers\ClientFinancialsController;
+use App\Domain\Finance\Http\Controllers\ExecutiveFinancialDashboardController;
+use App\Domain\Finance\Http\Controllers\FinancialInsightsApiController;
+use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\AccountsReceivableController;
 use App\Domain\Finance\Http\Controllers\AuditExportController;
 use App\Domain\Finance\Http\Controllers\ConsolidationController;
@@ -46,6 +51,21 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // Dashboard
     Route::get('/dashboard', [FinanceDashboardController::class, 'index'])
         ->name('dashboard')
+        ->middleware('permission:finance.dashboard');
+
+    // Executive Financial Dashboard
+    Route::get('/executive-dashboard', [ExecutiveFinancialDashboardController::class, 'index'])
+        ->name('executive-dashboard')
+        ->middleware('permission:finance.dashboard');
+
+    // Site Financial Dashboard
+    Route::get('/sites/{site}/financial-dashboard', [SiteFinancialDashboardController::class, 'show'])
+        ->name('sites.financial-dashboard')
+        ->middleware('permission:finance.dashboard');
+
+    // Client Financials
+    Route::get('/clients/{client}/financials', [ClientFinancialsController::class, 'show'])
+        ->name('clients.financials')
         ->middleware('permission:finance.dashboard');
 
     // ── Chart of Accounts ───────────────────────────────────────────────
@@ -559,4 +579,42 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/donor-funds/{fund}/reports', [DonorFundController::class, 'reports'])
         ->name('donor-funds.reports')
         ->middleware('permission:finance.reports.view');
+
+    // ── Financial Insights API (JSON) ──────────────────────────────────
+    // These endpoints return JSON for dashboard widgets and async data loading.
+    Route::prefix('api')->name('api.')->middleware('permission:finance.dashboard')->group(function () {
+
+        // Site financial data
+        Route::get('/sites/overview', [FinancialInsightsApiController::class, 'sitesOverview'])
+            ->name('sites.overview');
+        Route::get('/sites/{site}/financial-summary', [FinancialInsightsApiController::class, 'siteFinancialSummary'])
+            ->name('sites.financial-summary');
+
+        // Client financial data
+        Route::get('/clients/{client}/financial-summary', [FinancialInsightsApiController::class, 'clientFinancialSummary'])
+            ->name('clients.financial-summary');
+        Route::get('/clients/{client}/ledger', [FinancialInsightsApiController::class, 'clientLedger'])
+            ->name('clients.ledger');
+
+        // KPIs
+        Route::get('/kpis', [FinancialInsightsApiController::class, 'kpis'])->name('kpis');
+        Route::get('/kpis/sites', [FinancialInsightsApiController::class, 'siteKpis'])->name('kpis.sites');
+        Route::get('/kpis/clients', [FinancialInsightsApiController::class, 'clientKpis'])->name('kpis.clients');
+
+        // Insights
+        Route::get('/insights', [FinancialInsightsApiController::class, 'insights'])->name('insights');
+
+        // Budgets
+        Route::get('/budgets', [BudgetForecastApiController::class, 'budgetOverview'])->name('budgets');
+        Route::get('/sites/{site}/budget', [BudgetForecastApiController::class, 'siteBudget'])->name('sites.budget');
+
+        // Variance
+        Route::get('/variance', [BudgetForecastApiController::class, 'organisationVariance'])->name('variance');
+        Route::get('/sites/{site}/variance', [BudgetForecastApiController::class, 'siteVariance'])->name('sites.variance');
+        Route::get('/sites/{site}/variance/trend', [BudgetForecastApiController::class, 'siteVarianceTrend'])->name('sites.variance.trend');
+
+        // Forecast
+        Route::get('/forecast', [BudgetForecastApiController::class, 'organisationForecast'])->name('forecast');
+        Route::get('/sites/{site}/forecast', [BudgetForecastApiController::class, 'siteForecast'])->name('sites.forecast');
+    });
 });

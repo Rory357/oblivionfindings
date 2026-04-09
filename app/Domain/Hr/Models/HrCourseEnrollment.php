@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,6 +25,7 @@ class HrCourseEnrollment extends Model
         'score',
         'certificate_path',
         'notes',
+        'journal_id',
     ];
 
     protected $casts = [
@@ -49,6 +51,11 @@ class HrCourseEnrollment extends Model
     public function session(): BelongsTo
     {
         return $this->belongsTo(HrCourseSession::class, 'session_id');
+    }
+
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 
     /* ------------------------------------------------------------------ */

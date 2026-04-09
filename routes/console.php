@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Finance\Jobs\PostLeaveProvisionJob;
+use App\Domain\Finance\Jobs\PostSiteRentJob;
+use App\Domain\Finance\Jobs\PostSiteUtilitiesJob;
 use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
 use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
 use App\Domain\Hr\Jobs\EscalateLeaveApprovalsJob;
@@ -170,6 +173,24 @@ app(Schedule::class)
     ->job(new ProcessLeaveBalanceAccrualJob)
     ->timezone('Pacific/Auckland')
     ->monthlyOn(1, '00:30');
+
+// Site rent posting: monthly on the 1st at 02:00 NZT
+app(Schedule::class)
+    ->job(new PostSiteRentJob)
+    ->timezone('Pacific/Auckland')
+    ->monthlyOn(1, '02:00');
+
+// Site utility costs: monthly on the 1st at 02:30 NZT
+app(Schedule::class)
+    ->job(new PostSiteUtilitiesJob)
+    ->timezone('Pacific/Auckland')
+    ->monthlyOn(1, '02:30');
+
+// Leave liability provision: monthly on the 1st at 01:00 (after accrual at 00:30)
+app(Schedule::class)
+    ->job(new PostLeaveProvisionJob)
+    ->timezone('Pacific/Auckland')
+    ->monthlyOn(1, '01:00');
 
 // Leave approval SLA escalations: every 30 minutes
 app(Schedule::class)

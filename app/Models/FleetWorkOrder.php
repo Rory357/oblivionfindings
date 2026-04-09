@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,7 @@ class FleetWorkOrder extends Model
         'estimated_cost',
         'actual_cost',
         'completion_notes',
+        'journal_id',
     ];
 
     protected $casts = [
@@ -50,5 +52,10 @@ class FleetWorkOrder extends Model
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 }

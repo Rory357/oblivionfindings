@@ -85,6 +85,16 @@ class FinJournal extends Model
         return $this->morphTo();
     }
 
+    public function financialEvents(): HasMany
+    {
+        return $this->hasMany(FinFinancialEvent::class, 'journal_id');
+    }
+
+    public function costAllocations(): HasMany
+    {
+        return $this->hasMany(FinCostAllocation::class, 'journal_id');
+    }
+
     public function scopeForOrganization($query, ?int $orgId)
     {
         return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));

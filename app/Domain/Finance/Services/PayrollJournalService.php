@@ -88,6 +88,16 @@ class PayrollJournalService
             ];
         }
 
+        // DR 5020 ACC Employer Levy (expense recognition for the employer ACC obligation)
+        if (bccomp($totalAccLevy, '0', 2) > 0) {
+            $lines[] = [
+                'account_id'  => $this->findAccountByCode($orgId, '5020')->id,
+                'description' => 'ACC Employer Levy',
+                'debit'       => $totalAccLevy,
+                'credit'      => 0,
+            ];
+        }
+
         // CR 2100 PAYE Payable
         if (bccomp($totalPaye, '0', 2) > 0) {
             $lines[] = [

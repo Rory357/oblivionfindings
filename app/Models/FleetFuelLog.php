@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinJournal;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -21,6 +22,7 @@ class FleetFuelLog extends Model
         'location',
         'receipt_path',
         'notes',
+        'journal_id',
     ];
 
     protected $casts = [
@@ -40,6 +42,11 @@ class FleetFuelLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 
     /**

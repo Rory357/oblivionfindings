@@ -46,6 +46,7 @@ import {
     Circle,
     ClipboardCheck,
     Cpu,
+    DollarSign,
     DoorOpen,
     FileText,
     Fuel,
@@ -607,6 +608,13 @@ export default function SiteShow({
                             {fleet && fleet.vehicles.length > 0 && (
                                 <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">{fleet.vehicles.length}</Badge>
                             )}
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="financials"
+                            className="flex items-center gap-1"
+                        >
+                            <DollarSign className="h-4 w-4" />
+                            Financials
                         </TabsTrigger>
                         {canSeeVendorsCredentials && (
                             <TabsTrigger
@@ -1626,6 +1634,26 @@ export default function SiteShow({
                                         )}
                                     </div>
                                 )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="financials">
+                        <Card>
+                            <CardContent className="flex flex-col items-center justify-center gap-4 py-12">
+                                <DollarSign className="h-10 w-10 text-purple-500/40" />
+                                <div className="text-center">
+                                    <p className="font-medium">Financial Dashboard</p>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        View detailed cost breakdowns, budgets, and trends for this site.
+                                    </p>
+                                </div>
+                                <Link href={`/finance/sites/${site.id}/financial-dashboard`}>
+                                    <Button>
+                                        <DollarSign className="mr-2 h-4 w-4" />
+                                        Open Financial Dashboard
+                                    </Button>
+                                </Link>
                             </CardContent>
                         </Card>
                     </TabsContent>

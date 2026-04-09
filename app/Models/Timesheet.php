@@ -64,6 +64,7 @@ class Timesheet extends Model
         'reconciliation_detected_at',
         'reconciliation_summary',
         'reconciliation_findings',
+        'mileage_journal_id',
     ];
 
     protected $casts = [
@@ -244,6 +245,11 @@ class Timesheet extends Model
     public function attendanceSession()
     {
         return $this->belongsTo(\App\Domain\Hr\Models\HrAttendanceSession::class, 'attendance_session_id');
+    }
+
+    public function mileageJournal()
+    {
+        return $this->belongsTo(\App\Domain\Finance\Models\FinJournal::class, 'mileage_journal_id');
     }
 
     public function shiftSite()

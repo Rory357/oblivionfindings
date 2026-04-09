@@ -45,6 +45,12 @@ class Site extends Model
         'onboarding_completed_at',
         'onboarding_progress',
         'primary_contact_user_id',
+        'rent_amount',
+        'rent_frequency',
+        'lease_start_date',
+        'lease_end_date',
+        'landlord_name',
+        'landlord_contact',
     ];
 
     protected $casts = [
@@ -56,6 +62,9 @@ class Site extends Model
         'risk_review_date' => 'date',
         'onboarding_completed_at' => 'datetime',
         'onboarding_progress' => 'array',
+        'rent_amount' => 'decimal:2',
+        'lease_start_date' => 'date',
+        'lease_end_date' => 'date',
     ];
 
     // Relationships
@@ -188,6 +197,16 @@ class Site extends Model
     public function feedback(): HasMany
     {
         return $this->hasMany(SiteFeedback::class);
+    }
+
+    public function utilities(): HasMany
+    {
+        return $this->hasMany(SiteUtility::class);
+    }
+
+    public function houseLedger(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(HouseLedger::class);
     }
 
     public function serviceContexts(): HasMany

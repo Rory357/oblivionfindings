@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinJournal;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,6 +28,7 @@ class HouseLedgerEntry extends Model
         'approved_at',
         'notes',
         'attachments',
+        'journal_id',
     ];
 
     protected $casts = [
@@ -52,5 +54,10 @@ class HouseLedgerEntry extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function journal(): BelongsTo
+    {
+        return $this->belongsTo(FinJournal::class, 'journal_id');
     }
 }
