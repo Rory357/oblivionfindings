@@ -151,6 +151,8 @@ interface Props {
         unassigned: number;
     };
     queues?: Array<{ name: string; tier: number; active_alerts: number }>;
+    sla_daily_trend?: Array<{ date: string; compliance_pct: number }>;
+    escalation_daily_trend?: Array<{ date: string; count: number }>;
 }
 
 const severityColors: Record<string, string> = {
@@ -235,6 +237,8 @@ export default function ControlRoomIndex({
     sites,
     workload,
     queues,
+    sla_daily_trend,
+    escalation_daily_trend,
 }: Props) {
     const [searchValue, setSearchValue] = useState(filters.search || '');
     const prevCriticalRef = useRef(stats.critical);
@@ -251,6 +255,7 @@ export default function ControlRoomIndex({
                         'sla_compliance_pct', 'active_shift', 'recent_activity',
                         'attention_flags', 'site_comparison', 'escalation_rate',
                         'workload', 'queues',
+                        'sla_daily_trend', 'escalation_daily_trend',
                     ],
                 });
             }
@@ -455,15 +460,15 @@ export default function ControlRoomIndex({
                     </div>
                 )}
 
-                {/* Row 3: Charts */}
+                {/* Row 3: Trend Charts (unified 3-column) */}
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                    {/* Area Chart - Alert Trend */}
-                    <Card className="lg:col-span-2">
+                    {/* Alert Volume Trend */}
+                    <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Alert Trend (14 Days)</CardTitle>
+                            <CardTitle className="text-sm font-medium">Alert Volume</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="h-52">
+                            <div className="h-48">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={daily_trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                                         <defs>
@@ -473,94 +478,115 @@ export default function ControlRoomIndex({
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                        <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                                        <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: 'hsl(var(--card))',
-                                                border: '1px solid hsl(var(--border))',
-                                                borderRadius: '8px',
-                                                fontSize: '12px',
-                                            }}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="count"
-                                            stroke="hsl(var(--primary))"
-                                            strokeWidth={2}
-                                            fill="url(#colorAlerts)"
-                                        />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                                        <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" allowDecimals={false} />
+                                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                                        <Area type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#colorAlerts)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Donut Chart - Severity Distribution */}
+                    {/* SLA Compliance Trend */}
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Unresolved by Severity</CardTitle>
+                            <CardTitle className="text-sm font-medium">SLA Compliance</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex h-52 items-center justify-center">
+                            <div className="h-48">
+                                {sla_daily_trend && sla_daily_trend.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={sla_daily_trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="colorSla" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                                            <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" domain={[0, 100]} />
+                                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v: number) => [`${v}%`, 'Compliance']} />
+                                            <Area type="monotone" dataKey="compliance_pct" stroke="#22c55e" strokeWidth={2} fill="url(#colorSla)" />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No SLA data for this period</div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Escalation Trend */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Escalations</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-48">
+                                {escalation_daily_trend && escalation_daily_trend.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={escalation_daily_trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                                            <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" allowDecimals={false} />
+                                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v: number) => [v, 'Escalated']} />
+                                            <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No escalations in this period</div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Row 4: Distribution + Insights */}
+                <div className="mt-4 grid gap-4 lg:grid-cols-4">
+                    {/* Severity Donut */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Severity</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex h-44 items-center justify-center">
                                 {totalUnresolved > 0 ? (
                                     <div className="relative">
-                                        <ResponsiveContainer width={180} height={180}>
+                                        <ResponsiveContainer width={150} height={150}>
                                             <PieChart>
-                                                <Pie
-                                                    data={donutData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={55}
-                                                    outerRadius={80}
-                                                    paddingAngle={2}
-                                                    dataKey="value"
-                                                >
+                                                <Pie data={donutData} cx="50%" cy="50%" innerRadius={42} outerRadius={65} paddingAngle={2} dataKey="value">
                                                     {donutData.map((entry) => (
                                                         <Cell key={entry.name} fill={DONUT_COLORS[entry.name] || '#94a3b8'} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip
-                                                    formatter={(value: number, name: string) => [value, name]}
-                                                    contentStyle={{
-                                                        backgroundColor: 'hsl(var(--card))',
-                                                        border: '1px solid hsl(var(--border))',
-                                                        borderRadius: '8px',
-                                                        fontSize: '12px',
-                                                    }}
-                                                />
+                                                <Tooltip formatter={(value: number, name: string) => [value, name]} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                            <span className="text-2xl font-bold">{totalUnresolved}</span>
-                                            <span className="text-[10px] text-muted-foreground">Unresolved</span>
+                                            <span className="text-xl font-bold">{totalUnresolved}</span>
+                                            <span className="text-[9px] text-muted-foreground">Unresolved</span>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                        <Shield className="h-10 w-10" />
-                                        <span className="text-sm">All clear</span>
+                                        <Shield className="h-8 w-8" />
+                                        <span className="text-xs">All clear</span>
                                     </div>
                                 )}
                             </div>
-                            {/* Legend */}
-                            <div className="mt-2 flex flex-wrap justify-center gap-3">
+                            <div className="mt-1 flex flex-wrap justify-center gap-2">
                                 {donutData.map((d) => (
-                                    <div key={d.name} className="flex items-center gap-1.5 text-xs">
-                                        <span
-                                            className="inline-block h-2.5 w-2.5 rounded-full"
-                                            style={{ backgroundColor: DONUT_COLORS[d.name] }}
-                                        />
+                                    <div key={d.name} className="flex items-center gap-1 text-[10px]">
+                                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: DONUT_COLORS[d.name] }} />
                                         <span className="capitalize">{d.name}: {d.value}</span>
                                     </div>
                                 ))}
                             </div>
                         </CardContent>
                     </Card>
-                </div>
 
-                {/* Row 4: Secondary Insights */}
-                <div className="mt-4 grid gap-4 lg:grid-cols-3">
                     {/* Top Alert Types */}
                     <Card>
                         <CardHeader className="pb-2">

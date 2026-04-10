@@ -217,6 +217,10 @@ class ControlRoomDashboardController extends Controller
             'sla_compliance_pct' => (int) $sla['compliance_pct'],
             'escalation_rate' => $escalation['escalation_rate'],
 
+            // Daily trend data for SLA + escalation charts
+            'sla_daily_trend' => $this->buildSlaDailyTrend($from, $to, $siteId),
+            'escalation_daily_trend' => $this->buildEscalationDailyTrend($from, $to, $siteId),
+
             // PR12 additions
             'attention_flags' => $attentionFlags,
             'site_comparison' => $siteComparison,
@@ -245,5 +249,53 @@ class ControlRoomDashboardController extends Controller
                 'viewReports' => $user->canDo('controlRoom.reports.view'),
             ],
         ]);
+    }
+
+    /**
+     * Build daily SLA compliance trend data.
+     *
+     * Returns array of {date, compliance_pct} for each day in range.
+     */
+    private function buildSlaDailyTrend(Carbon $from, Carbon $to, ?int $siteId): array
+    {
+        $rows = \App\Models\ControlRoom\AlertSla::query()
+            ->whereBetween('created_at', [$from, $to])
+            ->when($siteId, fn ($q) => $q->whereHas('alert', fn ($aq) => $aq->where('site_id', $siteId)))
+            ->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('COUNT(*) as total'),
+                DB::raw("SUM(CASE WHEN acknowledge_breached = 1 OR response_breached = 1 OR resolution_breached = 1 THEN 1 ELSE 0 END) as breached")
+            )
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('date')
+            ->get();
+
+        return $rows->map(fn ($r) => [
+            'date' => $r->date,
+            'compliance_pct' => $r->total > 0
+                ? (int) round((($r->total - $r->breached) / $r->total) * 100)
+                : 100,
+        ])->values()->toArray();
+    }
+
+    /**
+     * Build daily escalation count trend data.
+     */
+    private function buildEscalationDailyTrend(Carbon $from, Carbon $to, ?int $siteId): array
+    {
+        return ControlRoomAlert::query()
+            ->whereBetween('triggered_at', [$from, $to])
+            ->where('escalation_level', '>', 0)
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->select(
+                DB::raw('DATE(triggered_at) as date'),
+                DB::raw('COUNT(*) as count')
+            )
+            ->groupBy(DB::raw('DATE(triggered_at)'))
+            ->orderBy('date')
+            ->get()
+            ->map(fn ($r) => ['date' => $r->date, 'count' => (int) $r->count])
+            ->values()
+            ->toArray();
     }
 }
