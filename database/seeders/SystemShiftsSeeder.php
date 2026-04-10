@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -102,8 +103,33 @@ class SystemShiftsSeeder extends Seeder
             ]);
             $this->seedTasks($shiftY, $taskTemplates, $worker, true, true);
 
-            // Timesheet for the completed shift
-            Timesheet::firstOrCreate([
+            // Attendance evidence for the completed shift (required by reconciliation).
+            // A worker may be assigned to multiple clients, so skip if they already
+            // have an overlapping attendance session (safety invariant rejects overlaps).
+            $hasExistingSession = HrAttendanceSession::query()
+                ->where('user_id', $worker->id)
+                ->whereNotNull('clock_in_at')
+                ->where('clock_in_at', '<', $shiftY->actual_ends_at ?? $shiftY->ends_at)
+                ->where(fn ($q) => $q->whereNull('clock_out_at')->orWhere('clock_out_at', '>', $shiftY->actual_starts_at ?? $shiftY->starts_at))
+                ->exists();
+
+            if (! $hasExistingSession) {
+                HrAttendanceSession::firstOrCreate([
+                    'shift_id' => $shiftY->id,
+                    'user_id' => $worker->id,
+                ], [
+                    'clock_in_at' => $shiftY->actual_starts_at ?? $shiftY->starts_at,
+                    'clock_out_at' => $shiftY->actual_ends_at ?? $shiftY->ends_at,
+                    'break_minutes' => 0,
+                    'status' => 'closed',
+                    'source' => 'seeder',
+                    'created_by' => $worker->id,
+                ]);
+            }
+
+            // Timesheet for the completed shift — create as draft, then promote
+            // to submitted only if attendance evidence exists (reconciliation requires it).
+            $timesheet = Timesheet::firstOrCreate([
                 'shift_id' => $shiftY->id,
                 'user_id' => $worker->id,
             ], [
@@ -111,9 +137,14 @@ class SystemShiftsSeeder extends Seeder
                 'work_date' => $yesterday->toDateString(),
                 'starts_at' => $shiftY->actual_starts_at ?? $shiftY->starts_at,
                 'ends_at' => $shiftY->actual_ends_at ?? $shiftY->ends_at,
-                'status' => 'submitted',
+                'status' => 'draft',
                 'created_by' => $worker->id,
             ]);
+
+            if (! $hasExistingSession) {
+                // We created attendance above — safe to submit
+                $timesheet->update(['status' => 'submitted']);
+            }
         }
     }
 
