@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AlertSeverity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,34 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ControlRoomAlert extends Model
 {
     use HasFactory;
+
+    // --- Lifecycle statuses ---
+    public const STATUS_OPEN = 'open';
+    public const STATUS_ACK = 'ack';
+    public const STATUS_TRIAGING = 'triaging';
+    public const STATUS_RESOLVED = 'resolved';
+    public const STATUS_CLOSED = 'closed';
+
+    public const VALID_STATUSES = [
+        self::STATUS_OPEN,
+        self::STATUS_ACK,
+        self::STATUS_TRIAGING,
+        self::STATUS_RESOLVED,
+        self::STATUS_CLOSED,
+    ];
+
+    /**
+     * Valid state transitions. Each key lists the statuses it may transition TO.
+     */
+    public const ALLOWED_TRANSITIONS = [
+        self::STATUS_OPEN => [self::STATUS_ACK, self::STATUS_TRIAGING, self::STATUS_RESOLVED],
+        self::STATUS_ACK => [self::STATUS_TRIAGING, self::STATUS_RESOLVED],
+        self::STATUS_TRIAGING => [self::STATUS_RESOLVED, self::STATUS_CLOSED],
+        self::STATUS_RESOLVED => [self::STATUS_CLOSED],
+        self::STATUS_CLOSED => [],
+    ];
+
+    public const MAX_ESCALATION_LEVEL = 5;
 
     protected $fillable = [
         'source',
@@ -203,5 +232,68 @@ class ControlRoomAlert extends Model
     public function scopeAssignedTo($query, $userId)
     {
         return $query->where('assigned_to_user_id', $userId);
+    }
+
+    // --- Lifecycle validation ---
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $alert): void {
+            // Ensure triggered_at is never null
+            $alert->triggered_at ??= now();
+
+            // Ensure status is valid
+            if (!in_array($alert->status, self::VALID_STATUSES, true)) {
+                $alert->status = self::STATUS_OPEN;
+            }
+
+            // Normalise severity
+            $alert->severity = AlertSeverity::normalise($alert->severity);
+
+            // Bound escalation level
+            $alert->escalation_level = min((int) ($alert->escalation_level ?? 0), self::MAX_ESCALATION_LEVEL);
+        });
+
+        static::updating(function (self $alert): void {
+            // Normalise severity on update
+            if ($alert->isDirty('severity')) {
+                $alert->severity = AlertSeverity::normalise($alert->severity);
+            }
+
+            // Bound escalation level on update
+            if ($alert->isDirty('escalation_level')) {
+                $alert->escalation_level = min((int) $alert->escalation_level, self::MAX_ESCALATION_LEVEL);
+            }
+        });
+    }
+
+    /**
+     * Check if a status transition is valid.
+     */
+    public function canTransitionTo(string $newStatus): bool
+    {
+        if (!in_array($newStatus, self::VALID_STATUSES, true)) {
+            return false;
+        }
+
+        $allowed = self::ALLOWED_TRANSITIONS[$this->status] ?? [];
+
+        return in_array($newStatus, $allowed, true);
+    }
+
+    /**
+     * Check if the alert is in a terminal state.
+     */
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_CLOSED], true);
+    }
+
+    /**
+     * Check if the alert is actionable (can receive triage actions).
+     */
+    public function isActionable(): bool
+    {
+        return !$this->isTerminal();
     }
 }

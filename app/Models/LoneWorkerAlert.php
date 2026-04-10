@@ -8,6 +8,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * Lone Worker Alert — legacy domain record.
+ *
+ * @deprecated PR4: Lone worker operational alerts now flow through the canonical
+ *             signal pipeline via LoneWorkerSignalService → SignalProcessingService
+ *             → ControlRoomAlert.
+ *
+ *             This model is RETAINED for:
+ *             - backward compatibility with the lone worker UI during transition
+ *             - reading historical alert data
+ *
+ *             The canonical operational lifecycle (triage, SLA, escalation,
+ *             playbooks) lives on ControlRoomAlert where source='lone_worker'.
+ *
+ * @see \App\Services\HealthSafety\LoneWorkerSignalService — canonical signal emission
+ * @see \App\Models\ControlRoomAlert — canonical operational alert
+ */
 class LoneWorkerAlert extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;

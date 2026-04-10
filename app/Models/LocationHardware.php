@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
-use App\Models\ControlRoom\Alert;
+use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -108,9 +108,15 @@ class LocationHardware extends Model
         return $this->hasMany(IntegrationEvent::class, 'hardware_id');
     }
 
+    /**
+     * Get canonical Control Room alerts for this hardware device.
+     *
+     * Integration events now create ControlRoomAlert records via the signal pipeline.
+     * The device_id field on ControlRoomAlert stores the hardware_id.
+     */
     public function alerts(): HasMany
     {
-        return $this->hasMany(Alert::class, 'hardware_id');
+        return $this->hasMany(ControlRoomAlert::class, 'device_id');
     }
 
     /* ---------------------------------------------------------------

@@ -8,9 +8,16 @@ use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDashboardAlert;
+use App\Services\Medication\MedicationSignalService;
 
 class MedicationIncidentIntegrationService
 {
+    public function __construct(
+        protected ?MedicationSignalService $signalService = null,
+    ) {
+        $this->signalService ??= app(MedicationSignalService::class);
+    }
+
     /**
      * Auto-create incident draft for missed dose
      */
@@ -41,13 +48,31 @@ class MedicationIncidentIntegrationService
         // Link to medication
         $this->linkToMedication($incident, $medication);
 
-        // Create dashboard alert
+        // Dashboard alert (UI compat)
         MedicationDashboardAlert::createOrUpdateAlert(
             $client->id,
             'missed_dose',
             'warning',
             "Missed dose: {$medication->name} scheduled for " . ($administration->scheduled_for?->format('H:i') ?? 'unknown time'),
             $medication->id
+        );
+
+        // Operational signal → Control Room
+        $severity = $medication->controlled_drug ? 'high' : ($medication->high_risk ? 'high' : 'medium');
+        $this->signalService->emit(
+            MedicationSignalService::TYPE_MISSED_DOSE,
+            $client->id,
+            $severity,
+            "Missed dose: {$medication->name} scheduled for " . ($administration->scheduled_for?->format('H:i') ?? 'unknown time'),
+            [
+                'client_medication_id' => $medication->id,
+                'administration_id' => $administration->id,
+                'medication_name' => $medication->name,
+                'scheduled_for' => $administration->scheduled_for?->toIso8601String(),
+                'controlled_drug' => $medication->controlled_drug,
+                'high_risk' => $medication->high_risk,
+                'site_id' => $client->site_id,
+            ],
         );
 
         return $incident;
@@ -94,6 +119,24 @@ class MedicationIncidentIntegrationService
             $medication->id
         );
 
+        // Operational signal → Control Room
+        $this->signalService->emit(
+            MedicationSignalService::TYPE_PRN_OVER_LIMIT,
+            $client->id,
+            'critical',
+            "PRN limit exceeded: {$medication->name} ({$count24h}/{$maxPerDay})",
+            [
+                'client_medication_id' => $medication->id,
+                'medication_name' => $medication->name,
+                'prn_count_24h' => $count24h,
+                'max_per_day' => $maxPerDay,
+                'attempted_by' => $attemptedBy,
+                'controlled_drug' => $medication->controlled_drug,
+                'high_risk' => $medication->high_risk,
+                'site_id' => $client->site_id,
+            ],
+        );
+
         return $incident;
     }
 
@@ -121,13 +164,28 @@ class MedicationIncidentIntegrationService
 
         $this->linkToMedication($incident, $medication);
 
-        // Lock further controlled drug actions until resolved
+        // Dashboard alert (UI compat)
         MedicationDashboardAlert::createOrUpdateAlert(
             $client->id,
             'controlled_discrepancy',
             'critical',
             "Controlled drug discrepancy: {$medication->name} (diff: {$discrepancy->difference})",
             $medication->id
+        );
+
+        // Operational signal → Control Room
+        $this->signalService->emit(
+            MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
+            $client->id,
+            'critical',
+            "Controlled drug discrepancy: {$medication->name} (diff: {$discrepancy->difference})",
+            [
+                'client_medication_id' => $medication->id,
+                'medication_name' => $medication->name,
+                'discrepancy_id' => $discrepancy->id,
+                'difference' => $discrepancy->difference,
+                'site_id' => $client->site_id,
+            ],
         );
 
         return $incident;
@@ -208,6 +266,26 @@ class MedicationIncidentIntegrationService
             $hoursLate > 4 ? 'critical' : 'warning',
             "Late dose: {$medication->name} ({$hoursLate}h late)",
             $medication->id
+        );
+
+        // Operational signal → Control Room
+        $severity = $hoursLate > 4 ? 'high' : 'medium';
+        $this->signalService->emit(
+            MedicationSignalService::TYPE_LATE_DOSE,
+            $client->id,
+            $severity,
+            "Late dose: {$medication->name} ({$hoursLate}h late)",
+            [
+                'client_medication_id' => $medication->id,
+                'administration_id' => $administration->id,
+                'medication_name' => $medication->name,
+                'hours_late' => $hoursLate,
+                'scheduled_for' => $administration->scheduled_for?->toIso8601String(),
+                'administered_at' => $administration->administered_at?->toIso8601String(),
+                'controlled_drug' => $medication->controlled_drug,
+                'high_risk' => $medication->high_risk,
+                'site_id' => $client->site_id,
+            ],
         );
 
         return $incident;

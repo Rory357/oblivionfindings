@@ -13,11 +13,19 @@ class WebhookReceiverController extends Controller
 {
     /**
      * Receive a webhook from an external provider.
+     *
+     * This is the ONLY entry point for integration-originated events.
+     * The flow is:
+     *   1. Authenticate via X-Integration-Key header
+     *   2. Parse provider-specific payload
+     *   3. Deduplicate via source_event_id
+     *   4. Persist as IntegrationEvent
+     *   5. Route through AlertRoutingService → signal pipeline → ControlRoomAlert
      */
     public function receive(Request $request, string $provider)
     {
         try {
-            // Validate API key from request header
+            // --- Step 1: Authenticate ---
             $apiKey = $request->header('X-Integration-Key');
 
             if (! $apiKey) {
@@ -32,7 +40,16 @@ class WebhookReceiverController extends Controller
                 ->connected()
                 ->get()
                 ->first(function (IntegrationTenantSecret $secret) use ($apiKey) {
-                    return decrypt($secret->secret_encrypted) === $apiKey;
+                    try {
+                        return decrypt($secret->secret_encrypted) === $apiKey;
+                    } catch (\Throwable $e) {
+                        Log::warning('WebhookReceiver: failed to decrypt tenant secret', [
+                            'secret_id' => $secret->id,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        return false;
+                    }
                 });
 
             if (! $tenantSecret) {
@@ -43,7 +60,7 @@ class WebhookReceiverController extends Controller
             $signature = $request->header('X-Webhook-Signature');
             if ($signature && $apiKey) {
                 $expectedSignature = hash_hmac('sha256', $request->getContent(), $apiKey);
-                if (!hash_equals($expectedSignature, $signature)) {
+                if (! hash_equals($expectedSignature, $signature)) {
                     return response()->json(['error' => 'Invalid signature'], 401);
                 }
             }
@@ -51,11 +68,16 @@ class WebhookReceiverController extends Controller
             $tenantId = $tenantSecret->tenant_id;
             $payload = $request->all();
 
-            // Parse provider-specific payload
+            // --- Step 2: Parse provider-specific payload ---
             $parsed = $this->parsePayload($provider, $payload);
 
-            // Check for duplicate (idempotent)
-            if ($parsed['source_event_id']) {
+            // Ensure event_type is never empty — critical for signal classification
+            if (empty($parsed['event_type']) || $parsed['event_type'] === 'unknown') {
+                $parsed['event_type'] = $this->inferEventType($provider, $payload) ?? 'unknown';
+            }
+
+            // --- Step 3: Deduplicate ---
+            if (! empty($parsed['source_event_id'])) {
                 $existing = IntegrationEvent::where('provider', $provider)
                     ->where('source_event_id', $parsed['source_event_id'])
                     ->first();
@@ -66,36 +88,42 @@ class WebhookReceiverController extends Controller
                         'event_id' => $existing->id,
                     ], 200);
                 }
+            } else {
+                Log::info('WebhookReceiver: no source_event_id — dedup check skipped', [
+                    'provider' => $provider,
+                    'event_type' => $parsed['event_type'],
+                ]);
             }
 
-            // Create the integration event
+            // --- Step 4: Persist the integration event ---
             $event = IntegrationEvent::create([
                 'tenant_id' => $tenantId,
                 'site_id' => $parsed['site_id'],
                 'provider' => $provider,
-                'source_app' => $parsed['source_app'],
+                'source_app' => $parsed['source_app'] ?? $provider,
                 'source_event_id' => $parsed['source_event_id'],
-                'occurred_at' => $parsed['occurred_at'] ?? now(),
+                'occurred_at' => $this->parseTimestamp($parsed['occurred_at']),
                 'received_at' => now(),
                 'severity' => $parsed['severity'] ?? IntegrationEvent::SEVERITY_INFO,
                 'event_type' => $parsed['event_type'],
-                'normalized_payload' => $parsed['normalized_payload'],
+                'normalized_payload' => $parsed['normalized_payload'] ?? [],
                 'raw_payload' => $payload,
             ]);
 
-            // Route through AlertRoutingService if severity warrants
+            // --- Step 5: Route through signal pipeline ---
             $routingService = app(AlertRoutingService::class);
-            $alert = $routingService->processEvent($event);
+            $routingService->processEvent($event);
 
             return response()->json([
                 'status' => 'accepted',
                 'event_id' => $event->id,
             ], 200);
         } catch (\Throwable $e) {
-            Log::error('Webhook receiver error', [
+            Log::error('WebhookReceiver: unhandled error', [
                 'provider' => $provider,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
+                'payload_keys' => array_keys($request->all()),
             ]);
 
             return response()->json([
@@ -184,7 +212,11 @@ class WebhookReceiverController extends Controller
     }
 
     /**
-     * Map provider severity values to our internal severity levels.
+     * Map provider severity values to our internal 3-level severity.
+     *
+     * This is the raw provider → IntegrationEvent mapping. The final
+     * canonical 4-level mapping (low/medium/high/critical) happens in
+     * IntegrationSignalNormaliser::resolveSeverity().
      */
     protected function mapSeverity(?string $value): string
     {
@@ -192,12 +224,69 @@ class WebhookReceiverController extends Controller
             return IntegrationEvent::SEVERITY_INFO;
         }
 
-        $value = strtolower($value);
+        $value = strtolower(trim($value));
 
         return match (true) {
-            in_array($value, ['critical', 'emergency', 'fatal', 'urgent', '1']) => IntegrationEvent::SEVERITY_CRITICAL,
-            in_array($value, ['warn', 'warning', 'high', 'major', '2', '3']) => IntegrationEvent::SEVERITY_WARN,
+            in_array($value, ['critical', 'emergency', 'fatal', 'urgent', '1'], true) => IntegrationEvent::SEVERITY_CRITICAL,
+            in_array($value, ['warn', 'warning', 'high', 'major', '2', '3'], true) => IntegrationEvent::SEVERITY_WARN,
             default => IntegrationEvent::SEVERITY_INFO,
         };
+    }
+
+    /**
+     * Attempt to infer event type from raw payload when parsers return 'unknown'.
+     *
+     * Looks for common field patterns across providers.
+     */
+    protected function inferEventType(string $provider, array $payload): ?string
+    {
+        // Try common field names
+        foreach (['event_type', 'eventType', 'type', 'key', 'alarm_type', 'alarmType', 'action'] as $field) {
+            if (! empty($payload[$field]) && is_string($payload[$field])) {
+                return strtolower($payload[$field]);
+            }
+        }
+
+        // Check nested structures
+        if (isset($payload['event']['type']) && is_string($payload['event']['type'])) {
+            return strtolower($payload['event']['type']);
+        }
+
+        if (isset($payload['data']['type']) && is_string($payload['data']['type'])) {
+            return strtolower($payload['data']['type']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Safely parse a timestamp value that may be a string, int (unix), or null.
+     */
+    protected function parseTimestamp(mixed $value): ?\Illuminate\Support\Carbon
+    {
+        if (empty($value)) {
+            return now();
+        }
+
+        try {
+            if (is_numeric($value)) {
+                // Unix timestamp (seconds or milliseconds)
+                $ts = (int) $value;
+                if ($ts > 1e12) {
+                    $ts = (int) ($ts / 1000); // milliseconds → seconds
+                }
+
+                return \Illuminate\Support\Carbon::createFromTimestamp($ts);
+            }
+
+            return \Illuminate\Support\Carbon::parse($value);
+        } catch (\Throwable $e) {
+            Log::warning('WebhookReceiver: unparseable timestamp, using now()', [
+                'value' => $value,
+                'error' => $e->getMessage(),
+            ]);
+
+            return now();
+        }
     }
 }

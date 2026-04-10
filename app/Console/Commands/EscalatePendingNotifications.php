@@ -13,10 +13,40 @@ use Illuminate\Console\Command;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Carbon;
 
+/**
+ * Re-notify or escalate pending WORKFLOW notifications based on admin-configured rules.
+ *
+ * ARCHITECTURAL NOTE (PR6):
+ * This command handles WORKFLOW notification escalation ONLY.
+ *
+ * OPERATIONAL alert escalation (incidents, safety events, medication, lone worker, etc.)
+ * is handled exclusively by the Control Room escalation engine:
+ *   - CheckControlRoomSlaBreaches (SLA-driven)
+ *   - AutoEscalateControlRoomQueues (queue-driven)
+ *
+ * Event keys prefixed with operational domains are SKIPPED by this command.
+ * Only workflow events (timesheets, leave, expenses, onboarding, etc.) are processed.
+ *
+ * Do NOT add operational event keys back into this command's scope.
+ */
 class EscalatePendingNotifications extends Command
 {
     protected $signature = 'notifications:escalate';
-    protected $description = 'Re-notify or escalate pending notifications based on admin-configured escalation rules.';
+    protected $description = 'Re-notify pending workflow notifications based on admin-configured escalation rules.';
+
+    /**
+     * Event key prefixes that are now handled by Control Room escalation.
+     * These are EXCLUDED from this command's processing.
+     */
+    protected const OPERATIONAL_EVENT_PREFIXES = [
+        'incidents.',
+        'followups.',
+        'controlroom.',
+        'medication.',
+        'lone_worker.',
+        'safeguarding.',
+        'hazard.',
+    ];
 
     public function handle(): int
     {
@@ -28,13 +58,34 @@ class EscalatePendingNotifications extends Command
 
         $now = now();
         $sent = 0;
+        $skipped = 0;
 
         foreach ($rules as $rule) {
+            // Skip operational event keys — these are now escalated by Control Room
+            if ($this->isOperationalEventKey($rule->event_key)) {
+                $skipped++;
+                continue;
+            }
+
             $sent += $this->processRule($rule, $now);
         }
 
-        $this->info("Escalation run complete. Sent {$sent} reminder notifications.");
+        $this->info("Escalation run complete. Sent {$sent} reminders. Skipped {$skipped} operational rules (handled by Control Room).");
         return self::SUCCESS;
+    }
+
+    /**
+     * Check if an event key belongs to an operational domain now handled by Control Room.
+     */
+    protected function isOperationalEventKey(string $eventKey): bool
+    {
+        foreach (self::OPERATIONAL_EVENT_PREFIXES as $prefix) {
+            if (str_starts_with($eventKey, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function processRule(NotificationEscalationRule $rule, Carbon $now): int
@@ -66,7 +117,6 @@ class EscalatePendingNotifications extends Command
         $sent = 0;
         foreach ($pending as $n) {
             if ($this->shouldStopBecauseEntityResolved($n)) {
-                // Treat as resolved; do not continue reminders.
                 $n->forceFill([
                     'last_escalated_at' => $now,
                     'escalation_count' => (int) $n->escalation_count,
@@ -79,7 +129,6 @@ class EscalatePendingNotifications extends Command
             $payload['reminder_number'] = ((int) $n->escalation_count) + 1;
             $payload['title'] = 'Reminder: ' . (string) ($payload['title'] ?? 'Notification');
 
-            // Add a little more context for auditability / clarity
             $payload['context'] = array_merge((array) ($payload['context'] ?? []), [
                 'Reminder' => '#' . $payload['reminder_number'],
             ]);
@@ -88,7 +137,6 @@ class EscalatePendingNotifications extends Command
 
             $recipients = $this->resolveEscalationRecipients($n, $rule, $reminderNumber);
 
-            // If force delivery is on, bypass user notification preferences.
             if (!$rule->force_delivery) {
                 $svc = app(NotificationService::class);
                 $recipients = $svc->applyPreferences($recipients, (string) $rule->event_key);
@@ -119,18 +167,6 @@ class EscalatePendingNotifications extends Command
 
         if (!$entityId) return false;
 
-        // Incidents: stop if reviewed
-        if (str_starts_with($eventKey, 'incidents.')) {
-            $incident = ClientIncident::query()->find($entityId);
-            return $incident && $incident->status === 'reviewed';
-        }
-
-        // Follow-ups: stop if completed
-        if (str_starts_with($eventKey, 'followups.')) {
-            $fu = IncidentFollowup::query()->find($entityId);
-            return $fu && (string) $fu->status === 'completed';
-        }
-
         // Timesheets: stop if approved/rejected
         if (str_starts_with($eventKey, 'timesheets.')) {
             $t = Timesheet::query()->find($entityId);
@@ -144,28 +180,24 @@ class EscalatePendingNotifications extends Command
     {
         $ids = collect();
 
-        // Always re-notify the original recipient
         if (!empty($n->notifiable_id) && $n->notifiable_type === User::class) {
             $ids->push((int) $n->notifiable_id);
         }
 
-        // Optionally escalate to additional role groups
         $groups = (array) ($rule->escalate_to_role_groups ?? []);
         $svc = app(NotificationService::class);
         foreach ($groups as $g) {
             $ids = $ids->merge($svc->resolveRoleGroupUserIds((string) $g));
         }
 
-        // Tiered escalation: add more recipients as reminder count increases.
         $tiers = (array) ($rule->tiers ?? []);
         if (!empty($tiers)) {
-            // Normalise + sort by from_reminder asc
-            usort($tiers, fn($a, $b) => ((int)($a['from_reminder'] ?? 0)) <=> ((int)($b['from_reminder'] ?? 0)));
+            usort($tiers, fn ($a, $b) => ((int) ($a['from_reminder'] ?? 0)) <=> ((int) ($b['from_reminder'] ?? 0)));
             foreach ($tiers as $t) {
-                $from = (int)($t['from_reminder'] ?? 0);
+                $from = (int) ($t['from_reminder'] ?? 0);
                 if ($from <= 0) continue;
                 if ($reminderNumber >= $from) {
-                    foreach ((array)($t['role_groups'] ?? []) as $g) {
+                    foreach ((array) ($t['role_groups'] ?? []) as $g) {
                         $ids = $ids->merge($svc->resolveRoleGroupUserIds((string) $g));
                     }
                 }

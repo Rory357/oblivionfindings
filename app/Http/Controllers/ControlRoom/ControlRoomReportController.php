@@ -5,156 +5,123 @@ namespace App\Http\Controllers\ControlRoom;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomReportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ControlRoomReportController extends Controller
 {
+    public function __construct(
+        protected ControlRoomReportService $reportService,
+    ) {}
+
+    /**
+     * Main reports dashboard — overview with all metric groups.
+     */
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
 
-        $period = $request->input('period', '30d');
-        $startDate = match ($period) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            '90d' => now()->subDays(90),
-            '1y' => now()->subYear(),
-            default => now()->subDays(30),
-        };
-        $driver = DB::connection()->getDriverName();
-        $avgResolutionExpr = $driver === 'sqlite'
-            ? "AVG((strftime('%s', resolved_at) - strftime('%s', triggered_at)) / 3600.0)"
-            : 'AVG(TIMESTAMPDIFF(HOUR, triggered_at, resolved_at))';
-        $avgAckExpr = $driver === 'sqlite'
-            ? "AVG((strftime('%s', acknowledged_at) - strftime('%s', triggered_at)) / 60.0)"
-            : 'AVG(TIMESTAMPDIFF(MINUTE, triggered_at, acknowledged_at))';
+        [$from, $to, $period] = $this->resolveDateRange($request);
+        $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
 
-        // Overall statistics
-        $totalAlerts = ControlRoomAlert::where('triggered_at', '>=', $startDate)->count();
-        $resolvedAlerts = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->whereIn('status', ['resolved', 'closed'])
-            ->count();
-
-        // Average resolution time (in hours)
-        $avgResolutionTime = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->whereNotNull('resolved_at')
-            ->selectRaw($avgResolutionExpr . ' as avg_hours')
-            ->value('avg_hours');
-
-        // Alerts by severity
-        $bySeverity = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->select('severity', DB::raw('COUNT(*) as count'))
-            ->groupBy('severity')
-            ->pluck('count', 'severity')
-            ->toArray();
-
-        // Alerts by status
-        $byStatus = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->select('status', DB::raw('COUNT(*) as count'))
-            ->groupBy('status')
-            ->pluck('count', 'status')
-            ->toArray();
-
-        // Alerts by source
-        $bySource = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->select('source', DB::raw('COUNT(*) as count'))
-            ->groupBy('source')
-            ->pluck('count', 'source')
-            ->toArray();
-
-        // Alerts by alert type (top 10)
-        $byAlertType = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->select('alert_type', DB::raw('COUNT(*) as count'))
-            ->groupBy('alert_type')
-            ->orderByDesc('count')
-            ->limit(10)
-            ->pluck('count', 'alert_type')
-            ->toArray();
-
-        // Daily trend
-        $dailyTrend = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->select(DB::raw('DATE(triggered_at) as date'), DB::raw('COUNT(*) as count'))
-            ->groupBy(DB::raw('DATE(triggered_at)'))
-            ->orderBy('date')
-            ->get()
-            ->map(fn($row) => [
-                'date' => $row->date,
-                'count' => $row->count,
-            ])
-            ->values()
-            ->toArray();
-
-        // Escalation statistics
-        $escalatedCount = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->where('escalation_level', '>', 0)
-            ->count();
-
-        // Response time by severity (average hours to acknowledge)
-        $responseTimeBySeverity = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->whereNotNull('acknowledged_at')
-            ->select('severity', DB::raw($avgAckExpr . ' as avg_minutes'))
-            ->groupBy('severity')
-            ->pluck('avg_minutes', 'severity')
-            ->toArray();
-
-        // Top assignees
-        $topAssignees = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->whereNotNull('assigned_to_user_id')
-            ->with('assignedTo:id,name')
-            ->select('assigned_to_user_id', DB::raw('COUNT(*) as count'))
-            ->groupBy('assigned_to_user_id')
-            ->orderByDesc('count')
-            ->limit(10)
-            ->get()
-            ->map(fn($row) => [
-                'user' => $row->assignedTo?->name ?? 'Unknown',
-                'count' => $row->count,
-            ])
-            ->values()
-            ->toArray();
-
-        AuditLogger::log('controlRoom.reports.view', null, [
-            'period' => $period,
-        ]);
+        AuditLogger::log('controlRoom.reports.view', null, ['period' => $period]);
 
         return Inertia::render('control-room/reports', [
             'period' => $period,
-            'stats' => [
-                'total_alerts' => $totalAlerts,
-                'resolved_alerts' => $resolvedAlerts,
-                'resolution_rate' => $totalAlerts > 0 ? round(($resolvedAlerts / $totalAlerts) * 100, 1) : 0,
-                'avg_resolution_hours' => round((float) $avgResolutionTime, 1),
-                'escalated_count' => $escalatedCount,
-                'escalation_rate' => $totalAlerts > 0 ? round(($escalatedCount / $totalAlerts) * 100, 1) : 0,
-            ],
-            'by_severity' => $bySeverity,
-            'by_status' => $byStatus,
-            'by_source' => $bySource,
-            'by_alert_type' => $byAlertType,
-            'daily_trend' => $dailyTrend,
-            'response_time_by_severity' => $responseTimeBySeverity,
-            'top_assignees' => $topAssignees,
+            'site_id' => $siteId,
+            'sla' => $this->reportService->slaCompliance($from, $to, $siteId),
+            'volume' => $this->reportService->alertVolume($from, $to, $siteId),
+            'escalation' => $this->reportService->escalationAnalysis($from, $to, $siteId),
+            'workload' => $this->reportService->workloadDistribution($from, $to, $siteId),
+            'playbooks' => $this->reportService->playbookPerformance($from, $to),
         ]);
     }
 
+    /**
+     * SLA compliance report endpoint.
+     */
+    public function sla(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+
+        [$from, $to] = $this->resolveDateRange($request);
+        $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+
+        return response()->json($this->reportService->slaCompliance($from, $to, $siteId));
+    }
+
+    /**
+     * Alert volume report endpoint.
+     */
+    public function alerts(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+
+        [$from, $to] = $this->resolveDateRange($request);
+        $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+
+        return response()->json($this->reportService->alertVolume($from, $to, $siteId));
+    }
+
+    /**
+     * Workload distribution report endpoint.
+     */
+    public function workload(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+
+        [$from, $to] = $this->resolveDateRange($request);
+        $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+
+        return response()->json($this->reportService->workloadDistribution($from, $to, $siteId));
+    }
+
+    /**
+     * Summary endpoint — compact KPIs for dashboard widgets.
+     */
+    public function summary(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+
+        [$from, $to] = $this->resolveDateRange($request);
+        $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+
+        $sla = $this->reportService->slaCompliance($from, $to, $siteId);
+        $volume = $this->reportService->alertVolume($from, $to, $siteId);
+        $escalation = $this->reportService->escalationAnalysis($from, $to, $siteId);
+
+        return response()->json([
+            'total_alerts' => $volume['total'],
+            'open_alerts' => $volume['open'],
+            'resolution_rate' => $volume['resolution_rate'],
+            'sla_compliance' => $sla['compliance_pct'],
+            'avg_acknowledge_minutes' => $sla['avg_acknowledge_minutes'],
+            'avg_resolution_hours' => $sla['avg_resolution_hours'],
+            'escalation_rate' => $escalation['escalation_rate'],
+            'sla_breached' => $sla['sla_breached'],
+        ]);
+    }
+
+    /**
+     * CSV export — full alert data for the period.
+     */
     public function export(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
 
-        $period = $request->input('period', '30d');
-        $startDate = match ($period) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            '90d' => now()->subDays(90),
-            '1y' => now()->subYear(),
-            default => now()->subDays(30),
-        };
+        [$from, $to, $period] = $this->resolveDateRange($request);
 
-        $alerts = ControlRoomAlert::where('triggered_at', '>=', $startDate)
+        $alerts = ControlRoomAlert::where('triggered_at', '>=', $from)
+            ->where('triggered_at', '<=', $to)
             ->with(['asset:id,name,asset_tag', 'assignedTo:id,name', 'resolvedBy:id,name'])
             ->orderByDesc('triggered_at')
             ->get();
@@ -193,5 +160,34 @@ class ControlRoomReportController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="control-room-alerts-' . now()->format('Y-m-d') . '.csv"',
         ]);
+    }
+
+    /**
+     * Resolve date range from request.
+     *
+     * @return array{0: Carbon, 1: Carbon, 2: string}
+     */
+    protected function resolveDateRange(Request $request): array
+    {
+        // Explicit date range takes priority
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            return [
+                Carbon::parse($request->input('date_from'))->startOfDay(),
+                Carbon::parse($request->input('date_to'))->endOfDay(),
+                'custom',
+            ];
+        }
+
+        $period = $request->input('period', '30d');
+        $to = now();
+        $from = match ($period) {
+            '7d' => now()->subDays(7),
+            '30d' => now()->subDays(30),
+            '90d' => now()->subDays(90),
+            '1y' => now()->subYear(),
+            default => now()->subDays(30),
+        };
+
+        return [$from, $to, $period];
     }
 }

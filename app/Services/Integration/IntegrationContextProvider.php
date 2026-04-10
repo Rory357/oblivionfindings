@@ -2,7 +2,7 @@
 
 namespace App\Services\Integration;
 
-use App\Models\ControlRoom\Alert;
+use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\LocationHardware;
 use App\Models\SiteRoom;
@@ -35,9 +35,10 @@ class IntegrationContextProvider
 
         $events = $eventsQuery->with(['hardware', 'room'])->get();
 
-        // Query open alerts for the site
-        $alerts = Alert::where('site_id', $siteId)
-            ->where('status', '!=', 'closed')
+        // Query open alerts from canonical ControlRoomAlert for integration sources
+        $alerts = ControlRoomAlert::where('site_id', $siteId)
+            ->where('source', 'like', 'integration_%')
+            ->whereNotIn('status', ['resolved', 'closed'])
             ->get();
 
         $openAlertCount = $alerts->count();
@@ -69,10 +70,10 @@ class IntegrationContextProvider
                 'provider' => $e->provider,
             ])->toArray(),
             'open_alerts' => $alerts->map(fn ($a) => [
-                'title' => $a->title,
+                'title' => $a->context['normalized_data']['title'] ?? $a->alert_type,
                 'severity' => $a->severity,
                 'status' => $a->status,
-                'created_at' => $a->created_at->toIso8601String(),
+                'created_at' => ($a->triggered_at ?? $a->created_at)->toIso8601String(),
             ])->toArray(),
             'rooms' => $rooms->map(fn ($r) => [
                 'name' => $r->name,

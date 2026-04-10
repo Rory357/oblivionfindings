@@ -85,14 +85,50 @@ class PlaybookRun extends Model
 
     public function start(User $user): void
     {
+        // Guard: cannot start an already-started or completed run
+        if ($this->status !== self::STATUS_PENDING) {
+            return;
+        }
+
         $this->update([
-            'status' => 'in_progress',
+            'status' => self::STATUS_IN_PROGRESS,
             'started_at' => now(),
             'started_by_user_id' => $user->id,
         ]);
 
-        // Create run steps from playbook steps
-        $steps = $this->playbook->steps;
+        $this->initialiseSteps();
+    }
+
+    /**
+     * Create run steps from the playbook's step definitions.
+     *
+     * Sets the first step to in_progress, all others to pending.
+     * Used by both manual start (via User) and system auto-start.
+     *
+     * Guards:
+     * - Will not create steps if steps already exist (idempotent)
+     * - Will not proceed if playbook has zero steps
+     */
+    public function initialiseSteps(): void
+    {
+        // Guard: don't duplicate steps on repeated calls
+        if ($this->steps()->count() > 0) {
+            return;
+        }
+
+        $steps = $this->playbook->steps()->orderBy('order')->get();
+
+        // Guard: playbook with zero steps cannot be meaningfully started
+        if ($steps->isEmpty()) {
+            $this->update([
+                'status' => self::STATUS_COMPLETED,
+                'total_steps' => 0,
+                'completed_at' => now(),
+            ]);
+
+            return;
+        }
+
         $this->update(['total_steps' => $steps->count()]);
 
         foreach ($steps as $index => $step) {

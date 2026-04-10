@@ -2,109 +2,111 @@
 
 namespace App\Services\Integration;
 
-use App\Models\ControlRoom\Alert;
+use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationTenantSecret;
+use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Routes integration events into the canonical Control Room signal pipeline.
+ *
+ * This service applies business-level filtering (quiet hours, severity gating)
+ * and then delegates normalisation to IntegrationSignalNormaliser and signal
+ * processing to SignalProcessingService.
+ *
+ * Flow: IntegrationEvent → shouldAlert? → normalise → ingest → process → ControlRoomAlert
+ */
 class AlertRoutingService
 {
-    /**
-     * Important event types that should create alerts even at info severity.
-     */
-    protected const IMPORTANT_EVENT_TYPES = [
-        'device_offline',
-        'door_forced',
-        'sos_triggered',
-        'tamper_detected',
-        'panic_alarm',
-        'duress_alarm',
-        'communication_failure',
-        'power_failure',
-    ];
+    public function __construct(
+        protected SignalProcessingService $signalProcessor,
+        protected IntegrationSignalNormaliser $normaliser,
+    ) {}
 
     /**
-     * Evaluate an integration event and create an alert if warranted.
+     * Evaluate an integration event and route it through the signal pipeline.
+     *
+     * Returns the resulting ControlRoomAlert if one was created, or null if
+     * the event was suppressed (info severity, quiet hours, or dedup).
      */
-    public function processEvent(IntegrationEvent $event): ?Alert
+    public function processEvent(IntegrationEvent $event): ?ControlRoomAlert
     {
-        // Info severity only creates alerts for important event types
-        if ($event->severity === IntegrationEvent::SEVERITY_INFO) {
-            if (! in_array($event->event_type, self::IMPORTANT_EVENT_TYPES)) {
-                return null;
-            }
+        // Step 1: Determine whether this event should create an alert
+        $decision = $this->normaliser->shouldAlert($event);
+
+        if (! $decision['alert']) {
+            // Check quiet hours: even warn-level events may be suppressed
+            Log::debug('AlertRoutingService: integration event suppressed', [
+                'integration_event_id' => $event->id,
+                'event_type' => $event->event_type,
+                'severity' => $event->severity,
+                'reason' => $decision['reason'],
+                'provider' => $event->provider,
+            ]);
+
+            return null;
         }
 
-        // Check quiet hours (skip non-critical alerts during quiet hours)
+        // Step 2: Apply quiet hours suppression for non-critical events
         if ($event->severity !== IntegrationEvent::SEVERITY_CRITICAL) {
             if ($this->isQuietHours($event->tenant_id, $event->provider)) {
-                Log::info('Alert suppressed during quiet hours', [
-                    'event_id' => $event->id,
+                Log::info('AlertRoutingService: event suppressed during quiet hours', [
+                    'integration_event_id' => $event->id,
                     'event_type' => $event->event_type,
                     'severity' => $event->severity,
+                    'provider' => $event->provider,
                 ]);
 
                 return null;
             }
         }
 
-        $alert = Alert::create([
-            'tenant_id' => $event->tenant_id,
-            'site_id' => $event->site_id,
-            'hardware_id' => $event->hardware_id,
-            'integration_event_id' => $event->id,
-            'title' => $this->generateTitle($event->event_type),
-            'description' => $event->normalized_payload['summary'] ?? 'Alert generated from integration event',
-            'severity' => $event->severity,
-            'status' => Alert::STATUS_NEW,
-            'provider' => $event->provider,
-            'source_event_id' => $event->source_event_id,
-        ]);
+        // Step 3: Normalise the event into canonical signal data
+        $signalData = $this->normaliser->normalise($event);
 
-        $this->routeAlert($alert);
+        // Step 4: Ingest through canonical signal pipeline
+        try {
+            $signal = $this->signalProcessor->ingest($signalData);
 
-        return $alert;
-    }
+            // Step 5: Process the signal to create/correlate a ControlRoomAlert
+            $alert = $this->signalProcessor->process($signal);
 
-    /**
-     * Apply routing rules to a newly created alert.
-     *
-     * TODO: Implement notification dispatch based on tenant/site config (email, push, etc.)
-     */
-    public function routeAlert(Alert $alert): void
-    {
-        Log::info('Alert created and routed', [
-            'alert_id' => $alert->id,
-            'title' => $alert->title,
-            'severity' => $alert->severity,
-            'site_id' => $alert->site_id,
-            'provider' => $alert->provider,
-        ]);
-    }
-
-    /**
-     * Convert a snake_case event type to a human-readable title.
-     *
-     * e.g., 'camera_offline' => 'Camera Offline'
-     *       'door_forced'    => 'Door Forced'
-     *       'sos_triggered'  => 'SOS Triggered'
-     */
-    public function generateTitle(string $eventType): string
-    {
-        // Handle common acronyms
-        $acronyms = ['sos', 'nfc', 'pir', 'ptz', 'ups', 'ip', 'api'];
-
-        $words = explode('_', $eventType);
-
-        $words = array_map(function (string $word) use ($acronyms) {
-            if (in_array(strtolower($word), $acronyms)) {
-                return strtoupper($word);
+            if ($alert) {
+                Log::info('AlertRoutingService: integration event → alert created', [
+                    'integration_event_id' => $event->id,
+                    'signal_id' => $signal->id,
+                    'alert_id' => $alert->id,
+                    'alert_type' => $alert->alert_type,
+                    'severity' => $alert->severity,
+                    'provider' => $event->provider,
+                    'signal_type' => $signalData['signal_type_code'],
+                ]);
+            } else {
+                Log::info('AlertRoutingService: signal processed but no alert created', [
+                    'integration_event_id' => $event->id,
+                    'signal_id' => $signal->id,
+                    'signal_status' => $signal->status,
+                    'reason' => $signal->processing_notes ?? 'maintenance_window_or_suppression',
+                    'provider' => $event->provider,
+                ]);
             }
 
-            return ucfirst($word);
-        }, $words);
+            return $alert;
+        } catch (\Throwable $e) {
+            Log::error('AlertRoutingService: signal processing failed', [
+                'integration_event_id' => $event->id,
+                'event_type' => $event->event_type,
+                'provider' => $event->provider,
+                'error' => $e->getMessage(),
+                'signal_data' => array_diff_key($signalData, ['payload' => true]), // exclude raw payload from log
+            ]);
 
-        return implode(' ', $words);
+            // Do NOT rethrow — the IntegrationEvent is already persisted.
+            // The failure is logged for operational visibility.
+            // A future retry mechanism can re-process unlinked events.
+            return null;
+        }
     }
 
     /**

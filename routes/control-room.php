@@ -61,9 +61,17 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.show');
 
-        // Reports
+        // Reports — main dashboard and individual metric endpoints
         Route::get('/control-room/reports', [ControlRoomReportController::class, 'index'])
             ->name('control-room.reports.index');
+        Route::get('/control-room/reports/summary', [ControlRoomReportController::class, 'summary'])
+            ->name('control-room.reports.summary');
+        Route::get('/control-room/reports/sla', [ControlRoomReportController::class, 'sla'])
+            ->name('control-room.reports.sla');
+        Route::get('/control-room/reports/alerts', [ControlRoomReportController::class, 'alerts'])
+            ->name('control-room.reports.alerts');
+        Route::get('/control-room/reports/workload', [ControlRoomReportController::class, 'workload'])
+            ->name('control-room.reports.workload');
         Route::get('/control-room/reports/export', [ControlRoomReportController::class, 'export'])
             ->name('control-room.reports.export');
     });
@@ -146,7 +154,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.alerts.store');
     });
 
-    // Integration Alerts (from integration_alerts table)
+    // Integration Alerts (now reads from canonical control_room_alerts, filtered by source)
     Route::prefix('control-room/integration-alerts')->group(function () {
         Route::get('/', [IntegrationAlertController::class, 'index'])
             ->middleware('permission:controlRoom.alerts.view')

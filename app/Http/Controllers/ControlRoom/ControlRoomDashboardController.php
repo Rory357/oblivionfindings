@@ -5,40 +5,53 @@ namespace App\Http\Controllers\ControlRoom;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\ControlRoomAlert;
-use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomReportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ControlRoomDashboardController extends Controller
 {
+    public function __construct(
+        protected ControlRoomReportService $reportService,
+    ) {}
+
     public function __invoke(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
+        // --- Period resolution ---
+        $period = $request->input('period', '7d');
+        $from = match ($period) {
+            '24h' => now()->subDay(),
+            '7d' => now()->subDays(7),
+            '30d' => now()->subDays(30),
+            '90d' => now()->subDays(90),
+            default => now()->subDays(7),
+        };
+        $to = now();
+
+        $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+
+        // --- Alert list query (existing behaviour preserved) ---
         $query = ControlRoomAlert::query()
             ->with(['asset:id,name,asset_tag', 'assignedTo:id,name', 'sla', 'client:id,first_name,last_name']);
 
-        // Filter by status
         if ($request->filled('status') && $request->input('status') !== 'all') {
             $query->where('status', $request->input('status'));
         }
-
-        // Filter by severity
         if ($request->filled('severity') && $request->input('severity') !== 'all') {
             $query->where('severity', $request->input('severity'));
         }
-
-        // Filter by source
         if ($request->filled('source') && $request->input('source') !== 'all') {
             $query->where('source', $request->input('source'));
         }
-
-        // Filter by assignee
         if ($request->filled('assigned_to')) {
             if ($request->input('assigned_to') === 'unassigned') {
                 $query->whereNull('assigned_to_user_id');
@@ -48,36 +61,32 @@ class ControlRoomDashboardController extends Controller
                 $query->where('assigned_to_user_id', (int) $request->input('assigned_to'));
             }
         }
-
-        // Filter by escalation level
         if ($request->filled('escalation_level') && $request->input('escalation_level') !== 'all') {
             $query->where('escalation_level', '>=', (int) $request->input('escalation_level'));
         }
-
-        // Search by alert type or notes
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(function ($q) use ($search) {
                 $q->where('alert_type', 'like', "%{$search}%")
                   ->orWhere('notes', 'like', "%{$search}%")
-                  ->orWhereHas('asset', fn($aq) => $aq->where('name', 'like', "%{$search}%")
+                  ->orWhereHas('asset', fn ($aq) => $aq->where('name', 'like', "%{$search}%")
                       ->orWhere('asset_tag', 'like', "%{$search}%"));
             });
         }
-
-        // Date range filter
         if ($request->filled('date_from')) {
             $query->whereDate('triggered_at', '>=', $request->input('date_from'));
         }
         if ($request->filled('date_to')) {
             $query->whereDate('triggered_at', '<=', $request->input('date_to'));
         }
+        if ($siteId) {
+            $query->where('site_id', $siteId);
+        }
 
-        // Sorting
         $sortField = $request->input('sort', 'triggered_at');
         $sortDir = $request->input('dir', 'desc');
         $allowedSorts = ['triggered_at', 'severity', 'status', 'escalation_level', 'alert_type'];
-        if (in_array($sortField, $allowedSorts)) {
+        if (in_array($sortField, $allowedSorts, true)) {
             $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
         } else {
             $query->latest('triggered_at');
@@ -85,7 +94,7 @@ class ControlRoomDashboardController extends Controller
 
         $alerts = $query->paginate(25)->withQueryString();
 
-        // Calculate statistics
+        // --- Real-time stats (current state, not historical) ---
         $stats = [
             'total' => ControlRoomAlert::count(),
             'open' => ControlRoomAlert::where('status', 'open')->count(),
@@ -100,88 +109,18 @@ class ControlRoomDashboardController extends Controller
             'my_alerts' => ControlRoomAlert::where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
         ];
 
-        // Staff list for assignment filter
-        $staff = User::staff()
-            ->whereHas('roles', fn($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        // --- PR11 report service metrics (period-aware, replaces inline queries) ---
+        $volume = $this->reportService->alertVolume($from, $to, $siteId);
+        $sla = $this->reportService->slaCompliance($from, $to, $siteId);
+        $escalation = $this->reportService->escalationAnalysis($from, $to, $siteId);
 
-        // Daily trend (last 14 days) - generate all dates to avoid empty gaps
-        $startDate = now()->subDays(13)->startOfDay();
-        $dailyTrendRaw = ControlRoomAlert::where('triggered_at', '>=', $startDate)
-            ->select(DB::raw('DATE(triggered_at) as date'), DB::raw('COUNT(*) as count'))
-            ->groupBy(DB::raw('DATE(triggered_at)'))
-            ->pluck('count', 'date')
-            ->toArray();
+        // --- Attention flags (PR12) ---
+        $attentionFlags = $this->reportService->attentionFlags($siteId);
 
-        $dailyTrend = [];
-        for ($i = 13; $i >= 0; $i--) {
-            $date = now()->subDays($i)->format('Y-m-d');
-            $dailyTrend[] = [
-                'date' => now()->subDays($i)->format('M j'),
-                'count' => $dailyTrendRaw[$date] ?? 0,
-            ];
-        }
+        // --- Site comparison (PR12) ---
+        $siteComparison = $this->reportService->siteComparison($from, $to);
 
-        // Severity breakdown for chart
-        $bySeverity = ControlRoomAlert::select('severity', DB::raw('COUNT(*) as count'))
-            ->groupBy('severity')
-            ->pluck('count', 'severity')
-            ->toArray();
-
-        // Unresolved by severity (for donut chart)
-        $unresolvedBySeverity = ControlRoomAlert::unresolved()
-            ->select('severity', DB::raw('COUNT(*) as count'))
-            ->groupBy('severity')
-            ->pluck('count', 'severity')
-            ->toArray();
-
-        // By source breakdown
-        $bySource = ControlRoomAlert::where('triggered_at', '>=', now()->subDays(7))
-            ->select('source', DB::raw('COUNT(*) as count'))
-            ->groupBy('source')
-            ->orderByDesc('count')
-            ->limit(8)
-            ->pluck('count', 'source')
-            ->toArray();
-
-        // Top alert types (last 7 days)
-        $topAlertTypes = ControlRoomAlert::where('triggered_at', '>=', now()->subDays(7))
-            ->select('alert_type', DB::raw('COUNT(*) as count'))
-            ->groupBy('alert_type')
-            ->orderByDesc('count')
-            ->limit(5)
-            ->pluck('count', 'alert_type')
-            ->toArray();
-
-        // Sparkline data (just the counts array)
-        $sparklineData = array_map(fn($d) => $d['count'], $dailyTrend);
-
-        // Alerts today vs yesterday for trend
-        $alertsToday = ControlRoomAlert::whereDate('triggered_at', now()->toDateString())->count();
-        $alertsYesterday = ControlRoomAlert::whereDate('triggered_at', now()->subDay()->toDateString())->count();
-
-        // Average response time (last 7 days)
-        $driver = DB::connection()->getDriverName();
-        $avgAckExpr = $driver === 'sqlite'
-            ? "AVG((strftime('%s', acknowledged_at) - strftime('%s', created_at)) / 60.0)"
-            : 'AVG(TIMESTAMPDIFF(MINUTE, created_at, acknowledged_at))';
-        $avgResponseMinutes = (float) AlertSla::where('created_at', '>=', now()->subDays(7))
-            ->whereNotNull('acknowledged_at')
-            ->selectRaw($avgAckExpr . ' as avg_mins')
-            ->value('avg_mins') ?: 0;
-
-        // SLA compliance (last 7 days)
-        $totalSlaAlerts = AlertSla::where('created_at', '>=', now()->subDays(7))->count();
-        $breachedSlaAlerts = AlertSla::where('created_at', '>=', now()->subDays(7))
-            ->where(function ($q) {
-                $q->where('acknowledge_breached', true)
-                  ->orWhere('response_breached', true)
-                  ->orWhere('resolution_breached', true);
-            })->count();
-        $slaCompliancePct = $totalSlaAlerts > 0 ? round((($totalSlaAlerts - $breachedSlaAlerts) / $totalSlaAlerts) * 100) : 100;
-
-        // Active shift
+        // --- Active shift ---
         $activeShift = Shift::where('status', 'active')->latest('starts_at')->first();
         $activeShiftData = null;
         if ($activeShift) {
@@ -195,14 +134,14 @@ class ControlRoomDashboardController extends Controller
             ];
         }
 
-        // Recent activity (last 15 control room audit logs)
+        // --- Recent activity ---
         $recentActivity = AuditLog::where('action', 'like', 'controlRoom.%')
             ->where('action', '!=', 'controlRoom.dashboard.view')
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->limit(15)
             ->get()
-            ->map(fn($log) => [
+            ->map(fn ($log) => [
                 'id' => $log->id,
                 'type' => $log->action,
                 'occurred_at' => $log->created_at->toISOString(),
@@ -213,13 +152,20 @@ class ControlRoomDashboardController extends Controller
                 'site' => null,
             ])->values()->toArray();
 
+        $staff = User::staff()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $sites = Site::active()->orderBy('name')->get(['id', 'name']);
+
         AuditLogger::log('controlRoom.dashboard.view', null, [
-            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search']),
+            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'period', 'site_id']),
         ]);
 
         return Inertia::render('control-room/index', [
             'alerts' => [
-                'data' => $alerts->getCollection()->map(fn($a) => [
+                'data' => $alerts->getCollection()->map(fn ($a) => [
                     'id' => $a->id,
                     'source' => $a->source,
                     'alert_type' => $a->alert_type,
@@ -253,20 +199,44 @@ class ControlRoomDashboardController extends Controller
                 ],
             ],
             'stats' => $stats,
-            'daily_trend' => $dailyTrend,
-            'by_severity' => $bySeverity,
-            'unresolved_by_severity' => $unresolvedBySeverity,
-            'by_source' => $bySource,
-            'top_alert_types' => $topAlertTypes,
-            'sparkline_data' => $sparklineData,
-            'alerts_today' => $alertsToday,
-            'alerts_yesterday' => $alertsYesterday,
-            'avg_response_minutes' => round($avgResponseMinutes, 1),
-            'sla_compliance_pct' => $slaCompliancePct,
+
+            // PR11 metrics (replaces old inline queries)
+            'daily_trend' => $volume['daily_trend'],
+            'by_severity' => $volume['by_severity'],
+            'unresolved_by_severity' => ControlRoomAlert::unresolved()
+                ->select('severity', DB::raw('COUNT(*) as count'))
+                ->groupBy('severity')
+                ->pluck('count', 'severity')
+                ->toArray(),
+            'by_source' => $volume['by_source'],
+            'top_alert_types' => $volume['top_alert_types'],
+            'sparkline_data' => array_map(fn ($d) => $d['count'], $volume['daily_trend']),
+            'alerts_today' => ControlRoomAlert::whereDate('triggered_at', now()->toDateString())->count(),
+            'alerts_yesterday' => ControlRoomAlert::whereDate('triggered_at', now()->subDay()->toDateString())->count(),
+            'avg_response_minutes' => $sla['avg_acknowledge_minutes'],
+            'sla_compliance_pct' => (int) $sla['compliance_pct'],
+            'escalation_rate' => $escalation['escalation_rate'],
+
+            // PR12 additions
+            'attention_flags' => $attentionFlags,
+            'site_comparison' => $siteComparison,
+            'period' => $period,
+            'sites' => $sites,
+
+            // Workload + queue pressure for dashboard charts
+            'workload' => $this->reportService->workloadDistribution($from, $to, $siteId),
+            'queues' => \App\Models\ControlRoom\TriageQueue::active()
+                ->withCount(['alerts as active_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed'])])
+                ->orderBy('tier')
+                ->get(['id', 'name', 'tier'])
+                ->map(fn ($q) => ['name' => $q->name, 'tier' => $q->tier, 'active_alerts' => $q->active_count])
+                ->toArray(),
+
+            // Preserved existing props
             'active_shift' => $activeShiftData,
             'recent_activity' => $recentActivity,
             'staff' => $staff,
-            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'escalation_level', 'search', 'date_from', 'date_to', 'sort', 'dir']),
+            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'escalation_level', 'search', 'date_from', 'date_to', 'sort', 'dir', 'period', 'site_id']),
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
                 'assign' => $user->canDo('controlRoom.alerts.assign'),

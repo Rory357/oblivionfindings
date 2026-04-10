@@ -5,6 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @deprecated PR5: Superseded by SignalRule for asset alert routing.
+ *             Asset alert policies are no longer used — FleetSignalService
+ *             handles asset signal emission and SignalRules handle routing.
+ */
 class AssetAlertPolicy extends Model
 {
     protected $fillable = [

@@ -6,6 +6,14 @@ use App\Models\AssetAlert;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 
+/**
+ * @deprecated PR5: AssetAlert is dead code. Asset operational alerts are canonical
+ *             ControlRoomAlert records created via FleetSignalService pipeline.
+ *             This controller is retained for backward compatibility with routes
+ *             that may still be referenced. It will be removed in a future cleanup PR.
+ *
+ * @see \App\Http\Controllers\ControlRoom\ControlRoomAlertController
+ */
 class AssetAlertController extends Controller
 {
     public function index(Request $request)

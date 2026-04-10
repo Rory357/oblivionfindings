@@ -68,6 +68,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->everyFiveMinutes();
 
+// Control Room device offline detection (non-fleet: bed sensors, cameras, alarm panels, etc.)
+app(Schedule::class)
+    ->job(new \App\Jobs\DetectCrDeviceOfflineJob)
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes();
+
 // Fleet telemetry retention cleanup
 app(Schedule::class)
     ->job(new PruneFleetTelemetry)
@@ -98,6 +104,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->everyFiveMinutes();
 
+// Lone worker overdue check-in detection and control-room signal emission
+app(Schedule::class)
+    ->job(new \App\Jobs\CheckLoneWorkerOverdueJob)
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes();
+
 // Control Room auto escalation between queues
 app(Schedule::class)
     ->job(new AutoEscalateControlRoomQueues)
@@ -123,6 +135,23 @@ app(Schedule::class)
     ->job(new InspectionDueJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:30');
+
+// H&S monitoring — overdue investigations and corrective actions
+app(Schedule::class)
+    ->job(new \App\Jobs\CheckOverdueInvestigationsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes();
+
+app(Schedule::class)
+    ->job(new \App\Jobs\CheckOverdueCorrectiveActionsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes();
+
+// H&S monitoring — risk assessment review dates (daily)
+app(Schedule::class)
+    ->job(new \App\Jobs\CheckRiskAssessmentReviewsJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:15');
 
 // Hazard overdue checks and escalations: daily at 09:00
 app(Schedule::class)

@@ -7,6 +7,25 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Medication Dashboard Alert — UI convenience layer.
+ *
+ * @deprecated PR3: This model is NO LONGER the operational source of truth for
+ *             medication alerts. Operational medication alerts now flow through
+ *             the canonical signal pipeline via MedicationSignalService →
+ *             SignalProcessingService → ControlRoomAlert.
+ *
+ *             This model is RETAINED for:
+ *             - medication dashboard UI display (widgets, counts, alert lists)
+ *             - acknowledge/resolve actions from medication-specific screens
+ *             - backward compatibility with existing medication views
+ *
+ *             The canonical operational lifecycle (triage, SLA, escalation,
+ *             playbooks, evidence) lives on ControlRoomAlert.
+ *
+ * @see \App\Services\Medication\MedicationSignalService — canonical signal emission
+ * @see \App\Models\ControlRoomAlert — canonical operational alert
+ */
 class MedicationDashboardAlert extends Model
 {
     use HasFactory;

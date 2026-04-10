@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SiteInspectionRecord;
 use App\Models\SiteCalendarEvent;
+use App\Services\Facility\FacilitySignalService;
 use Illuminate\Http\Request;
 
 class SiteInspectionController extends Controller
@@ -109,6 +110,11 @@ class SiteInspectionController extends Controller
             'linked_hazard_id' => $validated['linked_hazard_id'] ?? null,
             'evidence_photos' => $validated['evidence_photos'] ?? null,
         ]);
+
+        // Emit canonical signal for failed inspections → Control Room
+        if ($record->result === 'fail') {
+            app(FacilitySignalService::class)->emitInspectionFailed($schedule, $record);
+        }
 
         // Update next due date
         $schedule->update([

@@ -8,7 +8,7 @@ use App\Domain\Roadmap\Models\InitiativeCategory;
 use App\Domain\Roadmap\Models\InitiativeSuggestion;
 use App\Models\Asset;
 use App\Models\ClientIncident;
-use App\Models\ControlRoom\Alert;
+use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Timesheet;
@@ -35,29 +35,28 @@ class RoadmapSuggestionService
 
     public function ingestControlRoomRecurring(?int $tenantId = null): int
     {
-        $rows = Alert::query()
-            ->forTenant($tenantId)
+        $rows = ControlRoomAlert::query()
             ->where('created_at', '>=', now()->subDays(14))
-            ->selectRaw('site_id, COALESCE(provider, "unknown") as provider, title, COUNT(*) as total')
-            ->groupBy('site_id', 'provider', 'title')
+            ->selectRaw('site_id, source, alert_type, COUNT(*) as total')
+            ->groupBy('site_id', 'source', 'alert_type')
             ->havingRaw('COUNT(*) >= 10')
             ->get();
 
         $created = 0;
         foreach ($rows as $row) {
-            $key = sprintf('control:%s:%s:%s:14d', $row->provider, $row->site_id ?? 0, md5((string) $row->title));
+            $key = sprintf('control:%s:%s:%s:14d', $row->source, $row->site_id ?? 0, md5((string) $row->alert_type));
             $suggestion = $this->upsertSuggestion([
                 'tenant_id' => $tenantId,
                 'source' => 'control_room',
                 'source_key' => (string) ($row->site_id ?? 'global'),
                 'title' => 'Recurring control room alerts at site '.($row->site_id ?? 'unknown'),
-                'summary' => sprintf('%s recurring %d times in 14 days.', $row->title, $row->total),
+                'summary' => sprintf('%s (%s) recurring %d times in 14 days.', $row->alert_type, $row->source, $row->total),
                 'dedupe_key' => $key,
                 'score_hint' => min(100, 40 + ((int) $row->total * 2)),
                 'raw_payload' => [
                     'site_id' => $row->site_id,
-                    'provider' => $row->provider,
-                    'title' => $row->title,
+                    'source' => $row->source,
+                    'alert_type' => $row->alert_type,
                     'count' => (int) $row->total,
                 ],
                 'rate_limit_days' => 30,

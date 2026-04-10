@@ -7,12 +7,44 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDashboardAlert;
+use App\Services\Medication\MedicationSignalService;
 use Carbon\Carbon;
 
+/**
+ * Medication alert generation and dashboard widget service.
+ *
+ * ARCHITECTURAL NOTE (PR3):
+ * This service serves TWO purposes:
+ *
+ * 1. OPERATIONAL ALERTS — emitted via MedicationSignalService into the canonical
+ *    Control Room pipeline. These are the source of truth for triage, SLA,
+ *    escalation, and operational response. Only safety-critical events
+ *    (overdue, missed dose, PRN over-limit, controlled discrepancy, expired,
+ *    out of stock) emit signals.
+ *
+ * 2. DASHBOARD DISPLAY — writes to MedicationDashboardAlert for medication-specific
+ *    UI widgets, counts, and acknowledge/resolve actions. This is a COMPATIBILITY
+ *    LAYER only. MedicationDashboardAlert is NOT the operational source of truth.
+ *    It will be eliminated in a future PR once medication UI reads from ControlRoomAlert.
+ *
+ * Do NOT add new operational logic that depends on MedicationDashboardAlert status.
+ * Do NOT treat MedicationDashboardAlert as the authority for whether an alert
+ * has been triaged, escalated, or resolved — that lives on ControlRoomAlert.
+ *
+ * @see \App\Services\Medication\MedicationSignalService — canonical signal emission
+ * @see \App\Models\ControlRoomAlert — canonical operational alert record
+ */
 class MedicationAlertService
 {
+    public function __construct(
+        protected ?MedicationSignalService $signalService = null,
+    ) {
+        $this->signalService ??= app(MedicationSignalService::class);
+    }
+
     /**
-     * Get active alerts for a client from database
+     * Get active alerts for a client from database.
+     * Reads from MedicationDashboardAlert (display convenience layer).
      */
     public function getActiveAlertsForClient(int $clientId): array
     {
@@ -33,17 +65,15 @@ class MedicationAlertService
     }
 
     /**
-     * Generate all dashboard alerts for a client
+     * Generate all dashboard alerts for a client.
+     * Creates MedicationDashboardAlert records for UI AND emits signals for operational alerts.
      */
     public function generateClientAlerts(Client $client): array
     {
         $alerts = [];
-
-        // Get active medications
         $medications = $client->medications()->active()->get();
 
         foreach ($medications as $medication) {
-            // Check PRN limits
             if ($medication->is_prn && $medication->max_per_day) {
                 $prnAlert = $this->checkPrnAlert($client, $medication);
                 if ($prnAlert) {
@@ -51,26 +81,22 @@ class MedicationAlertService
                 }
             }
 
-            // Check expiry
             $expiryAlert = $this->checkExpiryAlert($client, $medication);
             if ($expiryAlert) {
                 $alerts[] = $expiryAlert;
             }
 
-            // Check stock levels
             $stockAlert = $this->checkStockAlert($client, $medication);
             if ($stockAlert) {
                 $alerts[] = $stockAlert;
             }
         }
 
-        // Check for overdue scheduled doses
         $overdueAlert = $this->checkOverdueDoses($client);
         if ($overdueAlert) {
             $alerts[] = $overdueAlert;
         }
 
-        // Check for controlled discrepancies
         $discrepancyAlert = $this->checkControlledDiscrepancies($client);
         if ($discrepancyAlert) {
             $alerts[] = $discrepancyAlert;
@@ -80,7 +106,8 @@ class MedicationAlertService
     }
 
     /**
-     * Check PRN alert
+     * Check PRN alert.
+     * Over-limit → operational signal (critical). Near-limit → dashboard only (not operational).
      */
     private function checkPrnAlert(Client $client, ClientMedication $medication): ?array
     {
@@ -92,6 +119,7 @@ class MedicationAlertService
         }
 
         if ($count >= $maxPerDay) {
+            // Dashboard alert (UI compat)
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'prn_over_limit',
@@ -99,10 +127,29 @@ class MedicationAlertService
                 "{$medication->name}: PRN limit reached ({$count}/{$maxPerDay})",
                 $medication->id
             );
+
+            // Operational signal → Control Room
+            $this->signalService->emit(
+                MedicationSignalService::TYPE_PRN_OVER_LIMIT,
+                $client->id,
+                'critical',
+                "{$medication->name}: PRN limit reached ({$count}/{$maxPerDay})",
+                [
+                    'client_medication_id' => $medication->id,
+                    'medication_name' => $medication->name,
+                    'prn_count_24h' => $count,
+                    'max_per_day' => $maxPerDay,
+                    'controlled_drug' => $medication->controlled_drug,
+                    'high_risk' => $medication->high_risk,
+                    'site_id' => $client->site_id,
+                ],
+            );
+
             return $alert->toArray();
         }
 
         if ($count >= ($maxPerDay * 0.75)) {
+            // Near-limit is dashboard-only — NOT operational
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'prn_near_limit',
@@ -117,7 +164,8 @@ class MedicationAlertService
     }
 
     /**
-     * Check expiry alert
+     * Check expiry alert.
+     * Expired → operational signal. Expiring soon → dashboard only.
      */
     private function checkExpiryAlert(Client $client, ClientMedication $medication): ?array
     {
@@ -133,10 +181,28 @@ class MedicationAlertService
                 "{$medication->name}: Medication expired on {$medication->end_date->format('d/m/Y')}",
                 $medication->id
             );
+
+            // Operational signal → Control Room
+            $this->signalService->emit(
+                MedicationSignalService::TYPE_EXPIRED,
+                $client->id,
+                'high',
+                "{$medication->name}: Medication expired on {$medication->end_date->format('d/m/Y')}",
+                [
+                    'client_medication_id' => $medication->id,
+                    'medication_name' => $medication->name,
+                    'expiry_date' => $medication->end_date->toDateString(),
+                    'controlled_drug' => $medication->controlled_drug,
+                    'high_risk' => $medication->high_risk,
+                    'site_id' => $client->site_id,
+                ],
+            );
+
             return $alert->toArray();
         }
 
         if ($medication->isExpiringSoon(7)) {
+            // Expiring soon is dashboard-only — NOT operational
             $daysRemaining = $medication->end_date->diffInDays(now());
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
@@ -152,12 +218,13 @@ class MedicationAlertService
     }
 
     /**
-     * Check stock alert
+     * Check stock alert.
+     * Out of stock → operational signal. Low stock → dashboard only.
      */
     private function checkStockAlert(Client $client, ClientMedication $medication): ?array
     {
         $stock = $medication->stock;
-        
+
         if (!$stock || $stock->on_hand === null) {
             return null;
         }
@@ -170,10 +237,27 @@ class MedicationAlertService
                 "{$medication->name}: OUT OF STOCK",
                 $medication->id
             );
+
+            // Operational signal → Control Room (out of stock is operational)
+            $this->signalService->emit(
+                MedicationSignalService::TYPE_STOCK_OUT,
+                $client->id,
+                'high',
+                "{$medication->name}: OUT OF STOCK — client cannot receive scheduled doses",
+                [
+                    'client_medication_id' => $medication->id,
+                    'medication_name' => $medication->name,
+                    'controlled_drug' => $medication->controlled_drug,
+                    'high_risk' => $medication->high_risk,
+                    'site_id' => $client->site_id,
+                ],
+            );
+
             return $alert->toArray();
         }
 
         if ($stock->reorder_level && $stock->on_hand <= $stock->reorder_level) {
+            // Low stock is dashboard-only — NOT operational
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'stock_low',
@@ -188,14 +272,13 @@ class MedicationAlertService
     }
 
     /**
-     * Check for overdue doses
+     * Check for overdue doses → always operational.
      */
     private function checkOverdueDoses(Client $client): ?array
     {
         $now = now();
         $cutoff = $now->copy()->subHours(3);
 
-        // Find medications with scheduled times that have passed and no administration
         $medications = $client->medications()
             ->active()
             ->where('is_prn', false)
@@ -206,13 +289,11 @@ class MedicationAlertService
 
         foreach ($medications as $medication) {
             $doseTimes = $medication->dose_times ?? [];
-            
+
             foreach ($doseTimes as $time) {
                 $scheduledTime = $now->copy()->setTimeFromTimeString($time);
-                
-                // If scheduled time has passed and within the last 3 hours
+
                 if ($scheduledTime->isPast() && $scheduledTime->greaterThan($cutoff)) {
-                    // Check if already recorded
                     $recorded = ClientMedicationAdministration::where('client_medication_id', $medication->id)
                         ->whereBetween('scheduled_for', [
                             $scheduledTime->copy()->subMinute(),
@@ -229,13 +310,30 @@ class MedicationAlertService
         }
 
         if ($overdueCount > 0) {
+            $message = "{$overdueCount} overdue dose(s): " . implode(', ', array_unique($overdueMeds));
+
+            // Dashboard alert (UI compat)
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'overdue',
                 'critical',
-                "{$overdueCount} overdue dose(s): " . implode(', ', array_unique($overdueMeds)),
+                $message,
                 null
             );
+
+            // Operational signal → Control Room
+            $this->signalService->emit(
+                MedicationSignalService::TYPE_OVERDUE,
+                $client->id,
+                'high',
+                $message,
+                [
+                    'overdue_count' => $overdueCount,
+                    'medication_names' => array_unique($overdueMeds),
+                    'site_id' => $client->site_id,
+                ],
+            );
+
             return $alert->toArray();
         }
 
@@ -243,7 +341,7 @@ class MedicationAlertService
     }
 
     /**
-     * Check for controlled drug discrepancies
+     * Check for controlled drug discrepancies → always operational.
      */
     private function checkControlledDiscrepancies(Client $client): ?array
     {
@@ -258,6 +356,7 @@ class MedicationAlertService
 
         $medNames = $openDiscrepancies->pluck('medication.name')->filter()->unique()->implode(', ');
 
+        // Dashboard alert (UI compat)
         $alert = MedicationDashboardAlert::createOrUpdateAlert(
             $client->id,
             'controlled_discrepancy',
@@ -266,12 +365,28 @@ class MedicationAlertService
             $openDiscrepancies->first()->client_medication_id
         );
 
+        // Operational signal → Control Room
+        $this->signalService->emit(
+            MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
+            $client->id,
+            'critical',
+            "Controlled drug discrepancy: {$medNames}. Review required.",
+            [
+                'client_medication_id' => $openDiscrepancies->first()->client_medication_id,
+                'medication_names' => $medNames,
+                'discrepancy_count' => $openDiscrepancies->count(),
+                'discrepancy_ids' => $openDiscrepancies->pluck('id')->toArray(),
+                'site_id' => $client->site_id,
+            ],
+        );
+
         return $alert->toArray();
     }
 
-    /**
-     * Get global dashboard widgets data
-     */
+    // -----------------------------------------------------------------------
+    // Dashboard widgets — unchanged, read from MedicationDashboardAlert / domain models
+    // -----------------------------------------------------------------------
+
     public function getGlobalDashboardWidgets(?int $clientId = null): array
     {
         return [
@@ -284,9 +399,6 @@ class MedicationAlertService
         ];
     }
 
-    /**
-     * Get overdue medications widget
-     */
     private function getOverdueMedsWidget(?int $clientId = null): array
     {
         $query = MedicationDashboardAlert::where('alert_type', 'overdue')
@@ -313,9 +425,6 @@ class MedicationAlertService
         ];
     }
 
-    /**
-     * Get PRN near limits widget
-     */
     private function getPrnNearLimitsWidget(?int $clientId = null): array
     {
         $query = MedicationDashboardAlert::whereIn('alert_type', ['prn_near_limit', 'prn_over_limit'])
@@ -344,9 +453,6 @@ class MedicationAlertService
         ];
     }
 
-    /**
-     * Get controlled discrepancies widget
-     */
     private function getControlledDiscrepanciesWidget(?int $clientId = null): array
     {
         $query = ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review'])
@@ -374,9 +480,6 @@ class MedicationAlertService
         ];
     }
 
-    /**
-     * Get expiring medications widget
-     */
     private function getExpiringMedicationsWidget(?int $clientId = null): array
     {
         $query = ClientMedication::active()
@@ -406,9 +509,6 @@ class MedicationAlertService
         ];
     }
 
-    /**
-     * Get high risk medications widget
-     */
     private function getHighRiskMedicationsWidget(?int $clientId = null): array
     {
         $query = ClientMedication::active()
@@ -436,15 +536,11 @@ class MedicationAlertService
         ];
     }
 
-    /**
-     * Get today's summary widget
-     */
     private function getTodaysSummaryWidget(?int $clientId = null): array
     {
         $today = now()->startOfDay();
         $tomorrow = $today->copy()->addDay();
 
-        // Get scheduled medications (non-PRN, active today)
         $scheduledQuery = ClientMedication::active()
             ->where('is_prn', false)
             ->where(function ($q) use ($today) {
@@ -459,30 +555,24 @@ class MedicationAlertService
         }
 
         $scheduledMeds = $scheduledQuery->get();
-        
-        // Calculate total scheduled doses for today
         $totalScheduled = 0;
         foreach ($scheduledMeds as $med) {
             $totalScheduled += count($med->dose_times ?? []);
         }
 
-        // Count completed administrations for scheduled medications only
-        // Must have scheduled_for today and status = given
         $completedQuery = ClientMedicationAdministration::where('status', 'given')
             ->whereNotNull('scheduled_for')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
-        
+
         if ($clientId) {
             $completedQuery->where('client_id', $clientId);
         }
-        
-        // Count unique scheduled slots (not duplicate administrations)
+
         $completed = $completedQuery->distinct(['client_medication_id', 'scheduled_for'])->count();
 
-        // Count refused and missed for scheduled medications
         $refusedQuery = ClientMedicationAdministration::where('status', 'refused')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
@@ -494,17 +584,16 @@ class MedicationAlertService
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
-        
+
         if ($clientId) {
             $refusedQuery->where('client_id', $clientId);
             $missedQuery->where('client_id', $clientId);
         }
-        
+
         $refused = $refusedQuery->count();
         $missed = $missedQuery->count();
 
-        // Calculate completion percentage (cap at 100%)
-        $completionPercentage = $totalScheduled > 0 
+        $completionPercentage = $totalScheduled > 0
             ? min(100, round(($completed / $totalScheduled) * 100, 1))
             : 0;
 
@@ -519,13 +608,14 @@ class MedicationAlertService
         ];
     }
 
-    /**
-     * Acknowledge an alert
-     */
+    // -----------------------------------------------------------------------
+    // Alert management — retained for MedicationDashboardAlert UI compat
+    // -----------------------------------------------------------------------
+
     public function acknowledgeAlert(int $alertId, int $userId): bool
     {
         $alert = MedicationDashboardAlert::find($alertId);
-        
+
         if (!$alert || $alert->status !== 'active') {
             return false;
         }
@@ -534,13 +624,10 @@ class MedicationAlertService
         return true;
     }
 
-    /**
-     * Resolve an alert
-     */
     public function resolveAlert(int $alertId, ?string $notes = null): bool
     {
         $alert = MedicationDashboardAlert::find($alertId);
-        
+
         if (!$alert) {
             return false;
         }
@@ -549,14 +636,10 @@ class MedicationAlertService
         return true;
     }
 
-    /**
-     * Clear stale alerts
-     */
     public function clearStaleAlerts(): int
     {
         $count = 0;
 
-        // Clear resolved PRN alerts when count drops
         $prnAlerts = MedicationDashboardAlert::where('alert_type', 'like', 'prn_%')
             ->where('status', 'active')
             ->get();
@@ -569,7 +652,6 @@ class MedicationAlertService
             }
         }
 
-        // Clear expired medication alerts for ceased medications
         $expiryAlerts = MedicationDashboardAlert::whereIn('alert_type', ['expired', 'expiring_soon'])
             ->where('status', 'active')
             ->get();

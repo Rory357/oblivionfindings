@@ -2,6 +2,7 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Enums\AlertSeverity;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertQueue;
@@ -37,15 +38,32 @@ class SignalProcessingService
 
     /**
      * Ingest a raw signal from an integration.
+     *
+     * Validates required fields and normalises severity before creating.
+     * Idempotent — returns existing signal if idempotency key matches.
      */
     public function ingest(array $data): Signal
     {
+        // Validate: signal_type_code is required for meaningful classification
+        if (empty($data['signal_type_code'])) {
+            Log::warning('Signal ingested without signal_type_code', [
+                'signal_source_id' => $data['signal_source_id'] ?? null,
+                'severity_hint' => $data['severity_hint'] ?? null,
+            ]);
+            $data['signal_type_code'] = 'unknown';
+        }
+
+        // Normalise severity_hint to canonical values
+        if (isset($data['severity_hint'])) {
+            $data['severity_hint'] = AlertSeverity::normalise($data['severity_hint']);
+        }
+
         // Generate idempotency key if not provided
         if (empty($data['idempotency_key'])) {
             $data['idempotency_key'] = Signal::generateIdempotencyKey($data);
         }
 
-        // Check for duplicate
+        // Check for duplicate (idempotent)
         $existing = Signal::where('idempotency_key', $data['idempotency_key'])->first();
         if ($existing) {
             Log::debug('Signal deduplicated', ['idempotency_key' => $data['idempotency_key']]);
@@ -53,7 +71,7 @@ class SignalProcessingService
         }
 
         // Resolve signal type
-        if (!empty($data['signal_type_code'])) {
+        if (!empty($data['signal_type_code']) && $data['signal_type_code'] !== 'unknown') {
             $signalType = SignalType::findByCode($data['signal_type_code']);
             if ($signalType) {
                 $data['signal_type_id'] = $signalType->id;
@@ -67,11 +85,25 @@ class SignalProcessingService
             $source?->recordSignal();
         }
 
-        // Create the signal
-        $signal = Signal::create(array_merge($data, [
-            'status' => 'pending',
-            'occurred_at' => $data['occurred_at'] ?? now(),
-        ]));
+        // Ensure occurred_at is never null
+        $data['occurred_at'] = $data['occurred_at'] ?? now();
+
+        // Create the signal (race-condition safe: unique constraint on idempotency_key)
+        try {
+            $signal = Signal::create(array_merge($data, [
+                'status' => 'pending',
+            ]));
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle race condition: another process created the signal between check and create
+            if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')) {
+                $signal = Signal::where('idempotency_key', $data['idempotency_key'])->firstOrFail();
+                Log::debug('Signal deduplicated (race condition)', ['idempotency_key' => $data['idempotency_key']]);
+
+                return $signal;
+            }
+
+            throw $e;
+        }
 
         Log::info('Signal ingested', [
             'signal_id' => $signal->id,
@@ -138,10 +170,13 @@ class SignalProcessingService
                 try {
                     $this->process($signal);
                     $processed++;
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Log::error('Failed to process signal', [
                         'signal_id' => $signal->id,
+                        'signal_type' => $signal->signal_type_code,
                         'error' => $e->getMessage(),
+                        'exception_class' => get_class($e),
+                        'trace' => $e->getTraceAsString(),
                     ]);
                     $signal->markFailed($e->getMessage());
                 }
@@ -157,11 +192,12 @@ class SignalProcessingService
     {
         $signalType = $signal->signalType;
 
-        // Determine severity
-        $severity = $rule?->getOutputSeverity($signal)
-            ?? $signal->severity_hint
-            ?? $signalType?->default_severity
-            ?? 'medium';
+        // Determine severity — normalised through canonical AlertSeverity
+        $severity = AlertSeverity::normalise(
+            $rule?->getOutputSeverity($signal)
+                ?? $signal->severity_hint
+                ?? $signalType?->default_severity
+        );
 
         // Determine alert type name
         $alertType = $this->resolveAlertType($signal, $rule);
@@ -213,8 +249,8 @@ class SignalProcessingService
         if ($rule?->playbook_id) {
             $this->attachPlaybook($alert, $rule->playbook);
         } else {
-            // Try to find auto-attach playbook
-            $playbook = Playbook::findForAlert($signal->signal_type_code, $severity);
+            // Try to find auto-attach playbook matching the resolved alert type name
+            $playbook = Playbook::findForAlert($alertType, $severity);
             if ($playbook) {
                 $this->attachPlaybook($alert, $playbook);
             }
@@ -242,6 +278,9 @@ class SignalProcessingService
         ]);
 
         $this->notifications->notifyAlert($alert, $rule, $queue);
+
+        // Run post-creation automation (auto-assign, auto-start playbook)
+        app(AlertAutomationService::class)->onAlertCreated($alert);
 
         return $alert;
     }
@@ -831,20 +870,10 @@ class SignalProcessingService
 
     protected function higherSeverity(?string $current, ?string $candidate): string
     {
-        $rank = [
-            'info' => 0,
-            'low' => 1,
-            'medium' => 2,
-            'high' => 3,
-            'critical' => 4,
-        ];
-
-        $currentSeverity = $current ?? 'medium';
-        $candidateSeverity = $candidate ?? $currentSeverity;
-
-        return ($rank[$candidateSeverity] ?? 0) > ($rank[$currentSeverity] ?? 0)
-            ? $candidateSeverity
-            : $currentSeverity;
+        return AlertSeverity::higher(
+            AlertSeverity::normalise($current),
+            AlertSeverity::normalise($candidate),
+        );
     }
 
     protected function resolveAlert(

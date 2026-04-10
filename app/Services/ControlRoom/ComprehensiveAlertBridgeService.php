@@ -7,6 +7,8 @@ use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientIncident;
 use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\Playbook;
+use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
@@ -27,6 +29,11 @@ class ComprehensiveAlertBridgeService
      * @param  int     $clientId
      * @param  array   $context    Additional context data
      */
+    /**
+     * @deprecated PR3: Use MedicationSignalService::emit() instead.
+     * Medication alerts now flow through the canonical signal pipeline.
+     * This method is retained only for backward compatibility — it is not called anywhere.
+     */
     public function bridgeMedicationAlert(string $alertType, string $severity, int $clientId, array $context = []): ?ControlRoomAlert
     {
         $severityMap = [
@@ -46,8 +53,9 @@ class ComprehensiveAlertBridgeService
     }
 
     /**
-     * Bridge a medication error into the Control Room.
-     * Only errors with severity 'major' or 'critical' are bridged.
+     * @deprecated PR3: Use MedicationSignalService::emit() instead.
+     * Medication errors now flow through the canonical signal pipeline.
+     * This method is retained only for backward compatibility — it is not called anywhere.
      */
     public function bridgeMedicationError(MedicationError $error): ?ControlRoomAlert
     {
@@ -323,6 +331,20 @@ class ComprehensiveAlertBridgeService
             AlertSla::createFromDefinition($alert, $slaDefinition);
         }
 
+        // ── Attach playbook (same resolution logic as SignalProcessingService) ──
+        $playbook = Playbook::findForAlert($alertType, $severity);
+
+        if ($playbook) {
+            $run = PlaybookRun::create([
+                'playbook_id' => $playbook->id,
+                'alert_id' => $alert->id,
+                'status' => 'pending',
+                'total_steps' => $playbook->steps()->count(),
+            ]);
+
+            $alert->update(['playbook_run_id' => $run->id]);
+        }
+
         // ── Audit & log ──
         AuditLogger::log('control_room.alert_bridged', $alert, [
             'source'     => $source,
@@ -339,6 +361,9 @@ class ComprehensiveAlertBridgeService
             'queue_id'   => $queue?->id,
             'has_sla'    => $slaDefinition !== null,
         ]);
+
+        // Run post-creation automation (auto-assign, auto-start playbook)
+        app(AlertAutomationService::class)->onAlertCreated($alert);
 
         return $alert;
     }

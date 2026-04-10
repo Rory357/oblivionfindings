@@ -34,8 +34,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     Area,
     AreaChart,
+    Bar,
+    BarChart,
     CartesianGrid,
     Cell,
+    Legend,
     Pie,
     PieChart,
     ResponsiveContainer,
@@ -123,6 +126,31 @@ interface Props {
         create: boolean;
         viewReports: boolean;
     };
+    // PR12 additions
+    escalation_rate?: number;
+    attention_flags?: Array<{
+        level: 'critical' | 'warning';
+        message: string;
+        metric: string;
+        value: number;
+    }>;
+    site_comparison?: Array<{
+        site_id: number;
+        site_name: string;
+        total_alerts: number;
+        critical_count: number;
+        escalated_count: number;
+        resolution_rate: number;
+    }>;
+    period?: string;
+    sites?: Array<{ id: number; name: string }>;
+    workload?: {
+        active_per_user: Array<{ user: string; user_id: number; active_alerts: number }>;
+        handled_per_user: Array<{ user: string; user_id: number; alerts_handled: number }>;
+        per_queue: Array<{ queue: string; tier: number; active_alerts: number }>;
+        unassigned: number;
+    };
+    queues?: Array<{ name: string; tier: number; active_alerts: number }>;
 }
 
 const severityColors: Record<string, string> = {
@@ -200,6 +228,13 @@ export default function ControlRoomIndex({
     staff,
     filters,
     can,
+    escalation_rate,
+    attention_flags,
+    site_comparison,
+    period,
+    sites,
+    workload,
+    queues,
 }: Props) {
     const [searchValue, setSearchValue] = useState(filters.search || '');
     const prevCriticalRef = useRef(stats.critical);
@@ -214,6 +249,8 @@ export default function ControlRoomIndex({
                         'by_source', 'top_alert_types', 'sparkline_data',
                         'alerts_today', 'alerts_yesterday', 'avg_response_minutes',
                         'sla_compliance_pct', 'active_shift', 'recent_activity',
+                        'attention_flags', 'site_comparison', 'escalation_rate',
+                        'workload', 'queues',
                     ],
                 });
             }
@@ -395,6 +432,29 @@ export default function ControlRoomIndex({
                     </div>
                 )}
 
+                {/* Attention Flags (PR12) */}
+                {attention_flags && attention_flags.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                        {attention_flags.map((flag, i) => (
+                            <div
+                                key={i}
+                                className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 text-sm ${
+                                    flag.level === 'critical'
+                                        ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200'
+                                        : 'border-yellow-300 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200'
+                                }`}
+                            >
+                                {flag.level === 'critical' ? (
+                                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                                ) : (
+                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                )}
+                                <span>{flag.message}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* Row 3: Charts */}
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
                     {/* Area Chart - Alert Trend */}
@@ -546,13 +606,166 @@ export default function ControlRoomIndex({
                     </Card>
                 </div>
 
+                {/* Row 4b: Workload + Queue Pressure */}
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    {/* Workload Distribution */}
+                    {workload && workload.active_per_user.length > 0 && (
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium">Active Alerts by Staff</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-52">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={workload.active_per_user.slice(0, 8)}
+                                            layout="vertical"
+                                            margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                                            <XAxis type="number" tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
+                                            <YAxis
+                                                type="category"
+                                                dataKey="user"
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                                width={90}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: 'hsl(var(--card))',
+                                                    border: '1px solid hsl(var(--border))',
+                                                    borderRadius: '8px',
+                                                    fontSize: '12px',
+                                                }}
+                                                formatter={(v: number) => [v, 'Active alerts']}
+                                            />
+                                            <Bar dataKey="active_alerts" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={16} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Queue Pressure */}
+                    {queues && queues.length > 0 && (
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium">Queue Pressure</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {queues.map((q) => {
+                                        const isHot = q.active_alerts >= 5;
+                                        const isWarm = q.active_alerts >= 2;
+                                        return (
+                                            <div key={q.name}>
+                                                <div className="mb-1.5 flex items-center justify-between">
+                                                    <span className="text-sm font-medium">{q.name}</span>
+                                                    <span className={`text-lg font-bold ${
+                                                        isHot ? 'text-red-600' : isWarm ? 'text-orange-500' : 'text-green-600'
+                                                    }`}>
+                                                        {q.active_alerts}
+                                                    </span>
+                                                </div>
+                                                <div className="h-2 rounded-full bg-muted">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all ${
+                                                            isHot ? 'bg-red-500' : isWarm ? 'bg-orange-400' : 'bg-green-500'
+                                                        }`}
+                                                        style={{ width: `${Math.min((q.active_alerts / 10) * 100, 100)}%` }}
+                                                    />
+                                                </div>
+                                                <div className="mt-0.5 text-[10px] text-muted-foreground">Tier {q.tier}</div>
+                                            </div>
+                                        );
+                                    })}
+                                    {workload && (
+                                        <div className="border-t pt-3">
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-muted-foreground">Unassigned</span>
+                                                <span className={`font-bold ${workload.unassigned >= 5 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                                    {workload.unassigned}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+
+                {/* Row 4c: Site Comparison (PR12) */}
+                {site_comparison && site_comparison.length > 0 && (
+                    <div className="mt-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium">Alerts by Site</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-56">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={site_comparison.slice(0, 8)}
+                                            margin={{ top: 5, right: 10, left: -10, bottom: 0 }}
+                                            layout="vertical"
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                                            <XAxis type="number" tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
+                                            <YAxis
+                                                type="category"
+                                                dataKey="site_name"
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                                width={100}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    backgroundColor: 'hsl(var(--card))',
+                                                    border: '1px solid hsl(var(--border))',
+                                                    borderRadius: '8px',
+                                                    fontSize: '12px',
+                                                }}
+                                                formatter={(value: number, name: string) => {
+                                                    const labels: Record<string, string> = {
+                                                        total_alerts: 'Total',
+                                                        critical_count: 'Critical',
+                                                        escalated_count: 'Escalated',
+                                                    };
+                                                    return [value, labels[name] || name];
+                                                }}
+                                            />
+                                            <Legend
+                                                wrapperStyle={{ fontSize: '11px' }}
+                                                formatter={(value: string) => {
+                                                    const labels: Record<string, string> = {
+                                                        total_alerts: 'Total',
+                                                        critical_count: 'Critical',
+                                                        escalated_count: 'Escalated',
+                                                    };
+                                                    return labels[value] || value;
+                                                }}
+                                            />
+                                            <Bar dataKey="total_alerts" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={14} />
+                                            <Bar dataKey="critical_count" fill="#dc2626" radius={[0, 4, 4, 0]} barSize={14} />
+                                            <Bar dataKey="escalated_count" fill="#f97316" radius={[0, 4, 4, 0]} barSize={14} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
                 {/* Row 5: Quick Stats Bar */}
                 <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6">
                     {[
                         { label: 'Open', value: stats.open, color: 'text-red-500', filter: () => applyFilter('status', 'open') },
                         { label: 'Acknowledged', value: stats.acknowledged, color: 'text-yellow-500', filter: () => applyFilter('status', 'ack') },
                         { label: 'Triaging', value: stats.triaging, color: 'text-blue-500', filter: () => applyFilter('status', 'triaging') },
-                        { label: 'Escalated', value: stats.escalated, color: 'text-orange-500', filter: () => applyFilter('escalation_level', '1') },
+                        { label: escalation_rate ? `Escalated (${escalation_rate}%)` : 'Escalated', value: stats.escalated, color: 'text-orange-500', filter: () => applyFilter('escalation_level', '1') },
                         { label: 'Unassigned', value: stats.unassigned, color: 'text-purple-500', filter: () => applyFilter('assigned_to', 'unassigned') },
                         { label: 'My Alerts', value: stats.my_alerts, color: 'text-indigo-500', filter: () => applyFilter('assigned_to', 'me') },
                     ].map((s) => (

@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\MedicationError;
 use App\Models\User;
+use App\Services\Medication\MedicationSignalService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -108,7 +109,10 @@ class MedicationErrorController extends Controller
         unset($validated['create_incident']);
         $validated['client_incident_id'] = $incidentId;
 
-        MedicationError::create($validated);
+        $error = MedicationError::create($validated);
+
+        // Emit canonical signal for major/critical medication errors → Control Room
+        app(MedicationSignalService::class)->emitError($error);
 
         return redirect()->back()->with('success', 'Medication error reported successfully.');
     }

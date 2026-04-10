@@ -49,7 +49,8 @@ class FleetAutoAlertJob implements ShouldQueue
             if (!$booking->asset || !$booking->user) continue;
 
             $hoursOverdue = $booking->ends_at->diffInHours(now());
-            $severity = $hoursOverdue >= 24 ? 'critical' : ($hoursOverdue >= 4 ? 'high' : 'medium');
+            // PR7: Vehicle overdue is operationally urgent but not life-safety
+            $severity = $hoursOverdue >= 4 ? 'high' : 'medium';
 
             $signalService->emit([
                 'asset_id' => $booking->asset_id,
@@ -82,7 +83,8 @@ class FleetAutoAlertJob implements ShouldQueue
                 ->get(['id', 'name', 'wof_expires_at']);
 
             foreach ($assets as $asset) {
-                $severity = $days <= 1 ? 'critical' : ($days <= 7 ? 'high' : 'medium');
+                // PR7: Compliance expiry is high urgency, not life-safety critical
+                $severity = $days <= 7 ? 'high' : 'medium';
 
                 $signalService->emit([
                     'asset_id' => $asset->id,
@@ -108,7 +110,7 @@ class FleetAutoAlertJob implements ShouldQueue
             $signalService->emit([
                 'asset_id' => $asset->id,
                 'signal_type' => 'wof_expired',
-                'severity_hint' => 'critical',
+                'severity_hint' => 'high', // PR7: expired WoF is compliance issue, not life-safety
                 'occurred_at' => now(),
                 'payload' => [
                     'expired_at' => $asset->wof_expires_at->toDateString(),
@@ -131,7 +133,8 @@ class FleetAutoAlertJob implements ShouldQueue
                 ->get(['id', 'name', 'registration_expires_at']);
 
             foreach ($assets as $asset) {
-                $severity = $days <= 1 ? 'critical' : ($days <= 7 ? 'high' : 'medium');
+                // PR7: Compliance expiry is high urgency, not life-safety critical
+                $severity = $days <= 7 ? 'high' : 'medium';
 
                 $signalService->emit([
                     'asset_id' => $asset->id,
@@ -185,7 +188,8 @@ class FleetAutoAlertJob implements ShouldQueue
             $signalService->emit([
                 'asset_id' => $state->asset_id,
                 'signal_type' => 'low_battery',
-                'severity_hint' => $state->battery_pct < 5 ? 'critical' : 'medium',
+                // PR7: Low battery is operational, not life-safety
+                'severity_hint' => $state->battery_pct < 5 ? 'medium' : 'low',
                 'occurred_at' => now(),
                 'payload' => [
                     'battery_pct' => $state->battery_pct,

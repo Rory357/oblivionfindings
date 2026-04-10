@@ -8,6 +8,13 @@ use App\Models\AssetAlertPolicy;
 use App\Models\AssetTracker;
 use Carbon\Carbon;
 
+/**
+ * @deprecated PR5: This service is DEAD CODE — openAlert() is never called anywhere.
+ *             Asset alerts flow through FleetSignalService → ControlRoomAlert.
+ *             Do NOT add new callers to this service.
+ *
+ * @see \App\Models\ControlRoomAlert — canonical operational alert
+ */
 class AssetAlertService
 {
     public function openAlert(

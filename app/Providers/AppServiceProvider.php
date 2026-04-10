@@ -82,6 +82,7 @@ class AppServiceProvider extends ServiceProvider
         FleetIncident::observe(FleetIncidentObserver::class);
         WorkplaceInjury::observe(WorkplaceInjuryObserver::class);
         RestraintEvent::observe(RestraintEventObserver::class);
+        EmergencyDrill::observe(\App\Observers\EmergencyDrillObserver::class);
 
         // Financial event observers — operational costs → GL
         FleetFuelLog::observe(FleetFuelLogObserver::class);

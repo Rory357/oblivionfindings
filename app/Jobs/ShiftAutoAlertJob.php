@@ -25,18 +25,25 @@ class ShiftAutoAlertJob implements ShouldQueue
     public $timeout = 300;
     public $tries = 2;
 
-    /** @var array<int, string> */
+    /**
+     * Severity thresholds for no-show / late-start alerts.
+     * PR7: Normalised — shift no-show is operationally urgent but not life-threatening.
+     * Critical reserved for life-safety events only.
+     */
     protected array $thresholdSeverities = [
-        15 => 'medium',
-        30 => 'high',
-        60 => 'critical',
+        30 => 'medium',
+        60 => 'high',
+        90 => 'high',
     ];
 
-    /** @var array<int, string> */
+    /**
+     * Severity thresholds for not-completed alerts.
+     * PR7: Normalised — extended not-completed is high, not critical.
+     */
     protected array $completionThresholdSeverities = [
         30 => 'medium',
         60 => 'high',
-        120 => 'critical',
+        120 => 'high',
     ];
 
     public function handle(
@@ -239,7 +246,7 @@ class ShiftAutoAlertJob implements ShouldQueue
                 $occurredAt = $now->copy();
 
                 if ($shift->starts_at && $shift->starts_at->lte($now->copy()->subMinutes(60))) {
-                    $severity = 'critical';
+                    $severity = 'high'; // PR7: high, not critical — staffing gap, not life-safety
                     $windowKey = 'started_60';
                     $occurredAt = $shift->starts_at->copy()->addMinutes(60);
                 } elseif ($shift->starts_at && $shift->starts_at->lte($now->copy()->subMinutes(15))) {
@@ -437,7 +444,8 @@ class ShiftAutoAlertJob implements ShouldQueue
         );
 
         if ($windowStart->lte($now)) {
-            return $deficit >= 2 ? 'critical' : 'high';
+            // PR7: high for coverage gaps — critical reserved for life-safety
+            return $deficit >= 2 ? 'high' : 'high';
         }
 
         return $deficit >= 2 ? 'high' : 'medium';

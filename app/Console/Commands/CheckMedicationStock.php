@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationDashboardAlert;
+use App\Services\Medication\MedicationSignalService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -13,7 +14,7 @@ class CheckMedicationStock extends Command
 
     protected $description = 'Check medication stock levels and expiry dates, creating alerts as needed';
 
-    public function handle(): int
+    public function handle(MedicationSignalService $signalService): int
     {
         $this->info('Checking medication stock levels and expiry dates...');
 
@@ -21,7 +22,7 @@ class CheckMedicationStock extends Command
 
         // Check for stocks expiring within 30 days (but not yet expired)
         $expiringSoon = ClientMedicationStock::expiringSoon()
-            ->with(['medication' => fn ($q) => $q->with('client:id,first_name,last_name')])
+            ->with(['medication' => fn ($q) => $q->with('client:id,first_name,last_name,site_id')])
             ->get();
 
         foreach ($expiringSoon as $stock) {
@@ -35,6 +36,7 @@ class CheckMedicationStock extends Command
                 ? $stock->medication->client->first_name . ' ' . $stock->medication->client->last_name
                 : 'Unknown';
 
+            // Dashboard alert only — expiring soon is NOT operational
             MedicationDashboardAlert::createOrUpdateAlert(
                 clientId: $stock->medication?->client_id ?? 0,
                 alertType: 'expiring_soon',
@@ -48,9 +50,9 @@ class CheckMedicationStock extends Command
             $this->info("  Expiring soon: {$medicationName} ({$daysUntilExpiry} days)");
         }
 
-        // Check for expired stocks
+        // Check for expired stocks — OPERATIONAL
         $expired = ClientMedicationStock::expired()
-            ->with(['medication' => fn ($q) => $q->with('client:id,first_name,last_name')])
+            ->with(['medication' => fn ($q) => $q->with('client:id,first_name,last_name,site_id')])
             ->get();
 
         foreach ($expired as $stock) {
@@ -63,6 +65,7 @@ class CheckMedicationStock extends Command
                 ? $stock->medication->client->first_name . ' ' . $stock->medication->client->last_name
                 : 'Unknown';
 
+            // Dashboard alert (UI compat)
             MedicationDashboardAlert::createOrUpdateAlert(
                 clientId: $stock->medication?->client_id ?? 0,
                 alertType: 'expired',
@@ -71,6 +74,23 @@ class CheckMedicationStock extends Command
                 medicationId: $stock->client_medication_id,
             );
 
+            // Operational signal → Control Room
+            if ($stock->medication?->client_id) {
+                $signalService->emit(
+                    MedicationSignalService::TYPE_EXPIRED,
+                    $stock->medication->client_id,
+                    'high',
+                    "{$medicationName} for {$clientName} has EXPIRED",
+                    [
+                        'client_medication_id' => $stock->client_medication_id,
+                        'medication_name' => $medicationName,
+                        'expiry_date' => $stock->expiry_date->toDateString(),
+                        'batch_number' => $stock->batch_number,
+                        'site_id' => $stock->medication->client?->site_id,
+                    ],
+                );
+            }
+
             $stock->update(['last_reorder_alert_at' => now()]);
             $alertsCreated++;
             $this->info("  Expired: {$medicationName}");
@@ -78,7 +98,7 @@ class CheckMedicationStock extends Command
 
         // Check for low stock
         $lowStock = ClientMedicationStock::lowStock()
-            ->with(['medication' => fn ($q) => $q->with('client:id,first_name,last_name')])
+            ->with(['medication' => fn ($q) => $q->with('client:id,first_name,last_name,site_id')])
             ->get();
 
         foreach ($lowStock as $stock) {
@@ -95,6 +115,7 @@ class CheckMedicationStock extends Command
                 ? " Suggested reorder: {$stock->reorder_quantity} {$stock->unit}."
                 : '';
 
+            // Dashboard alert (UI compat)
             MedicationDashboardAlert::createOrUpdateAlert(
                 clientId: $stock->medication?->client_id ?? 0,
                 alertType: 'stock_low',
@@ -102,6 +123,21 @@ class CheckMedicationStock extends Command
                 message: "{$medicationName} for {$clientName} is low ({$stock->on_hand} {$stock->unit} remaining, reorder level: {$stock->reorder_level}).{$suggestedQty}",
                 medicationId: $stock->client_medication_id,
             );
+
+            // OUT OF STOCK → operational signal. Low stock → dashboard only.
+            if ($stock->on_hand <= 0 && $stock->medication?->client_id) {
+                $signalService->emit(
+                    MedicationSignalService::TYPE_STOCK_OUT,
+                    $stock->medication->client_id,
+                    'high',
+                    "{$medicationName} for {$clientName}: OUT OF STOCK",
+                    [
+                        'client_medication_id' => $stock->client_medication_id,
+                        'medication_name' => $medicationName,
+                        'site_id' => $stock->medication->client?->site_id,
+                    ],
+                );
+            }
 
             $stock->update(['last_reorder_alert_at' => now()]);
             $alertsCreated++;

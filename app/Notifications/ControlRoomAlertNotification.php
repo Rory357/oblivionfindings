@@ -10,9 +10,10 @@ class ControlRoomAlertNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(protected ControlRoomAlert $alert)
-    {
-    }
+    public function __construct(
+        protected ControlRoomAlert $alert,
+        protected array $extraContext = [],
+    ) {}
 
     public function via(object $notifiable): array
     {
@@ -21,7 +22,7 @@ class ControlRoomAlertNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
-        return [
+        return array_merge([
             'type' => 'control_room_alert',
             'alert_id' => $this->alert->id,
             'severity' => $this->alert->severity,
@@ -29,6 +30,7 @@ class ControlRoomAlertNotification extends Notification
             'alert_type' => $this->alert->alert_type,
             'source' => $this->alert->source,
             'triggered_at' => $this->alert->triggered_at?->toISOString(),
-        ];
+            'escalation_level' => $this->alert->escalation_level,
+        ], $this->extraContext);
     }
 }

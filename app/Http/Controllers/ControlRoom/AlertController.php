@@ -3,94 +3,208 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
-use App\Models\ControlRoom\Alert;
-use App\Models\Site;
+use App\Models\ControlRoomAlert;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
+/**
+ * Integration Alert Controller
+ *
+ * Displays ControlRoomAlert records filtered to integration-originated sources.
+ * Renders the same shared alerts page as ControlRoomAlertController, with the
+ * same data shape and props — just pre-scoped to integration sources.
+ */
 class AlertController extends Controller
 {
     /**
-     * List alerts with filters.
+     * List integration-sourced alerts.
+     *
+     * Returns the exact same AlertItem shape and Props structure as
+     * ControlRoomAlertController::index() so the shared frontend page
+     * renders correctly.
      */
     public function index(Request $request)
     {
-        $tenantId = $request->user()->tenant_id;
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
-        $query = Alert::forTenant($tenantId)
-            ->with([
-                'site:id,name',
-                'assignedTo:id,name',
-                'hardware:id,name,category',
-            ]);
+        $query = ControlRoomAlert::with([
+            'asset:id,name,asset_tag',
+            'assignedTo:id,name,email',
+            'client:id,first_name,last_name',
+            'sla',
+        ]);
 
-        if ($request->filled('site_id')) {
-            $query->where('site_id', $request->input('site_id'));
+        // Pre-scope to integration sources only
+        $query->where('source', 'like', 'integration_%');
+
+        // Site access scoping
+        $siteAccess = app(UserSiteAccessService::class);
+        $siteAccess->applyAlertScope($query, $user, ['shifts.manageAny', 'timesheets.manageAny', 'reports.viewAny']);
+
+        // Filters — same set as ControlRoomAlertController
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
         }
 
-        if ($request->filled('severity')) {
-            $query->where('severity', $request->input('severity'));
+        if ($severity = $request->input('severity')) {
+            $query->where('severity', $severity);
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+        if ($source = $request->input('source')) {
+            // Allow further narrowing within integration sources
+            $query->where('source', $source);
         }
 
-        if ($request->filled('provider')) {
-            $query->where('provider', $request->input('provider'));
+        if ($assignedTo = $request->input('assigned_to')) {
+            if ($assignedTo === 'me') {
+                $query->where('assigned_to_user_id', $user->id);
+            } elseif ($assignedTo === 'unassigned') {
+                $query->whereNull('assigned_to_user_id');
+            } else {
+                $query->where('assigned_to_user_id', (int) $assignedTo);
+            }
         }
 
-        $alerts = $query->orderByDesc('created_at')
-            ->paginate(20)
-            ->withQueryString();
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('alert_type', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%")
+                  ->orWhere('source', 'like', "%{$search}%");
+            });
+        }
 
-        $sites = Site::where('tenant_id', $tenantId)
+        if ($dateFrom = $request->input('date_from')) {
+            $query->where('triggered_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+        }
+
+        if ($dateTo = $request->input('date_to')) {
+            $query->where('triggered_at', '<=', Carbon::parse($dateTo)->endOfDay());
+        }
+
+        // Sorting — same as canonical controller
+        $sortField = $request->input('sort', 'triggered_at');
+        $sortDir = $request->input('dir', 'desc');
+        $allowedSorts = ['triggered_at', 'severity', 'status', 'alert_type'];
+        if (in_array($sortField, $allowedSorts, true)) {
+            if ($sortField === 'severity') {
+                $query->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low') " . ($sortDir === 'desc' ? 'DESC' : 'ASC'));
+            } else {
+                $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
+            }
+        } else {
+            $query->orderByDesc('triggered_at');
+        }
+
+        $paginated = $query->paginate(30)->withQueryString();
+
+        // Same AlertItem shape as ControlRoomAlertController
+        $alerts = $paginated->through(fn (ControlRoomAlert $alert) => [
+            'id' => $alert->id,
+            'source' => $alert->source,
+            'alert_type' => $alert->alert_type,
+            'severity' => $alert->severity,
+            'status' => $alert->status,
+            'escalation_level' => $alert->escalation_level,
+            'triggered_at' => optional($alert->triggered_at)->toISOString(),
+            'asset' => $alert->asset ? [
+                'id' => $alert->asset->id,
+                'name' => $alert->asset->name,
+                'asset_tag' => $alert->asset->asset_tag,
+            ] : null,
+            'assigned_to' => $alert->assignedTo ? [
+                'id' => $alert->assignedTo->id,
+                'name' => $alert->assignedTo->name,
+            ] : null,
+            'client_name' => $alert->client
+                ? trim($alert->client->first_name . ' ' . $alert->client->last_name)
+                : null,
+            'sla_status' => $this->deriveSlaStatus($alert),
+            'notes' => $alert->notes ? Str::limit($alert->notes, 120) : null,
+        ]);
+
+        // Stats — scoped to integration sources only
+        $statsBase = ControlRoomAlert::where('source', 'like', 'integration_%');
+        $siteAccess->applyAlertScope($statsBase, $user, ['shifts.manageAny', 'timesheets.manageAny', 'reports.viewAny']);
+
+        $stats = [
+            'total' => (clone $statsBase)->count(),
+            'open' => (clone $statsBase)->where('status', 'open')->count(),
+            'critical' => (clone $statsBase)->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'assigned_to_me' => (clone $statsBase)->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+        ];
+
+        $staff = User::staff()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'email']);
 
         return Inertia::render('control-room/alerts/index', [
             'alerts' => $alerts,
-            'filters' => $request->only(['site_id', 'severity', 'status', 'provider']),
-            'sites' => $sites,
+            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir']),
+            'stats' => $stats,
+            'staff' => $staff,
+            'can' => [
+                'manage' => $user->canDo('controlRoom.alerts.manage'),
+                'assign' => $user->canDo('controlRoom.alerts.assign'),
+            ],
         ]);
     }
 
     /**
-     * Acknowledge an alert.
+     * Acknowledge an integration-sourced alert.
      */
-    public function acknowledge(Request $request, Alert $alert)
+    public function acknowledge(Request $request, ControlRoomAlert $alert)
     {
-        $alert->acknowledge(auth()->id());
+        $alert->update([
+            'status' => 'ack',
+            'acknowledged_at' => now(),
+            'acknowledged_by_user_id' => auth()->id(),
+        ]);
 
         return redirect()->back();
     }
 
     /**
-     * Assign an alert to a user.
+     * Assign an integration-sourced alert to a user.
      */
-    public function assign(Request $request, Alert $alert)
+    public function assign(Request $request, ControlRoomAlert $alert)
     {
         $request->validate([
             'user_id' => ['required', 'exists:users,id'],
         ]);
 
-        $alert->status = Alert::STATUS_ASSIGNED;
-        $alert->assigned_to_user_id = $request->input('user_id');
-        $alert->save();
+        $alert->update([
+            'status' => 'triaging',
+            'assigned_to_user_id' => $request->input('user_id'),
+            'assigned_at' => now(),
+            'assigned_by_user_id' => auth()->id(),
+        ]);
 
         return redirect()->back();
     }
 
     /**
-     * Close an alert.
+     * Close (resolve) an integration-sourced alert.
      */
-    public function close(Request $request, Alert $alert)
+    public function close(Request $request, ControlRoomAlert $alert)
     {
         $request->validate([
             'close_reason' => ['nullable', 'string'],
         ]);
 
-        $alert->close(auth()->id(), $request->input('close_reason'));
+        $alert->update([
+            'status' => 'resolved',
+            'resolved_at' => now(),
+            'resolved_by_user_id' => auth()->id(),
+            'resolution_code' => 'closed_via_integration_view',
+            'notes' => $request->input('close_reason'),
+        ]);
 
         return redirect()->back();
     }
@@ -98,8 +212,39 @@ class AlertController extends Controller
     /**
      * Placeholder for incident creation from an alert.
      */
-    public function createIncident(Request $request, Alert $alert)
+    public function createIncident(Request $request, ControlRoomAlert $alert)
     {
         return redirect()->back()->with('info', 'Incident linking will be available in a future update');
+    }
+
+    /**
+     * Derive SLA status for a given alert (green/yellow/red/none).
+     * Same logic as ControlRoomAlertController::deriveSlaStatus().
+     */
+    private function deriveSlaStatus(ControlRoomAlert $alert): ?string
+    {
+        if (! $alert->sla) {
+            return null;
+        }
+
+        $sla = $alert->sla;
+        if ($sla->resolution_breached || $sla->response_breached || $sla->acknowledge_breached) {
+            return 'red';
+        }
+
+        $now = now();
+        $deadlines = array_filter([
+            $sla->acknowledge_deadline,
+            $sla->response_deadline,
+            $sla->resolution_deadline,
+        ]);
+
+        foreach ($deadlines as $deadline) {
+            if ($deadline && $deadline->gt($now) && $deadline->diffInMinutes($now) <= 30) {
+                return 'yellow';
+            }
+        }
+
+        return 'green';
     }
 }

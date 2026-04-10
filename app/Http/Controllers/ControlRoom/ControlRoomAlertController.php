@@ -19,6 +19,12 @@ use Inertia\Inertia;
 class ControlRoomAlertController extends Controller
 {
     /**
+     * SQL fragment for ordering severity: critical first, low last.
+     * Used by both priority sort and explicit severity sort.
+     */
+    private const SEVERITY_ORDER_SQL = "FIELD(severity, 'critical', 'high', 'medium', 'low')";
+
+    /**
      * Display the alerts list with filters, sorting and stats.
      */
     public function index(Request $request)
@@ -31,6 +37,8 @@ class ControlRoomAlertController extends Controller
             'assignedTo:id,name,email',
             'client:id,first_name,last_name',
             'sla',
+            'playbookRun:id,alert_id,playbook_id,status,current_step,completed_steps,total_steps',
+            'playbookRun.playbook:id,name,category',
         ]);
 
         $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions());
@@ -74,18 +82,17 @@ class ControlRoomAlertController extends Controller
             $query->where('triggered_at', '<=', Carbon::parse($dateTo)->endOfDay());
         }
 
-        // Sorting
-        $sortField = $request->input('sort', 'triggered_at');
+        // Sorting — default is operational priority (severity → escalation → oldest first)
+        $sortField = $request->input('sort', 'priority');
         $sortDir = $request->input('dir', 'desc');
-        $allowedSorts = ['triggered_at', 'severity', 'status', 'alert_type'];
-        if (in_array($sortField, $allowedSorts)) {
-            if ($sortField === 'severity') {
-                $query->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low') " . ($sortDir === 'desc' ? 'DESC' : 'ASC'));
-            } else {
-                $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
-            }
+        $allowedSorts = ['triggered_at', 'severity', 'status', 'alert_type', 'priority'];
+
+        if ($sortField === 'priority' || !in_array($sortField, $allowedSorts, true)) {
+            $this->applyOperationalPrioritySort($query);
+        } elseif ($sortField === 'severity') {
+            $query->orderByRaw(self::SEVERITY_ORDER_SQL . ' ' . ($sortDir === 'desc' ? 'DESC' : 'ASC'));
         } else {
-            $query->orderByDesc('triggered_at');
+            $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
         }
 
         $paginated = $query->paginate(30)->withQueryString();
@@ -98,6 +105,7 @@ class ControlRoomAlertController extends Controller
             'status' => $alert->status,
             'escalation_level' => $alert->escalation_level,
             'triggered_at' => optional($alert->triggered_at)->toISOString(),
+            'age_minutes' => $alert->triggered_at ? (int) $alert->triggered_at->diffInMinutes(now()) : null,
             'asset' => $alert->asset ? [
                 'id' => $alert->asset->id,
                 'name' => $alert->asset->name,
@@ -112,6 +120,18 @@ class ControlRoomAlertController extends Controller
                 : null,
             'sla_status' => $this->deriveSlaStatus($alert),
             'notes' => $alert->notes ? \Illuminate\Support\Str::limit($alert->notes, 120) : null,
+            // Operator context — what this alert is about (from normalized_data)
+            'summary' => $this->extractAlertSummary($alert),
+            // Playbook progress — shows operator what action state this is in
+            'playbook' => $alert->playbookRun ? [
+                'name' => $alert->playbookRun->playbook?->name,
+                'status' => $alert->playbookRun->status,
+                'progress' => $alert->playbookRun->total_steps > 0
+                    ? (int) round(($alert->playbookRun->completed_steps / $alert->playbookRun->total_steps) * 100)
+                    : 0,
+                'current_step' => $alert->playbookRun->current_step,
+                'total_steps' => $alert->playbookRun->total_steps,
+            ] : null,
         ]);
 
         // Stats (unfiltered counts)
@@ -122,8 +142,16 @@ class ControlRoomAlertController extends Controller
             'total' => (clone $statsBase)->count(),
             'open' => (clone $statsBase)->where('status', 'open')->count(),
             'critical' => (clone $statsBase)->where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'in_triage' => (clone $statsBase)->where('status', 'triaging')->count(),
             'assigned_to_me' => (clone $statsBase)->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
             'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'sla_breached' => (clone $statsBase)->whereNotIn('status', ['resolved', 'closed'])
+                ->whereHas('sla', fn ($q) => $q->where(fn ($sq) =>
+                    $sq->where('acknowledge_breached', true)
+                       ->orWhere('response_breached', true)
+                       ->orWhere('resolution_breached', true)
+                ))
+                ->count(),
         ];
 
         $staff = User::staff()
@@ -131,16 +159,85 @@ class ControlRoomAlertController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
+        // Triage queue summary — compact overview for operators
+        $queues = TriageQueue::active()
+            ->withCount(['alerts as active_alert_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed'])])
+            ->orderBy('tier')
+            ->get(['id', 'name', 'tier', 'code'])
+            ->map(fn ($q) => [
+                'id' => $q->id,
+                'name' => $q->name,
+                'tier' => $q->tier,
+                'active_alerts' => $q->active_alert_count,
+            ]);
+
         return Inertia::render('control-room/alerts/index', [
             'alerts' => $alerts,
             'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir']),
             'stats' => $stats,
+            'queues' => $queues,
             'staff' => $staff,
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
             ],
+            // Polling metadata — frontend can use these to detect stale data.
+            // latest_alert_at: timestamp of the most recently triggered unresolved alert.
+            // If this changes between polls, the list has new data.
+            'server_time' => now()->toISOString(),
+            'latest_alert_at' => ControlRoomAlert::whereNotIn('status', ['resolved', 'closed'])
+                ->max('updated_at'),
         ]);
+    }
+
+    /**
+     * Extract a human-readable summary from the alert context for operator scanning.
+     *
+     * Defensive fallback chain ensures operators almost never see a blank summary:
+     * 1. normalized_data.title (set by all signal services and bridge methods)
+     * 2. normalized_data.description (sometimes richer than title)
+     * 3. alert notes (manually added context)
+     * 4. alert_type as display name (always available, humanised)
+     *
+     * This degrades gracefully for any future emitter that omits context fields.
+     */
+    private function extractAlertSummary(ControlRoomAlert $alert): string
+    {
+        $ctx = $alert->context['normalized_data'] ?? $alert->context ?? [];
+
+        // 1. Signal/bridge normalised title
+        $title = $ctx['title'] ?? null;
+        if ($title && is_string($title) && trim($title) !== '') {
+            return \Illuminate\Support\Str::limit(trim($title), 100);
+        }
+
+        // 2. Description (may contain more detail)
+        $desc = $ctx['description'] ?? null;
+        if ($desc && is_string($desc) && trim($desc) !== '') {
+            return \Illuminate\Support\Str::limit(trim($desc), 100);
+        }
+
+        // 3. Notes on the alert
+        if ($alert->notes && trim($alert->notes) !== '') {
+            return \Illuminate\Support\Str::limit(trim($alert->notes), 100);
+        }
+
+        // 4. Humanised alert_type as last resort (always available)
+        return str_replace(['.', '_'], ' ', ucfirst($alert->alert_type));
+    }
+
+    /**
+     * Apply operational priority sort: severity → escalation → oldest first.
+     *
+     * This is the default sort for the triage list. Ensures critical alerts
+     * are always at the top, heavily escalated alerts surface quickly, and
+     * within the same priority band the longest-waiting alert comes first.
+     */
+    private function applyOperationalPrioritySort($query): void
+    {
+        $query->orderByRaw(self::SEVERITY_ORDER_SQL . ' ASC')   // critical first
+              ->orderByDesc('escalation_level')                   // most escalated first
+              ->orderBy('triggered_at', 'asc');                   // oldest first
     }
 
     /**
@@ -188,16 +285,19 @@ class ControlRoomAlertController extends Controller
         ]);
 
         $alerts = ControlRoomAlert::whereIn('id', $data['alert_ids'])
-            ->where('status', 'open')
             ->tap(fn ($query) => $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions()))
             ->get();
 
-        abort_if($alerts->count() !== count($data['alert_ids']), 403, 'You are not authorized to manage one or more selected alerts.');
-
         $count = 0;
+        $skipped = 0;
         foreach ($alerts as $alert) {
+            if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
+                $skipped++;
+                continue;
+            }
+
             $alert->update([
-                'status' => 'ack',
+                'status' => ControlRoomAlert::STATUS_ACK,
                 'acknowledged_at' => now(),
                 'acknowledged_by_user_id' => $user->id,
             ]);
@@ -213,7 +313,12 @@ class ControlRoomAlertController extends Controller
             $count++;
         }
 
-        return back()->with('success', "{$count} alert(s) acknowledged.");
+        $message = "{$count} alert(s) acknowledged.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} skipped (already acknowledged or resolved).";
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
@@ -237,7 +342,13 @@ class ControlRoomAlertController extends Controller
         abort_if($alerts->count() !== count($data['alert_ids']), 403, 'You are not authorized to assign one or more selected alerts.');
 
         $count = 0;
+        $skipped = 0;
         foreach ($alerts as $alert) {
+            if (!$alert->isActionable()) {
+                $skipped++;
+                continue;
+            }
+
             $alert->update([
                 'assigned_to_user_id' => $data['assigned_to_user_id'],
                 'assigned_at' => now(),
@@ -254,7 +365,12 @@ class ControlRoomAlertController extends Controller
             $count++;
         }
 
-        return back()->with('success', "{$count} alert(s) assigned.");
+        $message = "{$count} alert(s) assigned.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} skipped (resolved or closed).";
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
@@ -265,6 +381,10 @@ class ControlRoomAlertController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
         $this->assertCanAccessAlert($user, $alert);
+
+        if (!$alert->isActionable()) {
+            return back()->withErrors(['alert' => "Cannot assign an alert in '{$alert->status}' status."]);
+        }
 
         $alert->update([
             'assigned_to_user_id' => $user->id,
@@ -547,8 +667,8 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if ($alert->status === 'closed' || $alert->status === 'resolved') {
-            return back()->withErrors(['alert' => 'Cannot acknowledge a closed or resolved alert.']);
+        if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
+            return back()->withErrors(['alert' => "Cannot acknowledge an alert in '{$alert->status}' status."]);
         }
 
         $request->validate([
@@ -581,8 +701,8 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!in_array($alert->status, ['open', 'ack'])) {
-            return back()->withErrors(['alert' => 'Alert must be open or acknowledged to start triage.']);
+        if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_TRIAGING)) {
+            return back()->withErrors(['alert' => "Cannot start triage on an alert in '{$alert->status}' status."]);
         }
 
         $request->validate([
@@ -613,8 +733,8 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if ($alert->status === 'closed' || $alert->status === 'resolved') {
-            return back()->withErrors(['alert' => 'Alert is already resolved or closed.']);
+        if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
+            return back()->withErrors(['alert' => "Cannot resolve an alert in '{$alert->status}' status."]);
         }
 
         $request->validate([
@@ -647,8 +767,8 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if ($alert->status === 'closed') {
-            return back()->withErrors(['alert' => 'Alert is already closed.']);
+        if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_CLOSED)) {
+            return back()->withErrors(['alert' => "Cannot close an alert in '{$alert->status}' status."]);
         }
 
         $request->validate([
@@ -678,6 +798,10 @@ class ControlRoomAlertController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
         $this->assertCanAccessAlert($user, $alert);
+
+        if (!$alert->isActionable()) {
+            return back()->withErrors(['alert' => "Cannot assign an alert in '{$alert->status}' status."]);
+        }
 
         $data = $request->validate([
             'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
@@ -727,6 +851,10 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
+        if (!$alert->isActionable()) {
+            return back()->withErrors(['alert' => "Cannot unassign an alert in '{$alert->status}' status."]);
+        }
+
         $previousAssignee = $alert->assigned_to_user_id;
 
         // Record unassignment in history
@@ -770,13 +898,13 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.escalate'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if ($alert->status === 'closed' || $alert->status === 'resolved') {
-            return back()->withErrors(['alert' => 'Cannot escalate a closed or resolved alert.']);
+        if (!$alert->isActionable()) {
+            return back()->withErrors(['alert' => "Cannot escalate an alert in '{$alert->status}' status."]);
         }
 
         $data = $request->validate([
             'escalation_reason' => ['required', 'string', 'max:1000'],
-            'escalation_level' => ['nullable', 'integer', 'min:1'],
+            'escalation_level' => ['nullable', 'integer', 'min:1', 'max:' . ControlRoomAlert::MAX_ESCALATION_LEVEL],
         ]);
 
         $newLevel = $data['escalation_level'] ?? (($alert->escalation_level ?? 0) + 1);

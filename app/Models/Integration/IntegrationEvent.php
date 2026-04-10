@@ -3,7 +3,7 @@
 namespace App\Models\Integration;
 
 use App\Models\Concerns\AuditableChanges;
-use App\Models\ControlRoom\Alert;
+use App\Models\ControlRoomAlert;
 use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
@@ -67,9 +67,33 @@ class IntegrationEvent extends Model
         return $this->belongsTo(LocationHardware::class, 'hardware_id');
     }
 
+    /**
+     * Get the canonical Control Room alert created from this integration event.
+     *
+     * Integration events now flow through the signal pipeline.
+     * The resulting ControlRoomAlert stores the integration_event_id
+     * in its context->normalized_data JSON.
+     *
+     * Note: This uses a query scope instead of a true hasOne relationship
+     * since the FK is inside a JSON column. If performance is a concern,
+     * consider caching or adding a direct FK column in a future migration.
+     */
+    public function controlRoomAlert(): ?ControlRoomAlert
+    {
+        return ControlRoomAlert::where('source', 'like', 'integration_%')
+            ->whereJsonContains('context->normalized_data->integration_event_id', $this->id)
+            ->first();
+    }
+
+    /**
+     * @deprecated Use controlRoomAlert() instead. Retained for backward compatibility.
+     */
     public function alert(): HasOne
     {
-        return $this->hasOne(Alert::class, 'integration_event_id');
+        // Return a hasOne on the deprecated integration_alerts table.
+        // This will return null for new events routed through the signal pipeline.
+        // Use controlRoomAlert() for the canonical alert.
+        return $this->hasOne(\App\Models\ControlRoom\Alert::class, 'integration_event_id');
     }
 
     /* ---------------------------------------------------------------
@@ -98,5 +122,16 @@ class IntegrationEvent extends Model
     public function scopeSince($query, $datetime)
     {
         return $query->where('occurred_at', '>=', $datetime);
+    }
+
+    /**
+     * Resolve the factory for this model.
+     *
+     * Required because the model namespace (App\Models\Integration) doesn't
+     * match the default factory namespace convention.
+     */
+    protected static function newFactory(): \Database\Factories\IntegrationEventFactory
+    {
+        return \Database\Factories\IntegrationEventFactory::new();
     }
 }

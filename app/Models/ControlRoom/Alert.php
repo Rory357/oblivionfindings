@@ -12,6 +12,22 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @deprecated PR1: This model is deprecated. Integration events now flow through
+ *             the canonical signal pipeline to create ControlRoomAlert records.
+ *
+ *             This model is retained ONLY for:
+ *             - reading historical integration_alerts data
+ *             - backward compatibility with IntegrationEvent::alert() relationship
+ *
+ *             NO NEW WRITES should target this model. The AlertRoutingService now
+ *             emits signals via SignalProcessingService instead.
+ *
+ *             Scheduled for removal in PR16 after a bake period.
+ *
+ * @see \App\Models\ControlRoomAlert          — canonical alert model
+ * @see \App\Services\Integration\AlertRoutingService — now emits signals
+ */
 class Alert extends Model
 {
     use HasFactory;
@@ -129,6 +145,7 @@ class Alert extends Model
      * Helper Methods
      * ------------------------------------------------------------- */
 
+    /** @deprecated Use ControlRoomAlert lifecycle instead */
     public function acknowledge(int $userId): void
     {
         $this->status = self::STATUS_ACK;
@@ -137,6 +154,7 @@ class Alert extends Model
         $this->save();
     }
 
+    /** @deprecated Use ControlRoomAlert lifecycle instead */
     public function close(int $userId, ?string $reason = null): void
     {
         $this->status = self::STATUS_CLOSED;

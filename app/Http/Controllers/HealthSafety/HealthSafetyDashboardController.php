@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientIncident;
+use App\Models\ControlRoomAlert;
 use App\Models\EmergencyDrill;
 use App\Models\FleetIncident;
 use App\Models\LoneWorkerAlert;
@@ -66,7 +67,10 @@ class HealthSafetyDashboardController extends Controller
             ? (int) round(($sitesWithRecentDrill / $totalSites) * 100)
             : 0;
 
-        $activeAlerts = LoneWorkerAlert::where('status', 'active')->count();
+        // Lone worker active alerts — canonical ControlRoomAlert is the operational source of truth
+        $activeAlerts = ControlRoomAlert::where('source', 'lone_worker')
+            ->whereNotIn('status', ['resolved', 'closed'])
+            ->count();
 
         $openSafeguarding = SafeguardingConcern::whereIn('status', ['open', 'investigating', 'new'])->count();
 
