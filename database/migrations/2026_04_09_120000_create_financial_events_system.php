@@ -11,6 +11,7 @@ return new class extends Migration
         // ──────────────────────────────────────────────────────────
         // 1. Financial Events — audit trail + idempotency guard
         // ──────────────────────────────────────────────────────────
+        if (! Schema::hasTable('fin_financial_events')) {
         Schema::create('fin_financial_events', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('organization_id')->index();
@@ -61,10 +62,12 @@ return new class extends Migration
             $table->index(['client_id', 'event_date']);
             $table->index(['asset_id', 'event_date']);
         });
+        }
 
         // ──────────────────────────────────────────────────────────
         // 2. Cost Allocations — cross-module query layer
         // ──────────────────────────────────────────────────────────
+        if (! Schema::hasTable('fin_cost_allocations')) {
         Schema::create('fin_cost_allocations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('journal_id')->constrained('fin_journals')->cascadeOnDelete();
@@ -90,29 +93,26 @@ return new class extends Migration
             $table->index(['event_type', 'event_date']);
             $table->index(['journal_id']);
         });
+        }
 
         // ──────────────────────────────────────────────────────────
         // 3. Add journal_id to operational tables for back-reference
         // ──────────────────────────────────────────────────────────
-        Schema::table('fleet_fuel_logs', function (Blueprint $table) {
-            $table->foreignId('journal_id')->nullable()->after('notes')->constrained('fin_journals')->nullOnDelete();
-        });
+        $addJournalId = [
+            'fleet_fuel_logs'       => 'notes',
+            'fleet_work_orders'     => 'completion_notes',
+            'asset_maintenance_logs' => 'notes',
+            'hr_expense_claims'     => 'notes',
+            'hr_course_enrollments' => 'notes',
+        ];
 
-        Schema::table('fleet_work_orders', function (Blueprint $table) {
-            $table->foreignId('journal_id')->nullable()->after('completion_notes')->constrained('fin_journals')->nullOnDelete();
-        });
-
-        Schema::table('asset_maintenance_logs', function (Blueprint $table) {
-            $table->foreignId('journal_id')->nullable()->after('notes')->constrained('fin_journals')->nullOnDelete();
-        });
-
-        Schema::table('hr_expense_claims', function (Blueprint $table) {
-            $table->foreignId('journal_id')->nullable()->after('notes')->constrained('fin_journals')->nullOnDelete();
-        });
-
-        Schema::table('hr_course_enrollments', function (Blueprint $table) {
-            $table->foreignId('journal_id')->nullable()->after('notes')->constrained('fin_journals')->nullOnDelete();
-        });
+        foreach ($addJournalId as $table => $after) {
+            if (! Schema::hasColumn($table, 'journal_id')) {
+                Schema::table($table, function (Blueprint $table) use ($after) {
+                    $table->foreignId('journal_id')->nullable()->after($after)->constrained('fin_journals')->nullOnDelete();
+                });
+            }
+        }
     }
 
     public function down(): void
@@ -121,9 +121,13 @@ return new class extends Migration
             $table->dropConstrainedForeignId('journal_id');
         });
 
-        Schema::table('hr_expense_claims', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('journal_id');
-        });
+        // journal_id on hr_expense_claims may belong to an earlier migration — only drop if the table still has it
+        // and the earlier migration's down() hasn't already removed it.
+        if (Schema::hasColumn('hr_expense_claims', 'journal_id')) {
+            Schema::table('hr_expense_claims', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('journal_id');
+            });
+        }
 
         Schema::table('asset_maintenance_logs', function (Blueprint $table) {
             $table->dropConstrainedForeignId('journal_id');

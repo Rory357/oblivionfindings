@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Models\AssetMaintenanceLog;
 use App\Models\ClientIncident;
+use App\Models\EmergencyDrill;
 use App\Models\ClientNote;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
@@ -22,6 +23,7 @@ use App\Models\Timesheet;
 use App\Models\WorkplaceInjury;
 use App\Observers\AssetMaintenanceLogObserver;
 use App\Observers\ClientIncidentObserver;
+use App\Observers\EmergencyDrillObserver;
 use App\Observers\ClientLedgerEntryObserver;
 use App\Observers\ClientNoteObserver;
 use App\Observers\FleetFuelLogObserver;
@@ -82,7 +84,7 @@ class AppServiceProvider extends ServiceProvider
         FleetIncident::observe(FleetIncidentObserver::class);
         WorkplaceInjury::observe(WorkplaceInjuryObserver::class);
         RestraintEvent::observe(RestraintEventObserver::class);
-        EmergencyDrill::observe(\App\Observers\EmergencyDrillObserver::class);
+        EmergencyDrill::observe(EmergencyDrillObserver::class);
 
         // Financial event observers — operational costs → GL
         FleetFuelLog::observe(FleetFuelLogObserver::class);
