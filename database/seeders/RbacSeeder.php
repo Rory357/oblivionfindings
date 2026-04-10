@@ -422,6 +422,25 @@ class RbacSeeder extends Seeder
             // Reports - Sites
             ['key' => 'reports.sites.view', 'description' => 'View site reports', 'group' => 'reports', 'module' => 'System'],
             ['key' => 'reports.sites.export', 'description' => 'Export site reports', 'group' => 'reports', 'module' => 'System'],
+
+            // Finance
+            ['key' => 'finance.dashboard', 'description' => 'View finance dashboard', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.ledger.view', 'description' => 'View general ledger', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.ledger.manage', 'description' => 'Manage general ledger', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.ap.view', 'description' => 'View accounts payable', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.ap.manage', 'description' => 'Manage accounts payable', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.ar.view', 'description' => 'View accounts receivable', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.ar.manage', 'description' => 'Manage accounts receivable', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.bank.view', 'description' => 'View banking', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.bank.manage', 'description' => 'Manage banking', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.tax.view', 'description' => 'View tax & GST', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.tax.manage', 'description' => 'Manage tax & GST', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.assets.view', 'description' => 'View fixed assets', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.assets.manage', 'description' => 'Manage fixed assets', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.petty_cash.view', 'description' => 'View petty cash', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.petty_cash.manage', 'description' => 'Manage petty cash', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.reports.view', 'description' => 'View financial reports', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.admin', 'description' => 'Finance administration', 'group' => 'finance', 'module' => 'Finance'],
         ];
 
         foreach ($permissionDefinitions as $permDef) {
