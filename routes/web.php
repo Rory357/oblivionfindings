@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\ContactController;
 use App\Http\Controllers\Careers\CareerPortalController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\TodayDashboardController;
@@ -111,10 +111,10 @@ Route::get('/my-calendar', [\App\Http\Controllers\MyCalendarController::class, '
 Route::get('/my-calendar/events', [\App\Http\Controllers\MyCalendarController::class, 'events'])->middleware('auth')->name('my-calendar.events');
 
 // ── Operations module ────────────────────────────────────────────────
-require __DIR__ . '/operations.php';
+require __DIR__.'/operations.php';
 
 // ── eMAR module ──────────────────────────────────────────────────────
-require __DIR__ . '/emar.php';
+require __DIR__.'/emar.php';
 
 // Domain-specific routes
 require __DIR__.'/auth.php';
@@ -127,6 +127,7 @@ require __DIR__.'/sites.php';
 require __DIR__.'/fleet.php';
 require __DIR__.'/fleet-assets.php';
 require __DIR__.'/control-room.php';
+require __DIR__.'/security-devices.php';
 require __DIR__.'/shifts.php';
 require __DIR__.'/medications.php';
 require __DIR__.'/reports.php';
