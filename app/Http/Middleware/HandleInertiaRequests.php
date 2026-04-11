@@ -83,7 +83,7 @@ class HandleInertiaRequests extends Middleware
                 'portalClients' => $user && $user->hasRole('client', 'next_of_kin')
                     ? $user->portalClients()->get(['clients.id', 'clients.first_name', 'clients.last_name', 'clients.profile_photo_path'])->map(fn ($c) => [
                         'id' => $c->id,
-                        'name' => trim($c->first_name . ' ' . $c->last_name),
+                        'name' => trim($c->first_name.' '.$c->last_name),
                         'avatar' => $c->profile_photo_url,
                         'relation' => $c->pivot->relation ?? null,
                     ])->values()->all()
@@ -479,9 +479,11 @@ class HandleInertiaRequests extends Middleware
                         'manage' => $user->canDo('hr.orgchart.manage'),
                     ],
                     'time' => [
-                        'view' => $user->canDo('hr.time.view'),
+                        'view' => $user->canDo('hr.time.viewAny'),
+                        'viewAny' => $user->canDo('hr.time.viewAny'),
                         'manage' => $user->canDo('hr.time.manage'),
-                        'approve' => $user->canDo('hr.time.approve'),
+                        'approve' => $user->canDo('hr.time.manage') || $user->canDo('hr.time.approveTeam'),
+                        'approveTeam' => $user->canDo('hr.time.approveTeam'),
                     ],
                     'compensation' => [
                         'view' => $user->canDo('hr.compensation.view'),

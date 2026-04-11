@@ -4,16 +4,17 @@ namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Models\ControlRoomAlert;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
+use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsVisibilityService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class ControlRoomAlertController extends Controller
@@ -69,8 +70,8 @@ class ControlRoomAlertController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('alert_type', 'like', "%{$search}%")
-                  ->orWhere('notes', 'like', "%{$search}%")
-                  ->orWhere('source', 'like', "%{$search}%");
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhere('source', 'like', "%{$search}%");
             });
         }
 
@@ -87,17 +88,17 @@ class ControlRoomAlertController extends Controller
         $sortDir = $request->input('dir', 'desc');
         $allowedSorts = ['triggered_at', 'severity', 'status', 'alert_type', 'priority'];
 
-        if ($sortField === 'priority' || !in_array($sortField, $allowedSorts, true)) {
+        if ($sortField === 'priority' || ! in_array($sortField, $allowedSorts, true)) {
             $this->applyOperationalPrioritySort($query);
         } elseif ($sortField === 'severity') {
-            $query->orderByRaw(self::SEVERITY_ORDER_SQL . ' ' . ($sortDir === 'desc' ? 'DESC' : 'ASC'));
+            $query->orderByRaw(self::SEVERITY_ORDER_SQL.' '.($sortDir === 'desc' ? 'DESC' : 'ASC'));
         } else {
             $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
         }
 
         $paginated = $query->paginate(30)->withQueryString();
 
-        $alerts = $paginated->through(fn(ControlRoomAlert $alert) => [
+        $alerts = $paginated->through(fn (ControlRoomAlert $alert) => [
             'id' => $alert->id,
             'source' => $alert->source,
             'alert_type' => $alert->alert_type,
@@ -116,7 +117,7 @@ class ControlRoomAlertController extends Controller
                 'name' => $alert->assignedTo->name,
             ] : null,
             'client_name' => $alert->client
-                ? trim($alert->client->first_name . ' ' . $alert->client->last_name)
+                ? trim($alert->client->first_name.' '.$alert->client->last_name)
                 : null,
             'sla_status' => $this->deriveSlaStatus($alert),
             'notes' => $alert->notes ? \Illuminate\Support\Str::limit($alert->notes, 120) : null,
@@ -146,18 +147,18 @@ class ControlRoomAlertController extends Controller
             'assigned_to_me' => (clone $statsBase)->where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
             'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
             'sla_breached' => (clone $statsBase)->whereNotIn('status', ['resolved', 'closed'])
-                ->whereHas('sla', fn ($q) => $q->where(fn ($sq) =>
-                    $sq->where('acknowledge_breached', true)
-                       ->orWhere('response_breached', true)
-                       ->orWhere('resolution_breached', true)
+                ->whereHas('sla', fn ($q) => $q->where(fn ($sq) => $sq->where('acknowledge_breached', true)
+                    ->orWhere('response_breached', true)
+                    ->orWhere('resolution_breached', true)
                 ))
                 ->count(),
         ];
 
-        $staff = User::staff()
-            ->whereHas('roles', fn($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+        $staff = $this->assignableStaff($user);
+
+        $latestAlertQuery = ControlRoomAlert::query()
+            ->whereNotIn('status', ['resolved', 'closed']);
+        $this->siteAccess()->applyAlertScope($latestAlertQuery, $user, $this->alertBypassPermissions());
 
         // Triage queue summary — compact overview for operators
         $queues = TriageQueue::active()
@@ -185,8 +186,7 @@ class ControlRoomAlertController extends Controller
             // latest_alert_at: timestamp of the most recently triggered unresolved alert.
             // If this changes between polls, the list has new data.
             'server_time' => now()->toISOString(),
-            'latest_alert_at' => ControlRoomAlert::whereNotIn('status', ['resolved', 'closed'])
-                ->max('updated_at'),
+            'latest_alert_at' => $latestAlertQuery->max('updated_at'),
         ]);
     }
 
@@ -235,9 +235,9 @@ class ControlRoomAlertController extends Controller
      */
     private function applyOperationalPrioritySort($query): void
     {
-        $query->orderByRaw(self::SEVERITY_ORDER_SQL . ' ASC')   // critical first
-              ->orderByDesc('escalation_level')                   // most escalated first
-              ->orderBy('triggered_at', 'asc');                   // oldest first
+        $query->orderByRaw(self::SEVERITY_ORDER_SQL.' ASC')   // critical first
+            ->orderByDesc('escalation_level')                   // most escalated first
+            ->orderBy('triggered_at', 'asc');                   // oldest first
     }
 
     /**
@@ -245,7 +245,7 @@ class ControlRoomAlertController extends Controller
      */
     private function deriveSlaStatus(ControlRoomAlert $alert): ?string
     {
-        if (!$alert->sla) {
+        if (! $alert->sla) {
             return null;
         }
 
@@ -291,8 +291,9 @@ class ControlRoomAlertController extends Controller
         $count = 0;
         $skipped = 0;
         foreach ($alerts as $alert) {
-            if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
+            if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -335,6 +336,8 @@ class ControlRoomAlertController extends Controller
             'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
+        $this->assertCanAssignAlertToUser($user, (int) $data['assigned_to_user_id']);
+
         $alerts = ControlRoomAlert::whereIn('id', $data['alert_ids'])
             ->tap(fn ($query) => $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions()))
             ->get();
@@ -344,8 +347,9 @@ class ControlRoomAlertController extends Controller
         $count = 0;
         $skipped = 0;
         foreach ($alerts as $alert) {
-            if (!$alert->isActionable()) {
+            if (! $alert->isActionable()) {
                 $skipped++;
+
                 continue;
             }
 
@@ -382,7 +386,7 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!$alert->isActionable()) {
+        if (! $alert->isActionable()) {
             return back()->withErrors(['alert' => "Cannot assign an alert in '{$alert->status}' status."]);
         }
 
@@ -428,10 +432,10 @@ class ControlRoomAlertController extends Controller
             'sla.slaDefinition',
             'client:id,first_name,last_name',
             'device:id,type,latitude,longitude,location_description',
-            'tasks' => fn($q) => $q->whereNull('parent_task_id')->orderBy('sort_order')->with(['assignedTo:id,name', 'subtasks.assignedTo:id,name']),
-            'discussions' => fn($q) => $q->whereNull('parent_id')->orderBy('created_at', 'asc')->with(['user:id,name', 'replies' => fn($r) => $r->orderBy('created_at', 'asc')->with('user:id,name')]),
+            'tasks' => fn ($q) => $q->whereNull('parent_task_id')->orderBy('sort_order')->with(['assignedTo:id,name', 'subtasks.assignedTo:id,name']),
+            'discussions' => fn ($q) => $q->whereNull('parent_id')->orderBy('created_at', 'asc')->with(['user:id,name', 'replies' => fn ($r) => $r->orderBy('created_at', 'asc')->with('user:id,name')]),
             'watchers.user:id,name',
-            'timeEntries' => fn($q) => $q->orderBy('created_at', 'desc')->with('user:id,name'),
+            'timeEntries' => fn ($q) => $q->orderBy('created_at', 'desc')->with('user:id,name'),
         ]);
 
         // Fetch audit trail for this alert
@@ -442,7 +446,7 @@ class ControlRoomAlertController extends Controller
             ->orderByDesc('created_at')
             ->limit(50)
             ->get()
-            ->map(fn($log) => [
+            ->map(fn ($log) => [
                 'id' => $log->id,
                 'action' => $log->action,
                 'user' => $log->user ? ['id' => $log->user->id, 'name' => $log->user->name] : null,
@@ -535,20 +539,20 @@ class ControlRoomAlertController extends Controller
                     'name' => $alert->playbookRun->playbook->name,
                     'category' => $alert->playbookRun->playbook->category,
                 ],
-                'steps' => $alert->playbookRun->steps->map(fn($s) => [
+                'steps' => $alert->playbookRun->steps->map(fn ($s) => [
                     'id' => $s->id,
-                    'title' => $s->playbook_step_title ?? 'Step ' . $s->step_number,
+                    'title' => $s->playbook_step_title ?? 'Step '.$s->step_number,
                     'status' => $s->status,
                     'notes' => $s->notes,
                     'completed_at' => optional($s->completed_at)->toISOString(),
                 ])->values(),
             ] : null,
-            'evidence_packs' => $alert->evidencePacks->map(fn($p) => [
+            'evidence_packs' => $alert->evidencePacks->map(fn ($p) => [
                 'id' => $p->id,
                 'title' => $p->title,
                 'status' => $p->status,
                 'item_count' => $p->item_count,
-                'items' => $p->evidenceItems->map(fn($i) => [
+                'items' => $p->evidenceItems->map(fn ($i) => [
                     'id' => $i->id,
                     'type' => $i->type,
                     'title' => $i->title,
@@ -556,7 +560,7 @@ class ControlRoomAlertController extends Controller
                     'created_at' => optional($i->created_at)->toISOString(),
                 ])->values(),
             ])->values(),
-            'communications' => $alert->communications->map(fn($c) => [
+            'communications' => $alert->communications->map(fn ($c) => [
                 'id' => $c->id,
                 'channel' => $c->channel,
                 'direction' => $c->direction,
@@ -577,7 +581,7 @@ class ControlRoomAlertController extends Controller
             ] : null,
             'client' => $alert->client ? [
                 'id' => $alert->client->id,
-                'name' => trim($alert->client->first_name . ' ' . $alert->client->last_name),
+                'name' => trim($alert->client->first_name.' '.$alert->client->last_name),
             ] : null,
             'location' => $alert->device && $alert->device->latitude ? [
                 'lat' => (float) $alert->device->latitude,
@@ -590,11 +594,8 @@ class ControlRoomAlertController extends Controller
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
                 'escalate' => $user->canDo('controlRoom.alerts.escalate'),
             ],
-            'staff' => User::staff()
-                ->whereHas('roles', fn($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
-                ->orderBy('name')
-                ->get(['id', 'name', 'email']),
-            'tasks' => $alert->tasks->map(fn($t) => [
+            'staff' => $this->assignableStaff($user),
+            'tasks' => $alert->tasks->map(fn ($t) => [
                 'id' => $t->id,
                 'title' => $t->title,
                 'description' => $t->description,
@@ -607,13 +608,13 @@ class ControlRoomAlertController extends Controller
                 'sort_order' => $t->sort_order,
                 'assigned_to' => $t->assignedTo ? ['id' => $t->assignedTo->id, 'name' => $t->assignedTo->name] : null,
                 'created_by_name' => $t->createdBy?->name,
-                'subtasks' => $t->subtasks->map(fn($st) => [
+                'subtasks' => $t->subtasks->map(fn ($st) => [
                     'id' => $st->id, 'title' => $st->title, 'status' => $st->status,
                     'assigned_to' => $st->assignedTo ? ['id' => $st->assignedTo->id, 'name' => $st->assignedTo->name] : null,
                 ])->values(),
                 'created_at' => $t->created_at->toISOString(),
             ])->values(),
-            'discussions' => $alert->discussions->map(fn($d) => [
+            'discussions' => $alert->discussions->map(fn ($d) => [
                 'id' => $d->id,
                 'type' => $d->type,
                 'content' => $d->content,
@@ -623,7 +624,7 @@ class ControlRoomAlertController extends Controller
                 'user' => ['id' => $d->user->id, 'name' => $d->user->name],
                 'edited_at' => $d->edited_at?->toISOString(),
                 'created_at' => $d->created_at->toISOString(),
-                'replies' => $d->replies->map(fn($r) => [
+                'replies' => $d->replies->map(fn ($r) => [
                     'id' => $r->id, 'type' => $r->type, 'content' => $r->content,
                     'is_internal' => $r->is_internal, 'attachments' => $r->attachments ?? [],
                     'user' => ['id' => $r->user->id, 'name' => $r->user->name],
@@ -631,12 +632,12 @@ class ControlRoomAlertController extends Controller
                     'created_at' => $r->created_at->toISOString(),
                 ])->values(),
             ])->values(),
-            'watchers' => $alert->watchers->map(fn($w) => [
+            'watchers' => $alert->watchers->map(fn ($w) => [
                 'id' => $w->id,
                 'user_id' => $w->user_id,
                 'user_name' => $w->user->name,
             ])->values(),
-            'time_entries' => $alert->timeEntries->map(fn($te) => [
+            'time_entries' => $alert->timeEntries->map(fn ($te) => [
                 'id' => $te->id,
                 'user_name' => $te->user->name,
                 'user_id' => $te->user_id,
@@ -645,7 +646,7 @@ class ControlRoomAlertController extends Controller
                 'duration_minutes' => $te->duration_minutes,
                 'description' => $te->description,
                 'task_id' => $te->task_id,
-                'is_running' => $te->started_at && !$te->ended_at,
+                'is_running' => $te->started_at && ! $te->ended_at,
                 'created_at' => $te->created_at->toISOString(),
             ])->values(),
             'time_spent_minutes' => $alert->time_spent_minutes ?? 0,
@@ -667,7 +668,7 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
+        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
             return back()->withErrors(['alert' => "Cannot acknowledge an alert in '{$alert->status}' status."]);
         }
 
@@ -701,7 +702,7 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_TRIAGING)) {
+        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_TRIAGING)) {
             return back()->withErrors(['alert' => "Cannot start triage on an alert in '{$alert->status}' status."]);
         }
 
@@ -733,7 +734,7 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
+        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
             return back()->withErrors(['alert' => "Cannot resolve an alert in '{$alert->status}' status."]);
         }
 
@@ -767,7 +768,7 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!$alert->canTransitionTo(ControlRoomAlert::STATUS_CLOSED)) {
+        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_CLOSED)) {
             return back()->withErrors(['alert' => "Cannot close an alert in '{$alert->status}' status."]);
         }
 
@@ -799,7 +800,7 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!$alert->isActionable()) {
+        if (! $alert->isActionable()) {
             return back()->withErrors(['alert' => "Cannot assign an alert in '{$alert->status}' status."]);
         }
 
@@ -808,6 +809,8 @@ class ControlRoomAlertController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
+
+        $this->assertCanAssignAlertToUser($user, (int) $data['assigned_to_user_id']);
 
         // Record assignment change in history
         $assignmentHistory = $alert->context['assignment_history'] ?? [];
@@ -851,7 +854,7 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!$alert->isActionable()) {
+        if (! $alert->isActionable()) {
             return back()->withErrors(['alert' => "Cannot unassign an alert in '{$alert->status}' status."]);
         }
 
@@ -898,13 +901,13 @@ class ControlRoomAlertController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.escalate'), 403);
         $this->assertCanAccessAlert($user, $alert);
 
-        if (!$alert->isActionable()) {
+        if (! $alert->isActionable()) {
             return back()->withErrors(['alert' => "Cannot escalate an alert in '{$alert->status}' status."]);
         }
 
         $data = $request->validate([
             'escalation_reason' => ['required', 'string', 'max:1000'],
-            'escalation_level' => ['nullable', 'integer', 'min:1', 'max:' . ControlRoomAlert::MAX_ESCALATION_LEVEL],
+            'escalation_level' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $newLevel = $data['escalation_level'] ?? (($alert->escalation_level ?? 0) + 1);
@@ -931,7 +934,7 @@ class ControlRoomAlertController extends Controller
             'escalated_by' => $user->id,
         ]);
 
-        return back()->with('success', 'Alert escalated to level ' . $newLevel . '.');
+        return back()->with('success', 'Alert escalated to level '.$newLevel.'.');
     }
 
     /**
@@ -993,7 +996,7 @@ class ControlRoomAlertController extends Controller
             }
         }
 
-        if (!empty($fieldsToUpdate)) {
+        if (! empty($fieldsToUpdate)) {
             $alert->update($fieldsToUpdate);
         }
 
@@ -1040,7 +1043,7 @@ class ControlRoomAlertController extends Controller
             ]);
         }
 
-        if (!$alert->sla) {
+        if (! $alert->sla) {
             $slaDefinition = SlaDefinition::findForAlert($alert->alert_type, $alert->severity, $alert->source);
             if ($slaDefinition) {
                 AlertSla::createFromDefinition($alert, $slaDefinition);
@@ -1076,7 +1079,7 @@ class ControlRoomAlertController extends Controller
      */
     protected function alertBypassPermissions(): array
     {
-        return ['shifts.manageAny', 'timesheets.manageAny', 'reports.viewAny'];
+        return ['reports.viewAny'];
     }
 
     protected function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
@@ -1087,5 +1090,27 @@ class ControlRoomAlertController extends Controller
             $this->alertBypassPermissions(),
             'You are not authorized to access alerts for this site.',
         );
+    }
+
+    protected function assertCanAssignAlertToUser(User $user, int $assigneeUserId): void
+    {
+        $this->siteAccess()->assertCanAssignControlRoomAlertToUser(
+            $user,
+            $assigneeUserId,
+            $this->alertBypassPermissions(),
+            'You are not authorized to assign alerts to that staff member.',
+        );
+    }
+
+    protected function assignableStaff(User $user): Collection
+    {
+        if (! $user->canDo('controlRoom.alerts.assign') && ! $user->canDo('controlRoom.alerts.manage')) {
+            return collect();
+        }
+
+        $staffQuery = User::staff()->orderBy('name');
+        $this->siteAccess()->applyControlRoomAssigneeScope($staffQuery, $user, $this->alertBypassPermissions());
+
+        return $staffQuery->get(['id', 'name', 'email']);
     }
 }

@@ -10,10 +10,13 @@ class ShiftAssignmentRecommendationService
     public function __construct(
         protected ShiftStaffEligibilityService $eligibility,
         protected ShiftCoverageService $coverage,
-    ) {
-    }
+        protected UserSiteAccessService $siteAccess,
+    ) {}
 
-    public function forShift(Shift $shift, ?User $viewer = null, int $limit = 8): array
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function forShift(Shift $shift, ?User $viewer = null, int $limit = 8, array $bypassPermissions = []): array
     {
         $shift->loadMissing(['client:id,first_name,last_name,site_id']);
         $coverage = $this->coverage->coverageStatusForShift($shift);
@@ -30,6 +33,8 @@ class ShiftAssignmentRecommendationService
         if ($viewer?->organization_id) {
             $staffQuery->where('organization_id', $viewer->organization_id);
         }
+
+        $this->siteAccess->applyStaffScope($staffQuery, $viewer, $bypassPermissions);
 
         $candidates = $staffQuery->get(['id', 'name', 'email']);
 

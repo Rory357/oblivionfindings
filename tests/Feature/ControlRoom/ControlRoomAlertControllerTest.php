@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\ControlRoom;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -13,7 +15,9 @@ class ControlRoomAlertControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $coordinator;
+
     protected User $supportWorker;
 
     protected function setUp(): void
@@ -273,17 +277,17 @@ class ControlRoomAlertControllerTest extends TestCase
         $this->assertNotNull($alert->closed_at);
     }
 
-    public function test_close_open_alert_directly(): void
+    public function test_cannot_close_open_alert_directly(): void
     {
         $alert = ControlRoomAlert::factory()->open()->create();
 
         $this->actingAs($this->admin)
             ->post("/control-room/alerts/{$alert->id}/close")
-            ->assertRedirect();
+            ->assertSessionHasErrors('alert');
 
         $this->assertDatabaseHas('control_room_alerts', [
             'id' => $alert->id,
-            'status' => 'closed',
+            'status' => 'open',
         ]);
     }
 
@@ -338,6 +342,26 @@ class ControlRoomAlertControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/control-room/alerts/{$alert->id}/assign", [
                 'assigned_to_user_id' => $this->coordinator->id,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_assign_blocks_out_of_scope_assignee_for_scoped_operator(): void
+    {
+        $visibleSite = Site::factory()->create(['type' => 'house']);
+        $hiddenSite = Site::factory()->create(['type' => 'house']);
+        $hiddenAssignee = $this->makeRoleUser('coordinator');
+
+        $this->scopeUserToSite($this->coordinator, $visibleSite);
+        $this->scopeUserToSite($hiddenAssignee, $hiddenSite);
+
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $visibleSite->id,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->post("/control-room/alerts/{$alert->id}/assign", [
+                'assigned_to_user_id' => $hiddenAssignee->id,
             ])
             ->assertForbidden();
     }
@@ -640,5 +664,39 @@ class ControlRoomAlertControllerTest extends TestCase
             ->assertRedirect();
         $alert->refresh();
         $this->assertEquals('closed', $alert->status);
+    }
+
+    protected function makeRoleUser(string $roleName): User
+    {
+        $user = User::factory()->create([
+            'role' => $roleName,
+            'approved_at' => now(),
+        ]);
+
+        $role = Role::query()->where('name', $roleName)->first();
+        if ($role) {
+            $user->roles()->syncWithoutDetaching([$role->id]);
+        }
+
+        return $user;
+    }
+
+    protected function scopeUserToSite(User $user, Site $site): void
+    {
+        HrEmployeeProfile::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'tenant_id' => 1,
+                'employee_number' => 'EMP-CR-'.$user->id,
+                'work_email' => $user->email,
+                'position_title' => 'Control Room',
+                'position_role' => $user->role,
+                'employment_type' => 'full_time',
+                'start_date' => now()->subMonth()->toDateString(),
+                'is_active' => true,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+            ],
+        );
     }
 }

@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
+use Illuminate\Database\Seeder;
 
 class RbacSeeder extends Seeder
 {
@@ -19,19 +19,19 @@ class RbacSeeder extends Seeder
         $roleDefinitions = [
             // System Admin (highest level)
             ['name' => 'admin', 'label' => 'Administrator', 'level' => 100, 'type' => 'system', 'description' => 'Full system access across all sites'],
-            
+
             // C-Suite / Executive
             ['name' => 'ceo', 'label' => 'CEO', 'level' => 95, 'type' => 'system', 'description' => 'Chief Executive Officer'],
             ['name' => 'coo', 'label' => 'COO', 'level' => 94, 'type' => 'system', 'description' => 'Chief Operating Officer'],
             ['name' => 'cfo', 'label' => 'CFO', 'level' => 93, 'type' => 'system', 'description' => 'Chief Financial Officer'],
-            
+
             // Board/Governance roles
             ['name' => 'board_chair', 'label' => 'Board Chair', 'level' => 90, 'type' => 'system', 'description' => 'Board chairperson with governance oversight'],
             ['name' => 'board_secretary', 'label' => 'Board Secretary', 'level' => 88, 'type' => 'system', 'description' => 'Board secretary with meeting management'],
             ['name' => 'board_member', 'label' => 'Board Member', 'level' => 85, 'type' => 'system', 'description' => 'Board member with governance access'],
             ['name' => 'board_observer', 'label' => 'Board Observer', 'level' => 80, 'type' => 'system', 'description' => 'Board observer with read-only access'],
             ['name' => 'board_trustee', 'label' => 'Board Trustee', 'level' => 75, 'type' => 'system', 'description' => 'Board trustee with read-only reports access'],
-            
+
             // Management roles
             ['name' => 'provider_manager', 'label' => 'Provider Manager', 'level' => 70, 'type' => 'system', 'description' => 'Manages daily operations and staff'],
             ['name' => 'compliance_lead', 'label' => 'Compliance Lead', 'level' => 68, 'type' => 'system', 'description' => 'Leads compliance and regulatory matters'],
@@ -39,20 +39,20 @@ class RbacSeeder extends Seeder
             ['name' => 'it_manager', 'label' => 'IT Manager', 'level' => 65, 'type' => 'system', 'description' => 'Manages IT systems and integrations'],
             ['name' => 'facilities_manager', 'label' => 'Facilities Manager', 'level' => 64, 'type' => 'system', 'description' => 'Manages facilities and maintenance'],
             ['name' => 'roadmap_manager', 'label' => 'Roadmap Manager', 'level' => 62, 'type' => 'system', 'description' => 'Manages organizational roadmap'],
-            
+
             // Department leads
             ['name' => 'coordinator', 'label' => 'Coordinator', 'level' => 60, 'type' => 'system', 'description' => 'Coordinates care and operations'],
             ['name' => 'team_lead', 'label' => 'Team Lead', 'level' => 55, 'type' => 'system', 'description' => 'Leads a team of support workers'],
             ['name' => 'clinical_lead', 'label' => 'Clinical Lead', 'level' => 58, 'type' => 'system', 'description' => 'Clinical oversight and medication authority'],
             ['name' => 'health_safety_officer', 'label' => 'Health & Safety Officer', 'level' => 54, 'type' => 'system', 'description' => 'Manages health and safety compliance'],
             ['name' => 'maintenance_coordinator', 'label' => 'Maintenance Coordinator', 'level' => 52, 'type' => 'system', 'description' => 'Coordinates maintenance activities'],
-            
+
             // Staff roles
             ['name' => 'support_worker', 'label' => 'Support Worker', 'level' => 40, 'type' => 'system', 'description' => 'Regular staff with limited access'],
             ['name' => 'finance', 'label' => 'Finance', 'level' => 50, 'type' => 'system', 'description' => 'Finance department access'],
             ['name' => 'hr', 'label' => 'HR', 'level' => 50, 'type' => 'system', 'description' => 'Human Resources department access'],
             ['name' => 'auditor', 'label' => 'Auditor (Read only)', 'level' => 45, 'type' => 'system', 'description' => 'Read-only audit and reporting access'],
-            
+
             // Portal roles (lowest level)
             ['name' => 'client', 'label' => 'Client (Portal)', 'level' => 20, 'type' => 'system', 'description' => 'Client portal access'],
             ['name' => 'next_of_kin', 'label' => 'Next of Kin / Guardian (Portal)', 'level' => 15, 'type' => 'system', 'description' => 'Family member portal access'],
@@ -118,7 +118,7 @@ class RbacSeeder extends Seeder
             ['key' => 'settings.access.edit_roles', 'description' => 'Edit role permissions', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.delete_roles', 'description' => 'Delete custom roles', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.impersonate', 'description' => 'Impersonate other users', 'group' => 'access_control', 'module' => 'System'],
-            
+
             // Sites
             ['key' => 'sites.viewAny', 'description' => 'View sites', 'group' => 'sites', 'module' => 'Operations'],
             ['key' => 'sites.create', 'description' => 'Create sites', 'group' => 'sites', 'module' => 'Operations'],
@@ -172,7 +172,7 @@ class RbacSeeder extends Seeder
             ['key' => 'workers.viewAny', 'description' => 'View workers', 'group' => 'general', 'module' => 'System'],
             ['key' => 'reports.viewAny', 'description' => 'View reports', 'group' => 'reports', 'module' => 'System'],
             ['key' => 'rostering.viewAny', 'description' => 'View rostering', 'group' => 'staff', 'module' => 'HR'],
-            
+
             // Fleet
             ['key' => 'fleet.viewAny', 'description' => 'View fleet management', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.manage', 'description' => 'Full fleet management access', 'group' => 'fleet', 'module' => 'Resources'],
@@ -346,6 +346,9 @@ class RbacSeeder extends Seeder
             ['key' => 'hr.reports.export', 'description' => 'Export HR reports', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.driver.view', 'description' => 'View driver eligibility register', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.driver.manage', 'description' => 'Manage driver eligibility', 'group' => 'hr', 'module' => 'HR'],
+            ['key' => 'hr.time.viewAny', 'description' => 'View HR time tracking dashboard', 'group' => 'hr', 'module' => 'HR'],
+            ['key' => 'hr.time.manage', 'description' => 'Manage all HR time entries and timesheets', 'group' => 'hr', 'module' => 'HR'],
+            ['key' => 'hr.time.approveTeam', 'description' => 'Approve team HR timesheets and amend time entries', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.wellbeing.view', 'description' => 'View wellbeing dashboard', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.onboarding.view', 'description' => 'View onboarding checklists', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.onboarding.manage', 'description' => 'Manage onboarding checklists', 'group' => 'hr', 'module' => 'HR'],
@@ -465,7 +468,9 @@ class RbacSeeder extends Seeder
 
         // Helper function to sync permissions by key
         $syncPermissions = function ($role, $keys) {
-            if (!$role) return;
+            if (! $role) {
+                return;
+            }
             $ids = Permission::whereIn('key', $keys)->pluck('id');
             $role->permissions()->sync($ids);
         };
@@ -473,6 +478,7 @@ class RbacSeeder extends Seeder
         // Provider Manager
         $syncPermissions($providerManager, [
             'sites.viewAny', 'sites.create', 'sites.update',
+            'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'staff.viewAny', 'staff.create', 'staff.update', 'staff.invite', 'staff.assignments.update',
             'staff.credentials.viewAny', 'staff.credentials.updateAny', 'staff.availability.updateAny',
             'workers.viewAny', 'reports.viewAny', 'rostering.viewAny',
@@ -522,6 +528,7 @@ class RbacSeeder extends Seeder
             'hr.policies.view', 'hr.policies.manage', 'hr.policies.attest',
             'hr.documents.view', 'hr.documents.manage', 'hr.payroll.view', 'hr.payroll.export',
             'hr.reports.view', 'hr.reports.export', 'hr.driver.view', 'hr.driver.manage',
+            'hr.time.viewAny', 'hr.time.manage',
             'hr.wellbeing.view', 'hr.onboarding.view', 'hr.onboarding.manage',
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create', 'sites.ledger.manage',
@@ -529,7 +536,8 @@ class RbacSeeder extends Seeder
 
         // Coordinator
         $syncPermissions($coordinator, [
-            'sites.viewAny', 'staff.viewAny', 'staff.credentials.viewAny', 'staff.credentials.updateAny',
+            'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
+            'staff.viewAny', 'staff.credentials.viewAny', 'staff.credentials.updateAny',
             'staff.availability.updateAny', 'clients.viewAny', 'clients.assignments.update',
             'clients.onboarding.manage', 'medications.view', 'medications.orders.manage',
             'medications.administer.record', 'medications.administer.correct', 'medications.stock.update',
@@ -562,6 +570,7 @@ class RbacSeeder extends Seeder
             'hr.employees.viewAny', 'hr.compliance.view', 'hr.training.view',
             'hr.vetting.view', 'hr.leave.viewAny', 'hr.leave.approve',
             'hr.performance.view', 'hr.policies.view', 'hr.policies.attest', 'hr.onboarding.view',
+            'hr.time.viewAny', 'hr.time.approveTeam',
             'sites.damages.view', 'sites.damages.create',
             'sites.ledger.view', 'sites.ledger.create',
         ]);
@@ -618,6 +627,7 @@ class RbacSeeder extends Seeder
             'hr.disciplinary.view', 'hr.disciplinary.manage', 'hr.policies.view', 'hr.policies.manage',
             'hr.policies.attest', 'hr.documents.view', 'hr.documents.manage', 'hr.payroll.view',
             'hr.payroll.export', 'hr.reports.view', 'hr.reports.export', 'hr.driver.view', 'hr.driver.manage',
+            'hr.time.viewAny', 'hr.time.manage',
             'hr.wellbeing.view', 'hr.onboarding.view', 'hr.onboarding.manage',
         ]);
 
@@ -642,7 +652,9 @@ class RbacSeeder extends Seeder
 
         // Team Lead
         $syncPermissions($teamLead, [
-            'sites.viewAny', 'sites.update', 'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
+            'sites.viewAny', 'sites.update',
+            'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
+            'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
             'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign',
             'checklists.view', 'checklists.run', 'checklists.schedule',
             'vendors.view', 'credentials.view', 'reports.sites.view',
@@ -650,6 +662,7 @@ class RbacSeeder extends Seeder
             'hr.employees.viewAny', 'hr.compliance.view', 'hr.training.view',
             'hr.leave.viewAny', 'hr.leave.approve', 'hr.performance.view', 'hr.performance.manage',
             'hr.policies.view', 'hr.policies.attest', 'hr.onboarding.view',
+            'hr.time.viewAny', 'hr.time.approveTeam',
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create',
         ]);

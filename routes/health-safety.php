@@ -1,17 +1,17 @@
 <?php
 
-use App\Http\Controllers\HealthSafety\WorkerParticipationController;
-use App\Http\Controllers\HealthSafety\HazardousSubstanceController;
 use App\Http\Controllers\HealthSafety\EmergencyDrillController;
-use App\Http\Controllers\HealthSafety\ReturnToWorkController;
-use App\Http\Controllers\HealthSafety\LoneWorkerController;
-use App\Http\Controllers\HealthSafety\PpeController;
+use App\Http\Controllers\HealthSafety\FirstAidController;
+use App\Http\Controllers\HealthSafety\HazardousSubstanceController;
 use App\Http\Controllers\HealthSafety\HealthSafetyDashboardController;
 use App\Http\Controllers\HealthSafety\HsEventController;
 use App\Http\Controllers\HealthSafety\HsGovernanceReportController;
-use App\Http\Controllers\HealthSafety\FirstAidController;
+use App\Http\Controllers\HealthSafety\LoneWorkerController;
+use App\Http\Controllers\HealthSafety\PpeController;
 use App\Http\Controllers\HealthSafety\RestraintController;
+use App\Http\Controllers\HealthSafety\ReturnToWorkController;
 use App\Http\Controllers\HealthSafety\SafeWorkProcedureController;
+use App\Http\Controllers\HealthSafety\WorkerParticipationController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -23,9 +23,6 @@ use Illuminate\Support\Facades\Route;
  * Phase 4: Dashboard and analytics.
  * Phase 5: First aid register, restraint register, safe work procedures.
  */
-// Debug test route - no middleware at all
-Route::get('/health-safety-test', fn () => response()->json(['ok' => true, 'time' => now()->toIso8601String()]));
-
 Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->group(function () {
 
     // ── Phase 4: Dashboard & Analytics ──────────────────────────────────
@@ -98,8 +95,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         // Show route after /create to avoid wildcard conflict
         Route::get('/{procedure}', [SafeWorkProcedureController::class, 'show'])
             ->middleware('permission:hazards.view')
-            ->name('show')
-;
+            ->name('show');
     });
 
     // ── Worker Participation ──────────────────────────────────────────
@@ -164,8 +160,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         // Show route after /create to avoid wildcard conflict
         Route::get('/{substance}', [HazardousSubstanceController::class, 'show'])
             ->middleware('permission:hazards.view')
-            ->name('show')
-;
+            ->name('show');
     });
 
     // ── Emergency Drills ──────────────────────────────────────────────
@@ -191,8 +186,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         // Show route after /create to avoid wildcard conflict
         Route::get('/{drill}', [EmergencyDrillController::class, 'show'])
             ->middleware('permission:hazards.view')
-            ->name('show')
-;
+            ->name('show');
     });
 
     // ── Workplace Injuries & Return to Work ───────────────────────────
@@ -221,8 +215,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         // Show route after /create to avoid wildcard conflict
         Route::get('/{injury}', [ReturnToWorkController::class, 'show'])
             ->middleware('permission:hazards.view')
-            ->name('show')
-;
+            ->name('show');
     });
 
     // ── Lone Worker Safety (Phase 3) ──────────────────────────────────

@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\ControlRoomReportService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ControlRoomReportController extends Controller
@@ -27,16 +27,17 @@ class ControlRoomReportController extends Controller
 
         [$from, $to, $period] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+        $reportSiteScope = $this->reportSiteScope($user, $siteId);
 
         AuditLogger::log('controlRoom.reports.view', null, ['period' => $period]);
 
         return Inertia::render('control-room/reports', [
             'period' => $period,
             'site_id' => $siteId,
-            'sla' => $this->reportService->slaCompliance($from, $to, $siteId),
-            'volume' => $this->reportService->alertVolume($from, $to, $siteId),
-            'escalation' => $this->reportService->escalationAnalysis($from, $to, $siteId),
-            'workload' => $this->reportService->workloadDistribution($from, $to, $siteId),
+            'sla' => $this->reportService->slaCompliance($from, $to, $reportSiteScope),
+            'volume' => $this->reportService->alertVolume($from, $to, $reportSiteScope),
+            'escalation' => $this->reportService->escalationAnalysis($from, $to, $reportSiteScope),
+            'workload' => $this->reportService->workloadDistribution($from, $to, $reportSiteScope),
             'playbooks' => $this->reportService->playbookPerformance($from, $to),
         ]);
     }
@@ -52,7 +53,7 @@ class ControlRoomReportController extends Controller
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
 
-        return response()->json($this->reportService->slaCompliance($from, $to, $siteId));
+        return response()->json($this->reportService->slaCompliance($from, $to, $this->reportSiteScope($user, $siteId)));
     }
 
     /**
@@ -66,7 +67,7 @@ class ControlRoomReportController extends Controller
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
 
-        return response()->json($this->reportService->alertVolume($from, $to, $siteId));
+        return response()->json($this->reportService->alertVolume($from, $to, $this->reportSiteScope($user, $siteId)));
     }
 
     /**
@@ -80,7 +81,7 @@ class ControlRoomReportController extends Controller
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
 
-        return response()->json($this->reportService->workloadDistribution($from, $to, $siteId));
+        return response()->json($this->reportService->workloadDistribution($from, $to, $this->reportSiteScope($user, $siteId)));
     }
 
     /**
@@ -93,10 +94,11 @@ class ControlRoomReportController extends Controller
 
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+        $reportSiteScope = $this->reportSiteScope($user, $siteId);
 
-        $sla = $this->reportService->slaCompliance($from, $to, $siteId);
-        $volume = $this->reportService->alertVolume($from, $to, $siteId);
-        $escalation = $this->reportService->escalationAnalysis($from, $to, $siteId);
+        $sla = $this->reportService->slaCompliance($from, $to, $reportSiteScope);
+        $volume = $this->reportService->alertVolume($from, $to, $reportSiteScope);
+        $escalation = $this->reportService->escalationAnalysis($from, $to, $reportSiteScope);
 
         return response()->json([
             'total_alerts' => $volume['total'],
@@ -119,9 +121,11 @@ class ControlRoomReportController extends Controller
         abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
 
         [$from, $to, $period] = $this->resolveDateRange($request);
+        $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
 
         $alerts = ControlRoomAlert::where('triggered_at', '>=', $from)
             ->where('triggered_at', '<=', $to)
+            ->tap(fn ($query) => $this->applyReportAlertScope($query, $user, $siteId))
             ->with(['asset:id,name,asset_tag', 'assignedTo:id,name', 'resolvedBy:id,name'])
             ->orderByDesc('triggered_at')
             ->get();
@@ -136,19 +140,19 @@ class ControlRoomReportController extends Controller
 
             $csv .= implode(',', [
                 $alert->id,
-                '"' . str_replace('"', '""', $alert->source ?? '') . '"',
-                '"' . str_replace('"', '""', $alert->alert_type ?? '') . '"',
+                '"'.str_replace('"', '""', $alert->source ?? '').'"',
+                '"'.str_replace('"', '""', $alert->alert_type ?? '').'"',
                 $alert->severity ?? '',
                 $alert->status ?? '',
-                '"' . str_replace('"', '""', $alert->asset?->name ?? '') . '"',
-                '"' . str_replace('"', '""', $alert->assignedTo?->name ?? '') . '"',
+                '"'.str_replace('"', '""', $alert->asset?->name ?? '').'"',
+                '"'.str_replace('"', '""', $alert->assignedTo?->name ?? '').'"',
                 $alert->triggered_at?->toDateTimeString() ?? '',
                 $alert->acknowledged_at?->toDateTimeString() ?? '',
                 $alert->resolved_at?->toDateTimeString() ?? '',
                 $resolutionHours,
                 $alert->escalation_level ?? 0,
-                '"' . str_replace('"', '""', substr($alert->notes ?? '', 0, 200)) . '"',
-            ]) . "\n";
+                '"'.str_replace('"', '""', substr($alert->notes ?? '', 0, 200)).'"',
+            ])."\n";
         }
 
         AuditLogger::log('controlRoom.reports.export', null, [
@@ -158,8 +162,49 @@ class ControlRoomReportController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="control-room-alerts-' . now()->format('Y-m-d') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="control-room-alerts-'.now()->format('Y-m-d').'.csv"',
         ]);
+    }
+
+    protected function applyReportAlertScope($query, $user, ?int $siteId): void
+    {
+        $siteAccess = app(UserSiteAccessService::class);
+        $siteAccess->applyAlertScope($query, $user, $this->alertBypassPermissions());
+
+        if ($siteId) {
+            $query->where(function ($scopedQuery) use ($siteId) {
+                $scopedQuery->where('site_id', $siteId)
+                    ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
+            });
+        }
+    }
+
+    protected function reportSiteScope($user, ?int $siteId): int|array|null
+    {
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->alertBypassPermissions();
+
+        if ($siteId) {
+            $siteAccess->assertCanAccessSiteId(
+                $user,
+                $siteId,
+                $bypassPermissions,
+                'You are not authorized to access Control Room reports for that site.',
+            );
+
+            return $siteId;
+        }
+
+        if ($siteAccess->canBypass($user, $bypassPermissions)) {
+            return null;
+        }
+
+        return $siteAccess->accessibleSiteIds($user, $bypassPermissions);
+    }
+
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 
     /**
@@ -178,14 +223,16 @@ class ControlRoomReportController extends Controller
             ];
         }
 
-        $period = $request->input('period', '30d');
+        $requestedPeriod = (string) $request->input('period', '30d');
+        $period = in_array($requestedPeriod, ['7d', '30d', '90d', '1y'], true)
+            ? $requestedPeriod
+            : '30d';
         $to = now();
         $from = match ($period) {
             '7d' => now()->subDays(7),
             '30d' => now()->subDays(30),
             '90d' => now()->subDays(90),
             '1y' => now()->subYear(),
-            default => now()->subDays(30),
         };
 
         return [$from, $to, $period];

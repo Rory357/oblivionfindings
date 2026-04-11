@@ -4,14 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientCondition;
+use App\Models\ClientControlledDrugDiscrepancy;
+use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientDocument;
 use App\Models\ClientEmergencyContact;
+use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
-use App\Models\ClientMedicalProfile;
-use App\Models\ClientControlledDrugEntry;
-use App\Models\ClientControlledDrugDiscrepancy;
-use App\Models\ClientDocument;
 use App\Models\ServiceContext;
 use App\Models\TimelineEvent;
 use App\Models\User;
@@ -119,9 +119,13 @@ class ClientMedicalController extends Controller
         $witnesses = User::staff()
             ->where(function ($q) {
                 $q->whereHas('roles.permissions', fn ($rp) => $rp->where('key', 'medications.controlled.witness'))
-                  ->orWhereHas('permissionOverrides', fn ($po) => $po->where('permissions.key', 'medications.controlled.witness')->wherePivot('allowed', true));
+                    ->orWhereHas('permissionOverrides', fn ($po) => $po
+                        ->where('permissions.key', 'medications.controlled.witness')
+                        ->where('permission_user.allowed', true));
             })
-            ->whereDoesntHave('permissionOverrides', fn ($po) => $po->where('permissions.key', 'medications.controlled.witness')->wherePivot('allowed', false))
+            ->whereDoesntHave('permissionOverrides', fn ($po) => $po
+                ->where('permissions.key', 'medications.controlled.witness')
+                ->where('permission_user.allowed', false))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -290,8 +294,9 @@ class ClientMedicalController extends Controller
         ]);
 
         foreach (['disabilities', 'allergies'] as $field) {
-            if (!array_key_exists($field, $data) || $data[$field] === null || $data[$field] === '') {
+            if (! array_key_exists($field, $data) || $data[$field] === null || $data[$field] === '') {
                 $data[$field] = [];
+
                 continue;
             }
 
@@ -306,9 +311,9 @@ class ClientMedicalController extends Controller
         $profile->save();
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medical profile', $profile, $client, [
-                'title' => 'Medical profile updated',
-                'url' => url("/clients/{$client->id}/medical"),
-            ]);
+            'title' => 'Medical profile updated',
+            'url' => url("/clients/{$client->id}/medical"),
+        ]);
 
         return back()->with('success', 'Medical profile saved successfully.');
     }
@@ -350,14 +355,14 @@ class ClientMedicalController extends Controller
         ]);
 
         // Normalize state/active
-        if (!empty($data['state'])) {
+        if (! empty($data['state'])) {
             $data['active'] = $data['state'] === 'active';
         } else {
             $data['state'] = ($data['active'] ?? true) ? 'active' : 'ceased';
         }
 
         try {
-            $m = new ClientMedication();
+            $m = new ClientMedication;
             $m->client_id = $client->id;
             $m->fill($this->buildMedicationPayload($data));
             $m->save();
@@ -370,7 +375,7 @@ class ClientMedicalController extends Controller
                 'actor_user_id' => $user->id,
                 'client_id' => $client->id,
                 'site_id' => $client->site_id,
-                'subject' => 'Medication added: ' . $m->name . ($m->dosage ? ' ' . $m->dosage : ''),
+                'subject' => 'Medication added: '.$m->name.($m->dosage ? ' '.$m->dosage : ''),
                 'body' => $m->instructions,
                 'meta' => array_filter([
                     'medication_name' => $m->name,
@@ -387,14 +392,15 @@ class ClientMedicalController extends Controller
             ]);
 
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication', $m, $client, [
-                'title' => 'Medication added: ' . $m->name,
+                'title' => 'Medication added: '.$m->name,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Medication added successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->withInput()->with('error', 'Failed to add medication: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Failed to add medication: '.$e->getMessage());
         }
     }
 
@@ -435,7 +441,7 @@ class ClientMedicalController extends Controller
             'active' => ['sometimes', 'boolean'],
         ]);
 
-        if (!empty($data['state'])) {
+        if (! empty($data['state'])) {
             $data['active'] = $data['state'] === 'active';
         } else {
             $data['state'] = ($data['active'] ?? true) ? 'active' : 'ceased';
@@ -446,14 +452,15 @@ class ClientMedicalController extends Controller
             $medication->save();
 
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medication', $medication, $client, [
-                'title' => 'Medication updated: ' . $medication->name,
+                'title' => 'Medication updated: '.$medication->name,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Medication updated successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->withInput()->with('error', 'Failed to update medication: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Failed to update medication: '.$e->getMessage());
         }
     }
 
@@ -498,7 +505,7 @@ class ClientMedicalController extends Controller
                 ->where('client_medication_id', $medication->id)
                 ->whereIn('status', ['open', 'under_review'])
                 ->exists();
-            if ($hasOpen && !($user?->canDo('medications.controlled.override') ?? false) && !($user?->canDo('clients.update') ?? false)) {
+            if ($hasOpen && ! ($user?->canDo('medications.controlled.override') ?? false) && ! ($user?->canDo('clients.update') ?? false)) {
                 return back()->withInput()->with('error', 'There is an open controlled-drug discrepancy. Further stock edits are blocked unless you have override permission.');
             }
             if (empty($data['witnessed_by'])) {
@@ -512,7 +519,7 @@ class ClientMedicalController extends Controller
             }
 
             $witness = User::query()->find($data['witnessed_by']);
-            if (!$witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || !$witness->canDo('medications.controlled.witness')) {
+            if (! $witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || ! $witness->canDo('medications.controlled.witness')) {
                 return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
             }
         }
@@ -555,14 +562,15 @@ class ClientMedicalController extends Controller
                 }
             }
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medication stock', $stock, $client, [
-                'title' => 'Medication stock updated: ' . ($medication->name ?? 'Medication'),
+                'title' => 'Medication stock updated: '.($medication->name ?? 'Medication'),
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Medication stock updated successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->withInput()->with('error', 'Failed to update medication stock: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Failed to update medication stock: '.$e->getMessage());
         }
     }
 
@@ -597,10 +605,10 @@ class ClientMedicalController extends Controller
 
         // Step 8: time window logic. If a scheduled dose is administered outside the safe window,
         // require a reason even for "given".
-        if (($data['status'] ?? 'given') === 'given' && !empty($data['scheduled_for'])) {
+        if (($data['status'] ?? 'given') === 'given' && ! empty($data['scheduled_for'])) {
             try {
                 $scheduled = \Carbon\Carbon::parse($data['scheduled_for']);
-                $adminAt = !empty($data['administered_at']) ? \Carbon\Carbon::parse($data['administered_at']) : now();
+                $adminAt = ! empty($data['administered_at']) ? \Carbon\Carbon::parse($data['administered_at']) : now();
 
                 $lateAfterMinutes = 30;
                 $earlyBeforeMinutes = 60;
@@ -625,14 +633,14 @@ class ClientMedicalController extends Controller
             }
 
             $witness = User::query()->find($data['witnessed_by']);
-            if (!$witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || !$witness->canDo('medications.controlled.witness')) {
+            if (! $witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || ! $witness->canDo('medications.controlled.witness')) {
                 return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
             }
         }
 
         $medication->loadMissing('stock');
 
-        $a = new ClientMedicationAdministration();
+        $a = new ClientMedicationAdministration;
         $a->client_id = $client->id;
         $a->client_medication_id = $medication->id;
         $a->administered_by = $user->id;
@@ -642,7 +650,7 @@ class ClientMedicalController extends Controller
             $shift = \App\Models\Shift::query()->find($a->shift_id);
             $a->service_context_id = $shift?->service_context_id;
         }
-        if (!$a->service_context_id) {
+        if (! $a->service_context_id) {
             $a->service_context_id = $client->service_context_id ?: ServiceContext::defaultId();
         }
         $a->status = $data['status'];
@@ -682,7 +690,8 @@ class ClientMedicalController extends Controller
             return back()->with('success', 'Medication administration recorded.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->withInput()->with('error', 'Failed to record administration: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Failed to record administration: '.$e->getMessage());
         }
     }
 
@@ -726,14 +735,15 @@ class ClientMedicalController extends Controller
         try {
             $medication->delete();
             app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'medication', $medication, $client, [
-                'title' => 'Medication removed: ' . ($medication->name ?? 'Medication'),
+                'title' => 'Medication removed: '.($medication->name ?? 'Medication'),
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Medication removed successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->with('error', 'Failed to remove medication: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to remove medication: '.$e->getMessage());
         }
     }
 
@@ -748,7 +758,7 @@ class ClientMedicalController extends Controller
         ]);
 
         try {
-            $c = new ClientCondition();
+            $c = new ClientCondition;
             $c->client_id = $client->id;
             $c->fill($data);
             $c->save();
@@ -761,7 +771,7 @@ class ClientMedicalController extends Controller
                 'actor_user_id' => $request->user()?->id,
                 'client_id' => $client->id,
                 'site_id' => $client->site_id,
-                'subject' => 'Condition added: ' . $c->label,
+                'subject' => 'Condition added: '.$c->label,
                 'body' => $c->notes,
                 'meta' => array_filter(['severity' => $c->severity]),
                 'visibility' => 'internal',
@@ -770,14 +780,15 @@ class ClientMedicalController extends Controller
             ]);
 
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'condition', $c, $client, [
-                'title' => 'Condition added: ' . $c->label,
+                'title' => 'Condition added: '.$c->label,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Condition added successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->withInput()->with('error', 'Failed to add condition: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Failed to add condition: '.$e->getMessage());
         }
     }
 
@@ -797,14 +808,15 @@ class ClientMedicalController extends Controller
             $condition->save();
 
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'condition', $condition, $client, [
-                'title' => 'Condition updated: ' . $condition->label,
+                'title' => 'Condition updated: '.$condition->label,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Condition updated successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->withInput()->with('error', 'Failed to update condition: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Failed to update condition: '.$e->getMessage());
         }
     }
 
@@ -816,14 +828,15 @@ class ClientMedicalController extends Controller
         try {
             $condition->delete();
             app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'condition', $condition, $client, [
-                'title' => 'Condition removed: ' . ($condition->label ?? 'Condition'),
+                'title' => 'Condition removed: '.($condition->label ?? 'Condition'),
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Condition removed successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->with('error', 'Failed to remove condition: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to remove condition: '.$e->getMessage());
         }
     }
 
@@ -840,20 +853,21 @@ class ClientMedicalController extends Controller
         ]);
 
         try {
-            $e = new ClientEmergencyContact();
+            $e = new ClientEmergencyContact;
             $e->client_id = $client->id;
             $e->fill($data);
             $e->save();
 
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'emergency contact', $e, $client, [
-                'title' => 'Emergency contact added: ' . $e->name,
+                'title' => 'Emergency contact added: '.$e->name,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Emergency contact added successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->withInput()->with('error', 'Failed to add emergency contact: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Failed to add emergency contact: '.$e->getMessage());
         }
     }
 
@@ -875,14 +889,15 @@ class ClientMedicalController extends Controller
             $contact->save();
 
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'emergency contact', $contact, $client, [
-                'title' => 'Emergency contact updated: ' . $contact->name,
+                'title' => 'Emergency contact updated: '.$contact->name,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Emergency contact updated successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->withInput()->with('error', 'Failed to update emergency contact: ' . $e->getMessage());
+
+            return back()->withInput()->with('error', 'Failed to update emergency contact: '.$e->getMessage());
         }
     }
 
@@ -894,14 +909,15 @@ class ClientMedicalController extends Controller
         try {
             $contact->delete();
             app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'emergency contact', $contact, $client, [
-                'title' => 'Emergency contact removed: ' . ($contact->name ?? 'Contact'),
+                'title' => 'Emergency contact removed: '.($contact->name ?? 'Contact'),
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
 
             return back()->with('success', 'Emergency contact removed successfully.');
         } catch (\Throwable $e) {
             report($e);
-            return back()->with('error', 'Failed to remove emergency contact: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to remove emergency contact: '.$e->getMessage());
         }
     }
 }

@@ -160,7 +160,7 @@ class HrNotificationService
         }
 
         // Notify HR users with compliance management permissions
-        $hrUsers = $this->getUsersWithPermission('hr.compliance.manage', $status->tenant_id);
+        $hrUsers = $this->getUsersWithPermission(['hr.compliance.manage'], $status->tenant_id);
         foreach ($hrUsers as $hrUser) {
             if ($hrUser->id === $employee?->id) {
                 continue;
@@ -187,7 +187,7 @@ class HrNotificationService
     {
         $claim->loadMissing('user');
 
-        $approvers = $this->getUsersWithPermission('hr.expenses.approve', $claim->tenant_id);
+        $approvers = $this->getUsersWithPermission(['hr.expenses.approve'], $claim->tenant_id);
 
         foreach ($approvers as $approver) {
             try {
@@ -228,7 +228,10 @@ class HrNotificationService
     {
         $timesheet->loadMissing('user');
 
-        $approvers = $this->getUsersWithPermission('hr.time.approve', $timesheet->tenant_id);
+        $approvers = $this->getUsersWithPermission([
+            'hr.time.manage',
+            'hr.time.approveTeam',
+        ], $timesheet->tenant_id);
 
         foreach ($approvers as $approver) {
             try {
@@ -274,7 +277,7 @@ class HrNotificationService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -282,18 +285,29 @@ class HrNotificationService
      */
     protected function getLeaveApprovers(HrLeaveRequest $request): \Illuminate\Support\Collection
     {
-        return $this->getUsersWithPermission('hr.leave.approve', $request->tenant_id)
+        return $this->getUsersWithPermission(['hr.leave.approve'], $request->tenant_id)
             ->reject(fn (User $u) => $u->id === $request->user_id);
     }
 
     /**
-     * Get all users who have a specific permission, optionally scoped to a tenant.
+     * Get all users who have any of the supplied permissions, optionally scoped to a tenant.
+     *
+     * @param  array<int, string>  $permissions
      */
-    protected function getUsersWithPermission(string $permission, ?int $tenantId): \Illuminate\Support\Collection
+    protected function getUsersWithPermission(array $permissions, ?int $tenantId): \Illuminate\Support\Collection
     {
         return User::query()
             ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->whereHas('roles.permissions', fn ($q) => $q->where('name', $permission))
+            ->where(function ($query) use ($permissions) {
+                $query->whereHas('roles.permissions', fn ($permissionQuery) => $permissionQuery->whereIn('key', $permissions))
+                    ->orWhereHas('permissionOverrides', fn ($permissionQuery) => $permissionQuery
+                        ->whereIn('permissions.key', $permissions)
+                        ->wherePivot('allowed', true));
+            })
+            ->whereDoesntHave('permissionOverrides', fn ($permissionQuery) => $permissionQuery
+                ->whereIn('permissions.key', $permissions)
+                ->wherePivot('allowed', false))
+            ->distinct()
             ->get();
     }
 }

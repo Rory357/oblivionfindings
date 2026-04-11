@@ -176,7 +176,10 @@ class UserSiteAccessService
 
         $siteId = $alert->site_id
             ?: $alert->client?->site_id
+            ?: data_get($alert->context, 'site_id')
             ?: data_get($alert->context, 'shift_context.site.id')
+            ?: data_get($alert->context, 'shift.site_id')
+            ?: data_get($alert->context, 'shift.site.id')
             ?: data_get($alert->context, 'site.id');
 
         $this->assertCanAccessSiteId(
@@ -308,6 +311,42 @@ class UserSiteAccessService
     /**
      * @param  array<int, string>  $bypassPermissions
      */
+    public function applyControlRoomAssigneeScope(Builder $query, ?User $user, array $bypassPermissions = []): Builder
+    {
+        $query->whereHas('roles', fn (Builder $roleQuery) => $roleQuery->whereIn('name', [
+            'admin',
+            'provider_manager',
+            'coordinator',
+        ]));
+
+        return $this->applyStaffScope($query, $user, $bypassPermissions);
+    }
+
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function assertCanAssignControlRoomAlertToUser(
+        ?User $user,
+        int $assigneeUserId,
+        array $bypassPermissions = [],
+        ?string $message = null,
+    ): void {
+        $query = User::query()
+            ->staff()
+            ->whereKey($assigneeUserId);
+
+        $this->applyControlRoomAssigneeScope($query, $user, $bypassPermissions);
+
+        abort_unless(
+            $query->exists(),
+            403,
+            $message ?? 'You are not authorized to assign alerts to that staff member.',
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $bypassPermissions
+     */
     public function applyAlertScope(Builder $query, ?User $user, array $bypassPermissions = []): Builder
     {
         if ($this->canBypass($user, $bypassPermissions)) {
@@ -322,6 +361,17 @@ class UserSiteAccessService
         return $query->where(function (Builder $nested) use ($siteIds) {
             $nested->whereIn('site_id', $siteIds)
                 ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds));
+
+            foreach ($this->alertContextSitePaths() as $jsonPath) {
+                $nested->orWhereRaw(
+                    sprintf(
+                        'CAST(JSON_UNQUOTE(JSON_EXTRACT(`context`, \'%s\')) AS UNSIGNED) IN (%s)',
+                        $jsonPath,
+                        implode(', ', array_fill(0, count($siteIds), '?')),
+                    ),
+                    $siteIds,
+                );
+            }
         });
     }
 
@@ -436,5 +486,19 @@ class UserSiteAccessService
             $nested->whereIn('site_id', $siteIds)
                 ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds));
         });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function alertContextSitePaths(): array
+    {
+        return [
+            '$.site_id',
+            '$.site.id',
+            '$.shift.site_id',
+            '$.shift.site.id',
+            '$.shift_context.site.id',
+        ];
     }
 }

@@ -4,8 +4,10 @@ namespace Tests;
 
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use PDO;
+use Symfony\Component\Process\Process;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -16,6 +18,8 @@ abstract class TestCase extends BaseTestCase
     protected static bool $isolatedMysqlPrepared = false;
 
     protected static bool $mysqlClientPathConfigured = false;
+
+    protected static bool $isolatedMysqlSchemaLoaded = false;
 
     public function createApplication()
     {
@@ -28,6 +32,10 @@ abstract class TestCase extends BaseTestCase
         $this->traitsUsedByTest = array_flip(class_uses_recursive(static::class));
 
         $app->make(Kernel::class)->bootstrap();
+
+        if (static::$isolatedMysqlSchemaLoaded) {
+            RefreshDatabaseState::$migrated = true;
+        }
 
         return $app;
     }
@@ -88,7 +96,7 @@ abstract class TestCase extends BaseTestCase
         static::$isolatedMysqlDatabase ??= sprintf(
             '%s_%s',
             static::$testDatabaseBaseName,
-            $this->testProcessToken(),
+            $this->resolveProcessToken(),
         );
 
         $this->setEnvironmentValue('DB_DATABASE', static::$isolatedMysqlDatabase);
@@ -113,10 +121,18 @@ abstract class TestCase extends BaseTestCase
         $pdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $database));
         $pdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', $database));
 
+        static::$isolatedMysqlSchemaLoaded = $this->loadSchemaDumpIntoTestingDatabase(
+            host: $host,
+            port: $port,
+            username: $username,
+            password: $password,
+            database: $database,
+        );
+
         static::$isolatedMysqlPrepared = true;
     }
 
-    protected function testProcessToken(): string
+    protected function resolveProcessToken(): string
     {
         foreach (['TEST_TOKEN', 'PARALLEL_PROCESS', 'PROCESS_TOKEN'] as $key) {
             $value = $this->environmentValue($key);
@@ -145,11 +161,115 @@ abstract class TestCase extends BaseTestCase
      */
     protected function mysqlClientDirectories(): array
     {
-        return array_values(array_filter([
+        $configuredDirectories = [];
+
+        foreach (['MYSQL_CLIENT_BIN', 'MYSQL_BINARY', 'MYSQLDUMP_BINARY'] as $envKey) {
+            $value = $this->environmentValue($envKey);
+            if (! $value) {
+                continue;
+            }
+
+            foreach (preg_split('/[;,]+/', $value) ?: [] as $candidate) {
+                $candidate = trim($candidate, " \t\n\r\0\x0B\"'");
+                if ($candidate === '') {
+                    continue;
+                }
+
+                $configuredDirectories[] = is_dir($candidate)
+                    ? $candidate
+                    : dirname($candidate);
+            }
+        }
+
+        return array_values(array_unique(array_filter(array_merge($configuredDirectories, [
             'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin',
             'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin',
             'C:\\Program Files\\MariaDB 11.4\\bin',
             'C:\\Program Files\\MariaDB 11.3\\bin',
-        ]));
+        ]))));
+    }
+
+    protected function loadSchemaDumpIntoTestingDatabase(
+        string $host,
+        string $port,
+        string $username,
+        string $password,
+        string $database,
+    ): bool {
+        $schemaPath = Application::inferBasePath()
+            .DIRECTORY_SEPARATOR.'database'
+            .DIRECTORY_SEPARATOR.'schema'
+            .DIRECTORY_SEPARATOR.'mysql-schema.sql';
+
+        if (! is_file($schemaPath)) {
+            return false;
+        }
+
+        $mysqlBinary = $this->resolveMysqlBinary();
+        if ($mysqlBinary === null) {
+            return false;
+        }
+
+        $process = new Process([
+            $mysqlBinary,
+            sprintf('--host=%s', $host),
+            sprintf('--port=%s', $port),
+            sprintf('--user=%s', $username),
+            sprintf('--password=%s', $password),
+            $database,
+        ]);
+
+        $process->setInput(file_get_contents($schemaPath));
+        $process->setTimeout(300);
+        $process->run();
+
+        return $process->isSuccessful();
+    }
+
+    protected function resolveMysqlBinary(): ?string
+    {
+        if ($configuredBinary = $this->resolveClientBinaryFromEnvironment(['MYSQL_BINARY', 'MYSQL_CLIENT_BIN'], 'mysql.exe')) {
+            return $configuredBinary;
+        }
+
+        foreach ($this->mysqlClientDirectories() as $directory) {
+            $candidate = $directory.DIRECTORY_SEPARATOR.'mysql.exe';
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, string>  $envKeys
+     */
+    protected function resolveClientBinaryFromEnvironment(array $envKeys, string $binaryName): ?string
+    {
+        foreach ($envKeys as $envKey) {
+            $value = $this->environmentValue($envKey);
+            if (! $value) {
+                continue;
+            }
+
+            foreach (preg_split('/[;,]+/', $value) ?: [] as $candidate) {
+                $candidate = trim($candidate, " \t\n\r\0\x0B\"'");
+                if ($candidate === '') {
+                    continue;
+                }
+
+                if (is_file($candidate)) {
+                    return $candidate;
+                }
+
+                $pathCandidate = rtrim($candidate, '\\/').DIRECTORY_SEPARATOR.$binaryName;
+                if (is_file($pathCandidate)) {
+                    return $pathCandidate;
+                }
+            }
+        }
+
+        return null;
     }
 }

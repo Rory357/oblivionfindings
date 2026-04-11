@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
-use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\CustomForm;
@@ -16,30 +15,30 @@ use App\Models\ShiftEligibilityOverride;
 use App\Models\ShiftHandover;
 use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftTask;
+use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
-use App\Services\EnhancedMarService;
-use App\Services\ShiftAssignmentRecommendationService;
 use App\Services\CoverageReservationService;
+use App\Services\EnhancedMarService;
+use App\Services\NotificationService;
 use App\Services\Operations\TimesheetReconciliationService;
-use App\Services\ShiftCoverageService;
+use App\Services\ServiceContextResolver;
+use App\Services\ShiftAssignmentRecommendationService;
+use App\Services\ShiftCancellationService;
 use App\Services\ShiftConflictService;
+use App\Services\ShiftCoverageService;
 use App\Services\ShiftHandoverService;
 use App\Services\ShiftOperationalSnapshotService;
 use App\Services\ShiftReplacementService;
-use App\Services\ShiftCancellationService;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use App\Services\NotificationService;
-use App\Services\ServiceContextResolver;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Models\TimelineEvent;
 use Illuminate\Validation\ValidationException;
 
 class ShiftController extends Controller
@@ -95,7 +94,7 @@ class ShiftController extends Controller
 
         if ($request->filled('q')) {
             $q = $request->query('q');
-            $searchTerm = '%' . $q . '%';
+            $searchTerm = '%'.$q.'%';
             $query->where(function ($builder) use ($searchTerm) {
                 $builder->where('location', 'like', $searchTerm)
                     ->orWhereHas('client', function ($cq) use ($searchTerm) {
@@ -109,7 +108,7 @@ class ShiftController extends Controller
             });
         }
 
-        if (!$auth->canDo('shifts.manageAny')) {
+        if (! $auth->canDo('shifts.manageAny')) {
             // Assigned-only access: only their own shifts
             $query->where('user_id', $auth->id);
         }
@@ -127,7 +126,7 @@ class ShiftController extends Controller
         $staff = $this->siteAccess()->applyStaffScope(
             User::staff(),
             $auth,
-            $this->shiftBypassPermissions(),
+            $this->shiftStaffBypassPermissions(),
         )
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
@@ -155,7 +154,7 @@ class ShiftController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('shifts.viewAny') || $auth->canDo('shifts.viewAssigned')), 403);
 
-        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+        if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -279,25 +278,38 @@ class ShiftController extends Controller
         }
 
         if ($canRecordMedications) {
-            $medicationWitnesses = User::staff()
+            $medicationWitnesses = $this->siteAccess()->applyStaffScope(
+                User::staff(),
+                $auth,
+                $this->shiftStaffBypassPermissions(),
+            )
                 ->where(function ($query) {
                     $query->whereHas('roles.permissions', fn ($rolePermissions) => $rolePermissions->where('key', 'medications.controlled.witness'))
-                        ->orWhereHas('permissionOverrides', fn ($overrides) => $overrides->where('permissions.key', 'medications.controlled.witness')->wherePivot('allowed', true));
+                        ->orWhereHas('permissionOverrides', fn ($overrides) => $overrides
+                            ->where('permissions.key', 'medications.controlled.witness')
+                            ->where('permission_user.allowed', true));
                 })
-                ->whereDoesntHave('permissionOverrides', fn ($overrides) => $overrides->where('permissions.key', 'medications.controlled.witness')->wherePivot('allowed', false))
+                ->whereDoesntHave('permissionOverrides', fn ($overrides) => $overrides
+                    ->where('permissions.key', 'medications.controlled.witness')
+                    ->where('permission_user.allowed', false))
                 ->orderBy('name')
                 ->get(['id', 'name']);
         }
 
         $assignmentCandidates = [];
         if ($auth->canDo('shifts.manageAny') && in_array($shift->status, ['draft', 'scheduled', 'in_progress'], true)) {
-            $assignmentCandidates = app(ShiftAssignmentRecommendationService::class)->forShift($shift, $auth);
+            $assignmentCandidates = app(ShiftAssignmentRecommendationService::class)->forShift(
+                $shift,
+                $auth,
+                8,
+                $this->shiftStaffBypassPermissions(),
+            );
         }
         $coverage = app(ShiftCoverageService::class)->coverageStatusForShift($shift);
 
         return inertia('operations/shifts/show', [
             'shift' => $shift,
-            'handover' => $handover->map(fn($entry) => [
+            'handover' => $handover->map(fn ($entry) => [
                 'id' => $entry->id,
                 'type' => 'handover',
                 'occurred_at' => optional($entry->created_at)->toISOString(),
@@ -307,7 +319,7 @@ class ShiftController extends Controller
                 'body' => $entry->handover_notes,
                 'actor' => $entry->outgoingStaff ? ['id' => $entry->outgoingStaff->id, 'name' => $entry->outgoingStaff->name] : null,
             ])->values(),
-            'notes' => $notes->map(fn($e) => [
+            'notes' => $notes->map(fn ($e) => [
                 'id' => $e->id,
                 'type' => $e->type,
                 'occurred_at' => optional($e->occurred_at)->toISOString(),
@@ -416,6 +428,7 @@ class ShiftController extends Controller
                     ->with(['incomingStaff:id,name'])
                     ->latest()
                     ->first();
+
                 return $h ? [
                     'id' => $h->id,
                     'status' => $h->status,
@@ -482,7 +495,7 @@ class ShiftController extends Controller
         $staff = $this->siteAccess()->applyStaffScope(
             User::staff(),
             $auth,
-            $this->shiftBypassPermissions(),
+            $this->shiftStaffBypassPermissions(),
         )->orderBy('name')->get(['id', 'name', 'email']);
 
         $serviceContexts = ServiceContext::query()
@@ -579,6 +592,7 @@ class ShiftController extends Controller
         ]);
 
         $assignee = User::findOrFail($data['user_id']);
+        $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
         $tempShift = new Shift([
             'user_id' => $data['user_id'],
             'starts_at' => $data['starts_at'],
@@ -664,6 +678,7 @@ class ShiftController extends Controller
         // Full eligibility check when assigning staff during creation.
         // Covers conflicts, compliance, fatigue, availability, leave, site, and driver checks.
         if (! empty($data['user_id'])) {
+            $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
             try {
                 $assignee = User::findOrFail($data['user_id']);
                 $tempShift = new Shift(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
@@ -720,6 +735,7 @@ class ShiftController extends Controller
                 }
 
                 app(CoverageReservationService::class)->fulfill($reservation, $shift);
+
                 return $shift;
             });
         } catch (\Throwable $e) {
@@ -739,7 +755,7 @@ class ShiftController extends Controller
 
         // Notify assigned staff only (open shifts have no assignee).
         // Wrapped in try-catch to prevent notification failures from breaking the request.
-        if (!empty($shift->user_id)) {
+        if (! empty($shift->user_id)) {
             try {
                 $client = Client::query()->find($shift->client_id);
                 $targetUserIds = $shift->user_id ? [$shift->user_id] : [];
@@ -767,7 +783,7 @@ class ShiftController extends Controller
         abort_unless($auth && $auth->canDo('shifts.update'), 403);
 
         // Staff can edit only own shifts unless manageAny
-        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+        if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -785,7 +801,7 @@ class ShiftController extends Controller
         $staff = $this->siteAccess()->applyStaffScope(
             User::staff(),
             $auth,
-            $this->shiftBypassPermissions(),
+            $this->shiftStaffBypassPermissions(),
         )->orderBy('name')->get(['id', 'name', 'email']);
 
         $serviceContexts = ServiceContext::query()
@@ -815,7 +831,7 @@ class ShiftController extends Controller
             'status' => $shift->status,
         ];
 
-        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+        if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -980,6 +996,7 @@ class ShiftController extends Controller
                          || (array_key_exists('ends_at', $data) && $endsAt->ne($shift->ends_at));
 
             if ($resolvedUserId && ($userChanged || $timesChanged)) {
+                $this->assertCanAssignShiftToUser($auth, (int) $resolvedUserId);
                 try {
                     $assignee = User::findOrFail($resolvedUserId);
                     $evalShift = clone $shift;
@@ -1084,14 +1101,13 @@ class ShiftController extends Controller
         );
     }
 
-
     public function start(Request $request, Shift $shift)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.update'), 403);
         $this->assertCanAccessShift($auth, $shift);
 
-        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+        if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -1123,7 +1139,7 @@ class ShiftController extends Controller
         abort_unless($auth && $auth->canDo('shifts.update'), 403);
         $this->assertCanAccessShift($auth, $shift);
 
-        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+        if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -1221,20 +1237,20 @@ class ShiftController extends Controller
             ->whereIn('type', ['progress_note', 'shift_note'])
             ->count();
 
-        $finalBody = trim((string)($data['final_note_body'] ?? ''));
+        $finalBody = trim((string) ($data['final_note_body'] ?? ''));
         if ($finalBody === '' && $existingNoteCount === 0) {
             throw ValidationException::withMessages([
                 'final_note_body' => 'Add at least one progress note during the shift or provide a shift summary note to complete the shift.',
             ]);
         }
 
-        $allowIncomplete = (bool)($data['allow_incomplete_tasks'] ?? false);
-        if ($incompleteTasks->count() > 0 && !$allowIncomplete) {
+        $allowIncomplete = (bool) ($data['allow_incomplete_tasks'] ?? false);
+        if ($incompleteTasks->count() > 0 && ! $allowIncomplete) {
             throw ValidationException::withMessages([
                 'allow_incomplete_tasks' => 'This shift still has incomplete tasks. Complete all tasks or allow completion with a reason.',
             ]);
         }
-        if ($incompleteTasks->count() > 0 && $allowIncomplete && empty(trim((string)($data['incomplete_tasks_reason'] ?? '')))) {
+        if ($incompleteTasks->count() > 0 && $allowIncomplete && empty(trim((string) ($data['incomplete_tasks_reason'] ?? '')))) {
             throw ValidationException::withMessages([
                 'incomplete_tasks_reason' => 'Please provide a reason for completing with incomplete tasks.',
             ]);
@@ -1289,7 +1305,7 @@ class ShiftController extends Controller
             }
 
             // Create a shift summary note (auditable via ClientNote + TimelineEvent)
-            $subject = trim((string)($data['final_note_subject'] ?? 'Shift summary'));
+            $subject = trim((string) ($data['final_note_subject'] ?? 'Shift summary'));
             $body = $finalBody !== ''
                 ? $finalBody
                 : 'Shift completed - see shift notes for details.';
@@ -1323,7 +1339,7 @@ class ShiftController extends Controller
                     'meta' => array_filter([
                         'note_id' => $note->id,
                         'completed_with_incomplete_tasks' => $incompleteTasks->count() > 0 ? true : null,
-                        'incomplete_tasks_reason' => $allowIncomplete ? (string)($data['incomplete_tasks_reason'] ?? null) : null,
+                        'incomplete_tasks_reason' => $allowIncomplete ? (string) ($data['incomplete_tasks_reason'] ?? null) : null,
                         'incomplete_task_count' => $incompleteTasks->count() ?: null,
                         'handover_waiver_reason' => $handoverWaiverReason !== '' ? $handoverWaiverReason : null,
                     ]),
@@ -1583,7 +1599,7 @@ class ShiftController extends Controller
         ]);
 
         // Only allow assigning staff users
-        abort_unless(User::staff()->whereKey($data['user_id'])->exists(), 404);
+        $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
 
         // Full eligibility check: block assignment if any hard-stop rule fails.
         $overrideData = null;
@@ -1886,7 +1902,7 @@ class ShiftController extends Controller
     }
 
     /**
-     * @param array<int, array{starts_at: Carbon, ends_at: Carbon}> $windows
+     * @param  array<int, array{starts_at: Carbon, ends_at: Carbon}>  $windows
      */
     protected function hasOverlappingFutureSeriesWindows(array $windows): bool
     {
@@ -2027,7 +2043,37 @@ class ShiftController extends Controller
      */
     protected function shiftBypassPermissions(): array
     {
-        return ['shifts.manageAny', 'reports.viewAny'];
+        return ['reports.viewAny'];
+    }
+
+    /**
+     * Staff pickers and assignment actions should still respect explicit site assignments
+     * unless the user has broader reporting-level bypass access.
+     *
+     * @return array<int, string>
+     */
+    protected function shiftStaffBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
+    }
+
+    protected function assertCanAssignShiftToUser(User $auth, int $userId): void
+    {
+        $query = User::query()
+            ->staff()
+            ->whereKey($userId);
+
+        $this->siteAccess()->applyStaffScope(
+            $query,
+            $auth,
+            $this->shiftStaffBypassPermissions(),
+        );
+
+        abort_unless(
+            $query->exists(),
+            403,
+            'You are not authorized to assign that staff member to this shift.',
+        );
     }
 
     protected function assertCanAccessShift(User $auth, Shift $shift): void

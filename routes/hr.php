@@ -1,76 +1,75 @@
 <?php
 
-use App\Http\Controllers\Hr\RecruitmentController;
+use App\Http\Controllers\Hr\AnalyticsDashboardController;
+use App\Http\Controllers\Hr\AnnouncementController;
+use App\Http\Controllers\Hr\ApprovalController;
+use App\Http\Controllers\Hr\AssetController;
+use App\Http\Controllers\Hr\AuditController;
+use App\Http\Controllers\Hr\BenefitsController;
+use App\Http\Controllers\Hr\BonusController;
+use App\Http\Controllers\Hr\CalendarController;
 use App\Http\Controllers\Hr\CandidateController;
-use App\Http\Controllers\Hr\RecruitmentJobController;
-use App\Http\Controllers\Hr\InterviewKitController;
-use App\Http\Controllers\Hr\WellbeingController;
-use App\Http\Controllers\Hr\DevelopmentGoalController;
-use App\Http\Controllers\Hr\EmployeeProfileController;
+use App\Http\Controllers\Hr\CompensationController;
+use App\Http\Controllers\Hr\CompetencyController;
+use App\Http\Controllers\Hr\ComplianceCalendarController;
 use App\Http\Controllers\Hr\ComplianceController;
 use App\Http\Controllers\Hr\ComplianceMatrixController;
-use App\Http\Controllers\Hr\TrainingDashboardController;
-use App\Http\Controllers\Hr\VettingController;
-use App\Http\Controllers\Hr\DriverEligibilityController;
-use App\Http\Controllers\Hr\LeaveController;
-use App\Http\Controllers\Hr\OnboardingController;
-use App\Http\Controllers\Hr\OnboardingEmailController;
-use App\Http\Controllers\Hr\OffboardingController;
-use App\Http\Controllers\Hr\ComplianceCalendarController;
-use App\Http\Controllers\Hr\SupervisionController;
-use App\Http\Controllers\Hr\PerformanceReviewController;
-use App\Http\Controllers\Hr\HrCaseController;
+use App\Http\Controllers\Hr\CustomFieldController;
+use App\Http\Controllers\Hr\DepartmentController;
+use App\Http\Controllers\Hr\DevelopmentGoalController;
+use App\Http\Controllers\Hr\DirectoryController;
 use App\Http\Controllers\Hr\DisciplinaryController;
-use App\Http\Controllers\Hr\PolicyController;
-use App\Http\Controllers\Hr\PolicyAttestationController;
+use App\Http\Controllers\Hr\DriverEligibilityController;
+use App\Http\Controllers\Hr\EmployeeProfileController;
+use App\Http\Controllers\Hr\ESignatureController;
+use App\Http\Controllers\Hr\ExitInterviewController;
+use App\Http\Controllers\Hr\ExpenseController;
+use App\Http\Controllers\Hr\FeedbackController;
+use App\Http\Controllers\Hr\FeedController;
+use App\Http\Controllers\Hr\GoalController;
+use App\Http\Controllers\Hr\HeadcountController;
+use App\Http\Controllers\Hr\HrAutomationController;
+use App\Http\Controllers\Hr\HrCaseController;
 use App\Http\Controllers\Hr\HrDocumentController;
-use App\Http\Controllers\Hr\PayrollExportController;
 use App\Http\Controllers\Hr\HrReportController;
 use App\Http\Controllers\Hr\HrWebhookController;
-use App\Http\Controllers\Hr\HrAutomationController;
-use App\Http\Controllers\Hr\MyHrController;
-use App\Http\Controllers\Hr\DirectoryController;
-use App\Http\Controllers\Hr\ImportExportController;
-use App\Http\Controllers\Hr\PositionController;
-use App\Http\Controllers\Hr\OrgChartController;
-use App\Http\Controllers\Hr\JobPostingController;
-use App\Http\Controllers\Hr\CompensationController;
-use App\Http\Controllers\Hr\BenefitsController;
-use App\Http\Controllers\Hr\ExpenseController;
-use App\Http\Controllers\Hr\TimeOffCalendarController;
-use App\Http\Controllers\Hr\FeedbackController;
-use App\Http\Controllers\Hr\CompetencyController;
-use App\Http\Controllers\Hr\SuccessionController;
-use App\Http\Controllers\Hr\GoalController;
-use App\Http\Controllers\Hr\FeedController;
-use App\Http\Controllers\Hr\SurveyController;
-use App\Http\Controllers\Hr\AnnouncementController;
-use App\Http\Controllers\Hr\SkillsController;
-use App\Http\Controllers\Hr\AnalyticsDashboardController;
-use App\Http\Controllers\Hr\HeadcountController;
-use App\Http\Controllers\Hr\CalendarController;
-use App\Http\Controllers\Hr\AssetController;
-use App\Http\Controllers\Hr\ApprovalController;
-use App\Http\Controllers\Hr\ESignatureController;
-use App\Http\Controllers\Hr\PayslipController;
-use App\Http\Controllers\Hr\ExitInterviewController;
-use App\Http\Controllers\Hr\TimeTrackingController;
-use App\Http\Controllers\Hr\CustomFieldController;
-use App\Http\Controllers\Hr\AuditController;
-use App\Http\Controllers\Hr\ReportBuilderController;
-use App\Http\Controllers\Hr\BonusController;
-use App\Http\Controllers\Hr\PipController;
-use App\Http\Controllers\Hr\ScorecardController;
 use App\Http\Controllers\Hr\ICalController;
+use App\Http\Controllers\Hr\ImportExportController;
+use App\Http\Controllers\Hr\InterviewKitController;
+use App\Http\Controllers\Hr\JobPostingController;
+use App\Http\Controllers\Hr\LeaveController;
 use App\Http\Controllers\Hr\LeaveReportController;
+use App\Http\Controllers\Hr\MyHrController;
+use App\Http\Controllers\Hr\OffboardingController;
+use App\Http\Controllers\Hr\OnboardingController;
+use App\Http\Controllers\Hr\OnboardingEmailController;
+use App\Http\Controllers\Hr\OrgChartController;
+use App\Http\Controllers\Hr\PayrollExportController;
+use App\Http\Controllers\Hr\PayslipController;
+use App\Http\Controllers\Hr\PerformanceReviewController;
+use App\Http\Controllers\Hr\PipController;
+use App\Http\Controllers\Hr\PolicyAttestationController;
+use App\Http\Controllers\Hr\PolicyController;
+use App\Http\Controllers\Hr\PositionController;
+use App\Http\Controllers\Hr\RecruitmentController;
+use App\Http\Controllers\Hr\RecruitmentJobController;
+use App\Http\Controllers\Hr\ReportBuilderController;
+use App\Http\Controllers\Hr\ScorecardController;
+use App\Http\Controllers\Hr\SkillsController;
+use App\Http\Controllers\Hr\SuccessionController;
+use App\Http\Controllers\Hr\SupervisionController;
+use App\Http\Controllers\Hr\SurveyController;
+use App\Http\Controllers\Hr\TimeOffCalendarController;
+use App\Http\Controllers\Hr\TimeTrackingController;
+use App\Http\Controllers\Hr\TrainingDashboardController;
+use App\Http\Controllers\Hr\VettingController;
 use App\Http\Controllers\Hr\WebhookController;
-use App\Http\Controllers\Hr\DepartmentController;
+use App\Http\Controllers\Hr\WellbeingController;
 use Illuminate\Support\Facades\Route;
 
 /**
  * HR Module Routes
  */
-
 Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     // HR module landing page for shared breadcrumbs/navigation.
     Route::redirect('/', '/hr/my')->name('index');
@@ -948,7 +947,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Time Tracking
     |--------------------------------------------------------------------------
     */
-    Route::prefix('time')->name('time.')->group(function () {
+    Route::prefix('time')->name('time.')->middleware('permission:hr.time.viewAny')->group(function () {
         Route::get('/', [TimeTrackingController::class, 'index'])->name('index');
         Route::post('/clock-in', [TimeTrackingController::class, 'clockIn'])->name('clock-in');
         Route::post('/clock-out', [TimeTrackingController::class, 'clockOut'])->name('clock-out');

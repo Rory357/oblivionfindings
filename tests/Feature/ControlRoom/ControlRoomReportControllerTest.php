@@ -13,7 +13,9 @@ class ControlRoomReportControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $coordinator;
+
     protected User $supportWorker;
 
     protected function setUp(): void
@@ -83,14 +85,12 @@ class ControlRoomReportControllerTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('control-room/reports')
                 ->has('period')
-                ->has('stats')
-                ->has('by_severity')
-                ->has('by_status')
-                ->has('by_source')
-                ->has('by_alert_type')
-                ->has('daily_trend')
-                ->has('response_time_by_severity')
-                ->has('top_assignees')
+                ->has('site_id')
+                ->has('sla')
+                ->has('volume')
+                ->has('escalation')
+                ->has('workload')
+                ->has('playbooks')
             );
     }
 
@@ -140,7 +140,7 @@ class ControlRoomReportControllerTest extends TestCase
             ->get('/control-room/reports?period=invalid')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('period', 'invalid')
+                ->where('period', '30d')
             );
     }
 
@@ -153,12 +153,14 @@ class ControlRoomReportControllerTest extends TestCase
             ->get('/control-room/reports')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('stats.total_alerts')
-                ->has('stats.resolved_alerts')
-                ->has('stats.resolution_rate')
-                ->has('stats.avg_resolution_hours')
-                ->has('stats.escalated_count')
-                ->has('stats.escalation_rate')
+                ->has('sla.total_with_sla')
+                ->has('sla.compliance_pct')
+                ->has('sla.avg_resolution_hours')
+                ->has('volume.total')
+                ->has('volume.resolved')
+                ->has('volume.resolution_rate')
+                ->has('escalation.escalated')
+                ->has('escalation.escalation_rate')
             );
     }
 
@@ -168,10 +170,10 @@ class ControlRoomReportControllerTest extends TestCase
             ->get('/control-room/reports')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('stats.total_alerts', 0)
-                ->where('stats.resolved_alerts', 0)
-                ->where('stats.resolution_rate', 0)
-                ->where('stats.escalated_count', 0)
+                ->where('volume.total', 0)
+                ->where('volume.resolved', 0)
+                ->where('volume.resolution_rate', 0)
+                ->where('escalation.escalated', 0)
             );
     }
 
@@ -186,7 +188,7 @@ class ControlRoomReportControllerTest extends TestCase
             ->get('/control-room/reports?period=30d')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('stats.total_alerts', 5)
+                ->where('volume.total', 5)
             );
     }
 
@@ -199,8 +201,8 @@ class ControlRoomReportControllerTest extends TestCase
             ->get('/control-room/reports')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('by_severity.critical', 2)
-                ->where('by_severity.low', 3)
+                ->where('volume.by_severity.critical', 2)
+                ->where('volume.by_severity.low', 3)
             );
     }
 
@@ -213,8 +215,8 @@ class ControlRoomReportControllerTest extends TestCase
             ->get('/control-room/reports')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('by_source.fleet', 4)
-                ->where('by_source.compliance', 2)
+                ->where('volume.by_source.fleet', 4)
+                ->where('volume.by_source.compliance', 2)
             );
     }
 
@@ -227,7 +229,7 @@ class ControlRoomReportControllerTest extends TestCase
             ->get('/control-room/reports')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('stats.escalated_count', 3)
+                ->where('escalation.escalated', 3)
             );
     }
 
@@ -241,7 +243,7 @@ class ControlRoomReportControllerTest extends TestCase
             ->get('/control-room/reports')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('top_assignees')
+                ->has('workload.handled_per_user')
             );
     }
 

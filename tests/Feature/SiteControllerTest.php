@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
-use App\Models\Client;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -15,7 +15,9 @@ class SiteControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $coordinator;
+
     protected User $supportWorker;
 
     protected function setUp(): void
@@ -82,7 +84,7 @@ class SiteControllerTest extends TestCase
 
     public function test_site_index_lists_all_sites(): void
     {
-        Site::factory()->count(5)->create();
+        Site::factory()->count(5)->create(['type' => 'house']);
 
         $this->actingAs($this->admin)
             ->get('/sites')
@@ -92,10 +94,29 @@ class SiteControllerTest extends TestCase
             );
     }
 
+    public function test_site_index_respects_assigned_site_scope_when_user_has_profile_scope(): void
+    {
+        $visibleSite = Site::factory()->create(['name' => 'Visible House', 'type' => 'house']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden House', 'type' => 'house']);
+
+        $this->scopeUserToSite($this->coordinator, $visibleSite);
+
+        $this->actingAs($this->coordinator)
+            ->get('/sites')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('sites', 1)
+                ->where('sites.0.id', $visibleSite->id)
+                ->where('sites.0.name', 'Visible House')
+            );
+
+        $this->assertNotSame($visibleSite->id, $hiddenSite->id);
+    }
+
     public function test_site_index_filter_by_active_status(): void
     {
-        Site::factory()->count(3)->create(['is_active' => true]);
-        Site::factory()->count(2)->create(['is_active' => false]);
+        Site::factory()->count(3)->create(['type' => 'house', 'is_active' => true]);
+        Site::factory()->count(2)->create(['type' => 'house', 'is_active' => false]);
 
         $this->actingAs($this->admin)
             ->get('/sites?status=active')
@@ -107,8 +128,8 @@ class SiteControllerTest extends TestCase
 
     public function test_site_index_filter_by_inactive_status(): void
     {
-        Site::factory()->count(3)->create(['is_active' => true]);
-        Site::factory()->count(2)->create(['is_active' => false]);
+        Site::factory()->count(3)->create(['type' => 'house', 'is_active' => true]);
+        Site::factory()->count(2)->create(['type' => 'house', 'is_active' => false]);
 
         $this->actingAs($this->admin)
             ->get('/sites?status=inactive')
@@ -120,8 +141,8 @@ class SiteControllerTest extends TestCase
 
     public function test_site_index_all_status_shows_everything(): void
     {
-        Site::factory()->count(3)->create(['is_active' => true]);
-        Site::factory()->count(2)->create(['is_active' => false]);
+        Site::factory()->count(3)->create(['type' => 'house', 'is_active' => true]);
+        Site::factory()->count(2)->create(['type' => 'house', 'is_active' => false]);
 
         $this->actingAs($this->admin)
             ->get('/sites?status=all')
@@ -168,6 +189,18 @@ class SiteControllerTest extends TestCase
                 ->has('can_edit')
                 ->has('can')
             );
+    }
+
+    public function test_site_show_blocks_foreign_site_for_scoped_user(): void
+    {
+        $visibleSite = Site::factory()->create(['type' => 'house']);
+        $hiddenSite = Site::factory()->create(['type' => 'house']);
+
+        $this->scopeUserToSite($this->coordinator, $visibleSite);
+
+        $this->actingAs($this->coordinator)
+            ->get("/sites/{$hiddenSite->id}")
+            ->assertForbidden();
     }
 
     public function test_site_show_includes_checklist(): void
@@ -237,6 +270,7 @@ class SiteControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->post('/sites', [
                 'name' => 'New Care Home',
+                'type' => 'house',
                 'is_active' => true,
             ])
             ->assertRedirect(route('sites.index'));
@@ -283,6 +317,7 @@ class SiteControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->post('/sites', [
                 'name' => 'Full Details Home',
+                'type' => 'house',
                 'phone' => '09 123 4567',
                 'email' => 'home@example.com',
                 'manager_name' => 'Jane Manager',
@@ -355,6 +390,7 @@ class SiteControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->put("/sites/{$site->id}", [
                 'name' => 'Updated Name',
+                'type' => $site->type,
                 'is_active' => true,
             ])
             ->assertRedirect(route('sites.index'));
@@ -391,11 +427,31 @@ class SiteControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->put("/sites/{$site->id}", [
                 'name' => $site->name,
+                'type' => $site->type,
                 'is_active' => false,
             ])
             ->assertRedirect(route('sites.index'));
 
         $site->refresh();
         $this->assertFalse((bool) $site->is_active);
+    }
+
+    protected function scopeUserToSite(User $user, Site $site): void
+    {
+        HrEmployeeProfile::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'tenant_id' => 1,
+                'employee_number' => 'EMP-SITE-'.$user->id,
+                'work_email' => $user->email,
+                'position_title' => 'Coordinator',
+                'position_role' => $user->role,
+                'employment_type' => 'full_time',
+                'start_date' => now()->subMonth()->toDateString(),
+                'is_active' => true,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+            ],
+        );
     }
 }

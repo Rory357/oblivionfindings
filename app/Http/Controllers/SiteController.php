@@ -15,6 +15,7 @@ use App\Models\Site;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\NotificationService;
 use App\Services\ShiftCoverageService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
@@ -24,26 +25,31 @@ class SiteController extends Controller
     {
         $this->authorize('viewAny', Site::class);
 
+        $user = $request->user();
         $type = $request->input('type');
         $status = $request->input('status', 'all');
         $region = $request->input('region');
         $risk = $request->input('risk');
         $managerId = $request->input('manager_id');
         $allowedTypes = $this->allowedSiteTypes($request);
+        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
 
-        if ($type && !in_array($type, $allowedTypes, true)) {
+        if ($type && ! in_array($type, $allowedTypes, true)) {
             abort(403);
         }
 
-        $sites = Site::query()
+        $visibleSitesQuery = Site::query()
             ->whereIn('type', $allowedTypes)
-            ->when(in_array($status, ['active', 'inactive']), fn($q) => $q->where('is_active', $status === 'active'))
-            ->when($type && in_array($type, ['head_office', 'house', 'facility']), fn($q) => $q->where('type', $type))
-            ->when($region, fn($q) => $q->where('region', $region))
-            ->when($risk === 'high_risk', fn($q) => $q->where('is_high_risk', true))
-            ->when($risk === 'high_needs', fn($q) => $q->where('is_high_needs', true))
-            ->when($risk === 'both', fn($q) => $q->where('is_high_risk', true)->where('is_high_needs', true))
-            ->when($managerId, fn($q) => $q->where('primary_contact_user_id', $managerId))
+            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('id', $accessibleSiteIds));
+
+        $sites = (clone $visibleSitesQuery)
+            ->when(in_array($status, ['active', 'inactive']), fn ($q) => $q->where('is_active', $status === 'active'))
+            ->when($type && in_array($type, ['head_office', 'house', 'facility']), fn ($q) => $q->where('type', $type))
+            ->when($region, fn ($q) => $q->where('region', $region))
+            ->when($risk === 'high_risk', fn ($q) => $q->where('is_high_risk', true))
+            ->when($risk === 'high_needs', fn ($q) => $q->where('is_high_needs', true))
+            ->when($risk === 'both', fn ($q) => $q->where('is_high_risk', true)->where('is_high_needs', true))
+            ->when($managerId, fn ($q) => $q->where('primary_contact_user_id', $managerId))
             ->with('primaryContact:id,name')
             ->orderBy('name')
             ->get([
@@ -64,8 +70,18 @@ class SiteController extends Controller
             ]);
 
         // Get filter options
-        $regions = Site::distinct()->pluck('region')->filter()->values();
-        $managers = \App\Models\User::whereHas('sitesAsPrimaryContact')
+        $regions = (clone $visibleSitesQuery)
+            ->distinct()
+            ->pluck('region')
+            ->filter()
+            ->values();
+        $managerIds = (clone $visibleSitesQuery)
+            ->whereNotNull('primary_contact_user_id')
+            ->distinct()
+            ->pluck('primary_contact_user_id')
+            ->filter()
+            ->values();
+        $managers = \App\Models\User::whereIn('id', $managerIds)
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get();
@@ -106,9 +122,9 @@ class SiteController extends Controller
             'documents.uploadedBy:id,name,email',
             'primaryContact:id,name',
             'serviceContexts',
-            'houseRooms' => fn($q) => $q->active()->orderBy('sort_order'),
-            'hoResources' => fn($q) => $q->active()->orderBy('name'),
-            'facilityZones' => fn($q) => $q->active()->orderBy('name'),
+            'houseRooms' => fn ($q) => $q->active()->orderBy('sort_order'),
+            'hoResources' => fn ($q) => $q->active()->orderBy('name'),
+            'facilityZones' => fn ($q) => $q->active()->orderBy('name'),
         ]);
 
         $user = $request->user();
@@ -167,7 +183,7 @@ class SiteController extends Controller
                 'done' => $site->documents->count() > 0,
             ],
         ];
-        
+
         // Add type-specific checklist items
         if ($site->type === 'house') {
             $checklist[] = [
@@ -192,17 +208,17 @@ class SiteController extends Controller
         // Type-specific data
         $typeSpecificData = match ($site->type) {
             'house' => [
-                'rooms' => $site->houseRooms->map(fn($r) => [
+                'rooms' => $site->houseRooms->map(fn ($r) => [
                     'id' => $r->id,
                     'name' => $r->name,
                     'assigned_client' => $r->assignedClient ? [
                         'id' => $r->assignedClient->id,
-                        'name' => $r->assignedClient->first_name . ' ' . $r->assignedClient->last_name,
+                        'name' => $r->assignedClient->first_name.' '.$r->assignedClient->last_name,
                     ] : null,
                 ]),
             ],
             'head_office' => [
-                'resources' => $site->hoResources->map(fn($r) => [
+                'resources' => $site->hoResources->map(fn ($r) => [
                     'id' => $r->id,
                     'name' => $r->name,
                     'type' => $r->resource_type,
@@ -210,7 +226,7 @@ class SiteController extends Controller
                 ]),
             ],
             'facility' => [
-                'zones' => $site->facilityZones->map(fn($z) => [
+                'zones' => $site->facilityZones->map(fn ($z) => [
                     'id' => $z->id,
                     'name' => $z->name,
                     'type' => $z->zone_type,
@@ -247,7 +263,7 @@ class SiteController extends Controller
                     'id' => $site->primaryContact->id,
                     'name' => $site->primaryContact->name,
                 ] : null,
-                'service_contexts' => $site->serviceContexts->map(fn($context) => [
+                'service_contexts' => $site->serviceContexts->map(fn ($context) => [
                     'id' => $context->id,
                     'name' => $context->name,
                     'type' => $context->type,
@@ -258,13 +274,13 @@ class SiteController extends Controller
                 'onboarding_progress' => $site->onboarding_progress,
             ],
             'typeSpecificData' => $typeSpecificData,
-            'clients' => $site->clients->sortBy([['first_name', 'asc'], ['last_name', 'asc']])->values()->map(fn($c) => [
+            'clients' => $site->clients->sortBy([['first_name', 'asc'], ['last_name', 'asc']])->values()->map(fn ($c) => [
                 'id' => $c->id,
                 'first_name' => $c->first_name,
                 'last_name' => $c->last_name,
                 'status' => $c->status,
             ]),
-            'contacts' => $site->contacts->sortByDesc('is_primary')->values()->map(fn($c) => [
+            'contacts' => $site->contacts->sortByDesc('is_primary')->values()->map(fn ($c) => [
                 'id' => $c->id,
                 'type' => $c->type,
                 'name' => $c->name,
@@ -274,7 +290,7 @@ class SiteController extends Controller
                 'is_primary' => (bool) $c->is_primary,
                 'notes' => $c->notes,
             ]),
-            'documents' => $site->documents->sortByDesc('created_at')->values()->map(fn($d) => [
+            'documents' => $site->documents->sortByDesc('created_at')->values()->map(fn ($d) => [
                 'id' => $d->id,
                 'title' => $d->title,
                 'category' => $d->category,
@@ -286,9 +302,9 @@ class SiteController extends Controller
                 'mime_type' => $d->mime_type,
                 'size_bytes' => $d->size_bytes,
                 'created_at' => $d->created_at?->toDateTimeString(),
-                'uploaded_by' => $d->uploadedBy?->only(['id','name','email']),
+                'uploaded_by' => $d->uploadedBy?->only(['id', 'name', 'email']),
             ]),
-            'assets' => $assets->map(fn($a) => [
+            'assets' => $assets->map(fn ($a) => [
                 'id' => $a->id,
                 'name' => $a->name,
                 'asset_tag' => $a->asset_tag,
@@ -298,7 +314,7 @@ class SiteController extends Controller
                 'location' => $a->location,
                 'owner' => $a->client ? [
                     'type' => 'client',
-                    'label' => trim($a->client->first_name . ' ' . $a->client->last_name),
+                    'label' => trim($a->client->first_name.' '.$a->client->last_name),
                     'id' => $a->client->id,
                 ] : [
                     'type' => 'site',
@@ -312,7 +328,7 @@ class SiteController extends Controller
                 ->where('is_active', true)
                 ->orderBy('service_type')
                 ->get()
-                ->map(fn($v) => [
+                ->map(fn ($v) => [
                     'id' => $v->id,
                     'company_name' => $v->company_name,
                     'service_type' => $v->service_type,
@@ -324,7 +340,7 @@ class SiteController extends Controller
             'integrationStatus' => \App\Models\Integration\IntegrationSiteConfig::where('site_id', $site->id)
                 ->where('is_active', true)
                 ->get()
-                ->map(fn($c) => [
+                ->map(fn ($c) => [
                     'provider' => $c->provider,
                     'status' => $c->status,
                 ])
@@ -335,7 +351,7 @@ class SiteController extends Controller
                 ->where('is_active', true)
                 ->orderByRaw("FIELD(category, 'mandatory', 'recommended', 'specialist')")
                 ->get()
-                ->map(fn($r) => [
+                ->map(fn ($r) => [
                     'id' => $r->id,
                     'requirement_name' => $r->requirement_name,
                     'category' => $r->category,
@@ -349,7 +365,7 @@ class SiteController extends Controller
                 ->orderByRaw("FIELD(day_of_week, 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')")
                 ->orderBy('starts_time')
                 ->get()
-                ->map(fn($r) => [
+                ->map(fn ($r) => [
                     'id' => $r->id,
                     'name' => $r->name,
                     'coverage_type' => $r->coverage_type,
@@ -486,6 +502,7 @@ class SiteController extends Controller
                     return true;
                 }
             }
+
             return false;
         })->map(function ($v) {
             $items = [];
@@ -502,6 +519,7 @@ class SiteController extends Controller
                     }
                 }
             }
+
             return ['vehicle_name' => $v['name'], 'vehicle_id' => $v['id'], 'items' => $items];
         })->filter(fn ($v) => count($v['items']) > 0)->values();
 
@@ -535,12 +553,12 @@ class SiteController extends Controller
         $this->authorize('create', Site::class);
 
         $validated = $request->validated();
-        
+
         $site = Site::create($validated);
 
-        app(NotificationService::class)->notifyCrud($request->user(), "created", "site", $site, null, [
-            "title" => "Site created: {$site->name}",
-            "url" => url("/sites"),
+        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'site', $site, null, [
+            'title' => "Site created: {$site->name}",
+            'url' => url('/sites'),
         ]);
 
         return redirect()
@@ -594,9 +612,9 @@ class SiteController extends Controller
 
         $site->update($request->validated());
 
-        app(NotificationService::class)->notifyCrud($request->user(), "updated", "site", $site, null, [
-            "title" => "Site updated: {$site->name}",
-            "url" => url("/sites"),
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'site', $site, null, [
+            'title' => "Site updated: {$site->name}",
+            'url' => url('/sites'),
         ]);
 
         return redirect()
@@ -620,5 +638,10 @@ class SiteController extends Controller
             ->all();
 
         return $allowed !== [] ? $allowed : array_keys($map);
+    }
+
+    private function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
     }
 }

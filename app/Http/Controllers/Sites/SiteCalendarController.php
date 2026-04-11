@@ -7,6 +7,7 @@ use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Site;
 use App\Models\SiteCalendarEvent;
 use App\Services\Sites\SiteCalendarService;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -132,30 +133,37 @@ class SiteCalendarController extends Controller
 
     public function global(Request $request)
     {
-        abort_unless($request->user()?->canDo('calendar.view'), 403);
+        $user = $request->user();
+        abort_unless($user?->canDo('calendar.view'), 403);
 
         $start = Carbon::parse($request->input('start', now()->startOfMonth()));
         $end = Carbon::parse($request->input('end', now()->endOfMonth()));
 
         $siteIds = $request->input('site_ids');
         $eventTypes = $request->input('event_types');
-        if (!is_array($siteIds) && $siteIds !== null) {
+        if (! is_array($siteIds) && $siteIds !== null) {
             $siteIds = [$siteIds];
         }
-        if (!is_array($eventTypes) && $eventTypes !== null) {
+        if (! is_array($eventTypes) && $eventTypes !== null) {
             $eventTypes = [$eventTypes];
         }
         $siteType = $request->input('site_type');
         $status = $request->input('status');
         $allowedSiteTypes = $this->allowedSiteTypes($request);
 
-        if ($siteType && !in_array($siteType, $allowedSiteTypes, true)) {
+        if ($siteType && ! in_array($siteType, $allowedSiteTypes, true)) {
             abort(403);
         }
+
+        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
 
         $siteQuery = Site::active()
             ->select(['id', 'name', 'type'])
             ->whereIn('type', $allowedSiteTypes);
+
+        if ($accessibleSiteIds !== []) {
+            $siteQuery->whereIn('id', $accessibleSiteIds);
+        }
 
         if ($siteType) {
             $siteQuery->where('type', $siteType);
@@ -185,7 +193,7 @@ class SiteCalendarController extends Controller
             'key' => $type['key'] ?? null,
             'label' => $type['label'] ?? ($type['key'] ?? 'Other'),
             'color' => $type['color'] ?? '#64748b',
-        ])->filter(fn ($type) => !empty($type['key']))->values();
+        ])->filter(fn ($type) => ! empty($type['key']))->values();
 
         if ($eventTypeOptions->isEmpty()) {
             $eventTypeOptions = collect([
@@ -235,11 +243,16 @@ class SiteCalendarController extends Controller
 
     private function requiresApproval(string $eventType): bool
     {
-        $eventTypes = function_exists('settings') 
+        $eventTypes = function_exists('settings')
             ? settings('sites.default_event_types', [])
             : [];
         $type = collect($eventTypes)->firstWhere('key', $eventType);
+
         return $type['requires_approval'] ?? false;
     }
 
+    private function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
+    }
 }

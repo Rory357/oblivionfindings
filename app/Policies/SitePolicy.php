@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Site;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 
 class SitePolicy
 {
@@ -14,11 +15,12 @@ class SitePolicy
 
     public function view(User $user, Site $site): bool
     {
-        if (!$user->canDo('sites.viewAny')) {
+        if (! $user->canDo('sites.viewAny')) {
             return false;
         }
 
-        return $this->canViewType($user, $site->type);
+        return $this->canViewType($user, $site->type)
+            && $this->canAccessAssignedSite($user, $site);
     }
 
     public function create(User $user): bool
@@ -28,12 +30,16 @@ class SitePolicy
 
     public function update(User $user, Site $site): bool
     {
-        return $user->canDo('sites.update');
+        return $user->canDo('sites.update')
+            && $this->canViewType($user, $site->type)
+            && $this->canAccessAssignedSite($user, $site);
     }
 
     public function delete(User $user, Site $site): bool
     {
-        return $user->canDo('sites.archive');
+        return $user->canDo('sites.archive')
+            && $this->canViewType($user, $site->type)
+            && $this->canAccessAssignedSite($user, $site);
     }
 
     private function canViewType(User $user, string $type): bool
@@ -48,10 +54,26 @@ class SitePolicy
         $hasTypeScopedPermissions = collect($typePermissions)
             ->contains(fn (string $permission) => $user->canDo($permission));
 
-        if (!$hasTypeScopedPermissions) {
+        if (! $hasTypeScopedPermissions) {
             return false;
         }
 
         return isset($typePermissions[$type]) && $user->canDo($typePermissions[$type]);
+    }
+
+    private function canAccessAssignedSite(User $user, Site $site): bool
+    {
+        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
+
+        if ($accessibleSiteIds === []) {
+            return true;
+        }
+
+        return in_array((int) $site->id, $accessibleSiteIds, true);
+    }
+
+    private function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
     }
 }

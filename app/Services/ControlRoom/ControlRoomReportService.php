@@ -31,7 +31,7 @@ class ControlRoomReportService
     /**
      * SLA compliance metrics.
      */
-    public function slaCompliance(Carbon $from, Carbon $to, ?int $siteId = null): array
+    public function slaCompliance(Carbon $from, Carbon $to, int|array|null $siteId = null): array
     {
         $alertQuery = $this->baseAlertQuery($from, $to, $siteId);
 
@@ -90,7 +90,7 @@ class ControlRoomReportService
     /**
      * Alert volume and distribution metrics.
      */
-    public function alertVolume(Carbon $from, Carbon $to, ?int $siteId = null): array
+    public function alertVolume(Carbon $from, Carbon $to, int|array|null $siteId = null): array
     {
         $query = $this->baseAlertQuery($from, $to, $siteId);
 
@@ -140,7 +140,7 @@ class ControlRoomReportService
     /**
      * Escalation analysis metrics.
      */
-    public function escalationAnalysis(Carbon $from, Carbon $to, ?int $siteId = null): array
+    public function escalationAnalysis(Carbon $from, Carbon $to, int|array|null $siteId = null): array
     {
         $query = $this->baseAlertQuery($from, $to, $siteId);
 
@@ -174,7 +174,7 @@ class ControlRoomReportService
     /**
      * Workload distribution metrics.
      */
-    public function workloadDistribution(Carbon $from, Carbon $to, ?int $siteId = null): array
+    public function workloadDistribution(Carbon $from, Carbon $to, int|array|null $siteId = null): array
     {
         // Active alerts per user (currently unresolved)
         $activePerUser = ControlRoomAlert::query()
@@ -214,9 +214,8 @@ class ControlRoomReportService
 
         // Alerts per queue (currently active)
         $perQueue = TriageQueue::active()
-            ->withCount(['alerts as active_count' => fn ($q) =>
-                $q->whereNotIn('status', ['resolved', 'closed'])
-                    ->when($siteId, fn ($qq) => $qq->where('site_id', $siteId))
+            ->withCount(['alerts as active_count' => fn ($q) => $q->whereNotIn('status', ['resolved', 'closed'])
+                ->when($siteId, fn ($qq) => $qq->where('site_id', $siteId)),
             ])
             ->orderBy('tier')
             ->get()
@@ -299,19 +298,20 @@ class ControlRoomReportService
     /**
      * Site-level comparison metrics.
      */
-    public function siteComparison(Carbon $from, Carbon $to): array
+    public function siteComparison(Carbon $from, Carbon $to, int|array|null $siteId = null): array
     {
         return ControlRoomAlert::query()
             ->where('triggered_at', '>=', $from)
             ->where('triggered_at', '<=', $to)
             ->whereNotNull('site_id')
+            ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId))
             ->join('sites', 'control_room_alerts.site_id', '=', 'sites.id')
             ->select(
                 'sites.id as site_id',
                 'sites.name as site_name',
                 DB::raw('COUNT(*) as total_alerts'),
                 DB::raw("SUM(CASE WHEN control_room_alerts.severity = 'critical' THEN 1 ELSE 0 END) as critical_count"),
-                DB::raw("SUM(CASE WHEN control_room_alerts.escalation_level > 0 THEN 1 ELSE 0 END) as escalated_count"),
+                DB::raw('SUM(CASE WHEN control_room_alerts.escalation_level > 0 THEN 1 ELSE 0 END) as escalated_count'),
                 DB::raw("SUM(CASE WHEN control_room_alerts.status IN ('resolved', 'closed') THEN 1 ELSE 0 END) as resolved_count"),
             )
             ->groupBy('sites.id', 'sites.name')
@@ -337,11 +337,11 @@ class ControlRoomReportService
      * Returns actionable flags for operators/managers — simple boolean/threshold
      * checks, not complex analytics.
      */
-    public function attentionFlags(?int $siteId = null): array
+    public function attentionFlags(int|array|null $siteId = null): array
     {
         $baseQuery = ControlRoomAlert::query()
             ->whereNotIn('status', ['resolved', 'closed'])
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId));
+            ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId));
 
         $unassigned = (clone $baseQuery)->whereNull('assigned_to_user_id')->count();
         $critical = (clone $baseQuery)->where('severity', 'critical')->count();
@@ -351,9 +351,15 @@ class ControlRoomReportService
             ->count();
 
         // SLA compliance check (last 7 days)
-        $recentSlaTotal = AlertSla::where('created_at', '>=', now()->subDays(7))->count();
-        $recentSlaBreached = AlertSla::where('created_at', '>=', now()->subDays(7))
-            ->breached()->count();
+        $recentSlaTotal = AlertSla::query()
+            ->where('created_at', '>=', now()->subDays(7))
+            ->when($siteId !== null, fn ($query) => $query->whereHas('alert', fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId)))
+            ->count();
+        $recentSlaBreached = AlertSla::query()
+            ->where('created_at', '>=', now()->subDays(7))
+            ->breached()
+            ->when($siteId !== null, fn ($query) => $query->whereHas('alert', fn ($alertQuery) => $this->applySiteConstraint($alertQuery, $siteId)))
+            ->count();
         $slaCompliancePct = $recentSlaTotal > 0
             ? round((($recentSlaTotal - $recentSlaBreached) / $recentSlaTotal) * 100, 1)
             : 100;
@@ -411,12 +417,12 @@ class ControlRoomReportService
     /**
      * Build a base alert query scoped to date range and optional site.
      */
-    protected function baseAlertQuery(Carbon $from, Carbon $to, ?int $siteId = null)
+    protected function baseAlertQuery(Carbon $from, Carbon $to, int|array|null $siteId = null)
     {
         return ControlRoomAlert::query()
             ->where('triggered_at', '>=', $from)
             ->where('triggered_at', '<=', $to)
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId));
+            ->tap(fn ($query) => $this->applySiteConstraint($query, $siteId));
     }
 
     /**
@@ -425,7 +431,7 @@ class ControlRoomReportService
     protected function avgTimeDiff(
         Carbon $from,
         Carbon $to,
-        ?int $siteId,
+        int|array|null $siteId,
         string $startCol,
         string $endCol,
         string $unit = 'minute',
@@ -446,5 +452,26 @@ class ControlRoomReportService
             ->whereNotNull($endCol)
             ->selectRaw("{$expr} as avg_val")
             ->value('avg_val');
+    }
+
+    protected function applySiteConstraint($query, int|array|null $siteId): void
+    {
+        if ($siteId === null) {
+            return;
+        }
+
+        if (is_array($siteId)) {
+            if ($siteId === []) {
+                $query->whereRaw('1 = 0');
+
+                return;
+            }
+
+            $query->whereIn('site_id', $siteId);
+
+            return;
+        }
+
+        $query->where('site_id', $siteId);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Operations;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
@@ -111,6 +112,44 @@ class ShiftSiteIsolationTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_shift_manage_any_without_reports_permission_remains_site_scoped(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAny', 'shifts.manageAny']);
+
+        $visibleShift = Shift::factory()->create([
+            'client_id' => $this->clientA->id,
+            'site_id' => $this->siteA->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $scheduler->id,
+            'starts_at' => now()->copy()->setTime(9, 0),
+            'ends_at' => now()->copy()->setTime(13, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $hiddenShift = Shift::factory()->create([
+            'client_id' => $this->clientB->id,
+            'site_id' => $this->siteB->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $scheduler->id,
+            'starts_at' => now()->copy()->setTime(14, 0),
+            'ends_at' => now()->copy()->setTime(18, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $this->actingAs($scheduler)
+            ->get('/operations/shifts?from=2026-04-06&to=2026-04-06')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('operations/shifts/index')
+                ->has('shifts.data', 1)
+                ->where('shifts.data.0.id', $visibleShift->id)
+            );
+
+        $this->actingAs($scheduler)
+            ->get("/operations/shifts/{$hiddenShift->id}")
+            ->assertForbidden();
+    }
+
     public function test_user_cannot_approve_timesheet_from_another_site(): void
     {
         $approver = $this->makeSiteScopedUser([$this->siteA], ['timesheets.approve']);
@@ -123,21 +162,74 @@ class ShiftSiteIsolationTest extends TestCase
             'user_id' => $staff->id,
             'starts_at' => now()->copy()->subDay()->setTime(9, 0),
             'ends_at' => now()->copy()->subDay()->setTime(17, 0),
+            'actual_starts_at' => now()->copy()->subDay()->setTime(9, 0),
+            'actual_ends_at' => now()->copy()->subDay()->setTime(17, 0),
             'status' => 'completed',
+        ]);
+
+        $attendance = HrAttendanceSession::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $staff->id,
+            'shift_id' => $shift->id,
+            'site_id' => $this->siteB->id,
+            'clock_in_at' => Carbon::parse('2026-04-05 09:00:00'),
+            'clock_out_at' => Carbon::parse('2026-04-05 17:00:00'),
+            'break_minutes' => 0,
+            'status' => 'closed',
+            'source' => 'manual',
+            'created_by' => $staff->id,
+            'closed_by' => $staff->id,
         ]);
 
         $timesheet = Timesheet::factory()->submitted()->create([
             'shift_id' => $shift->id,
+            'attendance_session_id' => $attendance->id,
             'user_id' => $staff->id,
             'client_id' => $this->clientB->id,
             'shift_site_id' => $this->siteB->id,
             'work_date' => '2026-04-05',
             'starts_at' => Carbon::parse('2026-04-05 09:00:00'),
             'ends_at' => Carbon::parse('2026-04-05 17:00:00'),
+            'break_minutes' => 0,
         ]);
 
         $this->actingAs($approver)
             ->post("/timesheets/{$timesheet->id}/approve")
+            ->assertForbidden();
+    }
+
+    public function test_timesheet_manage_any_without_reports_permission_remains_site_scoped(): void
+    {
+        $manager = $this->makeSiteScopedUser([$this->siteA], ['timesheets.viewAny', 'timesheets.manageAny']);
+        $staff = User::factory()->create(['approved_at' => now(), 'role' => 'support_worker']);
+
+        $visibleTimesheet = Timesheet::factory()->submitted()->create([
+            'user_id' => $staff->id,
+            'client_id' => $this->clientA->id,
+            'shift_id' => null,
+            'shift_site_id' => $this->siteA->id,
+            'work_date' => '2026-04-05',
+        ]);
+
+        $hiddenTimesheet = Timesheet::factory()->submitted()->create([
+            'user_id' => $staff->id,
+            'client_id' => $this->clientB->id,
+            'shift_id' => null,
+            'shift_site_id' => $this->siteB->id,
+            'work_date' => '2026-04-05',
+        ]);
+
+        $this->actingAs($manager)
+            ->get(route('operations.timesheets.index', ['mode' => 'approvals']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('operations/timesheets/index')
+                ->has('timesheets.data', 1)
+                ->where('timesheets.data.0.id', $visibleTimesheet->id)
+            );
+
+        $this->actingAs($manager)
+            ->get(route('operations.timesheets.edit', $hiddenTimesheet))
             ->assertForbidden();
     }
 
@@ -217,6 +309,42 @@ class ShiftSiteIsolationTest extends TestCase
             ->where('sites.0.id', $this->siteA->id)
             ->where('report.staff_utilisation.total_shifts', 1)
         );
+    }
+
+    public function test_shift_manage_any_without_reports_permission_does_not_bypass_operations_report_scope(): void
+    {
+        $user = $this->makeSiteScopedUser([$this->siteA], ['operations.reports.view', 'shifts.manageAny']);
+        $staff = User::factory()->create(['approved_at' => now(), 'role' => 'support_worker', 'name' => 'Scoped Staff']);
+
+        Shift::factory()->create([
+            'client_id' => $this->clientA->id,
+            'site_id' => $this->siteA->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $staff->id,
+            'starts_at' => Carbon::parse('2026-04-06 09:00:00'),
+            'ends_at' => Carbon::parse('2026-04-06 17:00:00'),
+            'status' => 'scheduled',
+        ]);
+
+        Shift::factory()->create([
+            'client_id' => $this->clientB->id,
+            'site_id' => $this->siteB->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $staff->id,
+            'starts_at' => Carbon::parse('2026-04-06 09:00:00'),
+            'ends_at' => Carbon::parse('2026-04-06 17:00:00'),
+            'status' => 'scheduled',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/operations/reports/shifts?date_from=2026-04-01&date_to=2026-04-30')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('operations/reports/Shifts')
+                ->has('sites', 1)
+                ->where('sites.0.id', $this->siteA->id)
+                ->where('report.staff_utilisation.total_shifts', 1)
+            );
     }
 
     public function test_csv_export_respects_site_scope(): void
@@ -340,6 +468,117 @@ class ShiftSiteIsolationTest extends TestCase
             ->has('clients', 1)
             ->where('clients.0.id', $this->clientA->id)
         );
+    }
+
+    public function test_shift_show_scopes_medication_witnesses_to_accessible_sites(): void
+    {
+        $user = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned', 'medications.administer.record']);
+        $visibleWitness = $this->makeSiteScopedUser([$this->siteA], ['medications.controlled.witness']);
+        $hiddenWitness = $this->makeSiteScopedUser([$this->siteB], ['medications.controlled.witness']);
+
+        $shift = Shift::factory()->create([
+            'client_id' => $this->clientA->id,
+            'site_id' => $this->siteA->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $user->id,
+            'starts_at' => now()->copy()->setTime(9, 0),
+            'ends_at' => now()->copy()->setTime(13, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $response = $this->actingAs($user)->get("/operations/shifts/{$shift->id}");
+
+        $response->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('operations/shifts/show')
+            ->has('medicationWitnesses', 1)
+            ->where('medicationWitnesses.0.id', $visibleWitness->id)
+        );
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->missing('medicationWitnesses.1')
+        );
+
+        $this->assertNotSame($visibleWitness->id, $hiddenWitness->id);
+    }
+
+    public function test_shift_assignment_candidates_exclude_hidden_site_staff_for_site_bound_scheduler(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAny', 'shifts.manageAny']);
+        $visibleCandidate = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
+        $hiddenCandidate = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
+
+        $shift = Shift::factory()->create([
+            'client_id' => $this->clientA->id,
+            'site_id' => $this->siteA->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $visibleCandidate->id,
+            'starts_at' => now()->copy()->setTime(9, 0),
+            'ends_at' => now()->copy()->setTime(13, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $response = $this->actingAs($scheduler)->get("/operations/shifts/{$shift->id}");
+
+        $response->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('operations/shifts/show')
+            ->has('assignmentCandidates')
+        );
+
+        $candidateIds = collect($response->viewData('page')['props']['assignmentCandidates'] ?? [])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $this->assertContains($visibleCandidate->id, $candidateIds);
+        $this->assertNotContains($hiddenCandidate->id, $candidateIds);
+    }
+
+    public function test_shift_assign_rejects_hidden_site_staff_for_site_bound_scheduler(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAny', 'shifts.manageAny']);
+        $visibleStaff = $this->makeSiteScopedUser([$this->siteA], ['shifts.viewAssigned']);
+        $hiddenStaff = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
+
+        $shift = Shift::factory()->create([
+            'client_id' => $this->clientA->id,
+            'site_id' => $this->siteA->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $visibleStaff->id,
+            'starts_at' => now()->copy()->setTime(9, 0),
+            'ends_at' => now()->copy()->setTime(13, 0),
+            'status' => 'scheduled',
+        ]);
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.assign', $shift), [
+                'user_id' => $hiddenStaff->id,
+            ])
+            ->assertForbidden();
+
+        $shift->refresh();
+        $this->assertSame($visibleStaff->id, $shift->user_id);
+    }
+
+    public function test_shift_store_rejects_hidden_site_staff_for_site_bound_scheduler(): void
+    {
+        $scheduler = $this->makeSiteScopedUser([$this->siteA], ['shifts.create']);
+        $hiddenStaff = $this->makeSiteScopedUser([$this->siteB], ['shifts.viewAssigned']);
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.store'), [
+                'client_id' => $this->clientA->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => $hiddenStaff->id,
+                'starts_at' => now()->copy()->addDay()->setTime(9, 0)->format('Y-m-d H:i:s'),
+                'ends_at' => now()->copy()->addDay()->setTime(13, 0)->format('Y-m-d H:i:s'),
+                'status' => 'scheduled',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('shifts', [
+            'client_id' => $this->clientA->id,
+            'user_id' => $hiddenStaff->id,
+        ]);
     }
 
     /**

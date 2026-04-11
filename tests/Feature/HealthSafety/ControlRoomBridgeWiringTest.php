@@ -8,6 +8,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\FleetIncident;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
@@ -35,6 +36,34 @@ class ControlRoomBridgeWiringTest extends TestCase
             'severity' => 'high',
             'client_id' => $incident->client_id,
         ]);
+    }
+
+    public function test_incident_alert_carries_site_and_shift_context_for_control_room_triage(): void
+    {
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $shift = Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'status' => 'scheduled',
+        ]);
+
+        $incident = ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'shift_id' => $shift->id,
+            'severity' => 'high',
+            'status' => 'submitted',
+        ]);
+
+        $alert = ControlRoomAlert::query()
+            ->where('source', 'incident')
+            ->where('client_id', $incident->client_id)
+            ->first();
+
+        $this->assertNotNull($alert);
+        $this->assertSame($site->id, $alert->site_id);
+        $this->assertSame($shift->id, data_get($alert->context, 'shift_id'));
+        $this->assertSame($site->id, data_get($alert->context, 'site_id'));
     }
 
     public function test_low_severity_incident_does_not_create_alert(): void
@@ -87,7 +116,8 @@ class ControlRoomBridgeWiringTest extends TestCase
         $incident->update(['severity' => 'high']);
 
         $this->assertDatabaseHas('control_room_alerts', [
-            'source' => 'incident',
+            'source' => 'operations',
+            'alert_type' => 'operations.client_incident_escalation',
             'severity' => 'high',
         ]);
     }

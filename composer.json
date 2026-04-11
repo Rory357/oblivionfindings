@@ -71,6 +71,9 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
+        "test:prepare": [
+            "@php artisan testing:prepare-schema --env=testing"
+        ],
         "test:unit": [
             "@php artisan test --testsuite=Unit"
         ],
@@ -79,6 +82,9 @@
         ],
         "test:feature": [
             "@php artisan test --testsuite=Feature"
+        ],
+        "rbac:sync": [
+            "@php artisan rbac:sync --force"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

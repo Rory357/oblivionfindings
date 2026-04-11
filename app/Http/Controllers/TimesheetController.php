@@ -23,7 +23,7 @@ class TimesheetController extends Controller
     public function approvals(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($this->canReviewTimesheets($auth), 403);
 
         $pending = Timesheet::query()
             ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
@@ -42,7 +42,7 @@ class TimesheetController extends Controller
     public function bulkApprove(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($this->canReviewTimesheets($auth), 403);
 
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -115,7 +115,7 @@ class TimesheetController extends Controller
     public function bulkReturnForChanges(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($this->canReviewTimesheets($auth), 403);
 
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -158,7 +158,7 @@ class TimesheetController extends Controller
     public function bulkReject(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($this->canReviewTimesheets($auth), 403);
 
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -198,9 +198,9 @@ class TimesheetController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
+        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned') || $auth->canDo('hr.time.viewAny')), 403);
 
-        $canApprove = $auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny');
+        $canApprove = $this->canReviewTimesheets($auth);
         $approvalMode = $request->query('mode') === 'approvals' && $canApprove;
 
         $status = $approvalMode ? 'submitted' : $request->query('status');
@@ -220,7 +220,7 @@ class TimesheetController extends Controller
 
         $this->siteAccess()->applyTimesheetScope($q, $auth, $this->timesheetBypassPermissions());
 
-        if (!$auth->canDo('timesheets.manageAny') && !$approvalMode) {
+        if (! $auth->canDo('timesheets.manageAny') && ! $approvalMode) {
             $q->where('user_id', $auth->id);
         }
 
@@ -290,7 +290,7 @@ class TimesheetController extends Controller
                 'You are not authorized to create timesheets for that site.',
             );
             // Staff can only create timesheet from their own shift unless manageAny
-            if (!$auth->canDo('timesheets.manageAny') && $shift->user_id !== $auth->id) {
+            if (! $auth->canDo('timesheets.manageAny') && $shift->user_id !== $auth->id) {
                 abort(403);
             }
         }
@@ -346,7 +346,7 @@ class TimesheetController extends Controller
                 $this->timesheetBypassPermissions(),
                 'You are not authorized to create timesheets for that site.',
             );
-            if (!$auth->canDo('timesheets.manageAny') && $linkedShift->user_id !== $auth->id) {
+            if (! $auth->canDo('timesheets.manageAny') && $linkedShift->user_id !== $auth->id) {
                 abort(403);
             }
             $userId = $linkedShift->user_id;
@@ -428,9 +428,9 @@ class TimesheetController extends Controller
     public function edit(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
+        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned') || $auth->canDo('hr.time.viewAny')), 403);
 
-        if (!$auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
+        if (! $auth->canDo('timesheets.manageAny') && ! $this->canReviewTimesheets($auth) && $timesheet->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -452,7 +452,7 @@ class TimesheetController extends Controller
         return inertia('operations/timesheets/edit', [
             'timesheet' => $timesheet,
             'clients' => $clients,
-            'canApprove' => $auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny'),
+            'canApprove' => $this->canReviewTimesheets($auth),
             'canSubmit' => $auth->canDo('timesheets.submit') && ($auth->canDo('timesheets.manageAny') || $timesheet->user_id === $auth->id),
             'canEdit' => $auth->canDo('timesheets.update')
                 && ($auth->canDo('timesheets.manageAny') || $timesheet->user_id === $auth->id)
@@ -466,14 +466,14 @@ class TimesheetController extends Controller
         abort_unless($auth && $auth->canDo('timesheets.update'), 403);
 
         // Ownership check
-        if (!$auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
+        if (! $auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
             abort(403);
         }
 
         $this->assertCanAccessTimesheet($auth, $timesheet);
 
         // Only editable while draft/returned (audit safety)
-        if (!in_array($timesheet->status, ['draft', 'returned'], true)) {
+        if (! in_array($timesheet->status, ['draft', 'returned'], true)) {
             return back()->with('error', 'Only draft or returned timesheets can be edited.');
         }
 
@@ -555,7 +555,7 @@ class TimesheetController extends Controller
         abort_unless($auth && $auth->canDo('timesheets.submit'), 403);
 
         // Ownership check
-        if (!$auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
+        if (! $auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -608,45 +608,49 @@ class TimesheetController extends Controller
     public function approve(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($this->canReviewTimesheets($auth), 403);
         $this->assertCanAccessTimesheet($auth, $timesheet);
 
         $data = $request->validate([
             'decision_notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $result = DB::transaction(function () use ($timesheet, $auth, $data) {
-            $locked = Timesheet::query()
-                ->lockForUpdate()
-                ->findOrFail($timesheet->id);
+        try {
+            $result = DB::transaction(function () use ($timesheet, $auth, $data) {
+                $locked = Timesheet::query()
+                    ->lockForUpdate()
+                    ->findOrFail($timesheet->id);
 
-            if ($locked->status === 'approved') {
+                if ($locked->status === 'approved') {
+                    return [
+                        'timesheet' => $locked->fresh(['shift.client']) ?? $locked,
+                        'approved_now' => false,
+                    ];
+                }
+
+                if ($locked->status !== 'submitted') {
+                    throw ValidationException::withMessages([
+                        'timesheet' => 'Only submitted timesheets can be approved.',
+                    ]);
+                }
+
+                $this->assertApprovalAllowed($locked, $auth);
+
+                $locked->status = 'approved';
+                $locked->approved_by = $auth->id;
+                $locked->approved_at = now();
+                $locked->decision_notes = $data['decision_notes'] ?? null;
+                $locked->save();
+                $this->syncApprovedTimesheet($locked);
+
                 return [
                     'timesheet' => $locked->fresh(['shift.client']) ?? $locked,
-                    'approved_now' => false,
+                    'approved_now' => true,
                 ];
-            }
-
-            if ($locked->status !== 'submitted') {
-                throw ValidationException::withMessages([
-                    'timesheet' => 'Only submitted timesheets can be approved.',
-                ]);
-            }
-
-            $this->assertApprovalAllowed($locked, $auth);
-
-            $locked->status = 'approved';
-            $locked->approved_by = $auth->id;
-            $locked->approved_at = now();
-            $locked->decision_notes = $data['decision_notes'] ?? null;
-            $locked->save();
-            $this->syncApprovedTimesheet($locked);
-
-            return [
-                'timesheet' => $locked->fresh(['shift.client']) ?? $locked,
-                'approved_now' => true,
-            ];
-        });
+            });
+        } catch (ValidationException $exception) {
+            return back()->withErrors($exception->errors());
+        }
 
         /** @var \App\Models\Timesheet $approvedTimesheet */
         $approvedTimesheet = $result['timesheet'];
@@ -669,7 +673,7 @@ class TimesheetController extends Controller
     public function reject(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($this->canReviewTimesheets($auth), 403);
         abort_unless($timesheet->status === 'submitted', 403);
         $this->assertCanAccessTimesheet($auth, $timesheet);
 
@@ -683,7 +687,7 @@ class TimesheetController extends Controller
         ]);
 
         $decisionNotes = $data['decision_notes'] ?? $data['rejection_reason'] ?? null;
-        if (!$decisionNotes) {
+        if (! $decisionNotes) {
             return back()->withErrors(['decision_notes' => 'Decision notes are required.']);
         }
 
@@ -708,7 +712,7 @@ class TimesheetController extends Controller
     public function returnForChanges(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($this->canReviewTimesheets($auth), 403);
         abort_unless($timesheet->status === 'submitted', 403);
         $this->assertCanAccessTimesheet($auth, $timesheet);
 
@@ -722,7 +726,7 @@ class TimesheetController extends Controller
         ]);
 
         $returnedNotes = $data['returned_notes'] ?? $data['return_reason'] ?? null;
-        if (!$returnedNotes) {
+        if (! $returnedNotes) {
             return back()->withErrors(['returned_notes' => 'Returned notes are required.']);
         }
 
@@ -753,7 +757,7 @@ class TimesheetController extends Controller
      */
     protected function isLockedByPayroll(Timesheet $timesheet): bool
     {
-        if (!$timesheet->work_date) {
+        if (! $timesheet->work_date) {
             return false;
         }
 
@@ -913,6 +917,18 @@ class TimesheetController extends Controller
         app(TimesheetReconciliationService::class)->assertWorkflowAllowed($timesheet, 'approved');
     }
 
+    protected function canReviewTimesheets(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $user->canDo('timesheets.approve')
+            || $user->canDo('timesheets.manageAny')
+            || $user->canDo('hr.time.manage')
+            || $user->canDo('hr.time.approveTeam');
+    }
+
     protected function siteAccess(): UserSiteAccessService
     {
         return app(UserSiteAccessService::class);
@@ -923,7 +939,7 @@ class TimesheetController extends Controller
      */
     protected function timesheetBypassPermissions(): array
     {
-        return ['timesheets.manageAny', 'shifts.manageAny', 'reports.viewAny'];
+        return ['reports.viewAny'];
     }
 
     protected function assertCanAccessTimesheet(User $auth, Timesheet $timesheet): void

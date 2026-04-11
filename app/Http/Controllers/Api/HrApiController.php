@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
@@ -10,13 +9,14 @@ use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class HrApiController extends Controller
 {
     /* ------------------------------------------------------------------ */
-    /*  Employees                                                          */
+    /*  Employees */
     /* ------------------------------------------------------------------ */
 
     public function employees(Request $request): JsonResponse
@@ -27,8 +27,7 @@ class HrApiController extends Controller
         $employees = HrEmployeeProfile::forTenant($user->tenant_id)
             ->with(['user:id,name,email', 'primarySite:id,name'])
             ->when($request->query('active'), fn ($q) => $q->where('is_active', true))
-            ->when($request->query('q'), fn ($q, $search) => $q->whereHas('user', fn ($u) =>
-                $u->where('name', 'like', "%{$search}%")
+            ->when($request->query('q'), fn ($q, $search) => $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
             ))
             ->orderBy('employee_number')
             ->paginate($request->integer('per_page', 25));
@@ -49,7 +48,7 @@ class HrApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Leave                                                              */
+    /*  Leave */
     /* ------------------------------------------------------------------ */
 
     public function leaveRequests(Request $request): JsonResponse
@@ -81,7 +80,7 @@ class HrApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Positions                                                          */
+    /*  Positions */
     /* ------------------------------------------------------------------ */
 
     public function positions(Request $request): JsonResponse
@@ -98,7 +97,7 @@ class HrApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Compliance                                                         */
+    /*  Compliance */
     /* ------------------------------------------------------------------ */
 
     public function complianceStatus(Request $request): JsonResponse
@@ -115,13 +114,13 @@ class HrApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Time Entries                                                        */
+    /*  Time Entries */
     /* ------------------------------------------------------------------ */
 
     public function timeEntries(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user?->canDo('hr.time.view'), 403);
+        abort_unless($user?->canDo('hr.time.viewAny'), 403);
 
         $entries = HrTimeEntry::forTenant($user->tenant_id)
             ->with(['user:id,name,email'])
@@ -135,7 +134,7 @@ class HrApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Payroll Runs                                                        */
+    /*  Payroll Runs */
     /* ------------------------------------------------------------------ */
 
     public function payrollRuns(Request $request): JsonResponse

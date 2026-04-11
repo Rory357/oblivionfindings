@@ -14,8 +14,7 @@ class ShiftReportController extends Controller
 {
     public function __construct(
         protected ShiftReportingService $reporting,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -37,7 +36,7 @@ class ShiftReportController extends Controller
         ];
 
         $siteAccess = app(UserSiteAccessService::class);
-        $bypassPermissions = ['reports.viewAny', 'shifts.manageAny', 'timesheets.manageAny'];
+        $bypassPermissions = ['reports.viewAny'];
 
         if (! empty($normalizedFilters['site_id'])) {
             $siteAccess->assertCanAccessSiteId(
@@ -101,7 +100,7 @@ class ShiftReportController extends Controller
         ]);
 
         $siteAccess = app(UserSiteAccessService::class);
-        $bypassPermissions = ['reports.viewAny', 'shifts.manageAny', 'timesheets.manageAny'];
+        $bypassPermissions = ['reports.viewAny'];
 
         if (! empty($filters['site_id'])) {
             $siteAccess->assertCanAccessSiteId(

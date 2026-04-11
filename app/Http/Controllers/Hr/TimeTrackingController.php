@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Models\HrTimesheet;
+use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\BulkTimesheetActionRequest;
 use App\Http\Requests\Hr\ClockOnBehalfRequest;
 use App\Http\Requests\Hr\StoreTimesheetRequest;
 use App\Http\Requests\Hr\UpdateTimeEntryRequest;
-use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Hr\Models\HrTimeEntry;
-use App\Domain\Hr\Models\HrTimesheet;
-use App\Domain\Hr\Services\TimeTrackingService;
-use App\Models\Shift;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -23,7 +21,7 @@ class TimeTrackingController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     private function resolveAccess($user): array
@@ -52,11 +50,12 @@ class TimeTrackingController extends Controller
         if ($access['canApproveTeam']) {
             return $query->forUserOrTeam($user->id, $access['teamUserIds']);
         }
+
         return $query->forUser($user->id);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Index — time tracking dashboard                                    */
+    /*  Index — time tracking dashboard */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -147,8 +146,7 @@ class TimeTrackingController extends Controller
         $entries = (clone $entriesBaseQuery)
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($payType, fn ($q) => $q->where('pay_type', $payType))
-            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
-                $u->where('name', 'like', "%{$search}%")
+            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
             ))
             ->with('user:id,name,email', 'approver:id,name', 'shift:id,starts_at,ends_at', 'shift.client:id,first_name,last_name', 'client:id,first_name,last_name')
             ->orderByDesc('entry_date')
@@ -180,9 +178,9 @@ class TimeTrackingController extends Controller
             'amended_by' => $entry->amended_by,
             'amendment_reason' => $entry->amendment_reason,
             'client_name' => $entry->client
-                ? trim(($entry->client->first_name ?? '') . ' ' . ($entry->client->last_name ?? ''))
+                ? trim(($entry->client->first_name ?? '').' '.($entry->client->last_name ?? ''))
                 : ($entry->shift?->client
-                    ? trim(($entry->shift->client->first_name ?? '') . ' ' . ($entry->shift->client->last_name ?? ''))
+                    ? trim(($entry->shift->client->first_name ?? '').' '.($entry->shift->client->last_name ?? ''))
                     : null),
             'shift' => $entry->shift ? [
                 'id' => $entry->shift->id,
@@ -308,13 +306,13 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Clock In                                                           */
+    /*  Clock In */
     /* ------------------------------------------------------------------ */
 
     public function clockIn(Request $request)
     {
         $user = $request->user();
-        abort_unless($user, 403);
+        abort_unless($user && $user->canDo('hr.time.viewAny'), 403);
 
         $validated = $request->validate([
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
@@ -337,13 +335,13 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Clock Out                                                          */
+    /*  Clock Out */
     /* ------------------------------------------------------------------ */
 
     public function clockOut(Request $request)
     {
         $user = $request->user();
-        abort_unless($user, 403);
+        abort_unless($user && $user->canDo('hr.time.viewAny'), 403);
 
         $validated = $request->validate([
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
@@ -366,7 +364,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Clock On Behalf                                                    */
+    /*  Clock On Behalf */
     /* ------------------------------------------------------------------ */
 
     public function clockOnBehalf(ClockOnBehalfRequest $request)
@@ -384,7 +382,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Store — manual time entry                                          */
+    /*  Store — manual time entry */
     /* ------------------------------------------------------------------ */
 
     public function store(StoreTimesheetRequest $request)
@@ -398,7 +396,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Update — edit/amend time entry                                     */
+    /*  Update — edit/amend time entry */
     /* ------------------------------------------------------------------ */
 
     public function updateEntry(UpdateTimeEntryRequest $request, HrTimeEntry $entry)
@@ -418,7 +416,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Entry Amendments — audit trail                                     */
+    /*  Entry Amendments — audit trail */
     /* ------------------------------------------------------------------ */
 
     public function entryAmendments(HrTimeEntry $entry)
@@ -441,17 +439,19 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Timesheets                                                         */
+    /*  Timesheets */
     /* ------------------------------------------------------------------ */
 
     public function timesheets(Request $request)
     {
+        abort_unless($request->user()?->canDo('hr.time.viewAny'), 403);
+
         // Redirect to main page with timesheets tab
         return redirect()->route('hr.time.index', ['tab' => 'timesheets']);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Submit Timesheet                                                   */
+    /*  Submit Timesheet */
     /* ------------------------------------------------------------------ */
 
     public function submitTimesheet(Request $request, HrTimesheet $timesheet)
@@ -469,7 +469,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Approve Timesheet                                                  */
+    /*  Approve Timesheet */
     /* ------------------------------------------------------------------ */
 
     public function approveTimesheet(Request $request, HrTimesheet $timesheet)
@@ -487,7 +487,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Reject Timesheet                                                   */
+    /*  Reject Timesheet */
     /* ------------------------------------------------------------------ */
 
     public function rejectTimesheet(Request $request, HrTimesheet $timesheet)
@@ -513,7 +513,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Return Timesheet for Changes                                       */
+    /*  Return Timesheet for Changes */
     /* ------------------------------------------------------------------ */
 
     public function returnTimesheet(Request $request, HrTimesheet $timesheet)
@@ -535,7 +535,7 @@ class TimeTrackingController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Bulk Timesheet Actions                                             */
+    /*  Bulk Timesheet Actions */
     /* ------------------------------------------------------------------ */
 
     public function bulkApproveTimesheets(BulkTimesheetActionRequest $request)

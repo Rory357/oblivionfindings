@@ -1,28 +1,28 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ControlRoom\ControlRoomDashboardController;
-use App\Http\Controllers\ControlRoom\ControlRoomAlertController;
-use App\Http\Controllers\ControlRoom\ControlRoomMapController;
-use App\Http\Controllers\ControlRoom\ControlRoomReportController;
-use App\Http\Controllers\ControlRoom\ControlRoomEscalationController;
-use App\Http\Controllers\ControlRoom\ControlRoomIncidentController;
-use App\Http\Controllers\ControlRoom\ControlRoomShiftController;
-use App\Http\Controllers\ControlRoom\ControlRoomStatsController;
-use App\Http\Controllers\ControlRoom\ControlRoomBroadcastController;
-use App\Http\Controllers\ControlRoom\ControlRoomMessagingController;
-use App\Http\Controllers\ControlRoom\ControlRoomEvidenceController;
-use App\Http\Controllers\ControlRoom\ControlRoomSettingsController;
-use App\Http\Controllers\ControlRoom\ControlRoomSlaController;
-use App\Http\Controllers\ControlRoom\ControlRoomPlaybookController;
 use App\Http\Controllers\ControlRoom\AlertController as IntegrationAlertController;
-use App\Http\Controllers\ControlRoom\ControlRoomHandoverController;
+use App\Http\Controllers\ControlRoom\ControlRoomAlertController;
+use App\Http\Controllers\ControlRoom\ControlRoomBroadcastController;
+use App\Http\Controllers\ControlRoom\ControlRoomDashboardController;
 use App\Http\Controllers\ControlRoom\ControlRoomDeviceController;
-use App\Http\Controllers\ControlRoom\ControlRoomMyTasksController;
-use App\Http\Controllers\ControlRoom\ControlRoomTaskController;
 use App\Http\Controllers\ControlRoom\ControlRoomDiscussionController;
-use App\Http\Controllers\ControlRoom\ControlRoomWatcherController;
+use App\Http\Controllers\ControlRoom\ControlRoomEscalationController;
+use App\Http\Controllers\ControlRoom\ControlRoomEvidenceController;
+use App\Http\Controllers\ControlRoom\ControlRoomHandoverController;
+use App\Http\Controllers\ControlRoom\ControlRoomIncidentController;
+use App\Http\Controllers\ControlRoom\ControlRoomMapController;
+use App\Http\Controllers\ControlRoom\ControlRoomMessagingController;
+use App\Http\Controllers\ControlRoom\ControlRoomMyTasksController;
+use App\Http\Controllers\ControlRoom\ControlRoomPlaybookController;
+use App\Http\Controllers\ControlRoom\ControlRoomReportController;
+use App\Http\Controllers\ControlRoom\ControlRoomSettingsController;
+use App\Http\Controllers\ControlRoom\ControlRoomShiftController;
+use App\Http\Controllers\ControlRoom\ControlRoomSlaController;
+use App\Http\Controllers\ControlRoom\ControlRoomStatsController;
+use App\Http\Controllers\ControlRoom\ControlRoomTaskController;
 use App\Http\Controllers\ControlRoom\ControlRoomTimeEntryController;
+use App\Http\Controllers\ControlRoom\ControlRoomWatcherController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Control Room Routes
@@ -61,6 +61,9 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('alert')
             ->name('control-room.alerts.show');
 
+    });
+
+    Route::middleware('permission:controlRoom.reports.view')->group(function () {
         // Reports — main dashboard and individual metric endpoints
         Route::get('/control-room/reports', [ControlRoomReportController::class, 'index'])
             ->name('control-room.reports.index');

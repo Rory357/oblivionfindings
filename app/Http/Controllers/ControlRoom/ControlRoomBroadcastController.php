@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\Communication;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -20,10 +21,13 @@ class ControlRoomBroadcastController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->alertBypassPermissions();
 
         $broadcastGroups = Communication::query()
             ->where('purpose', 'broadcast')
             ->whereNotNull('broadcast_group_id')
+            ->whereHas('targetUser', fn ($targetUserQuery) => $siteAccess->applyStaffScope($targetUserQuery, $user, $bypassPermissions))
             ->selectRaw('
                 broadcast_group_id,
                 MIN(content) as content,
@@ -71,11 +75,14 @@ class ControlRoomBroadcastController extends Controller
         $roleCounts = [];
         foreach ($roles as $role) {
             $roleCounts[$role] = User::staff()
+                ->tap(fn ($staffQuery) => $siteAccess->applyStaffScope($staffQuery, $user, $bypassPermissions))
                 ->whereHas('roles', fn ($q) => $q->where('name', $role))
                 ->count();
         }
 
-        $totalStaff = User::staff()->count();
+        $totalStaff = User::staff()
+            ->tap(fn ($staffQuery) => $siteAccess->applyStaffScope($staffQuery, $user, $bypassPermissions))
+            ->count();
 
         return Inertia::render('control-room/broadcast', [
             'broadcasts' => $broadcastData,
@@ -111,12 +118,13 @@ class ControlRoomBroadcastController extends Controller
 
         // Resolve target users
         $usersQuery = User::staff();
+        app(UserSiteAccessService::class)->applyStaffScope($usersQuery, $user, $this->alertBypassPermissions());
 
-        if (!$sendToAll && !empty($targetRoles)) {
+        if (! $sendToAll && ! empty($targetRoles)) {
             $usersQuery->whereHas('roles', fn ($q) => $q->whereIn('name', $targetRoles));
         }
 
-        $targetUsers = $usersQuery->select('id', 'name', 'email', 'phone')->get();
+        $targetUsers = $usersQuery->select('id', 'name', 'email', 'cellphone', 'work_phone')->get();
 
         if ($targetUsers->isEmpty()) {
             return redirect()->route('control-room.broadcast.index')
@@ -139,7 +147,9 @@ class ControlRoomBroadcastController extends Controller
                     'purpose' => 'broadcast',
                     'target_user_id' => $targetUser->id,
                     'target_email' => $channel === 'email' ? $targetUser->email : null,
-                    'target_phone' => $channel === 'sms' ? $targetUser->phone : null,
+                    'target_phone' => $channel === 'sms'
+                        ? ($targetUser->cellphone ?: $targetUser->work_phone)
+                        : null,
                     'content' => $validated['content'],
                     'template_used' => $validated['template'] ?? null,
                     'status' => 'pending',
@@ -166,7 +176,7 @@ class ControlRoomBroadcastController extends Controller
         ]);
 
         return redirect()->route('control-room.broadcast.index')
-            ->with('success', "Broadcast sent to {$targetUsers->count()} recipients via " . count($channels) . ' channel(s).');
+            ->with('success', "Broadcast sent to {$targetUsers->count()} recipients via ".count($channels).' channel(s).');
     }
 
     /**
@@ -176,10 +186,12 @@ class ControlRoomBroadcastController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $siteAccess = app(UserSiteAccessService::class);
 
         $communications = Communication::query()
             ->where('purpose', 'broadcast')
             ->where('broadcast_group_id', $groupId)
+            ->whereHas('targetUser', fn ($targetUserQuery) => $siteAccess->applyStaffScope($targetUserQuery, $user, $this->alertBypassPermissions()))
             ->with('targetUser:id,name,email')
             ->orderBy('channel')
             ->orderBy('status')
@@ -222,5 +234,10 @@ class ControlRoomBroadcastController extends Controller
             'summary' => $summary,
             'recipients' => $recipients,
         ]);
+    }
+
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }

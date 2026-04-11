@@ -20,10 +20,9 @@ class SeedHrPermissionsSeeder extends Seeder
             'hr.positions.manage' => 'Create and edit positions',
 
             // Time Tracking
-            'hr.time.view' => 'View time tracking',
-            'hr.time.viewAny' => 'View all time entries',
-            'hr.time.manage' => 'Manage time entries',
-            'hr.time.approve' => 'Approve/reject timesheets',
+            'hr.time.viewAny' => 'View the HR time dashboard and time entries',
+            'hr.time.manage' => 'Manage all HR time entries and timesheets',
+            'hr.time.approveTeam' => 'Approve or return team HR timesheets',
 
             // Compensation
             'hr.compensation.view' => 'View compensation data',
@@ -109,14 +108,14 @@ class SeedHrPermissionsSeeder extends Seeder
         if ($adminRole) {
             $existing = $adminRole->permissions()->pluck('permissions.id')->all();
             $toAttach = array_diff($createdIds, $existing);
-            if (!empty($toAttach)) {
+            if (! empty($toAttach)) {
                 $adminRole->permissions()->attach($toAttach);
             }
-            $this->command->info('Attached ' . count($toAttach) . ' new permissions to admin role.');
+            $this->command->info('Attached '.count($toAttach).' new permissions to admin role.');
         } else {
             $this->command->warn('No admin role found. Permissions created but not assigned.');
         }
 
-        $this->command->info('Seeded ' . count($permissions) . ' HR permissions.');
+        $this->command->info('Seeded '.count($permissions).' HR permissions.');
     }
 }

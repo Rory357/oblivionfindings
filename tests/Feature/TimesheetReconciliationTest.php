@@ -235,13 +235,19 @@ class TimesheetReconciliationTest extends TestCase
             'starts_at' => now()->setTime(9, 0),
             'ends_at' => now()->setTime(17, 0),
             'break_minutes' => 0,
+            'status' => 'draft',
+            'created_by' => $this->staff->id,
+        ]);
+
+        $timesheet->forceFill([
             'status' => 'approved',
             'submitted_at' => now()->subHour(),
             'submitted_by' => $this->staff->id,
             'approved_at' => now(),
             'approved_by' => $this->admin->id,
-            'created_by' => $this->staff->id,
-        ]);
+        ])->saveQuietly();
+
+        $timesheet->refresh();
 
         $original = $timesheet->only([
             'starts_at',

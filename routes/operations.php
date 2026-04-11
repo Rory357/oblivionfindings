@@ -1,67 +1,65 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\BreakGlassController;
 // Existing controllers (root namespace)
-use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
-use App\Http\Controllers\ClientNoteController;
-use App\Http\Controllers\ClientMedicalController;
+use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientDocumentController;
+use App\Http\Controllers\ClientIncidentController;
+use App\Http\Controllers\ClientMarController;
+use App\Http\Controllers\ClientMedicalController;
+use App\Http\Controllers\ClientNoteController;
+use App\Http\Controllers\ClientOnboardingController;
+use App\Http\Controllers\ClientPersonalAssetController;
 use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
-use App\Http\Controllers\ClientOnboardingController;
-use App\Http\Controllers\ClientSupportPlanController;
-use App\Http\Controllers\ClientAssessmentController;
-use App\Http\Controllers\ClientMarController;
-use App\Http\Controllers\MedicationAdministrationCorrectionController;
-use App\Http\Controllers\BreakGlassController;
-use App\Http\Controllers\ClientIncidentController;
 use App\Http\Controllers\ClientRiskController;
+use App\Http\Controllers\ClientSupportPlanController;
+use App\Http\Controllers\MedicationAdministrationCorrectionController;
+use App\Http\Controllers\Operations\ActivityFeedController;
+use App\Http\Controllers\Operations\AvailabilityController;
+use App\Http\Controllers\Operations\BillingController;
+use App\Http\Controllers\Operations\CalendarSyncController;
+use App\Http\Controllers\Operations\CareNoteTemplateController;
+// New Operations controllers
+use App\Http\Controllers\Operations\CarePlanController;
+use App\Http\Controllers\Operations\CarePlanGoalController;
+use App\Http\Controllers\Operations\ClientConsentController;
+use App\Http\Controllers\Operations\ClientFundController;
+use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
+use App\Http\Controllers\Operations\CustomFormController;
+use App\Http\Controllers\Operations\DashboardController;
+use App\Http\Controllers\Operations\EvvController;
+use App\Http\Controllers\Operations\FamilyPortalController;
+use App\Http\Controllers\Operations\FundingClaimController;
+use App\Http\Controllers\Operations\FundingController;
+use App\Http\Controllers\Operations\GeofenceController;
+use App\Http\Controllers\Operations\HandoverController;
+use App\Http\Controllers\Operations\InvoiceController;
+use App\Http\Controllers\Operations\JobBoardController;
+use App\Http\Controllers\Operations\MessageController;
+use App\Http\Controllers\Operations\MileageClaimController;
+use App\Http\Controllers\Operations\OpsNotificationController;
+use App\Http\Controllers\Operations\PayrollExportController;
+use App\Http\Controllers\Operations\PriceBookController;
+use App\Http\Controllers\Operations\ProgressNoteController;
+use App\Http\Controllers\Operations\QualificationMatchController;
+use App\Http\Controllers\Operations\QuoteController;
+use App\Http\Controllers\Operations\RecurringChargeController;
+use App\Http\Controllers\Operations\ReportController;
+use App\Http\Controllers\Operations\RosterTemplateController;
+use App\Http\Controllers\Operations\ServiceAgreementController;
+use App\Http\Controllers\Operations\ShiftNoteController;
+use App\Http\Controllers\Operations\ShiftReportController;
+use App\Http\Controllers\RosteringController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
 use App\Http\Controllers\ShiftTaskController;
-use App\Http\Controllers\TimesheetController;
-use App\Http\Controllers\RosteringController;
-
-// New Operations controllers
-use App\Http\Controllers\Operations\DashboardController;
-use App\Http\Controllers\Operations\ActivityFeedController;
-use App\Http\Controllers\Operations\CarePlanController;
-use App\Http\Controllers\Operations\CarePlanGoalController;
-use App\Http\Controllers\Operations\ProgressNoteController;
-use App\Http\Controllers\Operations\ServiceAgreementController;
-use App\Http\Controllers\Operations\ShiftNoteController;
-use App\Http\Controllers\Operations\HandoverController;
-use App\Http\Controllers\Operations\RosterTemplateController;
-use App\Http\Controllers\Operations\AvailabilityController;
-use App\Http\Controllers\Operations\BillingController;
-use App\Http\Controllers\Operations\InvoiceController;
-use App\Http\Controllers\Operations\FundingController;
-use App\Http\Controllers\Operations\FundingClaimController;
-use App\Http\Controllers\Operations\MessageController;
-use App\Http\Controllers\Operations\ReportController;
-use App\Http\Controllers\Operations\ShiftReportController;
-use App\Http\Controllers\Operations\PriceBookController;
-use App\Http\Controllers\Operations\QuoteController;
-use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
-use App\Http\Controllers\Operations\ClientFundController;
-use App\Http\Controllers\Operations\JobBoardController;
-use App\Http\Controllers\Operations\CustomFormController;
-use App\Http\Controllers\Operations\EvvController;
-use App\Http\Controllers\Operations\FamilyPortalController;
-use App\Http\Controllers\Operations\MileageClaimController;
-use App\Http\Controllers\Operations\RecurringChargeController;
-use App\Http\Controllers\Operations\QualificationMatchController;
-use App\Http\Controllers\Operations\OpsNotificationController;
-use App\Http\Controllers\Operations\CareNoteTemplateController;
-use App\Http\Controllers\Operations\PayrollExportController;
-use App\Http\Controllers\Operations\CalendarSyncController;
-use App\Http\Controllers\Operations\GeofenceController;
-use App\Http\Controllers\Operations\ClientConsentController;
-use App\Http\Controllers\ClientPersonalAssetController;
-use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\SummaryController;
+use App\Http\Controllers\TimelineController;
+use App\Http\Controllers\TimesheetController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Operations Module Routes
@@ -69,7 +67,6 @@ use App\Http\Controllers\SummaryController;
  * Centralises client management, shifts, rostering, timesheets,
  * care plans, billing, invoicing, funding, and messaging.
  */
-
 Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // -------------------------------------------------------------------------
@@ -565,11 +562,11 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
 
     Route::get('/timesheets', [TimesheetController::class, 'index'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
         ->name('operations.timesheets.index');
 
     // Manager/Admin approval queue
-    Route::middleware('permission:timesheets.approve|timesheets.manageAny')->group(function () {
+    Route::middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')->group(function () {
         Route::get('/timesheets/approvals', [TimesheetController::class, 'approvals'])->name('operations.timesheets.approvals');
         Route::get('/timesheets/payroll-adjustments', [TimesheetController::class, 'payrollAdjustmentsPending'])->name('operations.timesheets.payrollAdjustments');
         Route::post('/timesheets/amendments/{amendment}/mark-processed', [TimesheetController::class, 'markPayrollAdjustmentProcessed'])->name('operations.timesheets.markPayrollProcessed');
@@ -588,10 +585,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // Timesheet viewing and editing
     Route::get('/timesheets/{timesheet}', [TimesheetController::class, 'show'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
         ->name('operations.timesheets.show');
     Route::get('/timesheets/{timesheet}/edit', [TimesheetController::class, 'edit'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
         ->name('operations.timesheets.edit');
     Route::put('/timesheets/{timesheet}', [TimesheetController::class, 'update'])
         ->middleware('permission:timesheets.update')
@@ -602,13 +599,13 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:timesheets.submit|timesheets.manageAny')
         ->name('operations.timesheets.submit');
     Route::post('/timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('operations.timesheets.approve');
     Route::post('/timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('operations.timesheets.reject');
     Route::post('/timesheets/{timesheet}/return', [TimesheetController::class, 'returnForChanges'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('operations.timesheets.return');
 
     // -------------------------------------------------------------------------

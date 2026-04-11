@@ -2,17 +2,18 @@
 
 namespace App\Services\Operations;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Timesheet;
 use App\Services\ShiftOperationalSnapshotService;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class TimesheetHrSyncService
 {
     public function __construct(
         protected PayrollRateResolver $rateResolver,
         protected ShiftOperationalSnapshotService $snapshots,
-    ) {
-    }
+    ) {}
 
     public function syncToHr(Timesheet $timesheet): void
     {
@@ -20,7 +21,7 @@ class TimesheetHrSyncService
             return;
         }
 
-        if (!Schema::hasTable('hr_time_entries')) {
+        if (! Schema::hasTable('hr_time_entries')) {
             return;
         }
 
@@ -36,6 +37,7 @@ class TimesheetHrSyncService
 
         $rate = $this->rateResolver->resolve($timesheet);
         $hours = $this->calculatePayableHours($timesheet);
+        $tenantId = $this->resolveTenantId($timesheet);
 
         // For HR time entry, use dominant_type when mixed so the entry
         // carries a meaningful single classification alongside the cost.
@@ -49,7 +51,7 @@ class TimesheetHrSyncService
                 'source_id' => $timesheet->id,
             ],
             [
-                'tenant_id' => $timesheet->user?->tenant_id,
+                'tenant_id' => $tenantId,
                 'user_id' => $timesheet->user_id,
                 'shift_id' => $timesheet->shift_id,
                 'client_id' => $timesheet->client_id,
@@ -89,7 +91,7 @@ class TimesheetHrSyncService
 
     protected function calculatePayableHours(Timesheet $timesheet): float
     {
-        if (!$timesheet->starts_at || !$timesheet->ends_at) {
+        if (! $timesheet->starts_at || ! $timesheet->ends_at) {
             return 0;
         }
 
@@ -97,5 +99,20 @@ class TimesheetHrSyncService
         $breakMinutes = $timesheet->break_minutes ?? 0;
 
         return round(($minutes - $breakMinutes) / 60, 2);
+    }
+
+    protected function resolveTenantId(Timesheet $timesheet): int
+    {
+        $tenantId = $timesheet->user?->tenant_id
+            ?? $timesheet->user?->hrEmployeeProfile?->tenant_id
+            ?? HrEmployeeProfile::query()->where('user_id', $timesheet->user_id)->value('tenant_id');
+
+        if (is_numeric($tenantId)) {
+            return (int) $tenantId;
+        }
+
+        throw ValidationException::withMessages([
+            'timesheet' => 'This approved timesheet cannot sync to HR because no tenant context could be resolved for the staff member.',
+        ]);
     }
 }

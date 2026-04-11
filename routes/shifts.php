@@ -1,11 +1,11 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
 use App\Http\Controllers\ShiftTaskController;
 use App\Http\Controllers\TimesheetController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Shift & Timesheet Management Routes
@@ -13,7 +13,6 @@ use App\Http\Controllers\TimesheetController;
  * Handles shift scheduling, recurring shifts, shift tasks,
  * and timesheet workflow.
  */
-
 Route::middleware(['auth'])->group(function () {
     // Shifts
     Route::get('/shifts', [ShiftController::class, 'index'])
@@ -81,21 +80,21 @@ Route::middleware(['auth'])->group(function () {
 
     // Timesheets
     Route::get('/timesheets', [TimesheetController::class, 'index'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
         ->name('timesheets.index');
 
     // Manager/Admin approval queue
     Route::get('/timesheets/approvals', [TimesheetController::class, 'approvals'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('timesheets.approvals');
     Route::post('/timesheets/bulk-approve', [TimesheetController::class, 'bulkApprove'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('timesheets.bulkApprove');
     Route::post('/timesheets/bulk-return', [TimesheetController::class, 'bulkReturnForChanges'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('timesheets.bulkReturn');
     Route::post('/timesheets/bulk-reject', [TimesheetController::class, 'bulkReject'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('timesheets.bulkReject');
 
     // Timesheet creation
@@ -108,10 +107,10 @@ Route::middleware(['auth'])->group(function () {
 
     // Timesheet updates
     Route::get('/timesheets/{timesheet}', [TimesheetController::class, 'show'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
         ->name('timesheets.show');
     Route::get('/timesheets/{timesheet}/edit', [TimesheetController::class, 'edit'])
-        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned|hr.time.viewAny')
         ->name('timesheets.edit');
     Route::put('/timesheets/{timesheet}', [TimesheetController::class, 'update'])
         ->middleware('permission:timesheets.update')
@@ -122,13 +121,13 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:timesheets.submit|timesheets.manageAny')
         ->name('timesheets.submit');
     Route::post('/timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('timesheets.approve');
     Route::post('/timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('timesheets.reject');
     Route::post('/timesheets/{timesheet}/return', [TimesheetController::class, 'returnForChanges'])
-        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')
         ->name('timesheets.return');
 
     // Attendance (clock in/out)

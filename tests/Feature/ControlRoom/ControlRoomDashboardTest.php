@@ -2,8 +2,11 @@
 
 namespace Tests\Feature\ControlRoom;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ControlRoomAlert;
+use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -13,7 +16,9 @@ class ControlRoomDashboardTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $coordinator;
+
     protected User $supportWorker;
 
     protected function setUp(): void
@@ -147,6 +152,73 @@ class ControlRoomDashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('daily_trend', 14)
+            );
+    }
+
+    public function test_dashboard_scopes_alerts_stats_staff_and_sites_for_site_bound_user(): void
+    {
+        $visibleSite = Site::factory()->create(['name' => 'Visible Site', 'type' => 'house']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site', 'type' => 'house']);
+        $visibleOperator = $this->makeRoleUser('coordinator');
+        $hiddenOperator = $this->makeRoleUser('coordinator');
+
+        $this->scopeUserToSite($this->coordinator, $visibleSite);
+        $this->scopeUserToSite($visibleOperator, $visibleSite);
+        $this->scopeUserToSite($hiddenOperator, $hiddenSite);
+
+        $visibleAlert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $visibleSite->id,
+        ]);
+
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => $hiddenSite->id,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get('/control-room')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.total', 1)
+                ->where('alerts.meta.total', 1)
+                ->where('alerts.data.0.id', $visibleAlert->id)
+                ->has('staff', 2)
+                ->has('sites', 1)
+                ->where('sites.0.id', $visibleSite->id)
+            );
+    }
+
+    public function test_manage_any_permissions_do_not_bypass_dashboard_site_scope(): void
+    {
+        $visibleSite = Site::factory()->create(['name' => 'Visible Site', 'type' => 'house']);
+        $hiddenSite = Site::factory()->create(['name' => 'Hidden Site', 'type' => 'house']);
+
+        $this->scopeUserToSite($this->coordinator, $visibleSite);
+
+        $permissionMap = Permission::query()
+            ->whereIn('key', ['shifts.manageAny', 'timesheets.manageAny'])
+            ->pluck('id', 'key');
+
+        $this->coordinator->permissionOverrides()->syncWithoutDetaching([
+            $permissionMap['shifts.manageAny'] => ['allowed' => true],
+            $permissionMap['timesheets.manageAny'] => ['allowed' => true],
+        ]);
+
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => $visibleSite->id,
+        ]);
+
+        ControlRoomAlert::factory()->open()->create([
+            'site_id' => $hiddenSite->id,
+        ]);
+
+        $this->actingAs($this->coordinator)
+            ->get('/control-room')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.total', 1)
+                ->where('alerts.meta.total', 1)
+                ->has('sites', 1)
+                ->where('sites.0.id', $visibleSite->id)
             );
     }
 
@@ -351,5 +423,39 @@ class ControlRoomDashboardTest extends TestCase
                 ->where('alerts.meta.current_page', 2)
                 ->has('alerts.data', 5) // 30 - 25 = 5
             );
+    }
+
+    protected function makeRoleUser(string $roleName): User
+    {
+        $user = User::factory()->create([
+            'role' => $roleName,
+            'approved_at' => now(),
+        ]);
+
+        $role = Role::query()->where('name', $roleName)->first();
+        if ($role) {
+            $user->roles()->syncWithoutDetaching([$role->id]);
+        }
+
+        return $user;
+    }
+
+    protected function scopeUserToSite(User $user, Site $site): void
+    {
+        HrEmployeeProfile::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'tenant_id' => 1,
+                'employee_number' => 'EMP-DASH-'.$user->id,
+                'work_email' => $user->email,
+                'position_title' => 'Control Room',
+                'position_role' => $user->role,
+                'employment_type' => 'full_time',
+                'start_date' => now()->subMonth()->toDateString(),
+                'is_active' => true,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+            ],
+        );
     }
 }

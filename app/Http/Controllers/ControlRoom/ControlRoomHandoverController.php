@@ -7,6 +7,7 @@ use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -20,6 +21,8 @@ class ControlRoomHandoverController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
         abort_unless($shift->status === 'active', 404, 'Only active shifts can be handed over.');
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->alertBypassPermissions();
 
         // Shift data with lead and team
         $shiftLead = $shift->shiftLead;
@@ -47,8 +50,11 @@ class ControlRoomHandoverController extends Controller
         ];
 
         // Open alerts summary
-        $openAlertsCount = ControlRoomAlert::unresolved()->count();
-        $criticalAlerts = ControlRoomAlert::unresolved()
+        $openAlertsBase = ControlRoomAlert::unresolved();
+        $siteAccess->applyAlertScope($openAlertsBase, $user, $bypassPermissions);
+
+        $openAlertsCount = (clone $openAlertsBase)->count();
+        $criticalAlerts = (clone $openAlertsBase)
             ->where('severity', 'critical')
             ->select(['id', 'alert_type', 'severity', 'triggered_at'])
             ->orderByDesc('triggered_at')
@@ -61,7 +67,7 @@ class ControlRoomHandoverController extends Controller
                 'triggered_at' => $a->triggered_at?->toISOString(),
             ])->all();
 
-        $highAlerts = ControlRoomAlert::unresolved()
+        $highAlerts = (clone $openAlertsBase)
             ->where('severity', 'high')
             ->select(['id', 'alert_type', 'severity', 'triggered_at'])
             ->orderByDesc('triggered_at')
@@ -74,8 +80,8 @@ class ControlRoomHandoverController extends Controller
                 'triggered_at' => $a->triggered_at?->toISOString(),
             ])->all();
 
-        $criticalCount = ControlRoomAlert::unresolved()->where('severity', 'critical')->count();
-        $highCount = ControlRoomAlert::unresolved()->where('severity', 'high')->count();
+        $criticalCount = (clone $openAlertsBase)->where('severity', 'critical')->count();
+        $highCount = (clone $openAlertsBase)->where('severity', 'high')->count();
 
         // Pinned operator notes from this shift
         $pinnedNotes = OperatorNote::where('shift_id', $shift->id)
@@ -113,6 +119,7 @@ class ControlRoomHandoverController extends Controller
 
         // Available staff for incoming shift
         $staff = User::staff()
+            ->tap(fn ($staffQuery) => $siteAccess->applyStaffScope($staffQuery, $user, $bypassPermissions))
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get()
@@ -132,5 +139,10 @@ class ControlRoomHandoverController extends Controller
             'followupNotes' => $followupNotes,
             'staff' => $staff,
         ]);
+    }
+
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }

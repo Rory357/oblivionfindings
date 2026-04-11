@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -30,7 +31,7 @@ class AlertController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        abort_unless($user && $user->canDo('controlRoom.alerts.view'), 403);
 
         $query = ControlRoomAlert::with([
             'asset:id,name,asset_tag',
@@ -44,7 +45,7 @@ class AlertController extends Controller
 
         // Site access scoping
         $siteAccess = app(UserSiteAccessService::class);
-        $siteAccess->applyAlertScope($query, $user, ['shifts.manageAny', 'timesheets.manageAny', 'reports.viewAny']);
+        $siteAccess->applyAlertScope($query, $user, ['reports.viewAny']);
 
         // Filters — same set as ControlRoomAlertController
         if ($status = $request->input('status')) {
@@ -73,8 +74,8 @@ class AlertController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('alert_type', 'like', "%{$search}%")
-                  ->orWhere('notes', 'like', "%{$search}%")
-                  ->orWhere('source', 'like', "%{$search}%");
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhere('source', 'like', "%{$search}%");
             });
         }
 
@@ -92,7 +93,7 @@ class AlertController extends Controller
         $allowedSorts = ['triggered_at', 'severity', 'status', 'alert_type'];
         if (in_array($sortField, $allowedSorts, true)) {
             if ($sortField === 'severity') {
-                $query->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low') " . ($sortDir === 'desc' ? 'DESC' : 'ASC'));
+                $query->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low') ".($sortDir === 'desc' ? 'DESC' : 'ASC'));
             } else {
                 $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
             }
@@ -121,7 +122,7 @@ class AlertController extends Controller
                 'name' => $alert->assignedTo->name,
             ] : null,
             'client_name' => $alert->client
-                ? trim($alert->client->first_name . ' ' . $alert->client->last_name)
+                ? trim($alert->client->first_name.' '.$alert->client->last_name)
                 : null,
             'sla_status' => $this->deriveSlaStatus($alert),
             'notes' => $alert->notes ? Str::limit($alert->notes, 120) : null,
@@ -129,7 +130,7 @@ class AlertController extends Controller
 
         // Stats — scoped to integration sources only
         $statsBase = ControlRoomAlert::where('source', 'like', 'integration_%');
-        $siteAccess->applyAlertScope($statsBase, $user, ['shifts.manageAny', 'timesheets.manageAny', 'reports.viewAny']);
+        $siteAccess->applyAlertScope($statsBase, $user, ['reports.viewAny']);
 
         $stats = [
             'total' => (clone $statsBase)->count(),
@@ -139,10 +140,7 @@ class AlertController extends Controller
             'unassigned' => (clone $statsBase)->whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
         ];
 
-        $staff = User::staff()
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+        $staff = $this->assignableStaff($user);
 
         return Inertia::render('control-room/alerts/index', [
             'alerts' => $alerts,
@@ -161,10 +159,18 @@ class AlertController extends Controller
      */
     public function acknowledge(Request $request, ControlRoomAlert $alert)
     {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessIntegrationAlert($user, $alert);
+
+        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_ACK)) {
+            return back()->withErrors(['alert' => "Cannot acknowledge an alert in '{$alert->status}' status."]);
+        }
+
         $alert->update([
             'status' => 'ack',
             'acknowledged_at' => now(),
-            'acknowledged_by_user_id' => auth()->id(),
+            'acknowledged_by_user_id' => $user->id,
         ]);
 
         return redirect()->back();
@@ -175,15 +181,30 @@ class AlertController extends Controller
      */
     public function assign(Request $request, ControlRoomAlert $alert)
     {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
+        $this->assertCanAccessIntegrationAlert($user, $alert);
+
+        if (! $alert->isActionable()) {
+            return back()->withErrors(['alert' => "Cannot assign an alert in '{$alert->status}' status."]);
+        }
+
         $request->validate([
             'user_id' => ['required', 'exists:users,id'],
         ]);
+
+        app(UserSiteAccessService::class)->assertCanAssignControlRoomAlertToUser(
+            $user,
+            (int) $request->integer('user_id'),
+            $this->alertBypassPermissions(),
+            'You are not authorized to assign alerts to that staff member.',
+        );
 
         $alert->update([
             'status' => 'triaging',
             'assigned_to_user_id' => $request->input('user_id'),
             'assigned_at' => now(),
-            'assigned_by_user_id' => auth()->id(),
+            'assigned_by_user_id' => $user->id,
         ]);
 
         return redirect()->back();
@@ -194,6 +215,14 @@ class AlertController extends Controller
      */
     public function close(Request $request, ControlRoomAlert $alert)
     {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessIntegrationAlert($user, $alert);
+
+        if (! $alert->canTransitionTo(ControlRoomAlert::STATUS_RESOLVED)) {
+            return back()->withErrors(['alert' => "Cannot resolve an alert in '{$alert->status}' status."]);
+        }
+
         $request->validate([
             'close_reason' => ['nullable', 'string'],
         ]);
@@ -201,7 +230,7 @@ class AlertController extends Controller
         $alert->update([
             'status' => 'resolved',
             'resolved_at' => now(),
-            'resolved_by_user_id' => auth()->id(),
+            'resolved_by_user_id' => $user->id,
             'resolution_code' => 'closed_via_integration_view',
             'notes' => $request->input('close_reason'),
         ]);
@@ -214,6 +243,10 @@ class AlertController extends Controller
      */
     public function createIncident(Request $request, ControlRoomAlert $alert)
     {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessIntegrationAlert($user, $alert);
+
         return redirect()->back()->with('info', 'Incident linking will be available in a future update');
     }
 
@@ -246,5 +279,39 @@ class AlertController extends Controller
         }
 
         return 'green';
+    }
+
+    protected function assignableStaff(User $user): Collection
+    {
+        if (! $user->canDo('controlRoom.alerts.assign') && ! $user->canDo('controlRoom.alerts.manage')) {
+            return collect();
+        }
+
+        $staffQuery = User::staff()->orderBy('name');
+
+        $siteAccess = app(UserSiteAccessService::class);
+        $siteAccess->applyControlRoomAssigneeScope($staffQuery, $user, $this->alertBypassPermissions());
+
+        return $staffQuery->get(['id', 'name', 'email']);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
+    }
+
+    protected function assertCanAccessIntegrationAlert(User $user, ControlRoomAlert $alert): void
+    {
+        abort_unless(Str::startsWith($alert->source ?? '', 'integration_'), 404);
+
+        app(UserSiteAccessService::class)->assertCanAccessAlert(
+            $user,
+            $alert,
+            $this->alertBypassPermissions(),
+            'You are not authorized to access alerts for this site.',
+        );
     }
 }

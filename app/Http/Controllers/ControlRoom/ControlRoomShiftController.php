@@ -8,6 +8,7 @@ use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -20,6 +21,8 @@ class ControlRoomShiftController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        $siteAccess = app(UserSiteAccessService::class);
+        $bypassPermissions = $this->alertBypassPermissions();
 
         // Current active shift
         $activeShift = Shift::where('status', 'active')
@@ -101,11 +104,16 @@ class ControlRoomShiftController extends Controller
             ->all();
 
         // Current alert counts
-        $openAlertsCount = ControlRoomAlert::unresolved()->count();
-        $criticalAlertsCount = ControlRoomAlert::unresolved()->where('severity', 'critical')->count();
+        $openAlertsBase = ControlRoomAlert::unresolved();
+        $siteAccess->applyAlertScope($openAlertsBase, $user, $bypassPermissions);
+
+        $openAlertsCount = (clone $openAlertsBase)->count();
+        $criticalAlertsCount = (clone $openAlertsBase)->where('severity', 'critical')->count();
 
         // Staff list for selects
-        $staff = User::orderBy('name')
+        $staff = User::staff()
+            ->tap(fn ($staffQuery) => $siteAccess->applyStaffScope($staffQuery, $user, $bypassPermissions))
+            ->orderBy('name')
             ->select('id', 'name')
             ->limit(200)
             ->get()
@@ -143,6 +151,11 @@ class ControlRoomShiftController extends Controller
             'team_members.*' => ['integer', 'exists:users,id'],
         ]);
 
+        $this->assertCanUseShiftStaff($user, [
+            (int) $validated['shift_lead_user_id'],
+            ...collect($validated['team_members'] ?? [])->map(fn ($id) => (int) $id)->all(),
+        ]);
+
         $shiftLead = User::findOrFail($validated['shift_lead_user_id']);
         $teamMembers = $validated['team_members'] ?? [];
 
@@ -175,6 +188,11 @@ class ControlRoomShiftController extends Controller
             'incoming_team_members.*' => ['integer', 'exists:users,id'],
         ]);
 
+        $this->assertCanUseShiftStaff($user, [
+            (int) $validated['incoming_lead_user_id'],
+            ...collect($validated['incoming_team_members'] ?? [])->map(fn ($id) => (int) $id)->all(),
+        ]);
+
         $incomingLead = User::findOrFail($validated['incoming_lead_user_id']);
 
         // Complete the current shift via handover
@@ -197,7 +215,7 @@ class ControlRoomShiftController extends Controller
         // Start the new shift for the incoming team
         $newShift = Shift::startNew(
             $incomingLead,
-            'Shift ' . now()->format('Y-m-d H:i'),
+            'Shift '.now()->format('Y-m-d H:i'),
             $validated['incoming_team_members'] ?? [],
         );
 
@@ -269,5 +287,35 @@ class ControlRoomShiftController extends Controller
 
         return redirect()->route('control-room.shifts.index')
             ->with('success', 'Note added.');
+    }
+
+    protected function assertCanUseShiftStaff(User $user, array $userIds): void
+    {
+        $uniqueUserIds = collect($userIds)
+            ->filter(fn ($id) => filled($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($uniqueUserIds === []) {
+            return;
+        }
+
+        $query = User::staff()
+            ->whereIn('id', $uniqueUserIds);
+
+        app(UserSiteAccessService::class)->applyStaffScope($query, $user, $this->alertBypassPermissions());
+
+        abort_if(
+            $query->count() !== count($uniqueUserIds),
+            403,
+            'You are not authorized to select one or more staff members for this shift.',
+        );
+    }
+
+    protected function alertBypassPermissions(): array
+    {
+        return ['reports.viewAny'];
     }
 }
