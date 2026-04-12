@@ -101,6 +101,8 @@ export function Tabs({
             el.addEventListener('scroll', checkScroll);
             return () => el.removeEventListener('scroll', checkScroll);
         }
+
+        return undefined;
     }, [checkScroll, tabs]);
 
     const scroll = (direction: 'left' | 'right') => {

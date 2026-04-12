@@ -208,9 +208,12 @@ class BudgetActualsService
     {
         $totals = FinJournalLine::where('account_id', $account->id)
             ->whereHas('journal', function ($q) use ($orgId, $startDate, $endDate) {
-                $q->where('organization_id', $orgId)
-                    ->where('status', 'posted')
+                $q->where('status', 'posted')
                     ->whereBetween('journal_date', [$startDate, $endDate]);
+
+                if ($orgId !== null) {
+                    $q->where('organization_id', $orgId);
+                }
             })
             ->selectRaw('COALESCE(SUM(debit), 0) as total_debits, COALESCE(SUM(credit), 0) as total_credits')
             ->first();

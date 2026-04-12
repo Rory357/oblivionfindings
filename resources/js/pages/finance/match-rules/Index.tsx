@@ -51,6 +51,15 @@ type PageProps = {
     rules: MatchRule[];
 };
 
+type MatchRuleFormData = {
+    name: string;
+    priority: number;
+    rule_type: string;
+    auto_confirm_threshold: number;
+    is_active: boolean;
+    conditions: Record<string, string | number | boolean | null>;
+};
+
 const ruleTypeLabels: Record<string, string> = {
     exact_amount: 'Exact Amount',
     reference_match: 'Reference Match',
@@ -61,13 +70,13 @@ const ruleTypeLabels: Record<string, string> = {
 
 function CreateRuleDialog() {
     const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm<MatchRuleFormData>({
         name: '',
         priority: 0,
-        rule_type: 'exact_amount' as string,
+        rule_type: 'exact_amount',
         auto_confirm_threshold: 95,
         is_active: true,
-        conditions: {} as Record<string, unknown>,
+        conditions: {},
     });
 
     function handleSubmit(e: FormEvent) {
@@ -180,13 +189,13 @@ function CreateRuleDialog() {
 
 function EditRuleDialog({ rule }: { rule: MatchRule }) {
     const [open, setOpen] = useState(false);
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors } = useForm<MatchRuleFormData>({
         name: rule.name,
         priority: rule.priority,
         rule_type: rule.rule_type,
         auto_confirm_threshold: rule.auto_confirm_threshold,
         is_active: rule.is_active,
-        conditions: rule.conditions ?? {},
+        conditions: (rule.conditions ?? {}) as MatchRuleFormData['conditions'],
     });
 
     function handleSubmit(e: FormEvent) {

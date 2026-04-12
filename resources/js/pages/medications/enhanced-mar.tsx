@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { AlertCircle, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Clock, Pill, Plus, ShieldAlert, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -154,11 +154,7 @@ export default function EnhancedMar() {
 
   const clientName = `${client.first_name} ${client.last_name}`.trim();
 
-  useEffect(() => {
-    loadMarData();
-  }, [date]);
-
-  const loadMarData = async () => {
+  const loadMarData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.get(`/api/medications/clients/${client.id}/mar`, {
@@ -170,7 +166,11 @@ export default function EnhancedMar() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [client.id, date]);
+
+  useEffect(() => {
+    void loadMarData();
+  }, [loadMarData]);
 
   const goToDate = (newDate: string) => {
     setDate(newDate);
@@ -603,6 +603,7 @@ export default function EnhancedMar() {
         }}
         onSubmit={handleSubmit}
         medication={selectedRow?.medication || null}
+        clientId={client.id}
         scheduledTime={'scheduled_for' in (selectedRow || {}) ? (selectedRow as ScheduledRow)?.scheduled_for : null}
         witnesses={witnesses}
         currentUserId={userId}

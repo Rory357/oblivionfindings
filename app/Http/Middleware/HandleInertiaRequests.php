@@ -563,7 +563,9 @@ class HandleInertiaRequests extends Middleware
                     ],
                     'budgets' => [
                         'view' => $user->canDo('governance.budgets.view'),
-                        'manage' => $user->canDo('governance.budgets.manage'),
+                        'create' => $user->canDo('governance.budgets.create'),
+                        'submit' => $user->canDo('governance.budgets.submit'),
+                        'approve' => $user->canDo('governance.budgets.approve'),
                     ],
                     'packs' => [
                         'view' => $user->canDo('governance.packs.view'),

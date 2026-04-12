@@ -4,232 +4,132 @@ import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Shield, Users, DollarSign, CheckCircle2, Gavel, FileWarning, Radio } from 'lucide-react';
+
+interface Metric {
+  label: string;
+  value: string;
+  tone: string;
+}
+
+interface ReportCard {
+  key: string;
+  title: string;
+  description: string;
+  status: string;
+  freshness: { label: string };
+  source: string;
+  metrics: Metric[];
+  highlights: string[];
+  href: string;
+}
+
+interface ReportSection {
+  key: string;
+  title: string;
+  cards: ReportCard[];
+}
 
 interface Props extends PageProps {
-    topRisks: any;
-    voidedRisks: any;
-    riskChanges: any;
-    clientSafety: any;
-    workforce: any;
-    financial: any;
-    compliance: any;
-    decisions: any;
-    incidents: any;
-    controlRoom: any;
-    generatedAt: string;
+  report: {
+    headline: Metric[];
+    sections: ReportSection[];
+  };
+  generatedAt: string;
 }
 
-function StatCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
-    return (
-        <div className="p-4 rounded-lg border bg-white">
-            <p className="text-sm text-gray-500">{label}</p>
-            <p className={cn('text-3xl font-bold', color)}>{value}</p>
+const statusStyles: Record<string, string> = {
+  good: 'bg-green-100 text-green-800 border-green-200',
+  warning: 'bg-amber-100 text-amber-800 border-amber-200',
+  critical: 'bg-red-100 text-red-800 border-red-200',
+  unknown: 'bg-slate-100 text-slate-800 border-slate-200',
+};
+
+const toneStyles: Record<string, string> = {
+  default: 'text-slate-900',
+  warning: 'text-amber-700',
+  critical: 'text-red-700',
+  muted: 'text-slate-500',
+};
+
+export default function BoardMonthly({ auth, report, generatedAt }: Props) {
+  return (
+    <AppLayout
+      user={auth.user}
+      breadcrumbs={[
+        { title: 'Governance', href: '/governance/dashboard' },
+        { title: 'Reports', href: '/governance/reports' },
+        { title: 'Board Monthly', href: '#' },
+      ]}
+    >
+      <Head title="Board Monthly Report" />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-6 space-y-2">
+          <h1 className="text-3xl font-bold text-slate-900">Board Monthly Report</h1>
+          <p className="text-sm text-slate-600">A board-ready summary of decisions, delivery, assurance, and organisational controls.</p>
         </div>
-    );
-}
 
-export default function BoardMonthly({ auth, topRisks, voidedRisks, riskChanges, clientSafety, workforce, financial, compliance, decisions, incidents, controlRoom, generatedAt }: Props) {
-    const formatDate = (d: string) =>
-        new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {report.headline.map((metric) => (
+            <Card key={metric.label}>
+              <CardContent className="pt-6">
+                <p className="text-sm text-slate-500">{metric.label}</p>
+                <p className={cn('mt-2 text-3xl font-bold', toneStyles[metric.tone] ?? toneStyles.default)}>{metric.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-    return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports' },
-                { title: 'Board Monthly', href: '#' },
-            ]}
-        >
-            <Head title="Board Monthly Report" />
-
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Board Monthly Report</h1>
-                    <p className="text-gray-500 mt-1">Comprehensive governance overview for the board</p>
-                </div>
-
-                {/* Top Risks */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <AlertTriangle className="w-5 h-5 text-red-500" />
-                            Top Risks
-                        </CardTitle>
+        <div className="space-y-8">
+          {report.sections.map((section) => (
+            <section key={section.key} className="space-y-4">
+              <h2 className="text-xl font-semibold text-slate-900">{section.title}</h2>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {section.cards.map((card) => (
+                  <Card key={card.key}>
+                    <CardHeader className="space-y-3 pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <CardTitle className="text-lg">{card.title}</CardTitle>
+                          <CardDescription>{card.description}</CardDescription>
+                        </div>
+                        <Badge className={statusStyles[card.status] ?? statusStyles.unknown}>{card.status.replace(/_/g, ' ')}</Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <Badge variant="outline">{card.source}</Badge>
+                        <Badge variant="outline">{card.freshness.label}</Badge>
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                        {topRisks ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard label="Critical" value={topRisks.critical ?? 0} color="text-red-600" />
-                                <StatCard label="High" value={topRisks.high ?? 0} color="text-orange-600" />
-                                <StatCard label="Above Appetite" value={topRisks.above_appetite ?? 0} color="text-purple-600" />
-                                <StatCard label="Total Active" value={topRisks.total ?? 0} />
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No risk data available.</p>
-                        )}
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {card.metrics.map((metric) => (
+                          <div key={`${card.key}-${metric.label}`} className="rounded-lg bg-slate-50 p-3">
+                            <p className="text-xs uppercase tracking-wide text-slate-500">{metric.label}</p>
+                            <p className={cn('mt-1 text-lg font-semibold', toneStyles[metric.tone] ?? toneStyles.default)}>{metric.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {card.highlights.length > 0 && (
+                        <div className="space-y-2">
+                          {card.highlights.slice(0, 3).map((highlight) => (
+                            <p key={highlight} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                              {highlight}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
-                </Card>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
 
-                {/* Client Safety */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Shield className="w-5 h-5 text-blue-500" />
-                            Client Safety
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {clientSafety ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard label="Total Incidents" value={clientSafety.total_incidents ?? 0} />
-                                <StatCard label="Open" value={clientSafety.open ?? 0} color="text-orange-600" />
-                                <StatCard label="Safeguarding" value={clientSafety.safeguarding ?? 0} color="text-red-600" />
-                                <StatCard label="Resolved" value={clientSafety.resolved ?? 0} color="text-green-600" />
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No client safety data available.</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Workforce */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Users className="w-5 h-5 text-indigo-500" />
-                            Workforce
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {workforce ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard label="Total Staff" value={workforce.total_staff ?? 0} />
-                                <StatCard label="Compliance Rate" value={`${workforce.compliance_rate ?? 0}%`} />
-                                <StatCard label="Vacancies" value={workforce.vacancies ?? 0} />
-                                <StatCard label="Turnover" value={`${workforce.turnover ?? 0}%`} />
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No workforce data available.</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Financial */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <DollarSign className="w-5 h-5 text-green-500" />
-                            Financial
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {financial ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard label="Budget Total" value={financial.budget_total ?? '-'} />
-                                <StatCard label="Actual Spend" value={financial.actual_spend ?? '-'} />
-                                <StatCard label="Variance" value={financial.variance ?? '-'} />
-                                <StatCard label="YTD" value={financial.ytd ?? '-'} />
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No financial data available.</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Compliance Calendar */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <CheckCircle2 className="w-5 h-5 text-teal-500" />
-                            Compliance Calendar
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {compliance ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard label="Total Obligations" value={compliance.total ?? 0} />
-                                <StatCard label="Complete" value={compliance.complete ?? 0} color="text-green-600" />
-                                <StatCard label="Overdue" value={compliance.overdue ?? 0} color="text-red-600" />
-                                <StatCard label="Due Soon" value={compliance.due_soon ?? 0} color="text-amber-600" />
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No compliance data available.</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Decisions Required */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Gavel className="w-5 h-5 text-violet-500" />
-                            Decisions Required
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {decisions ? (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <StatCard label="Pending" value={decisions.pending ?? 0} color="text-orange-600" />
-                                <StatCard label="This Month" value={decisions.this_month ?? 0} />
-                                <StatCard label="Overdue" value={decisions.overdue ?? 0} color="text-red-600" />
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No decision data available.</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Incidents */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FileWarning className="w-5 h-5 text-amber-500" />
-                            Incidents
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {incidents ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard label="Total" value={incidents.total ?? 0} />
-                                <StatCard label="Open" value={incidents.open ?? 0} color="text-orange-600" />
-                                <StatCard label="Serious" value={incidents.serious ?? 0} color="text-red-600" />
-                                <StatCard label="Closed" value={incidents.closed ?? 0} color="text-green-600" />
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No incident data available.</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Control Room */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Radio className="w-5 h-5 text-cyan-500" />
-                            Control Room
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {controlRoom ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <StatCard label="Total Alerts" value={controlRoom.total ?? 0} />
-                                <StatCard label="Critical" value={controlRoom.critical ?? 0} color="text-red-600" />
-                                <StatCard label="Open" value={controlRoom.open ?? 0} color="text-orange-600" />
-                                <StatCard label="Avg Response" value={controlRoom.avg_response ?? '-'} />
-                            </div>
-                        ) : (
-                            <p className="text-gray-500 text-sm">No control room data available.</p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Generated timestamp */}
-                <p className="text-sm text-gray-400 text-right">
-                    Generated: {formatDate(generatedAt)}
-                </p>
-            </div>
-        </AppLayout>
-    );
+        <p className="mt-6 text-right text-sm text-slate-400">
+          Generated {new Date(generatedAt).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })}
+        </p>
+      </div>
+    </AppLayout>
+  );
 }

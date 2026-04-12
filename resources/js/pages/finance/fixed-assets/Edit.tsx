@@ -86,6 +86,7 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
         { title: asset.asset_name, href: `/finance/fixed-assets/${asset.id}` },
         { title: 'Edit', href: `/finance/fixed-assets/${asset.id}/edit` },
     ];
+    const generalError = (errors as Record<string, string | undefined>).general;
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
@@ -141,9 +142,9 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
                     </div>
                 )}
 
-                {errors.general && (
+                {generalError && (
                     <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
-                        {errors.general}
+                        {generalError}
                     </div>
                 )}
 

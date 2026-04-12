@@ -172,7 +172,7 @@ export default function TrialBalance({ report, filters }: Props) {
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
                                         <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Tooltip formatter={(value?: number) => formatCurrency(value ?? 0)} />
                                         <Legend />
                                         <Bar dataKey="debit" name="Debit" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                         <Bar dataKey="credit" name="Credit" fill="#8b5cf6" radius={[4, 4, 0, 0]} />

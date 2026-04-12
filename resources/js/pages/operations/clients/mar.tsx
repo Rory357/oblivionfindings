@@ -183,12 +183,14 @@ export default function ClientMar() {
       administered_at: fromLocalDateTimeInput(adminForm.data.administered_at as any),
       witnessed_by: adminForm.data.witnessed_by === '__none__' ? null : adminForm.data.witnessed_by,
     };
-    adminForm.transform(() => payload).post(`/operations/clients/${client.id}/medical/medications/${mId}/administrations`, {
+    adminForm.transform(() => payload);
+    adminForm.post(`/operations/clients/${client.id}/medical/medications/${mId}/administrations`, {
       preserveScroll: true,
       onSuccess: () => {
         setAdminOpen(false);
         setAdminRow(null);
       },
+      onFinish: () => adminForm.transform((data) => data),
     });
   }
 
@@ -209,12 +211,14 @@ export default function ClientMar() {
       ...corrForm.data,
       administered_at: fromLocalDateTimeInput(corrForm.data.administered_at as any),
     };
-    corrForm.transform(() => payload).post(`/operations/clients/${client.id}/mar/administrations/${corrRecord.id}/corrections`, {
+    corrForm.transform(() => payload);
+    corrForm.post(`/operations/clients/${client.id}/mar/administrations/${corrRecord.id}/corrections`, {
       preserveScroll: true,
       onSuccess: () => {
         setCorrOpen(false);
         setCorrRecord(null);
       },
+      onFinish: () => corrForm.transform((data) => data),
     });
   }
 

@@ -133,9 +133,19 @@ interface Props extends PageProps {
       blocked_by: string | null;
     }>;
   };
+  meetingCockpit: {
+    cards: Array<{
+      key: string;
+      title: string;
+      status: 'done' | 'in_progress' | 'todo' | 'warning';
+      value: string | number;
+      detail: string;
+      href: string;
+    }>;
+  };
 }
 
-export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEdit, canManageMinutes, canApproveMinutes, workflowChecklist }: Props) {
+export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEdit, canManageMinutes, canApproveMinutes, workflowChecklist, meetingCockpit }: Props) {
   const page = usePage();
   const [generatingPack, setGeneratingPack] = useState(false);
   const [packMessage, setPackMessage] = useState<string | null>(null);
@@ -347,7 +357,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900">{meeting.title}</h1>
+                <h1 className="text-3xl font-bold text-gray-900" dusk="meeting-title">{meeting.title}</h1>
                 <Badge className={cn(getStatusColor(meeting.status))}>
                   {meeting.status.replace('_', ' ')}
                 </Badge>
@@ -377,13 +387,13 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
               )}
               {meeting.board_pack ? (
                 <Button asChild>
-                  <Link href={showPack.url({ pack: meeting.board_pack.id })}>
+                  <Link href={showPack.url({ pack: meeting.board_pack.id })} dusk="view-pack">
                     <FileDown className="w-4 h-4 mr-2" />
                     View Pack
                   </Link>
                 </Button>
               ) : canEdit ? (
-                <Button onClick={generatePack} disabled={generatingPack}>
+                <Button onClick={generatePack} disabled={generatingPack} dusk="generate-pack">
                   {generatingPack ? 'Generating...' : 'Generate Pack'}
                 </Button>
               ) : null}
@@ -425,11 +435,11 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
 
               <div className="space-y-2">
                 {workflowChecklist.items.map((item) => (
-                  <div key={item.key} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-start md:justify-between">
+                  <div key={item.key} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-start md:justify-between" dusk={`workflow-item-${item.key}`}>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-gray-900">{item.label}</p>
-                        <Badge className={getChecklistStatusColor(item.status)}>{item.status.replace('_', ' ')}</Badge>
+                        <Badge className={getChecklistStatusColor(item.status)} dusk={`workflow-status-${item.key}`}>{item.status.replace('_', ' ')}</Badge>
                       </div>
                       <p className="text-sm text-gray-600">{item.detail}</p>
                       {item.blocked_by && (
@@ -448,7 +458,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
           </Card>
 
           {/* Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-gray-500">Chair</p>
@@ -461,35 +471,31 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                 <p className="font-semibold">{meeting.secretary?.user.name || 'Not assigned'}</p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">Quorum</p>
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold">{quorum.present} / {quorum.required}</p>
-                  {quorum.met ? (
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 text-yellow-500" />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">Board Pack</p>
-                <p className="font-semibold">
-                  {meeting.board_pack?.distributed_at ? 'Distributed' : meeting.board_pack ? 'Generated' : 'Not generated'}
-                </p>
-              </CardContent>
-            </Card>
+            {meetingCockpit.cards.map((card) => (
+              <Card key={card.key}>
+                <CardContent className="pt-6 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-gray-500">{card.title}</p>
+                    <Badge className={getChecklistStatusColor(card.status === 'warning' ? 'blocked' : card.status)}>
+                      {card.status.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  <p className="font-semibold text-gray-900">{card.value}</p>
+                  <p className="text-sm text-gray-600">{card.detail}</p>
+                  <Button variant="ghost" size="sm" className="px-0" asChild>
+                    <Link href={card.href}>Open</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList>
               <TabsTrigger value="agenda">Agenda</TabsTrigger>
-              <TabsTrigger value="attendance">Attendance</TabsTrigger>
-              <TabsTrigger value="minutes">Minutes</TabsTrigger>
+              <TabsTrigger value="attendance" dusk="meeting-tab-attendance">Attendance</TabsTrigger>
+              <TabsTrigger value="minutes" dusk="meeting-tab-minutes">Minutes</TabsTrigger>
               <TabsTrigger value="resolutions">Resolutions</TabsTrigger>
             </TabsList>
 
@@ -681,7 +687,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                   {canEdit && (
                     <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button size="sm">
+                        <Button size="sm" dusk="record-attendance">
                           <Users className="w-4 h-4 mr-1" />
                           Record Attendance
                         </Button>
@@ -730,7 +736,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                         </div>
                         <div className="flex justify-end gap-2 mt-4">
                           <Button variant="outline" onClick={() => setAttendanceDialogOpen(false)}>Cancel</Button>
-                          <Button onClick={submitAttendance} disabled={attendanceSubmitting}>
+                          <Button onClick={submitAttendance} disabled={attendanceSubmitting} dusk="save-attendance">
                             {attendanceSubmitting ? 'Saving...' : 'Save Attendance'}
                           </Button>
                         </div>
@@ -784,7 +790,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                       <>
                         <Dialog open={minutesDialogOpen} onOpenChange={setMinutesDialogOpen}>
                           <DialogTrigger asChild>
-                            <Button size="sm" variant={meeting.minutes ? 'outline' : 'default'}>
+                            <Button size="sm" variant={meeting.minutes ? 'outline' : 'default'} dusk="edit-minutes">
                               {meeting.minutes ? (
                                 <><Pencil className="w-4 h-4 mr-1" /> Edit</>
                               ) : (
@@ -802,10 +808,11 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                                   <div key={idx} className="rounded-lg border p-4 space-y-2">
                                     <div className="flex items-center justify-between gap-2">
                                       <Input
-                                        value={block.heading}
-                                        onChange={e => updateMinutesBlock(idx, 'heading', e.target.value)}
-                                        placeholder="Section heading"
-                                        className="font-semibold"
+                                      dusk={idx === 0 ? 'minutes-heading-0' : undefined}
+                                      value={block.heading}
+                                      onChange={e => updateMinutesBlock(idx, 'heading', e.target.value)}
+                                      placeholder="Section heading"
+                                      className="font-semibold"
                                       />
                                       {minutesBlocks.length > 1 && (
                                         <Button
@@ -820,6 +827,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                                       )}
                                     </div>
                                     <Textarea
+                                      dusk={idx === 0 ? 'minutes-content-0' : undefined}
                                       value={block.content}
                                       onChange={e => updateMinutesBlock(idx, 'content', e.target.value)}
                                       placeholder="Enter minutes for this section..."
@@ -842,7 +850,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                                 <Button type="button" variant="outline" onClick={() => setMinutesDialogOpen(false)}>
                                   Cancel
                                 </Button>
-                                <Button type="submit" disabled={minutesSubmitting}>
+                                <Button type="submit" disabled={minutesSubmitting} dusk="save-minutes">
                                   {minutesSubmitting ? 'Saving...' : meeting.minutes ? 'Update Minutes' : 'Create Minutes'}
                                 </Button>
                               </div>
@@ -852,7 +860,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                         {meeting.minutes && meeting.minutes.status === 'draft' && canApproveMinutes && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="sm">
+                              <Button size="sm" dusk="approve-minutes">
                                 <Send className="w-4 h-4 mr-1" />
                                 Approve Minutes
                               </Button>

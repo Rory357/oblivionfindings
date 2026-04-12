@@ -306,7 +306,7 @@ export default function CashFlow({ report, filters }: Props) {
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
                                         <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
+                                        <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Amount']} />
                                         <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                                             {barData.map((entry, index) => (
                                                 <Cell
@@ -333,7 +333,7 @@ export default function CashFlow({ report, filters }: Props) {
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
                                         <YAxis tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value: number) => [formatCurrency(value), 'Cash']} />
+                                        <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Cash']} />
                                         <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                                             <Cell fill="#3b82f6" />
                                             <Cell fill="#8b5cf6" />

@@ -175,7 +175,7 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                                 <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v: number) => $(v)} />
+                                        <Tooltip formatter={(v?: number) => $(v ?? 0)} />
                                     </PieChart>
                                 </ResponsiveContainer>
                             ) : (
@@ -212,7 +212,7 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                         <XAxis dataKey="month" className="text-xs" />
                                         <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} className="text-xs" />
-                                        <Tooltip formatter={(v: number) => $(v)} />
+                                        <Tooltip formatter={(v?: number) => $(v ?? 0)} />
                                         <Area type="monotone" dataKey="cost" stroke="#7c3aed" fill="url(#costGradient)" strokeWidth={2} />
                                     </AreaChart>
                                 </ResponsiveContainer>

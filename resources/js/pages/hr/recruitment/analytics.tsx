@@ -246,7 +246,7 @@ export default function RecruitmentAnalytics({ timeToHire, sourceEffectiveness, 
                                                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                                     <XAxis type="number" className="text-xs" tick={{ fill: 'currentColor' }} />
                                                     <YAxis type="category" dataKey="label" width={100} className="text-xs" tick={{ fill: 'currentColor' }} />
-                                                    <Tooltip formatter={(val: number) => `${val} days`} />
+                                                    <Tooltip formatter={(val?: number) => `${val ?? 0} days`} />
                                                     <Bar dataKey="avg_days" name="Avg Days" radius={[0, 4, 4, 0]}>
                                                         {stageBottlenecks.map((entry, i) => (
                                                             <Cell key={i} fill={entry.avg_days > 14 ? '#ef4444' : entry.avg_days > 7 ? '#f59e0b' : '#10b981'} />
@@ -334,7 +334,7 @@ export default function RecruitmentAnalytics({ timeToHire, sourceEffectiveness, 
                                                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                                 <XAxis dataKey="month" className="text-xs" tick={{ fill: 'currentColor' }} />
                                                 <YAxis className="text-xs" tick={{ fill: 'currentColor' }} />
-                                                <Tooltip formatter={(val: number) => `${val} days`} />
+                                                <Tooltip formatter={(val?: number) => `${val ?? 0} days`} />
                                                 <Line type="monotone" dataKey="avg_days" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 4 }} name="Avg Days" />
                                             </LineChart>
                                         </ResponsiveContainer>

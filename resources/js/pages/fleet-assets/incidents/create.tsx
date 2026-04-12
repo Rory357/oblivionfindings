@@ -137,9 +137,10 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
             },
         };
 
+        form.transform(() => payload);
         form.post('/fleet-assets/incidents', {
             preserveScroll: true,
-            data: payload as any,
+            onFinish: () => form.transform((data) => data),
         });
     };
 

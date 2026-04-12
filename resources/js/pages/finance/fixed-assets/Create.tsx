@@ -64,6 +64,7 @@ export default function FixedAssetCreate({ assetAccounts, expenseAccounts }: Pro
         { title: 'Fixed Assets', href: '/finance/fixed-assets' },
         { title: 'Add Asset', href: '/finance/fixed-assets/create' },
     ];
+    const generalError = (errors as Record<string, string | undefined>).general;
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
@@ -107,9 +108,9 @@ export default function FixedAssetCreate({ assetAccounts, expenseAccounts }: Pro
                     </div>
                 </div>
 
-                {errors.general && (
+                {generalError && (
                     <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
-                        {errors.general}
+                        {generalError}
                     </div>
                 )}
 

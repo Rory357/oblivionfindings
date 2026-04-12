@@ -193,7 +193,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                         <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} />
                                         <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 12 }} />
                                         <Tooltip
-                                            formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                                            formatter={(value?: number) => [formatCurrency(value ?? 0), 'Amount']}
                                         />
                                         <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                                             {chartData.map((entry, index) => (

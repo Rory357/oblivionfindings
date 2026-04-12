@@ -5,140 +5,174 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-interface Props extends PageProps {
-    committee: any;
-    committeeType: string;
-    risks: any[];
-    metrics: any;
-    generatedAt: string;
+interface Metric {
+  label: string;
+  value: string;
+  tone: string;
 }
 
-const getSeverityColor = (score: number) => {
-    if (score >= 20) return 'bg-red-500 text-white';
-    if (score >= 15) return 'bg-orange-500 text-white';
-    if (score >= 10) return 'bg-yellow-500 text-black';
-    return 'bg-green-500 text-white';
+interface ReportCard {
+  key: string;
+  title: string;
+  description: string;
+  status: string;
+  metrics: Metric[];
+  highlights: string[];
+}
+
+interface Props extends PageProps {
+  report: {
+    committee: {
+      name: string;
+      description?: string | null;
+    };
+    headline: Metric[];
+    sections: Array<{
+      key: string;
+      title: string;
+      cards: ReportCard[];
+    }>;
+    risks: Array<{
+      id: number;
+      reference: string;
+      title: string;
+      category: string;
+      residual_score: number;
+      owner: string | null;
+      within_appetite: boolean;
+    }>;
+  };
+  generatedAt: string;
+}
+
+const statusStyles: Record<string, string> = {
+  good: 'bg-green-100 text-green-800 border-green-200',
+  warning: 'bg-amber-100 text-amber-800 border-amber-200',
+  critical: 'bg-red-100 text-red-800 border-red-200',
+  unknown: 'bg-slate-100 text-slate-800 border-slate-200',
 };
 
-function StatCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
-    return (
-        <div className="p-4 rounded-lg border bg-white">
-            <p className="text-sm text-gray-500">{label}</p>
-            <p className={cn('text-3xl font-bold', color)}>{value}</p>
+const toneStyles: Record<string, string> = {
+  default: 'text-slate-900',
+  warning: 'text-amber-700',
+  critical: 'text-red-700',
+  muted: 'text-slate-500',
+};
+
+const severityStyle = (score: number) => {
+  if (score >= 20) return 'bg-red-600 text-white';
+  if (score >= 15) return 'bg-orange-500 text-white';
+  if (score >= 10) return 'bg-amber-400 text-slate-950';
+
+  return 'bg-green-500 text-white';
+};
+
+export default function CommitteeReport({ auth, report, generatedAt }: Props) {
+  return (
+    <AppLayout
+      user={auth.user}
+      breadcrumbs={[
+        { title: 'Governance', href: '/governance/dashboard' },
+        { title: 'Reports', href: '/governance/reports' },
+        { title: 'Committee', href: '#' },
+      ]}
+    >
+      <Head title={`${report.committee.name} Report`} />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-6 space-y-2">
+          <h1 className="text-3xl font-bold text-slate-900">{report.committee.name} Report</h1>
+          <p className="text-sm text-slate-600">{report.committee.description || 'Committee-level assurance, delivery, and decision support.'}</p>
         </div>
-    );
-}
 
-function renderMetrics(committeeType: string, metrics: any) {
-    if (!metrics) return <p className="text-gray-500 text-sm">No metrics available.</p>;
+        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {report.headline.map((metric) => (
+            <Card key={metric.label}>
+              <CardContent className="pt-6">
+                <p className="text-sm text-slate-500">{metric.label}</p>
+                <p className={cn('mt-2 text-3xl font-bold', toneStyles[metric.tone] ?? toneStyles.default)}>{metric.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-    switch (committeeType) {
-        case 'audit_risk':
-            return (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard label="Audit Findings" value={metrics.audit_findings ?? 0} />
-                    <StatCard label="Open Items" value={metrics.open_items ?? 0} color="text-orange-600" />
-                    <StatCard label="Overdue Actions" value={metrics.overdue_actions ?? 0} color="text-red-600" />
-                    <StatCard label="Compliance Rate" value={`${metrics.compliance_rate ?? 0}%`} color="text-green-600" />
-                </div>
-            );
-        case 'people':
-            return (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard label="Headcount" value={metrics.headcount ?? 0} />
-                    <StatCard label="Turnover" value={`${metrics.turnover ?? 0}%`} />
-                    <StatCard label="Training Completion" value={`${metrics.training_completion ?? 0}%`} color="text-green-600" />
-                    <StatCard label="Vacancies" value={metrics.vacancies ?? 0} color="text-amber-600" />
-                </div>
-            );
-        case 'finance':
-            return (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard label="Budget Total" value={metrics.budget_total ?? '-'} />
-                    <StatCard label="Actual Spend" value={metrics.actual_spend ?? '-'} />
-                    <StatCard label="Variance" value={metrics.variance ?? '-'} />
-                    <StatCard label="Cash Position" value={metrics.cash_position ?? '-'} />
-                </div>
-            );
-        default:
-            return (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {Object.entries(metrics).map(([key, val]) => (
-                        <StatCard key={key} label={key.replace(/_/g, ' ')} value={String(val)} />
-                    ))}
-                </div>
-            );
-    }
-}
-
-export default function CommitteeReport({ auth, committee, committeeType, risks, metrics, generatedAt }: Props) {
-    const committeeName = committee?.name ?? committeeType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-    const sortedRisks = [...risks].sort((a, b) => (b.residual_score ?? 0) - (a.residual_score ?? 0));
-
-    const formatDate = (d: string) =>
-        new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-    return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports' },
-                { title: 'Committee', href: '#' },
-            ]}
-        >
-            <Head title={`${committeeName} Report`} />
-
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">{committeeName} Report</h1>
-                    <p className="text-gray-500 mt-1">Committee performance and risk overview</p>
-                </div>
-
-                {/* Metrics */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle>Key Metrics</CardTitle>
+        <div className="space-y-8">
+          {report.sections.map((section) => (
+            <section key={section.key} className="space-y-4">
+              <h2 className="text-xl font-semibold text-slate-900">{section.title}</h2>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {section.cards.map((card) => (
+                  <Card key={card.key}>
+                    <CardHeader className="space-y-3 pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <CardTitle className="text-lg">{card.title}</CardTitle>
+                          <CardDescription>{card.description}</CardDescription>
+                        </div>
+                        <Badge className={statusStyles[card.status] ?? statusStyles.unknown}>{card.status.replace(/_/g, ' ')}</Badge>
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                        {renderMetrics(committeeType, metrics)}
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {card.metrics.map((metric) => (
+                          <div key={`${card.key}-${metric.label}`} className="rounded-lg bg-slate-50 p-3">
+                            <p className="text-xs uppercase tracking-wide text-slate-500">{metric.label}</p>
+                            <p className={cn('mt-1 text-lg font-semibold', toneStyles[metric.tone] ?? toneStyles.default)}>{metric.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {card.highlights.length > 0 && (
+                        <div className="space-y-2">
+                          {card.highlights.slice(0, 3).map((highlight) => (
+                            <p key={highlight} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                              {highlight}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
-                </Card>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
 
-                {/* Risks */}
-                <Card className="mb-6">
-                    <CardHeader>
-                        <CardTitle>Assigned Risks</CardTitle>
-                        <CardDescription>{sortedRisks.length} risks by residual score</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {sortedRisks.length === 0 ? (
-                            <p className="text-center text-gray-500 py-8">No risks assigned to this committee.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {sortedRisks.map((risk) => (
-                                    <div key={risk.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium text-gray-900">{risk.title}</span>
-                                                {risk.risk_reference && <Badge variant="outline">{risk.risk_reference}</Badge>}
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-1 capitalize">{risk.category?.replace(/_/g, ' ')}</p>
-                                        </div>
-                                        <Badge className={getSeverityColor(risk.residual_score ?? 0)}>
-                                            {risk.residual_score ?? '-'}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>Assigned Risks</CardTitle>
+            <CardDescription>Highest residual exposure within this committee’s remit.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {report.risks.length ? (
+              report.risks.map((risk) => (
+                <div key={risk.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-slate-900">{risk.title}</p>
+                      <Badge variant="outline">{risk.reference}</Badge>
+                      <Badge variant="outline">{risk.category}</Badge>
+                    </div>
+                    {risk.owner && <p className="text-sm text-slate-600">Owner: {risk.owner}</p>}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {!risk.within_appetite && (
+                      <Badge className="bg-red-100 text-red-800 border-red-200">Outside appetite</Badge>
+                    )}
+                    <Badge className={severityStyle(risk.residual_score)}>{risk.residual_score}</Badge>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-500">No risks are currently assigned to this committee.</p>
+            )}
+          </CardContent>
+        </Card>
 
-                <p className="text-sm text-gray-400 text-right">
-                    Generated: {formatDate(generatedAt)}
-                </p>
-            </div>
-        </AppLayout>
-    );
+        <p className="mt-6 text-right text-sm text-slate-400">
+          Generated {new Date(generatedAt).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })}
+        </p>
+      </div>
+    </AppLayout>
+  );
 }

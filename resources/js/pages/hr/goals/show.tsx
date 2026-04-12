@@ -730,7 +730,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                         tickFormatter={(v) => `${v}%`}
                                                     />
                                                     <Tooltip
-                                                        formatter={(value: number) => [`${value}%`, 'Progress']}
+                                                        formatter={(value?: number) => [`${value ?? 0}%`, 'Progress']}
                                                         contentStyle={{
                                                             borderRadius: '8px',
                                                             border: '1px solid hsl(var(--border))',

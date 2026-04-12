@@ -68,7 +68,7 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{evaluation.title}</h1>
+              <h1 className="text-2xl font-bold" dusk="evaluation-title">{evaluation.title}</h1>
               <Badge className={cn('text-xs', getStatusColor(evaluation.status))}>{evaluation.status}</Badge>
             </div>
             <p className="text-gray-500 mt-1">
@@ -99,6 +99,7 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
                             {[1, 2, 3, 4, 5].map(n => (
                               <Button
                                 key={n}
+                                dusk={`rating-${i}-${n}`}
                                 type="button"
                                 variant={data.answers[String(i)] === String(n) ? 'default' : 'outline'}
                                 size="sm"
@@ -109,6 +110,7 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
                         )}
                         {q.type === 'text' && (
                           <Textarea
+                            dusk={`answer-${i}`}
                             className="mt-2"
                             value={data.answers[String(i)] || ''}
                             onChange={e => setData('answers', { ...data.answers, [String(i)]: e.target.value })}
@@ -119,6 +121,7 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
                             {['Yes', 'No'].map(v => (
                               <Button
                                 key={v}
+                                dusk={`answer-${i}-${v.toLowerCase()}`}
                                 type="button"
                                 variant={data.answers[String(i)] === v ? 'default' : 'outline'}
                                 size="sm"
@@ -131,9 +134,9 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
                     ))}
                     <div>
                       <Label>Overall Comments</Label>
-                      <Textarea value={data.overall_comments} onChange={e => setData('overall_comments', e.target.value)} rows={3} />
+                      <Textarea dusk="overall-comments" value={data.overall_comments} onChange={e => setData('overall_comments', e.target.value)} rows={3} />
                     </div>
-                    <Button type="submit" disabled={processing}>Submit Response</Button>
+                    <Button type="submit" disabled={processing} dusk="submit-evaluation-response">Submit Response</Button>
                   </form>
                 </CardContent>
               </Card>

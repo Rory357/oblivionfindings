@@ -103,7 +103,9 @@ function fuelLabel(level: string | null) {
 export default function HandoverIndex({ handovers: rawHandovers, vehicles, filters }: Props) {
     const allHandovers = Array.isArray(rawHandovers) ? rawHandovers : (rawHandovers?.data ?? []);
     const paginationLinks = !Array.isArray(rawHandovers) ? rawHandovers?.links ?? [] : [];
-    const paginationMeta = !Array.isArray(rawHandovers) ? rawHandovers?.meta ?? {} : {};
+    const paginationMeta = !Array.isArray(rawHandovers)
+        ? rawHandovers?.meta ?? { current_page: 1, last_page: 1, total: 0 }
+        : { current_page: 1, last_page: 1, total: 0 };
     const totalCount = allHandovers.length;
     const pendingCount = allHandovers.filter((h) => h.status === 'pending_acceptance').length;
     const acceptedCount = allHandovers.filter((h) => h.status === 'accepted').length;

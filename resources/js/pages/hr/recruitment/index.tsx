@@ -359,7 +359,7 @@ export default function RecruitmentIndex({ candidates, pipeline, sourceBreakdown
                                                         <Cell key={i} fill={entry.fill} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip formatter={(val: number) => val} />
+                                                <Tooltip formatter={(val?: number) => val ?? 0} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>

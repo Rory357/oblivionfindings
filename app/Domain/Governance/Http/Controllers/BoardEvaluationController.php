@@ -47,8 +47,15 @@ class BoardEvaluationController extends Controller
         ]);
 
         $evaluation = BoardEvaluation::create([
-            ...$validated,
+            'title' => $validated['title'],
+            'evaluation_type' => $validated['evaluation_type'],
+            'year' => (int) date('Y', strtotime($validated['period_end'])),
             'status' => 'draft',
+            'questions' => collect($validated['questions'])->values()->map(fn (array $question, int $index) => [
+                'id' => $index + 1,
+                'question' => $question['text'],
+                'type' => $question['type'] === 'yes_no' ? 'yes_no' : $question['type'],
+            ])->all(),
             'created_by' => auth()->id(),
         ]);
 
@@ -72,12 +79,31 @@ class BoardEvaluationController extends Controller
         }
 
         return Inertia::render('Governance/Evaluations/Show', [
-            'evaluation' => $evaluation,
+            'evaluation' => [
+                'id' => $evaluation->id,
+                'title' => $evaluation->title,
+                'evaluation_type' => $evaluation->evaluation_type,
+                'status' => $this->presentEvaluationStatus($evaluation->status),
+                'period_start' => now()->setYear($evaluation->year)->startOfYear()->toDateString(),
+                'period_end' => now()->setYear($evaluation->year)->endOfYear()->toDateString(),
+                'due_date' => ($evaluation->opened_at?->copy()->addWeeks(2) ?? now()->addWeeks(2))->toDateString(),
+                'questions' => collect($evaluation->questions ?? [])->values()->map(fn (array $question) => [
+                    'id' => $question['id'] ?? null,
+                    'text' => $question['question'] ?? $question['text'] ?? '',
+                    'type' => $question['type'] ?? 'text',
+                ])->all(),
+                'responses' => $evaluation->responses->map(fn (BoardEvaluationResponse $response) => [
+                    'id' => $response->id,
+                    'board_member' => $response->boardMember?->relationLoaded('user') ? ['user' => ['name' => $response->boardMember?->user?->name]] : null,
+                    'is_complete' => $response->submitted_at !== null,
+                    'submitted_at' => $response->submitted_at?->toIso8601String(),
+                ])->values()->all(),
+            ],
             'boardMembers' => $boardMembers,
-            'myResponse' => $myResponse,
+            'myResponse' => $myResponse ? $this->presentMyResponse($myResponse) : null,
             'responseRate' => [
                 'total' => $boardMembers->count(),
-                'completed' => $evaluation->responses()->where('is_complete', true)->count(),
+                'completed' => $evaluation->responses()->whereNotNull('submitted_at')->count(),
             ],
         ]);
     }
@@ -87,8 +113,8 @@ class BoardEvaluationController extends Controller
         abort_unless(request()->user()?->canDo('governance.evaluations.manage'), 403);
 
         $evaluation->update([
-            'status' => 'active',
-            'launched_at' => now(),
+            'status' => 'open',
+            'opened_at' => now(),
         ]);
 
         return redirect()->back()->with('success', 'Evaluation launched. Board members can now respond.');
@@ -112,9 +138,7 @@ class BoardEvaluationController extends Controller
                 'board_member_id' => $boardMember->id,
             ],
             [
-                'answers' => $validated['answers'],
-                'overall_comments' => $validated['overall_comments'] ?? null,
-                'is_complete' => true,
+                'answers' => $this->normalizeAnswers($evaluation, $validated['answers'], $validated['overall_comments'] ?? null),
                 'submitted_at' => now(),
             ]
         );
@@ -143,5 +167,63 @@ class BoardEvaluationController extends Controller
         return Inertia::render('Governance/Evaluations/Results', [
             'evaluation' => $evaluation,
         ]);
+    }
+
+    protected function normalizeAnswers(BoardEvaluation $evaluation, array $answers, ?string $overallComments): array
+    {
+        $normalized = collect($evaluation->questions ?? [])->values()->map(function (array $question, int $index) use ($answers) {
+            $value = $answers[(string) $index] ?? $answers[$index] ?? null;
+            $answer = [
+                'question_id' => $question['id'] ?? ($index + 1),
+                'question' => $question['question'] ?? $question['text'] ?? '',
+                'type' => $question['type'] ?? 'text',
+                'answer' => $value,
+            ];
+
+            if (($question['type'] ?? null) === 'rating' && $value !== null) {
+                $answer['rating'] = (int) $value;
+            }
+
+            return $answer;
+        })->all();
+
+        if ($overallComments) {
+            $normalized[] = [
+                'question_id' => 'overall_comments',
+                'question' => 'Overall Comments',
+                'type' => 'text',
+                'answer' => $overallComments,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    protected function presentMyResponse(BoardEvaluationResponse $response): array
+    {
+        $answers = [];
+        $overallComments = '';
+
+        foreach ($response->answers ?? [] as $index => $answer) {
+            if (($answer['question_id'] ?? null) === 'overall_comments') {
+                $overallComments = (string) ($answer['answer'] ?? '');
+                continue;
+            }
+
+            $answers[(string) $index] = (string) ($answer['answer'] ?? $answer['rating'] ?? '');
+        }
+
+        return [
+            'answers' => $answers,
+            'overall_comments' => $overallComments,
+        ];
+    }
+
+    protected function presentEvaluationStatus(string $status): string
+    {
+        return match ($status) {
+            'open' => 'active',
+            default => $status,
+        };
     }
 }

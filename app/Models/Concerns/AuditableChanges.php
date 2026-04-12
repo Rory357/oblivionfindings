@@ -14,7 +14,7 @@ trait AuditableChanges
                 $model,
                 [
                     'fields' => array_keys($model->getAttributes()),
-                    'after' => self::snapshot($model->getAttributes()),
+                    'after' => self::auditSnapshot($model->getAttributes()),
                 ]
             );
         });
@@ -41,8 +41,8 @@ trait AuditableChanges
                 $model,
                 [
                     'fields' => $changes,
-                    'before' => self::snapshot($before),
-                    'after' => self::snapshot($after),
+                    'before' => self::auditSnapshot($before),
+                    'after' => self::auditSnapshot($after),
                 ]
             );
         });
@@ -51,12 +51,12 @@ trait AuditableChanges
             AuditLogger::log(
                 strtolower(class_basename($model)) . '.delete',
                 $model,
-                ['before' => self::snapshot($model->getOriginal())]
+                ['before' => self::auditSnapshot($model->getOriginal())]
             );
         });
     }
 
-    private static function snapshot(array $data): array
+    private static function auditSnapshot(array $data): array
     {
         // Keep audit payload small + safe.
         $out = [];

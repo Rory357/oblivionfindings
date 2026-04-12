@@ -207,7 +207,6 @@ class DashboardAggregatorService
 
     public function getWorkforceMetrics(array $range): array
     {
-        // Overtime calculation
         $overtimeHours = Timesheet::whereBetween('work_date', [$range['start'], $range['end']])
             ->selectRaw('SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at) / 60 - 8) as overtime')
             ->value('overtime') ?? 0;
@@ -223,14 +222,21 @@ class DashboardAggregatorService
             ->whereNull('user_id')
             ->count();
 
-        // Training compliance (mock calculation)
-        $trainingCompliance = 85; // Would calculate from actual training records
+        $trainingCompliance = null;
+        if ($this->hsGovernanceService !== null) {
+            $trainingCompliance = $this->hsGovernanceService->getTrainingComplianceSummary()['compliance_rate'] ?? null;
+        }
+
+        $status = $overtimePct > 10 || $unfilledShifts > 0 ? 'warning' : 'good';
+        if ($trainingCompliance !== null && $trainingCompliance < 95) {
+            $status = 'warning';
+        }
 
         return [
             'overtime_percentage' => round($overtimePct, 1),
             'unfilled_shifts' => $unfilledShifts,
             'training_compliance' => $trainingCompliance,
-            'status' => $overtimePct > 10 ? 'warning' : 'good',
+            'status' => $status,
         ];
     }
 
@@ -250,26 +256,39 @@ class DashboardAggregatorService
 
         $utilization = $currentBudget->getTotalActual() / $currentBudget->total_budget * 100;
         $variance = $currentBudget->getVariancePercentage();
+        $roadmapWidget = $this->roadmapDashboardService?->governanceWidget(null) ?? [];
+        $governanceBudget = $roadmapWidget['governance_budget'] ?? null;
 
         return [
             'budget_utilization' => round($utilization, 1),
             'variance' => round($variance, 1),
             'status' => abs($variance) > 5 ? 'warning' : 'good',
             'fiscal_year' => $currentBudget->fiscal_year,
+            'budget_total' => round((float) $currentBudget->total_budget, 2),
+            'actual_total' => round($currentBudget->getTotalActual(), 2),
+            'variance_amount' => round($currentBudget->getTotalVariance(), 2),
+            'governance_envelope_total' => $governanceBudget['total_budget'] ?? null,
+            'roadmap_forecast_total' => $roadmapWidget['budget']['forecast_total'] ?? null,
         ];
     }
 
     public function getItCyberMetrics(array $range): array
     {
-        // Security incidents
         $securityIncidents = ControlRoomAlert::whereBetween('triggered_at', [$range['start'], $range['end']])
             ->where('alert_type', 'like', '%security%')
             ->count();
 
-        // System uptime (mock - would integrate with monitoring)
-        $uptime = 99.5;
+        $totalMinutes = max(1, Carbon::parse($range['start'])->diffInMinutes(Carbon::parse($range['end'])));
+        $downtimeMinutes = ControlRoomAlert::whereBetween('triggered_at', [$range['start'], $range['end']])
+            ->where('alert_type', 'like', '%outage%')
+            ->whereNotNull('resolved_at')
+            ->selectRaw('SUM(TIMESTAMPDIFF(MINUTE, triggered_at, resolved_at)) as total')
+            ->value('total');
 
-        // Open critical alerts
+        $uptime = $downtimeMinutes === null
+            ? null
+            : round((($totalMinutes - min((float) $downtimeMinutes, $totalMinutes)) / $totalMinutes) * 100, 1);
+
         $criticalAlerts = ControlRoomAlert::where('severity', 'critical')
             ->whereIn('status', ['open', 'acknowledged'])
             ->count();
@@ -278,7 +297,9 @@ class DashboardAggregatorService
             'security_incidents' => $securityIncidents,
             'uptime_percentage' => $uptime,
             'critical_open_alerts' => $criticalAlerts,
-            'status' => $criticalAlerts > 0 ? 'critical' : ($securityIncidents > 0 ? 'warning' : 'good'),
+            'status' => $criticalAlerts > 0
+                ? 'critical'
+                : ($securityIncidents > 0 || ($uptime !== null && $uptime < 99) ? 'warning' : 'good'),
         ];
     }
 

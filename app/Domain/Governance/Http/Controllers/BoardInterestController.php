@@ -15,10 +15,11 @@ class BoardInterestController extends Controller
         abort_unless(request()->user()?->canDo('governance.interests.view'), 403);
 
         $interests = BoardMemberInterest::with('boardMember.user')
-            ->where('is_active', true)
+            ->where('is_current', true)
             ->orderBy('board_member_id')
             ->get()
-            ->groupBy('board_member_id');
+            ->groupBy('board_member_id')
+            ->map(fn ($memberInterests) => $memberInterests->map(fn (BoardMemberInterest $interest) => $this->presentInterest($interest)));
 
         $boardMembers = BoardMember::with('user')->active()->get();
 
@@ -52,8 +53,16 @@ class BoardInterestController extends Controller
         ]);
 
         BoardMemberInterest::create([
-            ...$validated,
-            'declared_at' => now(),
+            'board_member_id' => $validated['board_member_id'],
+            'interest_type' => $validated['interest_type'],
+            'entity_name' => $validated['organization_name'] ?? null,
+            'description' => $validated['description'],
+            'nature' => $validated['nature_of_interest'],
+            'declared_at' => $validated['date_from'],
+            'ceased_at' => $validated['date_to'] ?? null,
+            'is_current' => $validated['is_active'] ?? true,
+            'notes' => null,
+            'recorded_by' => $request->user()->id,
         ]);
 
         return redirect()->back()->with('success', 'Interest declared.');
@@ -65,11 +74,15 @@ class BoardInterestController extends Controller
 
         $validated = $request->validate([
             'description' => 'sometimes|string',
-            'is_active' => 'boolean',
+            'is_active' => 'sometimes|boolean',
             'date_to' => 'nullable|date',
         ]);
 
-        $interest->update($validated);
+        $interest->update([
+            'description' => $validated['description'] ?? $interest->description,
+            'is_current' => $validated['is_active'] ?? $interest->is_current,
+            'ceased_at' => array_key_exists('date_to', $validated) ? $validated['date_to'] : $interest->ceased_at,
+        ]);
 
         return redirect()->back()->with('success', 'Interest updated.');
     }
@@ -87,11 +100,27 @@ class BoardInterestController extends Controller
 
         $interests = BoardMemberInterest::where('board_member_id', $boardMember->id)
             ->orderByDesc('declared_at')
-            ->get();
+            ->get()
+            ->map(fn (BoardMemberInterest $interest) => $this->presentInterest($interest));
 
         return Inertia::render('Governance/Interests/MyInterests', [
             'interests' => $interests,
             'boardMember' => $boardMember,
         ]);
+    }
+
+    protected function presentInterest(BoardMemberInterest $interest): array
+    {
+        return [
+            'id' => $interest->id,
+            'interest_type' => $interest->interest_type,
+            'description' => $interest->description,
+            'organization_name' => $interest->entity_name,
+            'nature_of_interest' => $interest->nature,
+            'date_from' => $interest->declared_at?->toDateString(),
+            'date_to' => $interest->ceased_at?->toDateString(),
+            'is_active' => (bool) $interest->is_current,
+            'declared_at' => $interest->declared_at?->toDateString(),
+        ];
     }
 }

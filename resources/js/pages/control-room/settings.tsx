@@ -971,7 +971,11 @@ export default function ControlRoomSettings({
     function handleToggleRuleActive(rule: SignalRuleData) {
         router.put(
             `/control-room/settings/rules/${rule.id}`,
-            { ...rule, is_active: !rule.is_active },
+            {
+                ...rule,
+                conditions: (rule.conditions ?? {}) as Record<string, string | number | boolean | null>,
+                is_active: !rule.is_active,
+            },
             { preserveScroll: true },
         );
     }

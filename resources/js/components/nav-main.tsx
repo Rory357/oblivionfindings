@@ -30,8 +30,12 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     const current = resolveUrl(currentUrl);
     const item = resolveUrl(itemHref);
 
-    const [currentPath, currentQuery = ''] = current.split('?');
-    const [itemPath, itemQuery = ''] = item.split('?');
+    const currentParts = current.split('?');
+    const itemParts = item.split('?');
+    const currentPath = currentParts[0] ?? '/';
+    const currentQuery = currentParts[1] ?? '';
+    const itemPath = itemParts[0] ?? '/';
+    const itemQuery = itemParts[1] ?? '';
 
     const normalizedCurrentPath = normalizePath(currentPath);
     const normalizedItemPath = normalizePath(itemPath);

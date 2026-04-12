@@ -147,7 +147,7 @@ export default function MedicationsIndex({ date, clients }: Props) {
                     <h2 className="mb-3 text-sm font-medium text-slate-700">Client Medication Status</h2>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {clients.map((c) => (
-                            <Card key={c.id} className={`transition-shadow hover:shadow-md ${c.has_critical_alerts || c.discrepancy_count > 0 ? 'border-red-300' : c.has_alerts ? 'border-amber-300' : ''}`}>
+                            <Card key={c.id} className={`transition-shadow hover:shadow-md ${c.has_critical_alerts || (c.discrepancy_count ?? 0) > 0 ? 'border-red-300' : c.has_alerts ? 'border-amber-300' : ''}`}>
                                 <CardHeader className="pb-2">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="text-base">
@@ -157,10 +157,10 @@ export default function MedicationsIndex({ date, clients }: Props) {
                                         </CardTitle>
                                         {/* Alert indicators */}
                                         <div className="flex items-center gap-1">
-                                            {c.discrepancy_count > 0 && (
+                                            {(c.discrepancy_count ?? 0) > 0 && (
                                                 <div className="flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800" title="Controlled drug discrepancy">
                                                     <XCircle className="h-3 w-3" />
-                                                    {c.discrepancy_count}
+                                                    {c.discrepancy_count ?? 0}
                                                 </div>
                                             )}
                                             {c.has_critical_alerts && (

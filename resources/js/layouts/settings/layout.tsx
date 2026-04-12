@@ -3,7 +3,7 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
 import { edit as editPassword } from '@/routes/user-password';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, type InertiaLinkProps, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
@@ -40,7 +40,7 @@ interface NavSection {
     items: {
         icon: LucideIcon;
         title: string;
-        href: string;
+        href: NonNullable<InertiaLinkProps['href']>;
         permission?: string;
     }[];
 }
@@ -51,6 +51,8 @@ const navSections: NavSection[] = [
         items: [
             { icon: User, title: 'Profile', href: edit() },
             { icon: Palette, title: 'Appearance', href: editAppearance() },
+            { icon: Lock, title: 'Password', href: editPassword() },
+            { icon: ShieldCheck, title: 'Two-Factor Authentication', href: show() },
         ],
     },
     {
@@ -150,7 +152,7 @@ function NavContent({ currentPath, can }: { currentPath: string; can: Record<str
                             const Icon = item.icon;
                             return (
                                 <Link
-                                    key={item.href}
+                                    key={`${section.label}:${item.title}:${typeof item.href === 'string' ? item.href : item.href.url}`}
                                     href={item.href}
                                     className={cn(
                                         'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',
@@ -178,14 +180,10 @@ function NavContent({ currentPath, can }: { currentPath: string; can: Record<str
 }
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
-    if (typeof window === 'undefined') {
-        return null;
-    }
-
-    const currentPath = window.location.pathname;
     const { auth } = usePage().props as any;
     const can = auth?.can;
     const [mobileOpen, setMobileOpen] = useState(false);
+    const currentPath = typeof window === 'undefined' ? '/settings' : window.location.pathname;
 
     // Find current page title for mobile header
     const currentTitle = useMemo(() => {
@@ -198,6 +196,10 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         }
         return 'Settings';
     }, [currentPath]);
+
+    if (typeof window === 'undefined') {
+        return null;
+    }
 
     return (
         <div className="flex h-full min-h-0">

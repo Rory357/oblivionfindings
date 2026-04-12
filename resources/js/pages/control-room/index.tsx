@@ -213,6 +213,39 @@ function actionLabel(action: string): string {
     return map[action] || action.split('.').pop()?.replace(/([A-Z])/g, ' $1').trim() || action;
 }
 
+function HorizontalBars({
+    data,
+    maxItems = 5,
+}: {
+    data: Record<string, number>;
+    maxItems?: number;
+}) {
+    const entries = Object.entries(data).slice(0, maxItems);
+    const max = Math.max(...entries.map(([, v]) => v), 1);
+
+    return (
+        <div className="space-y-2.5">
+            {entries.map(([label, count]) => (
+                <div key={label}>
+                    <div className="flex items-center justify-between text-xs">
+                        <span className="truncate capitalize text-muted-foreground">{label.replace(/_/g, ' ')}</span>
+                        <span className="ml-2 font-medium">{count}</span>
+                    </div>
+                    <div className="mt-1 h-2 rounded-full bg-muted">
+                        <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${(count / max) * 100}%` }}
+                        />
+                    </div>
+                </div>
+            ))}
+            {entries.length === 0 && (
+                <p className="py-4 text-center text-xs text-muted-foreground">No data</p>
+            )}
+        </div>
+    );
+}
+
 export default function ControlRoomIndex({
     alerts,
     stats,
@@ -305,33 +338,6 @@ export default function ControlRoomIndex({
     const todayTrend = alerts_yesterday > 0
         ? Math.round(((alerts_today - alerts_yesterday) / alerts_yesterday) * 100)
         : 0;
-
-    // Horizontal bar helper
-    function HorizontalBars({ data, maxItems = 5 }: { data: Record<string, number>; maxItems?: number }) {
-        const entries = Object.entries(data).slice(0, maxItems);
-        const max = Math.max(...entries.map(([, v]) => v), 1);
-        return (
-            <div className="space-y-2.5">
-                {entries.map(([label, count]) => (
-                    <div key={label}>
-                        <div className="flex items-center justify-between text-xs">
-                            <span className="truncate capitalize text-muted-foreground">{label.replace(/_/g, ' ')}</span>
-                            <span className="ml-2 font-medium">{count}</span>
-                        </div>
-                        <div className="mt-1 h-2 rounded-full bg-muted">
-                            <div
-                                className="h-full rounded-full bg-primary transition-all"
-                                style={{ width: `${(count / max) * 100}%` }}
-                            />
-                        </div>
-                    </div>
-                ))}
-                {entries.length === 0 && (
-                    <p className="py-4 text-center text-xs text-muted-foreground">No data</p>
-                )}
-            </div>
-        );
-    }
 
     return (
         <AppLayout
@@ -507,7 +513,7 @@ export default function ControlRoomIndex({
                                             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                             <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                                             <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" domain={[0, 100]} />
-                                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v: number) => [`${v}%`, 'Compliance']} />
+                                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v?: number) => [`${v ?? 0}%`, 'Compliance']} />
                                             <Area type="monotone" dataKey="compliance_pct" stroke="#22c55e" strokeWidth={2} fill="url(#colorSla)" />
                                         </AreaChart>
                                     </ResponsiveContainer>
@@ -531,7 +537,7 @@ export default function ControlRoomIndex({
                                             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                             <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                                             <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" allowDecimals={false} />
-                                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v: number) => [v, 'Escalated']} />
+                                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} formatter={(v?: number) => [v ?? 0, 'Escalated']} />
                                             <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
@@ -561,7 +567,7 @@ export default function ControlRoomIndex({
                                                         <Cell key={entry.name} fill={DONUT_COLORS[entry.name] || '#94a3b8'} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip formatter={(value: number, name: string) => [value, name]} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                                                <Tooltip formatter={(value?: number, name?: string) => [value ?? 0, name ?? '']} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                         <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -664,7 +670,7 @@ export default function ControlRoomIndex({
                                                     borderRadius: '8px',
                                                     fontSize: '12px',
                                                 }}
-                                                formatter={(v: number) => [v, 'Active alerts']}
+                                                formatter={(v?: number) => [v ?? 0, 'Active alerts']}
                                             />
                                             <Bar dataKey="active_alerts" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={16} />
                                         </BarChart>
@@ -754,13 +760,13 @@ export default function ControlRoomIndex({
                                                     borderRadius: '8px',
                                                     fontSize: '12px',
                                                 }}
-                                                formatter={(value: number, name: string) => {
+                                                formatter={(value?: number, name?: string) => {
                                                     const labels: Record<string, string> = {
                                                         total_alerts: 'Total',
                                                         critical_count: 'Critical',
                                                         escalated_count: 'Escalated',
                                                     };
-                                                    return [value, labels[name] || name];
+                                                    return [value ?? 0, labels[name ?? ''] || name || ''];
                                                 }}
                                             />
                                             <Legend

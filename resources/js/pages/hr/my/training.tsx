@@ -241,7 +241,7 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                             ? `${config.border} ring-2 ring-offset-2`
                                             : 'hover:border-primary/30'
                                     }`}
-                                    style={isActive ? { borderColor: config.color, ringColor: config.color } : undefined}
+                                    style={isActive ? { borderColor: config.color, boxShadow: `0 0 0 2px ${config.color}` } : undefined}
                                 >
                                     <div className="flex items-center justify-between">
                                         <div>

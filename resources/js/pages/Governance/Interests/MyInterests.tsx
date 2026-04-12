@@ -58,7 +58,7 @@ export default function MyInterests({ auth, interests, boardMember }: Props) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">My Interests</h1>
-          <Button onClick={() => setShowForm(!showForm)}>
+          <Button onClick={() => setShowForm(!showForm)} dusk="declare-interest">
             <Plus className="w-4 h-4 mr-2" /> Declare Interest
           </Button>
         </div>
@@ -83,29 +83,29 @@ export default function MyInterests({ auth, interests, boardMember }: Props) {
                 </div>
                 <div>
                   <Label>Organization</Label>
-                  <Input value={data.organization_name} onChange={e => setData('organization_name', e.target.value)} />
+                  <Input dusk="interest-organization" value={data.organization_name} onChange={e => setData('organization_name', e.target.value)} />
                 </div>
                 <div>
                   <Label>Nature of Interest</Label>
-                  <Input value={data.nature_of_interest} onChange={e => setData('nature_of_interest', e.target.value)} />
+                  <Input dusk="interest-nature" value={data.nature_of_interest} onChange={e => setData('nature_of_interest', e.target.value)} />
                 </div>
                 <div>
                   <Label>Description</Label>
-                  <Textarea value={data.description} onChange={e => setData('description', e.target.value)} rows={3} />
+                  <Textarea dusk="interest-description" value={data.description} onChange={e => setData('description', e.target.value)} rows={3} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>From</Label>
-                    <Input type="date" value={data.date_from} onChange={e => setData('date_from', e.target.value)} />
+                    <Input dusk="interest-date-from" type="date" value={data.date_from} onChange={e => setData('date_from', e.target.value)} />
                   </div>
                   <div>
                     <Label>To (blank = ongoing)</Label>
-                    <Input type="date" value={data.date_to} onChange={e => setData('date_to', e.target.value)} />
+                    <Input dusk="interest-date-to" type="date" value={data.date_to} onChange={e => setData('date_to', e.target.value)} />
                   </div>
                 </div>
                 <div className="flex justify-end gap-3">
                   <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-                  <Button type="submit" disabled={processing}>Submit</Button>
+                  <Button type="submit" disabled={processing} dusk="submit-interest">Submit</Button>
                 </div>
               </form>
             </CardContent>

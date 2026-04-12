@@ -107,7 +107,9 @@ function statusBadge(status: string) {
 export default function IncidentIndex({ incidents: rawIncidents, vehicles, filters, stats }: Props) {
     const allIncidents = Array.isArray(rawIncidents) ? rawIncidents : (rawIncidents?.data ?? []);
     const paginationLinks = !Array.isArray(rawIncidents) ? rawIncidents?.links ?? [] : [];
-    const paginationMeta = !Array.isArray(rawIncidents) ? rawIncidents?.meta ?? {} : {};
+    const paginationMeta = !Array.isArray(rawIncidents)
+        ? rawIncidents?.meta ?? { current_page: 1, last_page: 1, total: 0 }
+        : { current_page: 1, last_page: 1, total: 0 };
     const resolvedCount = allIncidents.filter((i) => i.status === 'resolved' || i.status === 'closed').length;
     const resolutionRate = allIncidents.length > 0 ? Math.round((resolvedCount / allIncidents.length) * 100) : 0;
 

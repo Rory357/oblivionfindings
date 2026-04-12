@@ -111,16 +111,18 @@ function DepartmentDialog({
         };
 
         if (isEdit) {
+            form.transform(() => payload);
             form.put(`/hr/departments/${department!.id}`, {
-                data: payload,
                 onSuccess: () => onClose(),
                 preserveScroll: true,
+                onFinish: () => form.transform((data) => data),
             });
         } else {
+            form.transform(() => payload);
             form.post('/hr/departments', {
-                data: payload,
                 onSuccess: () => onClose(),
                 preserveScroll: true,
+                onFinish: () => form.transform((data) => data),
             });
         }
     }

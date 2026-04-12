@@ -3,133 +3,130 @@ import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { CheckCircle2, AlertTriangle, Clock, FileText } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 interface Props extends PageProps {
-    obligations: Record<string, any[]>;
+  report: {
     summary: {
-        total: number;
-        complete: number;
-        overdue: number;
-        due_soon: number;
+      total: number;
+      complete: number;
+      overdue: number;
+      due_soon: number;
+      completion_rate: number;
     };
+    frameworks: Array<{
+      key: string;
+      title: string;
+      count: number;
+      items: Array<{
+        id: number;
+        title: string;
+        code: string;
+        owner: string | null;
+        due_date: string | null;
+        status: string;
+        days_remaining: number | null;
+      }>;
+    }>;
+  };
 }
 
-const statusColors: Record<string, string> = {
-    complete: 'bg-green-100 text-green-800 border-green-200',
-    compliant: 'bg-green-100 text-green-800 border-green-200',
-    overdue: 'bg-red-100 text-red-800 border-red-200',
-    due_soon: 'bg-amber-100 text-amber-800 border-amber-200',
-    pending: 'bg-gray-100 text-gray-800 border-gray-200',
-    in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
+const statusStyles: Record<string, string> = {
+  complete: 'bg-green-100 text-green-800 border-green-200',
+  overdue: 'bg-red-100 text-red-800 border-red-200',
+  due_soon: 'bg-amber-100 text-amber-800 border-amber-200',
+  not_due: 'bg-sky-100 text-sky-800 border-sky-200',
 };
 
-export default function ComplianceStatus({ auth, obligations, summary }: Props) {
-    const formatDate = (d: string | null) =>
-        d ? new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+export default function ComplianceStatus({ auth, report }: Props) {
+  return (
+    <AppLayout
+      user={auth.user}
+      breadcrumbs={[
+        { title: 'Governance', href: '/governance/dashboard' },
+        { title: 'Reports', href: '/governance/reports' },
+        { title: 'Compliance', href: '#' },
+      ]}
+    >
+      <Head title="Compliance Status Report" />
 
-    return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Reports', href: '/governance/reports' },
-                { title: 'Compliance', href: '#' },
-            ]}
-        >
-            <Head title="Compliance Status Report" />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-6 space-y-2">
+          <h1 className="text-3xl font-bold text-slate-900">Compliance Status Report</h1>
+          <p className="text-sm text-slate-600">A framework-by-framework view of obligations due, overdue, and complete.</p>
+        </div>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Compliance Status Report</h1>
-                    <p className="text-gray-500 mt-1">Obligation status across all frameworks</p>
-                </div>
+        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {[
+            { label: 'Total Obligations', value: report.summary.total, tone: 'text-slate-900' },
+            { label: 'Complete', value: report.summary.complete, tone: 'text-green-700' },
+            { label: 'Overdue', value: report.summary.overdue, tone: 'text-red-700' },
+            { label: 'Due Soon', value: report.summary.due_soon, tone: 'text-amber-700' },
+            { label: 'Completion Rate', value: `${report.summary.completion_rate}%`, tone: 'text-sky-700' },
+          ].map((item) => (
+            <Card key={item.label}>
+              <CardContent className="pt-6">
+                <p className="text-sm text-slate-500">{item.label}</p>
+                <p className={`mt-2 text-3xl font-bold ${item.tone}`}>{item.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-gray-500">Total Obligations</p>
-                                    <p className="text-3xl font-bold">{summary.total}</p>
-                                </div>
-                                <FileText className="w-8 h-8 text-gray-400" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-green-200">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-green-600">Complete</p>
-                                    <p className="text-3xl font-bold text-green-600">{summary.complete}</p>
-                                </div>
-                                <CheckCircle2 className="w-8 h-8 text-green-500" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-red-200">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-red-600">Overdue</p>
-                                    <p className="text-3xl font-bold text-red-600">{summary.overdue}</p>
-                                </div>
-                                <AlertTriangle className="w-8 h-8 text-red-500" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-amber-200">
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-amber-600">Due Soon</p>
-                                    <p className="text-3xl font-bold text-amber-600">{summary.due_soon}</p>
-                                </div>
-                                <Clock className="w-8 h-8 text-amber-500" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Overall Progress</CardTitle>
+            <CardDescription>Completion rate across the governance compliance register.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Progress value={report.summary.completion_rate} />
+            <p className="text-sm text-slate-600">{report.summary.completion_rate}% of tracked obligations are currently complete.</p>
+          </CardContent>
+        </Card>
 
-                {/* Grouped by Framework */}
-                {Object.keys(obligations).length === 0 ? (
-                    <Card>
-                        <CardContent className="pt-6">
-                            <p className="text-center text-gray-500 py-8">No compliance obligations found.</p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    Object.entries(obligations).map(([framework, items]) => (
-                        <Card key={framework} className="mb-6">
-                            <CardHeader>
-                                <CardTitle className="capitalize">{framework.replace(/_/g, ' ')}</CardTitle>
-                                <CardDescription>{items.length} obligations</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {items.map((ob: any) => (
-                                        <div key={ob.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-gray-900">{ob.title}</p>
-                                                <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                                                    {ob.owner?.name && <span>Owner: {ob.owner.name}</span>}
-                                                    {ob.due_date && <span>Due: {formatDate(ob.due_date)}</span>}
-                                                </div>
-                                            </div>
-                                            <Badge className={statusColors[ob.status] ?? statusColors.pending}>
-                                                {ob.status?.replace(/_/g, ' ')}
-                                            </Badge>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))
-                )}
-            </div>
-        </AppLayout>
-    );
+        <div className="space-y-6">
+          {report.frameworks.length ? (
+            report.frameworks.map((framework) => (
+              <Card key={framework.key}>
+                <CardHeader>
+                  <CardTitle>{framework.title}</CardTitle>
+                  <CardDescription>{framework.count} obligation(s)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {framework.items.map((item) => (
+                    <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-slate-900">{item.title}</p>
+                          <Badge variant="outline">{item.code}</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                          {item.owner && <span>Owner: {item.owner}</span>}
+                          {item.due_date && <span>Due: {item.due_date}</span>}
+                          {item.days_remaining !== null && (
+                            <span>
+                              {item.days_remaining < 0 ? `${Math.abs(item.days_remaining)} day(s) overdue` : `${item.days_remaining} day(s) remaining`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Badge className={statusStyles[item.status] ?? 'bg-slate-100 text-slate-800 border-slate-200'}>
+                        {item.status.replace(/_/g, ' ')}
+                      </Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-slate-500">No compliance obligations were found.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </AppLayout>
+  );
 }

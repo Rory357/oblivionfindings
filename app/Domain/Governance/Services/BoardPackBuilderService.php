@@ -2,9 +2,10 @@
 
 namespace App\Domain\Governance\Services;
 
+use App\Domain\Governance\Models\BoardCommittee;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\GovernanceMeeting;
-use App\Models\User;
+use App\Domain\Governance\Models\GovernanceDocument;
 use Illuminate\Support\Facades\Storage;
 
 class BoardPackBuilderService
@@ -25,23 +26,18 @@ class BoardPackBuilderService
      */
     public function build(GovernanceMeeting $meeting, ?\App\Domain\Governance\Models\DashboardSnapshot $snapshot = null): BoardPack
     {
-        // Capture or use provided snapshot
         $snapshot = $snapshot ?? $this->dashboardService->captureSnapshot('month');
-
-        // Generate document manifest
-        $manifest = $this->buildDocumentManifest($meeting);
-
-        // Build content data
-        $content = $this->buildPackContent($meeting, $snapshot, $manifest);
-
-        // Try PDF generation if library is available, otherwise store as JSON
+        $content = $this->buildPackContent($meeting, $snapshot);
+        $manifest = $this->buildDocumentManifest($content);
         $fileData = $this->generateFile($meeting, $content);
 
-        // Create board pack record
         $pack = BoardPack::create([
             'governance_meeting_id' => $meeting->id,
             'dashboard_snapshot_id' => $snapshot->id,
-            'document_manifest' => array_merge($manifest, ['content' => $content]),
+            'document_manifest' => [
+                'manifest_sections' => $manifest,
+                'content_sections' => $content,
+            ],
             'generated_at' => now(),
             'generated_by' => auth()->id() ?? $meeting->created_by,
             'file_path' => $fileData['path'] ?? null,
@@ -56,51 +52,29 @@ class BoardPackBuilderService
     /**
      * Build the document manifest
      */
-    protected function buildDocumentManifest(GovernanceMeeting $meeting): array
+    protected function buildDocumentManifest(array $content): array
     {
-        $manifest = [
-            ['id' => 'cover', 'title' => 'Cover & Agenda', 'type' => 'auto', 'included' => true],
-            ['id' => 'dashboard', 'title' => 'Dashboard Snapshot', 'type' => 'auto', 'included' => true],
-            ['id' => 'risk_report', 'title' => 'Risk Report', 'type' => 'auto', 'included' => true],
-        ];
-
-        // Add CEO performance if People Committee or Full Board
-        if ($meeting->isFullBoard() || $meeting->meeting_type === 'people') {
-            $manifest[] = ['id' => 'ceo_performance', 'title' => 'CEO Performance Scorecard', 'type' => 'auto', 'included' => true];
-        }
-
-        // Add finance report if Finance Committee or Full Board
-        if ($meeting->isFullBoard() || $meeting->meeting_type === 'finance') {
-            $manifest[] = ['id' => 'finance_report', 'title' => 'Finance Committee Report', 'type' => 'auto', 'included' => true];
-        }
-
-        // Add committee reports
-        if ($meeting->isFullBoard()) {
-            $manifest[] = ['id' => 'committee_reports', 'title' => 'Committee Reports', 'type' => 'auto', 'included' => true];
-        }
-
-        // Add agenda item supporting docs
-        foreach ($meeting->agendaItems as $item) {
-            if ($item->supporting_doc_ids) {
-                $manifest[] = [
-                    'id' => 'agenda_' . $item->id,
-                    'title' => $item->title . ' - Supporting Documents',
-                    'type' => 'attachment',
+        return collect($content)
+            ->map(function ($section, $key) {
+                return [
+                    'id' => $key,
+                    'title' => $this->sectionTitle($key),
+                    'type' => $key === 'supporting_documents' ? 'attachment' : 'auto',
                     'included' => true,
-                    'agenda_item_id' => $item->id,
                 ];
-            }
-        }
-
-        return $manifest;
+            })
+            ->values()
+            ->all();
     }
 
     /**
      * Build pack content sections
      */
-    protected function buildPackContent(GovernanceMeeting $meeting, $snapshot, array $manifest): array
+    protected function buildPackContent(GovernanceMeeting $meeting, $snapshot): array
     {
-        return [
+        $meeting->loadMissing(['agendaItems.presenter', 'ceoReport.submittedBy', 'resolutions']);
+
+        $content = [
             'cover' => [
                 'title' => $meeting->title,
                 'date' => $meeting->scheduled_at->format('l, j F Y'),
@@ -116,6 +90,47 @@ class BoardPackBuilderService
             'dashboard' => $snapshot->snapshot_data['widgets'] ?? [],
             'risk_report' => $this->riskService->generateBoardReport(),
         ];
+
+        if ($financeSection = $this->buildFinanceSection($snapshot)) {
+            $content['finance_report'] = $financeSection;
+        }
+
+        if ($meeting->ceoReport) {
+            $content['ceo_report'] = [
+                'status' => $meeting->ceoReport->status,
+                'submitted_at' => $meeting->ceoReport->submitted_at?->toIso8601String(),
+                'submitted_by' => $meeting->ceoReport->submittedBy?->name,
+                'operational_summary' => $meeting->ceoReport->operational_summary,
+                'key_achievements' => $meeting->ceoReport->key_achievements,
+                'challenges_and_risks' => $meeting->ceoReport->challenges_and_risks,
+                'staffing_update' => $meeting->ceoReport->staffing_update,
+                'compliance_status' => $meeting->ceoReport->compliance_status,
+                'financial_summary' => $meeting->ceoReport->financial_summary,
+                'recommendations' => $meeting->ceoReport->recommendations,
+            ];
+        }
+
+        if ($committeeReports = $this->buildCommitteeReports($meeting)) {
+            $content['committee_reports'] = ['items' => $committeeReports];
+        }
+
+        if ($supportingDocs = $this->buildSupportingDocuments($meeting)) {
+            $content['supporting_documents'] = ['items' => $supportingDocs];
+        }
+
+        if ($meeting->resolutions->isNotEmpty()) {
+            $content['resolutions'] = [
+                'items' => $meeting->resolutions->map(fn ($resolution) => [
+                    'id' => $resolution->id,
+                    'reference' => $resolution->resolution_reference,
+                    'title' => $resolution->title,
+                    'status' => $resolution->status,
+                    'deadline' => $resolution->deadline?->toDateString(),
+                ])->values()->all(),
+            ];
+        }
+
+        return $content;
     }
 
     /**
@@ -241,33 +256,25 @@ class BoardPackBuilderService
     public function regenerate(BoardPack $pack): BoardPack
     {
         $meeting = $pack->meeting;
-
-        // Delete old file
         if ($pack->file_path && Storage::exists($pack->file_path)) {
             Storage::delete($pack->file_path);
         }
 
-        // Delete old snapshot if it exists
         if ($pack->snapshot) {
             $pack->snapshot->delete();
         }
 
-        // Capture fresh snapshot
         $snapshot = $this->dashboardService->captureSnapshot('month');
-
-        // Generate document manifest
-        $manifest = $this->buildDocumentManifest($meeting);
-
-        // Build content data
-        $content = $this->buildPackContent($meeting, $snapshot, $manifest);
-
-        // Generate file
+        $content = $this->buildPackContent($meeting, $snapshot);
+        $manifest = $this->buildDocumentManifest($content);
         $fileData = $this->generateFile($meeting, $content);
 
-        // Update existing pack record instead of creating new one
         $pack->update([
             'dashboard_snapshot_id' => $snapshot->id,
-            'document_manifest' => array_merge($manifest, ['content' => $content]),
+            'document_manifest' => [
+                'manifest_sections' => $manifest,
+                'content_sections' => $content,
+            ],
             'generated_at' => now(),
             'generated_by' => auth()->id() ?? $meeting->created_by,
             'file_path' => $fileData['path'] ?? null,
@@ -303,7 +310,8 @@ class BoardPackBuilderService
     public function preview(GovernanceMeeting $meeting): array
     {
         $snapshot = $this->dashboardService->captureSnapshot('month');
-        $manifest = $this->buildDocumentManifest($meeting);
+        $content = $this->buildPackContent($meeting, $snapshot);
+        $manifest = $this->buildDocumentManifest($content);
 
         return [
             'meeting' => [
@@ -331,13 +339,96 @@ class BoardPackBuilderService
             $pages += match($item['id']) {
                 'dashboard' => 3,
                 'risk_report' => 4,
-                'ceo_performance' => 3,
+                'ceo_report' => 3,
                 'finance_report' => 5,
                 'committee_reports' => 3,
+                'supporting_documents' => 2,
                 default => 1,
             };
         }
 
         return $pages;
+    }
+
+    protected function buildFinanceSection($snapshot): ?array
+    {
+        $financial = $snapshot->snapshot_data['widgets']['financial'] ?? null;
+        if (! is_array($financial)) {
+            return null;
+        }
+
+        return [
+            'fiscal_year' => $financial['fiscal_year'] ?? null,
+            'utilization' => isset($financial['budget_utilization']) ? round((float) $financial['budget_utilization'], 1) . '%' : 'Unavailable',
+            'variance' => isset($financial['variance']) ? round((float) $financial['variance'], 1) . '%' : 'Unavailable',
+            'budget_total' => $financial['budget_total'] ?? null,
+            'actual_total' => $financial['actual_total'] ?? null,
+            'roadmap_forecast_total' => $financial['roadmap_forecast_total'] ?? null,
+            'governance_envelope_total' => $financial['governance_envelope_total'] ?? null,
+        ];
+    }
+
+    protected function buildCommitteeReports(GovernanceMeeting $meeting): array
+    {
+        if (! $meeting->isFullBoard()) {
+            return [];
+        }
+
+        return BoardCommittee::query()
+            ->with('chair.user')
+            ->where('is_active', true)
+            ->get()
+            ->map(fn (BoardCommittee $committee) => [
+                'id' => $committee->id,
+                'name' => $committee->name,
+                'chair' => $committee->chair?->user?->name,
+                'meeting_frequency' => $committee->meeting_frequency,
+                'description' => $committee->description,
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function buildSupportingDocuments(GovernanceMeeting $meeting): array
+    {
+        $documentIds = $meeting->agendaItems
+            ->pluck('supporting_doc_ids')
+            ->flatten()
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($documentIds->isEmpty()) {
+            return [];
+        }
+
+        return GovernanceDocument::query()
+            ->whereIn('id', $documentIds)
+            ->get()
+            ->map(fn (GovernanceDocument $document) => [
+                'id' => $document->id,
+                'title' => $document->title,
+                'category' => $document->category,
+                'document_type' => $document->document_type,
+                'version_number' => $document->version_number,
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function sectionTitle(string $key): string
+    {
+        return match ($key) {
+            'cover' => 'Cover & Meeting Overview',
+            'agenda' => 'Agenda',
+            'dashboard' => 'Executive Dashboard Snapshot',
+            'risk_report' => 'Risk Report',
+            'finance_report' => 'Financial Summary',
+            'ceo_report' => 'CEO Board Report',
+            'committee_reports' => 'Committee Updates',
+            'supporting_documents' => 'Supporting Documents',
+            'resolutions' => 'Decision Papers',
+            default => str($key)->replace('_', ' ')->title()->toString(),
+        };
     }
 }

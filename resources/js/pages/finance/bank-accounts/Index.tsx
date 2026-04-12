@@ -162,7 +162,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip formatter={(value: number) => [formatCurrency(value), 'Balance']} />
+                                                <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Balance']} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>

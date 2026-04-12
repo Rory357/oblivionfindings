@@ -11,6 +11,7 @@ use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Models\MeetingAttendance;
 use App\Domain\Governance\Models\MeetingMinute;
 use App\Domain\Governance\Services\GovernanceWorkflowService;
+use App\Domain\Governance\Support\GovernancePresenter;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -19,7 +20,8 @@ use Inertia\Inertia;
 class GovernanceMeetingController extends Controller
 {
     public function __construct(
-        protected GovernanceWorkflowService $workflowService
+        protected GovernanceWorkflowService $workflowService,
+        protected GovernancePresenter $presenter,
     ) {}
 
     public function create()
@@ -125,6 +127,7 @@ class GovernanceMeetingController extends Controller
             'secretary.user',
             'agendaItems.presenter',
             'attendances.boardMember.user',
+            'ceoReport.submittedBy',
             'minutes',
             'boardPack',
             'resolutions',
@@ -132,6 +135,7 @@ class GovernanceMeetingController extends Controller
 
         $quorum = $meeting->calculateQuorum();
         $boardMembers = BoardMember::with('user')->active()->get();
+        $workflowChecklist = $this->workflowService->meetingChecklist($meeting, auth()->user());
 
         return Inertia::render('Governance/Meetings/Show', [
             'meeting' => $meeting,
@@ -140,7 +144,8 @@ class GovernanceMeetingController extends Controller
             'canEdit' => $meeting->isEditable() && auth()->user()->can('update', $meeting),
             'canManageMinutes' => auth()->user()->can('manageMinutes', $meeting),
             'canApproveMinutes' => auth()->user()->can('approveMinutes', $meeting),
-            'workflowChecklist' => $this->workflowService->meetingChecklist($meeting, auth()->user()),
+            'workflowChecklist' => $workflowChecklist,
+            'meetingCockpit' => $this->presenter->meetingCockpit($meeting, $quorum, $workflowChecklist),
         ]);
     }
 

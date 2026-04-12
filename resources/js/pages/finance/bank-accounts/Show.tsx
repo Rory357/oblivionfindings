@@ -169,7 +169,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                         <XAxis dataKey="date" tick={{ fontSize: 12 }} className="text-muted-foreground" />
                                         <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" tickFormatter={(v) => formatCurrency(v)} />
-                                        <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
+                                        <Tooltip formatter={(value?: number) => [formatCurrency(value ?? 0), 'Amount']} />
                                         <Line
                                             type="monotone"
                                             dataKey="amount"

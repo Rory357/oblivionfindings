@@ -68,7 +68,7 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
         initialMapping[String(account.id)] = mapped;
     });
 
-    const { data, setData, put, processing } = useForm({
+    const { data, setData, put, processing, transform } = useForm({
         account_mapping: initialMapping,
         tax_mapping: integration.tax_mapping ?? {},
     });
@@ -90,11 +90,13 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
             }
         });
 
+        transform(() => ({
+            account_mapping: filteredMapping,
+            tax_mapping: data.tax_mapping,
+        }));
+
         put(`/finance/integrations/${integration.id}/mapping`, {
-            data: {
-                account_mapping: filteredMapping,
-                tax_mapping: data.tax_mapping,
-            },
+            onFinish: () => transform((currentData) => currentData),
         });
     }
 

@@ -198,7 +198,7 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                 value={form.data.client_id}
                                 disabled={!!shift}
                                 onChange={(e) =>
-                                    form.setData('client_id', e.target.value)
+                                    form.setData('client_id', Number(e.target.value))
                                 }
                             >
                                 {clients.map((c) => (

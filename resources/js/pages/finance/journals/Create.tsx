@@ -98,6 +98,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
     const totalCredits = data.lines.reduce((sum, l) => sum + (parseFloat(l.credit) || 0), 0);
     const difference = Math.round((totalDebits - totalCredits) * 100) / 100;
     const isBalanced = difference === 0 && totalDebits > 0;
+    const postingError = (errors as Record<string, string | undefined>).posting;
 
     const updateLine = (index: number, field: keyof JournalLine, value: string) => {
         const updated = [...data.lines];
@@ -139,9 +140,9 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                     <p className="text-gray-500 mt-1">Create a manual general ledger journal entry</p>
                 </div>
 
-                {errors.posting && (
+                {postingError && (
                     <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-4">
-                        <p className="text-sm text-red-800">{errors.posting}</p>
+                        <p className="text-sm text-red-800">{postingError}</p>
                     </div>
                 )}
 

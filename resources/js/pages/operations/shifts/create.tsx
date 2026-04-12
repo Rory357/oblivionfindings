@@ -515,7 +515,7 @@ export default function ShiftCreate({
                                 value={form.data.client_id}
                                 onChange={(e) => {
                                     const nextId = e.target.value;
-                                    form.setData('client_id', nextId);
+                                    form.setData('client_id', Number(nextId));
 
                                     // If service context not manually selected yet, inherit from client
                                     if (!form.data.service_context_id) {

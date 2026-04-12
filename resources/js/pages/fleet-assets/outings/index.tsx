@@ -100,9 +100,6 @@ export default function OutingsIndex({ outings, filters, stats, chart_data }: Pr
         }, { preserveState: true, preserveScroll: true });
     };
 
-    const chartValues = useMemo(() => safeChartData.map((d) => d.value), [safeChartData]);
-    const chartLabels = useMemo(() => safeChartData.map((d) => d.label), [safeChartData]);
-
     return (
         <AppLayout
             breadcrumbs={[
@@ -155,15 +152,14 @@ export default function OutingsIndex({ outings, filters, stats, chart_data }: Pr
 
                 {/* Chart + Filters */}
                 <div className="grid gap-4 lg:grid-cols-[2fr_3fr]">
-                    {chartValues.some((v) => v > 0) && (
+                    {safeChartData.some((entry) => entry.value > 0) && (
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm">Outings by Day of Week</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <MiniBarChart
-                                    data={chartValues}
-                                    labels={chartLabels}
+                                    data={safeChartData}
                                     color={FLEET_COLORS.primary}
                                     height={120}
                                 />

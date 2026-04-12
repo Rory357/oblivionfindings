@@ -336,7 +336,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, dashb
                                                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                                         <XAxis type="number" tick={{ fontSize: 11 }} />
                                                         <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11 }} />
-                                                        <Tooltip formatter={(value: number) => `${value}h`} />
+                                                        <Tooltip formatter={(value?: number) => `${value ?? 0}h`} />
                                                         <Bar dataKey="hours" fill="#ef4444" radius={[0, 4, 4, 0]} name="Sick Hours" />
                                                     </BarChart>
                                                 </ResponsiveContainer>

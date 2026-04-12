@@ -32,7 +32,7 @@ export const statusColors: Record<string, string> = {
 
 export function getStatusColor(status: string): string {
   const normalized = status.toLowerCase().replace(/[\s-]/g, '_');
-  return statusColors[normalized] || statusColors.draft;
+  return statusColors[normalized] ?? statusColors.draft ?? '';
 }
 
 export const riskScoreColor = (score: number): string => {

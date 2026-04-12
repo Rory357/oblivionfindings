@@ -2,11 +2,12 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { InertiaLinkProps, Link } from '@inertiajs/react';
 import { LucideIcon, Search, FileX, Inbox, AlertCircle } from 'lucide-react';
-import { ReactNode } from 'react';
+import { ReactNode, isValidElement } from 'react';
 
 interface EmptyStateProps {
-    icon?: LucideIcon;
-    title: string;
+    icon?: LucideIcon | ReactNode;
+    title?: string;
+    heading?: string;
     description?: string;
     action?: ReactNode;
     secondaryAction?: ReactNode;
@@ -24,12 +25,21 @@ const iconMap: Record<string, LucideIcon> = {
 export function EmptyState({
     icon: Icon,
     title,
+    heading,
     description,
     action,
     secondaryAction,
     className,
     variant = 'default',
 }: EmptyStateProps) {
+    const resolvedTitle = heading || title || 'Nothing here yet';
+    const IconComponent = typeof Icon === 'function' ? Icon : null;
+    const iconNode = isValidElement(Icon)
+        ? Icon
+        : IconComponent
+          ? <IconComponent className={variant === 'compact' ? 'h-8 w-8 text-muted-foreground/50' : variant === 'inline' ? 'h-4 w-4' : 'h-8 w-8 text-muted-foreground'} />
+          : null;
+
     if (variant === 'inline') {
         return (
             <div
@@ -38,8 +48,8 @@ export function EmptyState({
                     className
                 )}
             >
-                {Icon && <Icon className="h-4 w-4" />}
-                <span>{title}</span>
+                {iconNode}
+                <span>{resolvedTitle}</span>
                 {action && <div className="ml-auto">{action}</div>}
             </div>
         );
@@ -53,8 +63,8 @@ export function EmptyState({
                     className
                 )}
             >
-                {Icon && <Icon className="h-8 w-8 text-muted-foreground/50" />}
-                <h3 className="mt-3 text-sm font-medium">{title}</h3>
+                {iconNode}
+                <h3 className="mt-3 text-sm font-medium">{resolvedTitle}</h3>
                 {description && (
                     <p className="mt-1 text-xs text-muted-foreground">{description}</p>
                 )}
@@ -71,9 +81,9 @@ export function EmptyState({
             )}
         >
             <div className="rounded-full bg-muted p-4">
-                {Icon && <Icon className="h-8 w-8 text-muted-foreground" />}
+                {iconNode}
             </div>
-            <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+            <h3 className="mt-4 text-lg font-semibold">{resolvedTitle}</h3>
             {description && (
                 <p className="mt-2 max-w-sm text-sm text-muted-foreground">
                     {description}
@@ -92,6 +102,7 @@ export function EmptyState({
 // Pre-configured empty states for common scenarios
 
 interface EmptyListProps extends Omit<EmptyStateProps, 'icon'> {
+    icon?: LucideIcon | ReactNode;
     itemName?: string;
     itemNamePlural?: string;
     createHref?: InertiaLinkProps['href'];
@@ -100,6 +111,7 @@ interface EmptyListProps extends Omit<EmptyStateProps, 'icon'> {
 }
 
 export function EmptyList({
+    icon,
     itemName = 'item',
     itemNamePlural,
     createHref,
@@ -127,7 +139,7 @@ export function EmptyList({
 
     return (
         <EmptyState
-            icon={Inbox}
+            icon={icon ?? Inbox}
             title={defaultTitle}
             description={defaultDescription}
             action={action}

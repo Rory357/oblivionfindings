@@ -61,7 +61,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function PurchaseOrderShow() {
-    const { purchaseOrder } = usePage().props as { purchaseOrder: PurchaseOrder };
+    const { purchaseOrder } = usePage().props as unknown as { purchaseOrder: PurchaseOrder };
     const po = purchaseOrder;
     const approver = po.approved_by ?? po.approved_by_user;
     const canApprove = po.status === 'draft';

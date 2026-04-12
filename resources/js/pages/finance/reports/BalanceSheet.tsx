@@ -187,14 +187,14 @@ export default function BalanceSheet({ report, filters }: Props) {
                                             paddingAngle={3}
                                             dataKey="value"
                                             label={({ name, percent }) =>
-                                                `${name} ${(percent * 100).toFixed(0)}%`
+                                                `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
                                             }
                                         >
                                             {pieData.map((_, index) => (
                                                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Tooltip formatter={(value?: number) => formatCurrency(value ?? 0)} />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>

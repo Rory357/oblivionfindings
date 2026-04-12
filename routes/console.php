@@ -3,6 +3,8 @@
 use App\Domain\Finance\Jobs\PostLeaveProvisionJob;
 use App\Domain\Finance\Jobs\PostSiteRentJob;
 use App\Domain\Finance\Jobs\PostSiteUtilitiesJob;
+use App\Domain\Finance\Jobs\SyncBudgetActualsJob;
+use App\Domain\Governance\Jobs\SendBoardDigest;
 use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
 use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
 use App\Domain\Hr\Jobs\EscalateLeaveApprovalsJob;
@@ -290,6 +292,38 @@ app(Schedule::class)
     ->job(new SendRoadmapDigestJob)
     ->timezone('Pacific/Auckland')
     ->weeklyOn(1, '07:30');
+
+// Governance scheduled jobs
+
+app(Schedule::class)
+    ->command('governance:compliance-reminders')
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();
+
+app(Schedule::class)
+    ->command('governance:check-risk-reviews')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:45')
+    ->withoutOverlapping();
+
+app(Schedule::class)
+    ->job(new SyncBudgetActualsJob)
+    ->timezone('Pacific/Auckland')
+    ->hourly()
+    ->withoutOverlapping();
+
+app(Schedule::class)
+    ->command('governance:update-budget-variances')
+    ->timezone('Pacific/Auckland')
+    ->hourlyAt(10)
+    ->withoutOverlapping();
+
+app(Schedule::class)
+    ->job(new SendBoardDigest)
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();
 
 // Timesheet reconciliation: re-sync draft timesheets and re-evaluate submitted timesheets
 app(Schedule::class)

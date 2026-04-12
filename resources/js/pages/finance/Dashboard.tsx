@@ -256,7 +256,7 @@ export default function FinanceDashboard({
                                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                     <XAxis dataKey="month" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
                                     <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                    <Tooltip formatter={(value?: number) => formatCurrency(value ?? 0)} />
                                     <Area type="monotone" dataKey="profit" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} name="Net Profit" />
                                 </AreaChart>
                             </ResponsiveContainer>
@@ -278,7 +278,7 @@ export default function FinanceDashboard({
                                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                         <XAxis dataKey="month" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
                                         <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Tooltip formatter={(value?: number) => formatCurrency(value ?? 0)} />
                                         <Legend />
                                         <Bar dataKey="revenue" fill="#10b981" name="Revenue" radius={[4, 4, 0, 0]} />
                                         <Bar dataKey="expenses" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
@@ -315,7 +315,7 @@ export default function FinanceDashboard({
                                                         <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
                                                     ))}
                                                 </Pie>
-                                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                                <Tooltip formatter={(value?: number) => formatCurrency(value ?? 0)} />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>

@@ -48,6 +48,7 @@ class GovernanceWorkflowService
             'agendaItems',
             'attendances',
             'boardPack',
+            'ceoReport',
             'minutes',
             'resolutions',
         ]);
@@ -56,13 +57,19 @@ class GovernanceWorkflowService
         $attendanceCount = $meeting->attendances->count();
         $quorum = $meeting->calculateQuorum();
         $pack = $meeting->boardPack;
+        $ceoReport = $meeting->ceoReport;
         $minutes = $meeting->minutes;
         $resolutions = $meeting->resolutions->whereIn('status', ['draft', 'open'])->count();
         $isPastMeeting = $meeting->scheduled_at?->isPast() ?? false;
+        $previousMeeting = $this->previousMeeting($meeting);
+        $previousOpenActions = $this->previousMeetingOpenActions($previousMeeting);
 
         $minutesStatus = $minutes?->status;
         $minutesApproved = in_array($minutesStatus, ['approved', 'signed', 'archived'], true);
         $minutesSigned = in_array($minutesStatus, ['signed', 'archived'], true);
+        $ceoSubmitted = in_array($ceoReport?->status, ['submitted', 'included_in_pack'], true);
+        $packDistributedCount = count(array_unique($pack?->distributed_to ?? []));
+        $packReadCount = $pack?->readCount() ?? 0;
 
         $items = collect([
             [
@@ -86,6 +93,19 @@ class GovernanceWorkflowService
                 'blocked_by' => null,
             ],
             [
+                'key' => 'ceo_report',
+                'label' => 'CEO report ready',
+                'status' => $ceoSubmitted ? 'done' : ($agendaCount > 0 ? 'todo' : 'blocked'),
+                'detail' => $ceoSubmitted
+                    ? 'CEO report has been submitted for board pre-read.'
+                    : ($meeting->ceo_report_deadline
+                        ? 'CEO report is still pending. Due ' . $meeting->ceo_report_deadline->format('j M Y g:i A') . '.'
+                        : 'CEO report is still pending for this meeting.'),
+                'action_label' => 'Open CEO Report',
+                'action_url' => $ceoReport ? "/governance/ceo-reports/{$ceoReport->id}" : '/governance/ceo-reports',
+                'blocked_by' => $agendaCount > 0 ? null : 'Agenda is empty',
+            ],
+            [
                 'key' => 'pack_generated',
                 'label' => 'Board pack generated',
                 'status' => $pack !== null ? 'done' : ($agendaCount > 0 ? 'todo' : 'blocked'),
@@ -101,7 +121,7 @@ class GovernanceWorkflowService
                 'label' => 'Board pack distributed',
                 'status' => $pack?->distributed_at ? 'done' : ($pack !== null ? 'todo' : 'blocked'),
                 'detail' => $pack?->distributed_at
-                    ? 'Pack sent to board members.'
+                    ? "Pack sent to {$packDistributedCount} board member(s); {$packReadCount} marked as read."
                     : 'Distribute pack to start pre-read and voting preparation.',
                 'action_label' => $pack !== null ? 'Open Pack' : 'Open Meeting',
                 'action_url' => $pack !== null
@@ -153,6 +173,17 @@ class GovernanceWorkflowService
                 'action_url' => "/governance/meetings/{$meeting->id}?tab=minutes",
                 'blocked_by' => $minutesApproved ? null : 'Minutes not approved',
             ],
+            [
+                'key' => 'follow_through',
+                'label' => 'Previous meeting follow-through reviewed',
+                'status' => $previousOpenActions->isEmpty() ? 'done' : 'todo',
+                'detail' => $previousOpenActions->isEmpty()
+                    ? 'No open action items remain from the previous governance cycle.'
+                    : "{$previousOpenActions->count()} action item(s) are still open from the previous meeting.",
+                'action_label' => 'Open Action Items',
+                'action_url' => '/governance/actions',
+                'blocked_by' => null,
+            ],
         ]);
 
         $nextStep = $items->first(fn (array $item) => ! in_array($item['status'], ['done', 'blocked'], true))
@@ -167,6 +198,39 @@ class GovernanceWorkflowService
             'next_step' => $nextStep,
             'items' => $items->values()->all(),
         ];
+    }
+
+    protected function previousMeeting(GovernanceMeeting $meeting): ?GovernanceMeeting
+    {
+        return GovernanceMeeting::query()
+            ->where('scheduled_at', '<', $meeting->scheduled_at)
+            ->whereNotIn('status', ['cancelled'])
+            ->orderByDesc('scheduled_at')
+            ->first();
+    }
+
+    protected function previousMeetingOpenActions(?GovernanceMeeting $meeting): Collection
+    {
+        if (! $meeting || ! Schema::hasTable('action_items')) {
+            return collect();
+        }
+
+        $resolutionIds = $meeting->resolutions()->pluck('id');
+
+        return ActionItem::query()
+            ->whereIn('status', ['open', 'in_progress', 'blocked'])
+            ->where(function ($query) use ($meeting, $resolutionIds) {
+                $query
+                    ->where(function ($subQuery) use ($meeting) {
+                        $subQuery->where('source_type', 'meeting')
+                            ->where('source_id', $meeting->id);
+                    })
+                    ->orWhere(function ($subQuery) use ($resolutionIds) {
+                        $subQuery->where('source_type', 'resolution')
+                            ->whereIn('source_id', $resolutionIds);
+                    });
+            })
+            ->get();
     }
 
     protected function meetingActions(): Collection

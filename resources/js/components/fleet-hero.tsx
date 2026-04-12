@@ -4,7 +4,8 @@ import { ReactNode } from 'react';
 
 type Props = {
     title: ReactNode;
-    description?: string;
+    description?: ReactNode;
+    subtitle?: ReactNode;
     icon?: ReactNode;
     backHref?: string;
     backLabel?: string;
@@ -16,6 +17,7 @@ type Props = {
 export default function FleetHero({
     title,
     description,
+    subtitle,
     icon,
     backHref,
     backLabel = 'Back',
@@ -23,6 +25,8 @@ export default function FleetHero({
     stats,
     children,
 }: Props) {
+    const supportingText = description ?? subtitle;
+
     return (
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
             <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
@@ -49,8 +53,8 @@ export default function FleetHero({
                         )}
                         <div>
                             <h1 className="text-2xl font-bold md:text-3xl">{title}</h1>
-                            {description && (
-                                <p className="mt-0.5 text-sm text-white/60">{description}</p>
+                            {supportingText && (
+                                <p className="mt-0.5 text-sm text-white/60">{supportingText}</p>
                             )}
                         </div>
                     </div>

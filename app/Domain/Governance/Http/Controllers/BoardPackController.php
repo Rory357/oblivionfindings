@@ -5,6 +5,7 @@ namespace App\Domain\Governance\Http\Controllers;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Services\BoardPackBuilderService;
+use App\Domain\Governance\Support\BoardPackPresenter;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,18 +15,23 @@ use Inertia\Inertia;
 class BoardPackController extends Controller
 {
     public function __construct(
-        protected BoardPackBuilderService $packService
+        protected BoardPackBuilderService $packService,
+        protected BoardPackPresenter $presenter,
     ) {}
 
     public function show(BoardPack $pack)
     {
-        $pack->load(['meeting', 'snapshot']);
+        $pack->load(['meeting', 'snapshot', 'generatedBy']);
+        $presented = $this->presenter->present($pack);
 
         return Inertia::render('Governance/Packs/Show', [
             'pack' => $pack,
             'is_distributed' => $pack->isDistributed(),
             'read_count' => $pack->readCount(),
             'download_count' => $pack->downloadCount(),
+            'manifestSections' => $presented['manifestSections'],
+            'contentSections' => $presented['contentSections'],
+            'distributionStats' => $presented['distributionStats'],
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -42,7 +43,8 @@ class BoardMemberPreference extends Model
 
     public function isQuietHours(): bool
     {
-        $now = now()->timezone($this->timezone);
+        $timezone = $this->timezone ?: config('app.timezone', 'Pacific/Auckland');
+        $now = now()->timezone($timezone);
         $currentTime = $now->format('H:i');
         
         // Handle overnight quiet hours (e.g., 22:00 - 07:00)
@@ -76,7 +78,8 @@ class BoardMemberPreference extends Model
         ];
         
         $targetDay = $dayMap[$this->digest_day] ?? 1;
-        $now = now()->timezone($this->timezone);
+        $timezone = $this->timezone ?: config('app.timezone', 'Pacific/Auckland');
+        $now = now()->timezone($timezone);
         $currentDay = $now->dayOfWeek;
         
         $daysUntilDigest = ($targetDay - $currentDay + 7) % 7;
@@ -86,5 +89,37 @@ class BoardMemberPreference extends Model
         
         return $now->addDays($daysUntilDigest)
             ->setTimeFromTimeString($this->digest_time);
+    }
+
+    public function digestWindowFor(?Carbon $reference = null, int $windowMinutes = 15): array
+    {
+        $timezone = $this->timezone ?: config('app.timezone', 'Pacific/Auckland');
+        $reference = ($reference ?? now())->copy()->timezone($timezone);
+        $weekStart = $reference->copy()->startOfWeek(Carbon::SUNDAY);
+        $targetDay = [
+            'Sunday' => 0,
+            'Monday' => 1,
+            'Tuesday' => 2,
+            'Wednesday' => 3,
+            'Thursday' => 4,
+            'Friday' => 5,
+            'Saturday' => 6,
+        ][$this->digest_day] ?? 1;
+
+        $start = $weekStart->addDays($targetDay)->setTimeFromTimeString($this->digest_time);
+
+        return [
+            'start' => $start,
+            'end' => $start->copy()->addMinutes($windowMinutes),
+        ];
+    }
+
+    public function isDigestDueAt(?Carbon $reference = null, int $windowMinutes = 15): bool
+    {
+        $timezone = $this->timezone ?: config('app.timezone', 'Pacific/Auckland');
+        $now = ($reference ?? now())->copy()->timezone($timezone);
+        $window = $this->digestWindowFor($reference, $windowMinutes);
+
+        return $now->greaterThanOrEqualTo($window['start']) && $now->lessThan($window['end']);
     }
 }

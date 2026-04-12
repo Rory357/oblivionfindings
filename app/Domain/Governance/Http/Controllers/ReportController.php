@@ -2,11 +2,14 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Finance\Services\BudgetActualsService;
 use App\Domain\Governance\Models\BoardCommittee;
 use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Models\RiskRegisterEntry;
-use App\Domain\Governance\Services\DashboardAggregatorService;
 use App\Domain\Governance\Services\AuditEvidencePackService;
+use App\Domain\Governance\Services\DashboardAggregatorService;
+use App\Domain\Governance\Services\GovernanceWorkflowService;
+use App\Domain\Governance\Support\GovernancePresenter;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,23 +19,36 @@ class ReportController extends Controller
     public function __construct(
         protected DashboardAggregatorService $aggregator,
         protected AuditEvidencePackService $evidenceService,
+        protected GovernanceWorkflowService $workflowService,
+        protected GovernancePresenter $presenter,
+        protected BudgetActualsService $budgetActualsService,
     ) {}
 
     public function boardMonthly(Request $request)
     {
         $range = ['start' => now()->startOfMonth(), 'end' => now()];
-
-        return Inertia::render('Governance/Reports/BoardMonthly', [
-            'topRisks' => $this->aggregator->getTopRisks(),
-            'voidedRisks' => $this->aggregator->getVoidedRisks($range),
-            'riskChanges' => $this->aggregator->getRiskChanges($range),
-            'clientSafety' => $this->aggregator->getClientSafetyMetrics($range),
+        $this->syncBudgetActuals($request);
+        $widgets = [
+            'top_risks' => $this->aggregator->getTopRisks(),
+            'voided_risks' => $this->aggregator->getVoidedRisks($range),
+            'risk_changes' => $this->aggregator->getRiskChanges($range),
+            'client_safety' => $this->aggregator->getClientSafetyMetrics($range),
+            'operational_safety' => $this->aggregator->getOperationalSafetyMetrics($range),
+            'privacy_data' => $this->aggregator->getPrivacyMetrics($range),
             'workforce' => $this->aggregator->getWorkforceMetrics($range),
             'financial' => $this->aggregator->getFinancialMetrics($range),
-            'compliance' => $this->aggregator->getComplianceCalendar(),
-            'decisions' => $this->aggregator->getDecisionsRequired(),
+            'it_cyber' => $this->aggregator->getItCyberMetrics($range),
+            'compliance_calendar' => $this->aggregator->getComplianceCalendar(),
+            'decisions_required' => $this->aggregator->getDecisionsRequired(),
+            'roadmap' => $this->aggregator->getRoadmapMetrics(),
+            'control_room' => $this->aggregator->getControlRoomMetrics($range),
             'incidents' => $this->aggregator->getIncidentMetrics($range),
-            'controlRoom' => $this->aggregator->getControlRoomMetrics($range),
+            'safeguarding' => $this->aggregator->getSafeguardingMetrics($range),
+        ];
+        $workflow = $this->workflowService->dashboardWorkflow($request->user());
+
+        return Inertia::render('Governance/Reports/BoardMonthly', [
+            'report' => $this->presenter->boardMonthly($widgets, [], $workflow),
             'generatedAt' => now()->toIso8601String(),
         ]);
     }
@@ -52,30 +68,36 @@ class ReportController extends Controller
         ];
 
         $risks = RiskRegisterEntry::active()
+            ->with('riskOwner')
             ->whereIn('category', $categoryMap[$committee] ?? [])
             ->orderByDesc('residual_score')
             ->get();
 
+        $this->syncBudgetActuals($request);
+        $widgets = match($committee) {
+            'audit_risk' => [
+                'top_risks' => $this->aggregator->getTopRisks(),
+                'compliance_calendar' => $this->aggregator->getComplianceCalendar(),
+                'it_cyber' => $this->aggregator->getItCyberMetrics($range),
+                'privacy_data' => $this->aggregator->getPrivacyMetrics($range),
+                'hs_backbone' => $this->aggregator->getHsBackboneMetrics($range),
+            ],
+            'people' => [
+                'workforce' => $this->aggregator->getWorkforceMetrics($range),
+                'client_safety' => $this->aggregator->getClientSafetyMetrics($range),
+                'operational_safety' => $this->aggregator->getOperationalSafetyMetrics($range),
+                'safeguarding' => $this->aggregator->getSafeguardingMetrics($range),
+            ],
+            'finance' => [
+                'financial' => $this->aggregator->getFinancialMetrics($range),
+                'roadmap' => $this->aggregator->getRoadmapMetrics(),
+                'decisions_required' => $this->aggregator->getDecisionsRequired(),
+            ],
+            default => [],
+        };
+
         return Inertia::render('Governance/Reports/Committee', [
-            'committee' => $committeeModel,
-            'committeeType' => $committee,
-            'risks' => $risks,
-            'metrics' => match($committee) {
-                'audit_risk' => [
-                    'risks' => $this->aggregator->getTopRisks(),
-                    'compliance' => $this->aggregator->getComplianceCalendar(),
-                    'it_cyber' => $this->aggregator->getItCyberMetrics($range),
-                ],
-                'people' => [
-                    'workforce' => $this->aggregator->getWorkforceMetrics($range),
-                    'clientSafety' => $this->aggregator->getClientSafetyMetrics($range),
-                    'safeguarding' => $this->aggregator->getSafeguardingMetrics($range),
-                ],
-                'finance' => [
-                    'financial' => $this->aggregator->getFinancialMetrics($range),
-                ],
-                default => [],
-            },
+            'report' => $this->presenter->committee($committee, $committeeModel, $risks, $widgets),
             'generatedAt' => now()->toIso8601String(),
         ]);
     }
@@ -95,8 +117,7 @@ class ReportController extends Controller
         ];
 
         return Inertia::render('Governance/Reports/ComplianceStatus', [
-            'obligations' => $obligations,
-            'summary' => $summary,
+            'report' => $this->presenter->complianceStatus($obligations, $summary),
         ]);
     }
 
@@ -212,5 +233,14 @@ class ReportController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="compliance-register-' . now()->format('Y-m-d') . '.csv"',
         ]);
+    }
+
+    protected function syncBudgetActuals(Request $request): void
+    {
+        try {
+            $this->budgetActualsService->syncActuals($request->user()?->organization_id);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 }

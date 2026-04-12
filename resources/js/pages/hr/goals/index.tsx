@@ -486,7 +486,7 @@ export default function GoalsIndex({ goals, users, analytics, cascadeTree, filte
                                             <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                                                 <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} fontSize={11} />
                                                 <YAxis type="category" dataKey="type" fontSize={11} width={80} />
-                                                <Tooltip formatter={(v: number) => `${v}%`} />
+                                                <Tooltip formatter={(v?: number) => `${v ?? 0}%`} />
                                                 <Bar dataKey="progress" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
                                             </BarChart>
                                         </ResponsiveContainer>

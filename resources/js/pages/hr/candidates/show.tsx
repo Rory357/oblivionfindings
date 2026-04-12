@@ -121,7 +121,10 @@ interface CandidateDocument {
     id: number;
     original_name: string;
     category: string;
+    category_label?: string | null;
     formatted_size: string;
+    mime_type?: string | null;
+    is_expired?: boolean;
     uploaded_by: string | null;
     created_at: string;
     expires_at: string | null;

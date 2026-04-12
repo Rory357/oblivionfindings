@@ -16,6 +16,7 @@ import {
     Shield,
     ShieldAlert,
     Square,
+    Truck,
     User,
     WifiOff,
     XCircle,

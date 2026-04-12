@@ -4,7 +4,8 @@ import { ReactNode } from 'react';
 
 type Props = {
     title: ReactNode;
-    description?: string;
+    description?: ReactNode;
+    subtitle?: ReactNode;
     backHref?: string;
     backLabel?: string;
     actions?: ReactNode;
@@ -14,11 +15,14 @@ type Props = {
 export default function PageHeader({
     title,
     description,
+    subtitle,
     backHref,
     backLabel = 'Back',
     actions,
     children,
 }: Props) {
+    const supportingText = description ?? subtitle;
+
     return (
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
@@ -35,9 +39,9 @@ export default function PageHeader({
                 <h1 className="mt-1 text-xl md:text-2xl font-semibold tracking-tight">
                     {title}
                 </h1>
-                {description ? (
+                {supportingText ? (
                     <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                        {description}
+                        {supportingText}
                     </p>
                 ) : null}
             </div>

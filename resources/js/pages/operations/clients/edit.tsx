@@ -1,7 +1,40 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 
-export default function EditClient({ client, sites = [], serviceContexts = [] }) {
+type Option = {
+    id: number;
+    name: string;
+    is_active?: boolean;
+};
+
+type EditableClient = {
+    id: number;
+    site_id?: number | null;
+    service_context_id?: number | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    preferred_name?: string | null;
+    date_of_birth?: string | null;
+    gender?: string | null;
+    status?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address_line_1?: string | null;
+    address_line_2?: string | null;
+    suburb?: string | null;
+    city?: string | null;
+    postcode?: string | null;
+    funding_type?: string | null;
+    funding_notes?: string | null;
+};
+
+type Props = {
+    client: EditableClient;
+    sites?: Option[];
+    serviceContexts?: Option[];
+};
+
+export default function EditClient({ client, sites = [], serviceContexts = [] }: Props) {
     const { labels } = usePage().props as any;
     const clientSingular = labels?.['client.singular'] ?? 'Client';
     const clientPlural = labels?.['client.plural'] ?? 'Clients';

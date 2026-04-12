@@ -44,6 +44,21 @@ trait GovernanceTestHelpers
         return $user;
     }
 
+    protected function createUserWithRole(string $roleName, array $overrides = []): User
+    {
+        $user = User::factory()->create(array_merge([
+            'role' => $roleName,
+            'approved_at' => now(),
+        ], $overrides));
+
+        $role = Role::where('name', $roleName)->first();
+        if ($role) {
+            $user->roles()->syncWithoutDetaching([$role->id]);
+        }
+
+        return $user;
+    }
+
     protected function createBoardMember(User $user, array $overrides = []): BoardMember
     {
         return BoardMember::create(array_merge([

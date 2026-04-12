@@ -3,65 +3,26 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { data as dashboardData } from '@/routes/governance/dashboard';
-import { show as showResolution } from '@/routes/governance/resolutions';
-import { index as risksIndex } from '@/routes/governance/risks';
-import { calendar as complianceCalendar } from '@/routes/governance/compliance';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Shield, Users, Vote, AlertOctagon, BookOpen, FileText, ClipboardList, Star, FolderOpen, HeartPulse, Landmark } from 'lucide-react';
+import {
+  AlertOctagon,
+  BookOpen,
+  Calendar,
+  ClipboardList,
+  FileText,
+  FolderOpen,
+  HeartPulse,
+  Landmark,
+  LayoutGrid,
+  Shield,
+  Star,
+  Users,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
-
-interface DashboardWidget {
-  top_risks?: {
-    critical: number;
-    high: number;
-    medium: number;
-    above_appetite: number;
-    items: Array<{
-      id: number;
-      reference: string;
-      title: string;
-      category: string;
-      score: number;
-      color: string;
-    }>;
-  };
-  decisions_required?: {
-    count: number;
-    overdue: number;
-    items: Array<{
-      id: number;
-      reference: string;
-      title: string;
-      deadline: string | null;
-      is_overdue: boolean;
-      source?: string;
-    }>;
-  };
-  client_safety?: {
-    high_risk_clients: number;
-    serious_incidents_period: number;
-    open_critical_incidents: number;
-    status: string;
-  };
-  workforce?: {
-    overtime_percentage: number;
-    unfilled_shifts: number;
-    training_compliance: number;
-    status: string;
-  };
-  compliance_calendar?: Array<{
-    id: number;
-    framework: string;
-    title: string;
-    due_date: string;
-    days_remaining: number;
-    status: string;
-  }>;
-}
 
 interface WorkflowAction {
   id: string;
@@ -85,425 +46,337 @@ interface WorkflowPayload {
   actions: WorkflowAction[];
 }
 
-interface DashboardData {
-  snapshot_id: number;
-  period: {
-    type: string;
-    start: string;
-    end: string;
-  };
-  widgets: DashboardWidget;
-  workflow?: WorkflowPayload;
+interface CardMetric {
+  label: string;
+  value: string;
+  tone: 'default' | 'warning' | 'critical' | 'muted';
 }
 
-type DecisionItem = NonNullable<DashboardWidget['decisions_required']>['items'][number];
+interface CockpitCard {
+  key: string;
+  title: string;
+  description: string;
+  status: string;
+  source: string;
+  freshness: {
+    status: string;
+    at: string | null;
+    label: string;
+  };
+  metrics: CardMetric[];
+  highlights: string[];
+  href: string;
+}
 
-export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: PageProps & { isBoardMember: boolean; boardRole?: string }) {
+interface CockpitSection {
+  key: string;
+  title: string;
+  description: string;
+  cards: CockpitCard[];
+}
+
+interface CockpitAction {
+  label: string;
+  href: string;
+  description: string;
+}
+
+interface DashboardPayload {
+  snapshot_id: number | null;
+  workflow: WorkflowPayload;
+  cockpit: {
+    period_label: string;
+    sections: CockpitSection[];
+    role_actions: CockpitAction[];
+  };
+}
+
+type Props = PageProps & {
+  isBoardMember: boolean;
+  boardRole?: string;
+};
+
+const statusStyles: Record<string, string> = {
+  good: 'bg-green-100 text-green-800 border-green-200',
+  done: 'bg-green-100 text-green-800 border-green-200',
+  warning: 'bg-amber-100 text-amber-800 border-amber-200',
+  todo: 'bg-amber-100 text-amber-800 border-amber-200',
+  in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
+  critical: 'bg-red-100 text-red-800 border-red-200',
+  blocked: 'bg-red-100 text-red-800 border-red-200',
+  unknown: 'bg-slate-100 text-slate-800 border-slate-200',
+  fresh: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  stable: 'bg-sky-100 text-sky-800 border-sky-200',
+  stale: 'bg-orange-100 text-orange-800 border-orange-200',
+};
+
+const metricToneStyles: Record<string, string> = {
+  default: 'text-slate-900',
+  warning: 'text-amber-700',
+  critical: 'text-red-700',
+  muted: 'text-slate-500',
+};
+
+const workflowPriorityStyles: Record<string, string> = {
+  critical: 'bg-red-100 text-red-800 border-red-200',
+  high: 'bg-orange-100 text-orange-800 border-orange-200',
+  medium: 'bg-blue-100 text-blue-800 border-blue-200',
+  low: 'bg-slate-100 text-slate-800 border-slate-200',
+};
+
+const workflowStatusStyles: Record<string, string> = {
+  overdue: 'bg-red-100 text-red-800 border-red-200',
+  due_soon: 'bg-amber-100 text-amber-800 border-amber-200',
+  pending: 'bg-slate-100 text-slate-800 border-slate-200',
+};
+
+const cardIcon = (key: string) => {
+  switch (key) {
+    case 'meeting_readiness':
+    case 'compliance_calendar':
+      return <Calendar className="h-5 w-5 text-sky-600" />;
+    case 'follow_through':
+      return <ClipboardList className="h-5 w-5 text-orange-600" />;
+    case 'decisions_required':
+      return <AlertOctagon className="h-5 w-5 text-amber-600" />;
+    case 'client_safety':
+    case 'privacy_data':
+    case 'hs_backbone':
+      return <Shield className="h-5 w-5 text-emerald-600" />;
+    case 'workforce':
+      return <Users className="h-5 w-5 text-indigo-600" />;
+    default:
+      return <LayoutGrid className="h-5 w-5 text-slate-600" />;
+  }
+};
+
+const formatLabel = (value: string) => value.replace(/_/g, ' ');
+const toDuskKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: Props) {
   const [period, setPeriod] = useState('month');
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchData();
-  }, [period]);
 
   const fetchData = async () => {
     setLoading(true);
+
     try {
-      const response = await axios.get(dashboardData.url(), {
-        params: { period },
-      });
-      setData(response.data);
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
+      const response = await axios.get(dashboardData.url(), { params: { period } });
+      setPayload(response.data);
     } finally {
       setLoading(false);
     }
   };
 
-  const widgets = data?.widgets || {};
-  const workflow = data?.workflow;
+  useEffect(() => {
+    const loadDashboard = async () => {
+      setLoading(true);
 
-  const getStatusColor = (status: string) => {
-    return {
-      critical: 'bg-red-100 text-red-800 border-red-200',
-      warning: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      good: 'bg-green-100 text-green-800 border-green-200',
-      unknown: 'bg-gray-100 text-gray-800 border-gray-200',
-    }[status] || 'bg-gray-100 text-gray-800';
-  };
+      try {
+        const response = await axios.get(dashboardData.url(), { params: { period } });
+        setPayload(response.data);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const getWorkflowStatusColor = (status: WorkflowAction['status']) => {
-    return {
-      overdue: 'bg-red-100 text-red-800 border-red-200',
-      due_soon: 'bg-amber-100 text-amber-800 border-amber-200',
-      pending: 'bg-slate-100 text-slate-800 border-slate-200',
-    }[status];
-  };
+    void loadDashboard();
+  }, [period]);
 
-  const getWorkflowPriorityColor = (priority: WorkflowAction['priority']) => {
-    return {
-      critical: 'bg-red-100 text-red-800 border-red-200',
-      high: 'bg-orange-100 text-orange-800 border-orange-200',
-      medium: 'bg-blue-100 text-blue-800 border-blue-200',
-      low: 'bg-gray-100 text-gray-700 border-gray-200',
-    }[priority];
-  };
-
-  const decisionHref = (decision: DecisionItem) => {
-    if (decision.source === 'roadmap_decision_request') {
-      return '/roadmap/decisions';
-    }
-
-    return showResolution.url({ resolution: decision.id });
-  };
-
-  const decisionActionLabel = (decision: DecisionItem) => {
-    if (decision.source === 'roadmap_decision_request') {
-      return 'Open Request';
-    }
-
-    return 'Vote Now';
-  };
+  const workflow = payload?.workflow;
+  const cockpit = payload?.cockpit;
 
   return (
-    <AppLayout
-      user={auth.user}
-      breadcrumbs={[{ title: 'Governance', href: '/governance/dashboard' }]}
-    >
+    <AppLayout user={auth.user} breadcrumbs={[{ title: 'Governance', href: '/governance/dashboard' }]}>
       <Head title="Governance Dashboard" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Governance Dashboard</h1>
-              <p className="text-gray-500 mt-1">
-                Board oversight and decision-making center
-                {isBoardMember && boardRole && (
-                  <span className="ml-2 text-sm font-medium text-blue-600">
-                    ({boardRole.replace('_', ' ')})
-                  </span>
-                )}
-              </p>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold text-slate-900" dusk="governance-cockpit-heading">Executive & Board Cockpit</h1>
+              {isBoardMember && boardRole && (
+                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                  {formatLabel(boardRole)}
+                </Badge>
+              )}
             </div>
-            <div className="flex items-center gap-4">
-              <Select value={period} onValueChange={setPeriod}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                  <SelectItem value="year">This Year</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={fetchData} disabled={loading}>
-                {loading ? 'Loading...' : 'Refresh'}
-              </Button>
-            </div>
+            <p className="max-w-3xl text-sm text-slate-600">
+              A single governance map for meetings, plans, risk, compliance, workforce, finance, safety, privacy, and operational control.
+            </p>
+            {cockpit?.period_label && (
+              <p className="text-xs uppercase tracking-wide text-slate-500">{cockpit.period_label}</p>
+            )}
           </div>
 
-          <Card className="mb-6">
+          <div className="flex items-center gap-3">
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="year">This Year</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={fetchData} disabled={loading}>
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mb-6 grid gap-6 lg:grid-cols-[2fr,1fr]">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle>Workflow Center</CardTitle>
-              <CardDescription>Prioritized governance actions across meetings, risk, compliance, budget, and decisions.</CardDescription>
+              <CardDescription>Prioritized actions across meetings, decisions, risk, compliance, budgets, and follow-through.</CardDescription>
             </CardHeader>
-            <CardContent>
-              {workflow && workflow.actions.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">{workflow.summary.total} open actions</Badge>
-                    {workflow.summary.critical > 0 && (
-                      <Badge className="bg-red-100 text-red-800 border-red-200">
-                        {workflow.summary.critical} critical
-                      </Badge>
-                    )}
-                    {workflow.summary.overdue > 0 && (
-                      <Badge className="bg-amber-100 text-amber-800 border-amber-200">
-                        {workflow.summary.overdue} overdue
-                      </Badge>
-                    )}
-                  </div>
-                  {workflow.actions.slice(0, 8).map((action) => (
-                    <div
-                      key={action.id}
-                      className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3 md:flex-row md:items-start md:justify-between"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline">{action.area}</Badge>
-                          <Badge className={getWorkflowPriorityColor(action.priority)}>{action.priority}</Badge>
-                          <Badge className={getWorkflowStatusColor(action.status)}>{action.status.replace('_', ' ')}</Badge>
-                          {action.due_date && (
-                            <span className="text-xs text-gray-500">Due {action.due_date}</span>
-                          )}
-                        </div>
-                        <p className="font-medium text-gray-900">{action.title}</p>
-                        <p className="text-sm text-gray-600">{action.detail}</p>
-                        {action.owner && (
-                          <p className="text-xs text-gray-500">Owner: {action.owner}</p>
-                        )}
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">{workflow?.summary.total ?? 0} open actions</Badge>
+                <Badge className="bg-red-100 text-red-800 border-red-200">{workflow?.summary.critical ?? 0} critical</Badge>
+                <Badge className="bg-amber-100 text-amber-800 border-amber-200">{workflow?.summary.overdue ?? 0} overdue</Badge>
+              </div>
+
+              {workflow?.actions.length ? (
+                workflow.actions.slice(0, 8).map((action) => (
+                  <div key={action.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 lg:flex-row lg:justify-between">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{action.area}</Badge>
+                        <Badge className={workflowPriorityStyles[action.priority]}>{action.priority}</Badge>
+                        <Badge className={workflowStatusStyles[action.status]}>{formatLabel(action.status)}</Badge>
+                        {action.due_date && <span className="text-xs text-slate-500">Due {action.due_date}</span>}
                       </div>
-                      <div>
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={action.action_url}>{action.action_label}</a>
-                        </Button>
-                      </div>
+                      <p className="font-medium text-slate-900">{action.title}</p>
+                      <p className="text-sm text-slate-600">{action.detail}</p>
+                      {action.owner && <p className="text-xs text-slate-500">Owner: {action.owner}</p>}
                     </div>
-                  ))}
-                </div>
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={action.action_url}>{action.action_label}</a>
+                    </Button>
+                  </div>
+                ))
               ) : (
-                <p className="text-sm text-gray-500">No open workflow blockers. Keep monthly checks running.</p>
+                <p className="text-sm text-slate-500">No open workflow blockers right now.</p>
               )}
             </CardContent>
           </Card>
 
-          {widgets.decisions_required && widgets.decisions_required.count > 0 && (
-            <Card className="mb-6 border-orange-200 bg-orange-50">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-orange-100 rounded-full">
-                    <Vote className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-orange-900">
-                      Decisions Required ({widgets.decisions_required.count})
-                    </h3>
-                    <div className="mt-3 space-y-2">
-                      {(widgets.decisions_required.items || []).map((decision) => (
-                        <div
-                          key={`${decision.source ?? 'governance'}-${decision.id}`}
-                          className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-100"
-                        >
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Role Actions</CardTitle>
+              <CardDescription>Fast paths into the governance work you’re expected to act on.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {cockpit?.role_actions?.length ? (
+                cockpit.role_actions.map((action) => (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    dusk={`role-action-${toDuskKey(action.label)}`}
+                    className="block rounded-lg border border-slate-200 p-3 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <p className="font-medium text-slate-900">{action.label}</p>
+                    <p className="text-sm text-slate-600">{action.description}</p>
+                  </Link>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">No role-specific actions are available.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-8">
+          {cockpit?.sections.map((section) => (
+            <section key={section.key} className="space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-xl font-semibold text-slate-900">{section.title}</h2>
+                <p className="text-sm text-slate-600">{section.description}</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {section.cards.map((card) => (
+                  <Card key={card.key} className="h-full">
+                    <CardHeader className="space-y-3 pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-lg bg-slate-100 p-2">{cardIcon(card.key)}</div>
                           <div>
-                            <p className="font-medium text-gray-900">{decision.title}</p>
-                            <p className="text-sm text-gray-500">{decision.reference}</p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {decision.is_overdue && (
-                              <Badge variant="destructive">Overdue</Badge>
-                            )}
-                            <Button size="sm" asChild>
-                              <a href={decisionHref(decision)}>
-                                {decisionActionLabel(decision)}
-                              </a>
-                            </Button>
+                            <CardTitle className="text-lg">{card.title}</CardTitle>
+                            <CardDescription>{card.description}</CardDescription>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <AlertOctagon className="w-5 h-5 text-red-500" />
-                  Top Risks
-                </CardTitle>
-                <CardDescription>Current risk posture</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {widgets.top_risks ? (
-                  <div className="space-y-4">
-                    <div className="flex gap-2">
-                      {widgets.top_risks.critical > 0 && (
-                        <Badge variant="destructive" className="text-sm">
-                          {widgets.top_risks.critical} Critical
-                        </Badge>
-                      )}
-                      {widgets.top_risks.high > 0 && (
-                        <Badge className="bg-orange-500 text-sm">
-                          {widgets.top_risks.high} High
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      {(widgets.top_risks.items || []).slice(0, 3).map((risk) => (
-                        <div key={risk.id} className="flex items-center justify-between text-sm">
-                          <span className="truncate flex-1">{risk.title}</span>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              'ml-2',
-                              risk.color === 'red' && 'border-red-200 text-red-700',
-                              risk.color === 'orange' && 'border-orange-200 text-orange-700',
-                            )}
-                          >
-                            {risk.score}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                    <Button variant="ghost" size="sm" className="w-full" asChild>
-                      <a href={risksIndex.url()}>View Risk Register →</a>
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No risk data available</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Shield className="w-5 h-5 text-blue-500" />
-                  Client Safety
-                </CardTitle>
-                <CardDescription>Care quality indicators</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {widgets.client_safety ? (
-                  <div className="space-y-4">
-                    <Badge className={getStatusColor(widgets.client_safety.status)}>
-                      {widgets.client_safety.status === 'good' ? 'Good' :
-                       widgets.client_safety.status === 'warning' ? 'Attention Needed' : 'Critical'}
-                    </Badge>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="text-2xl font-bold text-gray-900">
-                          {widgets.client_safety.high_risk_clients}
-                        </p>
-                        <p className="text-xs text-gray-500">High Risk Clients</p>
+                        <Badge className={statusStyles[card.status] ?? statusStyles.unknown}>{formatLabel(card.status)}</Badge>
                       </div>
-                      <div className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="text-2xl font-bold text-gray-900">
-                          {widgets.client_safety.serious_incidents_period}
-                        </p>
-                        <p className="text-xs text-gray-500">Serious Incidents</p>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <Badge variant="outline">{card.source}</Badge>
+                        <Badge className={statusStyles[card.freshness.status] ?? statusStyles.unknown}>{card.freshness.label}</Badge>
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No safety data available</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Users className="w-5 h-5 text-green-500" />
-                  Workforce
-                </CardTitle>
-                <CardDescription>Staffing and capacity</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {widgets.workforce ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="text-center">
-                        <p className="text-xl font-bold">{widgets.workforce.overtime_percentage}%</p>
-                        <p className="text-xs text-gray-500">Overtime</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold">{widgets.workforce.unfilled_shifts}</p>
-                        <p className="text-xs text-gray-500">Unfilled</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold">{widgets.workforce.training_compliance}%</p>
-                        <p className="text-xs text-gray-500">Training</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      {widgets.workforce.overtime_percentage > 10
-                        ? 'High overtime levels detected'
-                        : 'Workforce metrics within normal range'}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No workforce data available</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2 lg:col-span-3">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Calendar className="w-5 h-5 text-purple-500" />
-                  Compliance Calendar (Next 90 Days)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(widgets.compliance_calendar || []).length > 0 ? (
-                  <div className="space-y-2">
-                    {(widgets.compliance_calendar || []).slice(0, 5).map((item) => (
-                      <div
-                        key={item.id}
-                        className={cn(
-                          'flex items-center justify-between p-3 rounded-lg border',
-                          item.days_remaining < 0 && 'bg-red-50 border-red-200',
-                          item.days_remaining < 7 && item.days_remaining >= 0 && 'bg-yellow-50 border-yellow-200',
-                          item.days_remaining >= 7 && 'bg-gray-50 border-gray-200',
-                        )}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={cn(
-                            'w-2 h-2 rounded-full',
-                            item.days_remaining < 0 && 'bg-red-500',
-                            item.days_remaining < 7 && item.days_remaining >= 0 && 'bg-yellow-500',
-                            item.days_remaining >= 7 && 'bg-green-500',
-                          )} />
-                          <div>
-                            <p className="font-medium text-gray-900">{item.title}</p>
-                            <p className="text-sm text-gray-500">{item.framework}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-sm font-medium">
-                              {item.days_remaining < 0
-                                ? `${Math.abs(item.days_remaining)} days overdue`
-                                : `${item.days_remaining} days remaining`
-                              }
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {card.metrics.map((metric) => (
+                          <div key={`${card.key}-${metric.label}`} className="rounded-lg bg-slate-50 p-3">
+                            <p className="text-xs uppercase tracking-wide text-slate-500">{metric.label}</p>
+                            <p className={cn('mt-1 text-lg font-semibold', metricToneStyles[metric.tone] ?? metricToneStyles.default)}>
+                              {metric.value}
                             </p>
-                            <p className="text-xs text-gray-500">Due {item.due_date}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {card.highlights.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs uppercase tracking-wide text-slate-500">Highlights</p>
+                          <div className="space-y-2">
+                            {card.highlights.slice(0, 3).map((highlight) => (
+                              <p key={highlight} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                                {highlight}
+                              </p>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No upcoming compliance obligations</p>
-                )}
-                <Button variant="ghost" size="sm" className="mt-4 w-full" asChild>
-                  <a href={complianceCalendar.url()}>View Full Calendar →</a>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+                      )}
 
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Governance Modules</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-              {[
-                { label: 'Policies', href: '/governance/policies', icon: <BookOpen className="w-5 h-5" />, color: 'text-blue-600 bg-blue-50' },
-                { label: 'CEO Reports', href: '/governance/ceo-reports', icon: <FileText className="w-5 h-5" />, color: 'text-indigo-600 bg-indigo-50' },
-                { label: 'Interests', href: '/governance/interests', icon: <ClipboardList className="w-5 h-5" />, color: 'text-purple-600 bg-purple-50' },
-                { label: 'Evaluations', href: '/governance/evaluations', icon: <Star className="w-5 h-5" />, color: 'text-amber-600 bg-amber-50' },
-                { label: 'Documents', href: '/governance/documents', icon: <FolderOpen className="w-5 h-5" />, color: 'text-emerald-600 bg-emerald-50' },
-                { label: 'Clinical Gov', href: '/governance/clinical', icon: <HeartPulse className="w-5 h-5" />, color: 'text-rose-600 bg-rose-50' },
-                { label: 'Te Tiriti', href: '/governance/te-tiriti', icon: <Landmark className="w-5 h-5" />, color: 'text-teal-600 bg-teal-50' },
-              ].map((tile) => (
-                <Link
-                  key={tile.href}
-                  href={tile.href}
-                  className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all text-center"
-                >
-                  <div className={cn('p-2 rounded-lg', tile.color)}>
-                    {tile.icon}
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">{tile.label}</span>
-                </Link>
-              ))}
-            </div>
+                      <Button variant="ghost" size="sm" className="w-full justify-between" asChild>
+                        <a href={card.href} dusk={`cockpit-open-${card.key}`}>Open {card.title}</a>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <div className="mt-10">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">Governance Modules</h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+            {[
+              { label: 'Policies', href: '/governance/policies', icon: <BookOpen className="h-5 w-5" />, color: 'text-blue-600 bg-blue-50' },
+              { label: 'CEO Reports', href: '/governance/ceo-reports', icon: <FileText className="h-5 w-5" />, color: 'text-indigo-600 bg-indigo-50' },
+              { label: 'Interests', href: '/governance/interests/mine', icon: <ClipboardList className="h-5 w-5" />, color: 'text-purple-600 bg-purple-50' },
+              { label: 'Evaluations', href: '/governance/evaluations', icon: <Star className="h-5 w-5" />, color: 'text-amber-600 bg-amber-50' },
+              { label: 'Documents', href: '/governance/documents', icon: <FolderOpen className="h-5 w-5" />, color: 'text-emerald-600 bg-emerald-50' },
+              { label: 'Clinical', href: '/governance/clinical', icon: <HeartPulse className="h-5 w-5" />, color: 'text-rose-600 bg-rose-50' },
+              { label: 'Te Tiriti', href: '/governance/te-tiriti', icon: <Landmark className="h-5 w-5" />, color: 'text-teal-600 bg-teal-50' },
+            ].map((tile) => (
+              <Link
+                key={tile.href}
+                href={tile.href}
+                className="flex flex-col items-center gap-2 rounded-lg border border-slate-200 p-4 text-center transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                <div className={cn('rounded-lg p-2', tile.color)}>{tile.icon}</div>
+                <span className="text-sm font-medium text-slate-700">{tile.label}</span>
+              </Link>
+            ))}
           </div>
+        </div>
       </div>
     </AppLayout>
   );

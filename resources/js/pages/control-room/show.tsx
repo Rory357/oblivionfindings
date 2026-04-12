@@ -63,7 +63,7 @@ interface FleetContext {
     vehicle?: { id: number; name: string; asset_tag?: string; registration?: string; home_site?: string };
     driver?: { id: number };
     geofence?: { id: number; name: string };
-    trip?: { id: number; started_at?: string; ended_at?: string; distance_km?: number };
+    trip?: { id: number; started_at?: string; ended_at?: string; distance_km?: number; start_address?: string | null; end_address?: string | null };
     booking?: { id: number; purpose?: string; booked_by_user_id?: number };
     outing?: { id: number; title: string };
     affected_resident_count?: number;

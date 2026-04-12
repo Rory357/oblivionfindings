@@ -26,6 +26,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import type { FormDataConvertible } from '@inertiajs/core';
 import {
     AlertTriangle,
     CheckCircle2,
@@ -741,18 +742,26 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
             is_active: formData.is_active,
         };
 
-        const url = editingSla ? `/control-room/sla/${editingSla.id}` : '/control-room/sla';
-        const method = editingSla ? 'put' : 'post';
+        const onSuccess = () => {
+            setDialogOpen(false);
+            setEditingSla(null);
+            setFormData(emptyForm());
+        };
 
-        router[method](url, payload, {
+        const options = {
             preserveScroll: true,
-            onSuccess: () => {
-                setDialogOpen(false);
-                setEditingSla(null);
-                setFormData(emptyForm());
-            },
+            onSuccess,
             onFinish: () => setSubmitting(false),
-        });
+        };
+
+        const requestPayload = payload as Record<string, FormDataConvertible>;
+
+        if (editingSla) {
+            router.put(`/control-room/sla/${editingSla.id}`, requestPayload, options);
+            return;
+        }
+
+        router.post('/control-room/sla', requestPayload, options);
     };
 
     const activeCount = slaDefinitions.filter((s) => s.is_active).length;

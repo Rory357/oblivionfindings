@@ -77,7 +77,7 @@ export default function MileageReimbursement() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <FleetStatCard label="TOTAL STAFF" value={staffCount} icon={Users} subtitle="Staff with trips" />
                         <FleetStatCard label="TOTAL DISTANCE" value={`${totalDistance.toFixed(1)} km`} icon={MapPin} subtitle="Kilometres driven" />
-                        <FleetStatCard label="TOTAL REIMBURSEMENT" value={formatCurrency(totalAmount)} icon={DollarSign} subtitle={`At ${formatCurrency(rate)}/km`} />
+                        <FleetStatCard label="TOTAL REIMBURSEMENT" value={formatCurrency(totalAmount)} icon={DollarSign} subtitle={`At ${formatCurrency(Number(rate))}/km`} />
                     </div>
                 )}
 

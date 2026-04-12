@@ -288,7 +288,7 @@ export default function MyDay({
     // Build unified open-items list
     const openItems: Array<{
         id: string;
-        type: 'alert' | 'followup' | 'note_followup' | 'incident';
+        type: 'shift' | 'alert' | 'followup' | 'note_followup' | 'incident';
         title: string;
         priority: string;
         client_name?: string;
@@ -299,7 +299,7 @@ export default function MyDay({
     shifts.forEach((s) => {
         openItems.push({
             id: `shift-${s.id}`,
-            type: 'shift' as any,
+            type: 'shift',
             title: `${s.client.name} — ${formatTime(s.starts_at)} to ${formatTime(s.ends_at)}`,
             priority: s.status === 'in_progress' ? 'high' : 'medium',
             client_name: s.client.name,
