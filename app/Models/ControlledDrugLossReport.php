@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ControlledDrugLossReport extends Model
@@ -65,6 +66,12 @@ class ControlledDrugLossReport extends Model
     public function resolvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'resolved_by');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(MedicationMarAttachment::class, 'attachable')
+            ->latest('id');
     }
 
     // ─── Scopes ─────────────────────────────────────────────

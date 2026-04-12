@@ -63,7 +63,7 @@ class MedicationsApiControllerTest extends TestCase
     {
         $medication = $this->createMedicationForClient($this->otherClient);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->admin, 'sanctum')
             ->getJson("/api/medications/clients/{$this->client->id}/medications/{$medication->id}/safety-check")
             ->assertNotFound();
     }
@@ -77,7 +77,7 @@ class MedicationsApiControllerTest extends TestCase
             'prn_reason' => 'As needed for pain',
         ]);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->admin, 'sanctum')
             ->getJson("/api/medications/clients/{$this->client->id}/medications/{$medication->id}/prn-history")
             ->assertNotFound();
     }
@@ -86,7 +86,7 @@ class MedicationsApiControllerTest extends TestCase
     {
         $medication = $this->createMedicationForClient($this->otherClient);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->admin, 'sanctum')
             ->postJson("/api/medications/clients/{$this->client->id}/medications/{$medication->id}/administrations", [
                 'status' => 'given',
                 'dose_given' => '5mg',

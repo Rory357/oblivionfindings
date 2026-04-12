@@ -20,6 +20,7 @@ return new class extends Migration
             $table->unsignedBigInteger('medication_id')->nullable(); // FK to client_medications
             $table->string('medication_name'); // denormalized
             $table->boolean('is_controlled_drug')->default(false);
+            $table->string('packed_witness_name')->nullable();
             $table->foreignId('packed_by_user_id')->constrained('users');
             $table->timestamp('packed_at');
             $table->timestamp('administered_at')->nullable();

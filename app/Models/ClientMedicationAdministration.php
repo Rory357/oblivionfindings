@@ -108,4 +108,10 @@ class ClientMedicationAdministration extends Model
     {
         return $this->hasOne(MedicationPrnEffectiveness::class, 'client_medication_administration_id');
     }
+
+    public function attachments()
+    {
+        return $this->hasMany(MedicationMarAttachment::class, 'client_medication_administration_id')
+            ->latest('id');
+    }
 }

@@ -221,7 +221,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     });
 
     // Medication handling during transport (requires medication permission)
-    Route::middleware('permission:fleet.medication.manage|medications.administer')->group(function () {
+    Route::middleware('permission:fleet.medication.manage|medications.administer.record|medications.stock.update|clients.update')->group(function () {
         Route::post('/transports/{transport}/pack-medication', [ResidentTransportController::class, 'packMedication'])->whereNumber('transport')->name('fleet-assets.transports.pack-medication');
         Route::post('/medication-transit/{log}/administer', [ResidentTransportController::class, 'administerMedication'])->whereNumber('log')->name('fleet-assets.medication-transit.administer');
         Route::post('/medication-transit/{log}/return', [ResidentTransportController::class, 'returnMedication'])->whereNumber('log')->name('fleet-assets.medication-transit.return');

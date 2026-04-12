@@ -16,6 +16,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Support\EmarUrl;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -157,18 +158,20 @@ class MedicationControllerTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->get('/medications')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('medications/index')
-                ->has('clients')
-                ->has('date')
-            );
+            ->assertRedirect(EmarUrl::daily());
     }
 
     public function test_medications_index_accessible_by_support_worker_with_view_permission(): void
     {
         $this->actingAs($this->supportWorker)
             ->get('/medications')
+            ->assertRedirect(EmarUrl::daily());
+    }
+
+    public function test_canonical_medications_daily_view_accessible_by_support_worker(): void
+    {
+        $this->actingAs($this->supportWorker)
+            ->get(EmarUrl::daily())
             ->assertOk();
     }
 
@@ -189,7 +192,7 @@ class MedicationControllerTest extends TestCase
         $unassignedClient = Client::factory()->create();
 
         $this->actingAs($this->supportWorker)
-            ->get('/medications')
+            ->get(EmarUrl::daily())
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('clients', fn ($clients) =>
@@ -204,7 +207,7 @@ class MedicationControllerTest extends TestCase
         $otherClient = Client::factory()->create();
 
         $this->actingAs($this->admin)
-            ->get('/medications')
+            ->get(EmarUrl::daily())
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('clients', fn ($clients) =>
@@ -371,26 +374,14 @@ class MedicationControllerTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('operations/clients/medical')
-                ->has('client')
-                ->has('medications')
-                ->has('conditions')
-                ->has('emergency_contacts')
-                ->has('administrations')
-                ->has('can_edit')
-                ->has('can_record')
-                ->has('can_stock')
-                ->has('witnesses')
-            );
+            ->assertRedirect(EmarUrl::medications($this->client));
     }
 
     public function test_client_medical_show_accessible_by_assigned_support_worker(): void
     {
         $this->actingAs($this->supportWorker)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertOk();
+            ->assertRedirect(EmarUrl::medications($this->client));
     }
 
     public function test_client_medical_show_forbidden_for_unassigned_support_worker(): void
@@ -1553,7 +1544,7 @@ class MedicationControllerTest extends TestCase
         // Without break-glass, verify they can access (provider_manager has clients.viewAny)
         $this->actingAs($otherWorker)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertOk();
+            ->assertRedirect(EmarUrl::medications($this->client));
 
         // Create break-glass access
         ClientBreakGlassAccess::create([
@@ -1566,7 +1557,7 @@ class MedicationControllerTest extends TestCase
         // Should still be accessible
         $this->actingAs($otherWorker)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertOk();
+            ->assertRedirect(EmarUrl::medications($this->client));
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -2092,25 +2083,14 @@ class MedicationControllerTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->get("/clients/{$this->client->id}/mar")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('operations/clients/mar')
-                ->has('client')
-                ->has('date')
-                ->has('rows')
-                ->has('history')
-                ->has('can.record')
-                ->has('can.correct')
-                ->has('can.export')
-                ->has('witnesses')
-            );
+            ->assertRedirect(EmarUrl::mar($this->client, now()->toDateString()));
     }
 
     public function test_mar_show_accessible_by_assigned_support_worker(): void
     {
         $this->actingAs($this->supportWorker)
             ->get("/clients/{$this->client->id}/mar")
-            ->assertOk();
+            ->assertRedirect(EmarUrl::mar($this->client, now()->toDateString()));
     }
 
     public function test_mar_show_forbidden_for_unassigned_support_worker(): void
@@ -2129,10 +2109,7 @@ class MedicationControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->get("/clients/{$this->client->id}/mar?date={$date}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('date', $date)
-            );
+            ->assertRedirect(EmarUrl::mar($this->client, $date));
     }
 
     public function test_mar_export_csv_requires_authentication(): void
@@ -2181,14 +2158,14 @@ class MedicationControllerTest extends TestCase
     {
         $this->actingAs($this->financeUser)
             ->get('/medications')
-            ->assertOk();
+            ->assertRedirect(EmarUrl::daily());
     }
 
     public function test_auditor_can_view_medications_index(): void
     {
         $this->actingAs($this->auditor)
             ->get('/medications')
-            ->assertOk();
+            ->assertRedirect(EmarUrl::daily());
     }
 
     public function test_coordinator_can_view_audit_log(): void
@@ -2220,7 +2197,7 @@ class MedicationControllerTest extends TestCase
         // via the clients.update middleware, but let's verify they can at least view
         $this->actingAs($this->coordinator)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertOk();
+            ->assertRedirect(EmarUrl::medications($this->client));
     }
 
     // ══════════════════════════════════════════════════════════════

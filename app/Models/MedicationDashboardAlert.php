@@ -60,6 +60,11 @@ class MedicationDashboardAlert extends Model
         'stock_low' => 'Low Stock',
         'missed_dose' => 'Missed Dose',
         'late_dose' => 'Late Dose',
+        'refused_dose' => 'Refused Dose',
+        'refusal_escalation' => 'Refusal Escalation',
+        'unsafe_correction' => 'Unsafe Correction',
+        'controlled_loss' => 'Controlled Drug Loss',
+        'transit_exception' => 'Medication Transit Exception',
     ];
 
     public const SEVERITY_LEVELS = [

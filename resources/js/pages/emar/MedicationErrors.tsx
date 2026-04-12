@@ -1,17 +1,45 @@
+import SupportingEvidenceDialog, {
+    type SupportingEvidenceAttachment,
+} from '@/components/medications/SupportingEvidenceDialog';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    TabsRoot as Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, Clock, Eye, Plus, ShieldAlert } from 'lucide-react';
+import {
+    AlertTriangle,
+    CheckCircle,
+    Clock,
+    Eye,
+    Paperclip,
+    Plus,
+    ShieldAlert,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
@@ -24,6 +52,9 @@ type Props = {
     };
     clients: { id: number; first_name: string; last_name: string }[];
     staff: { id: number; name: string }[];
+    can: {
+        manage_evidence: boolean;
+    };
     filters: {
         client_id?: string;
         severity?: string;
@@ -101,28 +132,47 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="error_client_id">Client *</Label>
-                            <Select value={form.data.client_id} onValueChange={(v) => form.setData('client_id', v)}>
+                            <Select
+                                value={form.data.client_id}
+                                onValueChange={(v) =>
+                                    form.setData('client_id', v)
+                                }
+                            >
                                 <SelectTrigger id="error_client_id">
                                     <SelectValue placeholder="Select client" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {clients.map((c) => (
-                                        <SelectItem key={c.id} value={c.id.toString()}>
+                                        <SelectItem
+                                            key={c.id}
+                                            value={c.id.toString()}
+                                        >
                                             {c.last_name}, {c.first_name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {form.errors.client_id && <p className="text-xs text-red-600">{form.errors.client_id}</p>}
+                            {form.errors.client_id && (
+                                <p className="text-xs text-red-600">
+                                    {form.errors.client_id}
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label htmlFor="client_medication_id">Medication (optional)</Label>
+                            <Label htmlFor="client_medication_id">
+                                Medication (optional)
+                            </Label>
                             <Input
                                 id="client_medication_id"
                                 placeholder="Medication name or ID"
                                 value={form.data.client_medication_id}
-                                onChange={(e) => form.setData('client_medication_id', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'client_medication_id',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </div>
                     </div>
@@ -130,36 +180,65 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="error_type">Error Type *</Label>
-                            <Select value={form.data.error_type} onValueChange={(v) => form.setData('error_type', v)}>
+                            <Select
+                                value={form.data.error_type}
+                                onValueChange={(v) =>
+                                    form.setData('error_type', v)
+                                }
+                            >
                                 <SelectTrigger id="error_type">
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {Object.entries(errorTypeLabels).map(([value, label]) => (
-                                        <SelectItem key={value} value={value}>
-                                            {label}
-                                        </SelectItem>
-                                    ))}
+                                    {Object.entries(errorTypeLabels).map(
+                                        ([value, label]) => (
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {label}
+                                            </SelectItem>
+                                        ),
+                                    )}
                                 </SelectContent>
                             </Select>
-                            {form.errors.error_type && <p className="text-xs text-red-600">{form.errors.error_type}</p>}
+                            {form.errors.error_type && (
+                                <p className="text-xs text-red-600">
+                                    {form.errors.error_type}
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-1.5">
                             <Label htmlFor="severity">Severity *</Label>
-                            <Select value={form.data.severity} onValueChange={(v) => form.setData('severity', v)}>
+                            <Select
+                                value={form.data.severity}
+                                onValueChange={(v) =>
+                                    form.setData('severity', v)
+                                }
+                            >
                                 <SelectTrigger id="severity">
                                     <SelectValue placeholder="Select severity" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="near_miss">Near Miss</SelectItem>
+                                    <SelectItem value="near_miss">
+                                        Near Miss
+                                    </SelectItem>
                                     <SelectItem value="minor">Minor</SelectItem>
-                                    <SelectItem value="moderate">Moderate</SelectItem>
+                                    <SelectItem value="moderate">
+                                        Moderate
+                                    </SelectItem>
                                     <SelectItem value="major">Major</SelectItem>
-                                    <SelectItem value="critical">Critical</SelectItem>
+                                    <SelectItem value="critical">
+                                        Critical
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
-                            {form.errors.severity && <p className="text-xs text-red-600">{form.errors.severity}</p>}
+                            {form.errors.severity && (
+                                <p className="text-xs text-red-600">
+                                    {form.errors.severity}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -169,30 +248,47 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                             id="description"
                             rows={3}
                             value={form.data.description}
-                            onChange={(e) => form.setData('description', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('description', e.target.value)
+                            }
                             placeholder="Describe the medication error in detail..."
                         />
-                        {form.errors.description && <p className="text-xs text-red-600">{form.errors.description}</p>}
+                        {form.errors.description && (
+                            <p className="text-xs text-red-600">
+                                {form.errors.description}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="immediate_action">Immediate Action Taken</Label>
+                        <Label htmlFor="immediate_action">
+                            Immediate Action Taken
+                        </Label>
                         <Textarea
                             id="immediate_action"
                             rows={2}
                             value={form.data.immediate_action}
-                            onChange={(e) => form.setData('immediate_action', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('immediate_action', e.target.value)
+                            }
                             placeholder="What immediate action was taken?"
                         />
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="contributing_factors">Contributing Factors</Label>
+                        <Label htmlFor="contributing_factors">
+                            Contributing Factors
+                        </Label>
                         <Textarea
                             id="contributing_factors"
                             rows={2}
                             value={form.data.contributing_factors}
-                            onChange={(e) => form.setData('contributing_factors', e.target.value)}
+                            onChange={(e) =>
+                                form.setData(
+                                    'contributing_factors',
+                                    e.target.value,
+                                )
+                            }
                             placeholder="What factors contributed to this error?"
                         />
                     </div>
@@ -202,16 +298,28 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                             type="checkbox"
                             id="create_incident"
                             checked={form.data.create_incident}
-                            onChange={(e) => form.setData('create_incident', e.target.checked)}
+                            onChange={(e) =>
+                                form.setData(
+                                    'create_incident',
+                                    e.target.checked,
+                                )
+                            }
                             className="h-4 w-4 rounded border-gray-300"
                         />
-                        <Label htmlFor="create_incident" className="text-sm font-normal">
+                        <Label
+                            htmlFor="create_incident"
+                            className="text-sm font-normal"
+                        >
                             Also create a linked incident report
                         </Label>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={form.processing}>
@@ -260,29 +368,48 @@ function ReviewDialog({ error }: { error: any }) {
                             id="review_notes"
                             rows={4}
                             value={form.data.review_notes}
-                            onChange={(e) => form.setData('review_notes', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('review_notes', e.target.value)
+                            }
                             placeholder="Enter your review notes..."
                         />
-                        {form.errors.review_notes && <p className="text-xs text-red-600">{form.errors.review_notes}</p>}
+                        {form.errors.review_notes && (
+                            <p className="text-xs text-red-600">
+                                {form.errors.review_notes}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-1.5">
                         <Label htmlFor="review_status">Status</Label>
-                        <Select value={form.data.status} onValueChange={(v) => form.setData('status', v)}>
+                        <Select
+                            value={form.data.status}
+                            onValueChange={(v) => form.setData('status', v)}
+                        >
                             <SelectTrigger id="review_status">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="reported">Reported</SelectItem>
-                                <SelectItem value="investigating">Investigating</SelectItem>
-                                <SelectItem value="resolved">Resolved</SelectItem>
+                                <SelectItem value="reported">
+                                    Reported
+                                </SelectItem>
+                                <SelectItem value="investigating">
+                                    Investigating
+                                </SelectItem>
+                                <SelectItem value="resolved">
+                                    Resolved
+                                </SelectItem>
                                 <SelectItem value="closed">Closed</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={form.processing}>
@@ -331,26 +458,47 @@ function ResolveDialog({ error }: { error: any }) {
                             id="outcome"
                             rows={3}
                             value={form.data.outcome}
-                            onChange={(e) => form.setData('outcome', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('outcome', e.target.value)
+                            }
                             placeholder="Describe the outcome of this error..."
                         />
-                        {form.errors.outcome && <p className="text-xs text-red-600">{form.errors.outcome}</p>}
+                        {form.errors.outcome && (
+                            <p className="text-xs text-red-600">
+                                {form.errors.outcome}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label htmlFor="preventive_actions">Preventive Actions *</Label>
+                        <Label htmlFor="preventive_actions">
+                            Preventive Actions *
+                        </Label>
                         <Textarea
                             id="preventive_actions"
                             rows={3}
                             value={form.data.preventive_actions}
-                            onChange={(e) => form.setData('preventive_actions', e.target.value)}
+                            onChange={(e) =>
+                                form.setData(
+                                    'preventive_actions',
+                                    e.target.value,
+                                )
+                            }
                             placeholder="What actions will be taken to prevent recurrence?"
                         />
-                        {form.errors.preventive_actions && <p className="text-xs text-red-600">{form.errors.preventive_actions}</p>}
+                        {form.errors.preventive_actions && (
+                            <p className="text-xs text-red-600">
+                                {form.errors.preventive_actions}
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={form.processing}>
@@ -363,13 +511,47 @@ function ResolveDialog({ error }: { error: any }) {
     );
 }
 
-export default function MedicationErrors({ errors, stats, clients, staff, filters }: Props) {
+export default function MedicationErrors({
+    errors,
+    stats,
+    clients,
+    staff,
+    can,
+    filters,
+}: Props) {
+    const [evidenceTarget, setEvidenceTarget] = useState<any | null>(null);
+    const [attachmentOverrides, setAttachmentOverrides] = useState<
+        Record<number, SupportingEvidenceAttachment[]>
+    >({});
+
+    function getAttachments(error: any): SupportingEvidenceAttachment[] {
+        return attachmentOverrides[error.id] ?? error.attachments ?? [];
+    }
+
+    function updateAttachments(
+        errorId: number,
+        attachments: SupportingEvidenceAttachment[],
+    ) {
+        setAttachmentOverrides((current) => ({
+            ...current,
+            [errorId]: attachments,
+        }));
+    }
+
     function updateFilter(key: string, value: string) {
-        router.get('/emar/errors', { ...filters, [key]: value || undefined }, { preserveState: true });
+        router.get(
+            '/emar/errors',
+            { ...filters, [key]: value || undefined },
+            { preserveState: true },
+        );
     }
 
     function switchTab(tab: string) {
-        router.get('/emar/errors', { ...filters, tab: tab === 'all' ? undefined : tab }, { preserveState: true });
+        router.get(
+            '/emar/errors',
+            { ...filters, tab: tab === 'all' ? undefined : tab },
+            { preserveState: true },
+        );
     }
 
     return (
@@ -389,8 +571,12 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                                 <Clock className="h-5 w-5 text-amber-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.total_open}</p>
-                                <p className="text-xs text-muted-foreground">Total Open</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.total_open}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Total Open
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -400,8 +586,12 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                                 <ShieldAlert className="h-5 w-5 text-red-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.critical}</p>
-                                <p className="text-xs text-muted-foreground">Critical</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.critical}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Critical
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -411,8 +601,12 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                                 <AlertTriangle className="h-5 w-5 text-blue-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.this_month}</p>
-                                <p className="text-xs text-muted-foreground">This Month</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.this_month}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    This Month
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -422,8 +616,12 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                                 <CheckCircle className="h-5 w-5 text-green-600" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.resolved_this_month}</p>
-                                <p className="text-xs text-muted-foreground">Resolved This Month</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.resolved_this_month}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Resolved This Month
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -436,16 +634,23 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                         className="w-40"
                         placeholder="From date"
                         value={filters.date_from ?? ''}
-                        onChange={(e) => updateFilter('date_from', e.target.value)}
+                        onChange={(e) =>
+                            updateFilter('date_from', e.target.value)
+                        }
                     />
                     <Input
                         type="date"
                         className="w-40"
                         placeholder="To date"
                         value={filters.date_to ?? ''}
-                        onChange={(e) => updateFilter('date_to', e.target.value)}
+                        onChange={(e) =>
+                            updateFilter('date_to', e.target.value)
+                        }
                     />
-                    <Select value={filters.client_id ?? ''} onValueChange={(v) => updateFilter('client_id', v)}>
+                    <Select
+                        value={filters.client_id ?? ''}
+                        onValueChange={(v) => updateFilter('client_id', v)}
+                    >
                         <SelectTrigger className="w-56">
                             <SelectValue placeholder="All clients" />
                         </SelectTrigger>
@@ -457,7 +662,10 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                             ))}
                         </SelectContent>
                     </Select>
-                    <Select value={filters.severity ?? ''} onValueChange={(v) => updateFilter('severity', v)}>
+                    <Select
+                        value={filters.severity ?? ''}
+                        onValueChange={(v) => updateFilter('severity', v)}
+                    >
                         <SelectTrigger className="w-40">
                             <SelectValue placeholder="All severities" />
                         </SelectTrigger>
@@ -469,32 +677,45 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                             <SelectItem value="critical">Critical</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Select value={filters.error_type ?? ''} onValueChange={(v) => updateFilter('error_type', v)}>
+                    <Select
+                        value={filters.error_type ?? ''}
+                        onValueChange={(v) => updateFilter('error_type', v)}
+                    >
                         <SelectTrigger className="w-48">
                             <SelectValue placeholder="All types" />
                         </SelectTrigger>
                         <SelectContent>
-                            {Object.entries(errorTypeLabels).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                    {label}
-                                </SelectItem>
-                            ))}
+                            {Object.entries(errorTypeLabels).map(
+                                ([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {label}
+                                    </SelectItem>
+                                ),
+                            )}
                         </SelectContent>
                     </Select>
-                    <Select value={filters.status ?? ''} onValueChange={(v) => updateFilter('status', v)}>
+                    <Select
+                        value={filters.status ?? ''}
+                        onValueChange={(v) => updateFilter('status', v)}
+                    >
                         <SelectTrigger className="w-40">
                             <SelectValue placeholder="All statuses" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="reported">Reported</SelectItem>
-                            <SelectItem value="investigating">Investigating</SelectItem>
+                            <SelectItem value="investigating">
+                                Investigating
+                            </SelectItem>
                             <SelectItem value="resolved">Resolved</SelectItem>
                             <SelectItem value="closed">Closed</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                <Tabs defaultValue={filters.tab ?? 'all'} onValueChange={switchTab}>
+                <Tabs
+                    defaultValue={filters.tab ?? 'all'}
+                    onValueChange={switchTab}
+                >
                     <TabsList className="mb-4">
                         <TabsTrigger value="all">All Errors</TabsTrigger>
                         <TabsTrigger value="open">Open</TabsTrigger>
@@ -506,61 +727,146 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                         <TabsContent key={tab} value={tab}>
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between pb-3">
-                                    <CardTitle className="text-base">Medication Errors</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Medication Errors
+                                    </CardTitle>
                                     <ReportErrorDialog clients={clients} />
                                 </CardHeader>
                                 <CardContent className="p-0">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b bg-muted/50">
-                                                <th className="p-3 text-left font-medium">Date</th>
-                                                <th className="p-3 text-left font-medium">Client</th>
-                                                <th className="p-3 text-left font-medium">Medication</th>
-                                                <th className="p-3 text-left font-medium">Type</th>
-                                                <th className="p-3 text-left font-medium">Severity</th>
-                                                <th className="p-3 text-left font-medium">Description</th>
-                                                <th className="p-3 text-left font-medium">Reported By</th>
-                                                <th className="p-3 text-left font-medium">Status</th>
-                                                <th className="p-3 text-right font-medium">Actions</th>
+                                                <th className="p-3 text-left font-medium">
+                                                    Date
+                                                </th>
+                                                <th className="p-3 text-left font-medium">
+                                                    Client
+                                                </th>
+                                                <th className="p-3 text-left font-medium">
+                                                    Medication
+                                                </th>
+                                                <th className="p-3 text-left font-medium">
+                                                    Type
+                                                </th>
+                                                <th className="p-3 text-left font-medium">
+                                                    Severity
+                                                </th>
+                                                <th className="p-3 text-left font-medium">
+                                                    Description
+                                                </th>
+                                                <th className="p-3 text-left font-medium">
+                                                    Reported By
+                                                </th>
+                                                <th className="p-3 text-left font-medium">
+                                                    Status
+                                                </th>
+                                                <th className="p-3 text-right font-medium">
+                                                    Actions
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {errors.data.map((err: any) => (
-                                                <tr key={err.id} className="border-b last:border-0">
+                                                <tr
+                                                    key={err.id}
+                                                    className="border-b last:border-0"
+                                                >
                                                     <td className="p-3 text-xs">
                                                         {err.reported_at
-                                                            ? new Date(err.reported_at).toLocaleDateString('en-NZ')
+                                                            ? new Date(
+                                                                  err.reported_at,
+                                                              ).toLocaleDateString(
+                                                                  'en-NZ',
+                                                              )
                                                             : '—'}
                                                     </td>
                                                     <td className="p-3">
-                                                        {err.client?.last_name}, {err.client?.first_name}
+                                                        {err.client?.last_name},{' '}
+                                                        {err.client?.first_name}
                                                     </td>
-                                                    <td className="p-3 text-xs">{err.medication?.name ?? '—'}</td>
+                                                    <td className="p-3 text-xs">
+                                                        {err.medication?.name ??
+                                                            '—'}
+                                                    </td>
                                                     <td className="p-3">
-                                                        <Badge variant="outline" className="text-xs">
-                                                            {errorTypeLabels[err.error_type] ?? err.error_type}
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="text-xs"
+                                                        >
+                                                            {errorTypeLabels[
+                                                                err.error_type
+                                                            ] ?? err.error_type}
                                                         </Badge>
                                                     </td>
                                                     <td className="p-3">
-                                                        <Badge className={`text-xs ${severityColors[err.severity] ?? ''}`}>
-                                                            {err.severity?.replace('_', ' ')}
+                                                        <Badge
+                                                            className={`text-xs ${severityColors[err.severity] ?? ''}`}
+                                                        >
+                                                            {err.severity?.replace(
+                                                                '_',
+                                                                ' ',
+                                                            )}
                                                         </Badge>
                                                     </td>
-                                                    <td className="max-w-[200px] truncate p-3 text-xs" title={err.description}>
+                                                    <td
+                                                        className="max-w-[200px] truncate p-3 text-xs"
+                                                        title={err.description}
+                                                    >
                                                         {err.description}
                                                     </td>
-                                                    <td className="p-3 text-xs">{err.reported_by_user?.name ?? '—'}</td>
+                                                    <td className="p-3 text-xs">
+                                                        {err.reported_by_user
+                                                            ?.name ?? '—'}
+                                                    </td>
                                                     <td className="p-3">
-                                                        <Badge className={`text-xs ${statusColors[err.status] ?? ''}`}>
+                                                        <Badge
+                                                            className={`text-xs ${statusColors[err.status] ?? ''}`}
+                                                        >
                                                             {err.status}
                                                         </Badge>
+                                                        {getAttachments(err)
+                                                            .length > 0 && (
+                                                            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                                                <Paperclip className="h-3 w-3" />
+                                                                {
+                                                                    getAttachments(
+                                                                        err,
+                                                                    ).length
+                                                                }{' '}
+                                                                evidence file(s)
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="p-3 text-right">
                                                         <div className="flex justify-end gap-1">
-                                                            {(err.status === 'reported' || err.status === 'investigating') && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-7 text-xs"
+                                                                onClick={() =>
+                                                                    setEvidenceTarget(
+                                                                        err,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Paperclip className="mr-1 h-3 w-3" />
+                                                                Evidence
+                                                            </Button>
+                                                            {(err.status ===
+                                                                'reported' ||
+                                                                err.status ===
+                                                                    'investigating') && (
                                                                 <>
-                                                                    <ReviewDialog error={err} />
-                                                                    <ResolveDialog error={err} />
+                                                                    <ReviewDialog
+                                                                        error={
+                                                                            err
+                                                                        }
+                                                                    />
+                                                                    <ResolveDialog
+                                                                        error={
+                                                                            err
+                                                                        }
+                                                                    />
                                                                 </>
                                                             )}
                                                         </div>
@@ -569,8 +875,12 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                                             ))}
                                             {errors.data.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={9} className="p-6 text-center text-muted-foreground">
-                                                        No medication errors found.
+                                                    <td
+                                                        colSpan={9}
+                                                        className="p-6 text-center text-muted-foreground"
+                                                    >
+                                                        No medication errors
+                                                        found.
                                                     </td>
                                                 </tr>
                                             )}
@@ -581,6 +891,31 @@ export default function MedicationErrors({ errors, stats, clients, staff, filter
                         </TabsContent>
                     ))}
                 </Tabs>
+
+                <SupportingEvidenceDialog
+                    isOpen={!!evidenceTarget}
+                    onClose={() => setEvidenceTarget(null)}
+                    clientId={evidenceTarget?.client?.id ?? null}
+                    targetType="error"
+                    targetId={evidenceTarget?.id ?? null}
+                    title="Medication Error Evidence"
+                    subject={
+                        evidenceTarget
+                            ? `${evidenceTarget.client?.last_name}, ${evidenceTarget.client?.first_name} - ${errorTypeLabels[evidenceTarget.error_type] ?? evidenceTarget.error_type}`
+                            : ''
+                    }
+                    attachments={
+                        evidenceTarget ? getAttachments(evidenceTarget) : []
+                    }
+                    canManage={can.manage_evidence}
+                    onAttachmentsChange={(attachments) => {
+                        if (!evidenceTarget) {
+                            return;
+                        }
+
+                        updateAttachments(evidenceTarget.id, attachments);
+                    }}
+                />
             </PageShell>
         </AppLayout>
     );

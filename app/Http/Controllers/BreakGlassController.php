@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Services\NotificationService;
+use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 
 class BreakGlassController extends Controller
@@ -32,7 +33,7 @@ class BreakGlassController extends Controller
 
         app(NotificationService::class)->notifyCrud($user, 'created', 'break-glass access', $access, $client, [
             'title' => 'Break-glass access used',
-            'url' => url("/clients/{$client->id}"),
+            'url' => url(EmarUrl::mar($client)),
         ]);
 
         return back()->with('success', 'Break-glass access granted.');
@@ -53,7 +54,7 @@ class BreakGlassController extends Controller
 
         app(NotificationService::class)->notifyCrud($user, 'deleted', 'break-glass access', $access, $client, [
             'title' => 'Break-glass access revoked',
-            'url' => url("/clients/{$client->id}/mar"),
+            'url' => url(EmarUrl::mar($client)),
         ]);
 
         return back()->with('success', 'Break-glass access revoked.');

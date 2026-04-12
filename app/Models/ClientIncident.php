@@ -21,6 +21,7 @@ class ClientIncident extends Model
         'client_id',
         'reported_by',
         'shift_id',
+        'service_context_id',
         'template_id',
 
         'type',
@@ -29,6 +30,7 @@ class ClientIncident extends Model
 
         'occurred_at',
         'description',
+        'metadata',
 
         'requires_followup',
         'immediate_action_taken',
@@ -95,6 +97,7 @@ class ClientIncident extends Model
     protected $casts = [
         'occurred_at' => 'datetime',
         'submitted_at' => 'datetime',
+        'metadata' => 'array',
         'requires_followup' => 'boolean',
         'portal_visible' => 'boolean',
         'reviewed_at' => 'datetime',
@@ -125,6 +128,11 @@ class ClientIncident extends Model
         return $this->belongsTo(Shift::class);
     }
 
+    public function serviceContext(): BelongsTo
+    {
+        return $this->belongsTo(ServiceContext::class);
+    }
+
     public function template(): BelongsTo
     {
         return $this->belongsTo(IncidentTemplate::class, 'template_id');
@@ -148,6 +156,16 @@ class ClientIncident extends Model
     public function isShiftLinked(): bool
     {
         return !empty($this->shift_id);
+    }
+
+    public function getCategoryAttribute(): ?string
+    {
+        return $this->type;
+    }
+
+    public function setCategoryAttribute(?string $value): void
+    {
+        $this->attributes['type'] = $value;
     }
 
     public function isSubmitted(): bool

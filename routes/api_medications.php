@@ -20,9 +20,45 @@ Route::middleware(['auth:sanctum'])->prefix('api/medications')->group(function (
         ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
         ->name('api.medications.mar.show');
 
+    Route::get('/clients/{client}/medications/{medication}/scan-code', [MedicationsApiController::class, 'getScanCode'])
+        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->name('api.medications.scan_code.show');
+
+    Route::get('/clients/{client}/medications/{medication}/scan-code/svg', [MedicationsApiController::class, 'getScanCodeSvg'])
+        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->name('api.medications.scan_code.svg');
+
+    Route::post('/clients/{client}/medications/{medication}/scan-verify', [MedicationsApiController::class, 'verifyScan'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->name('api.medications.scan.verify');
+
     Route::post('/clients/{client}/medications/{medication}/administrations', [MedicationsApiController::class, 'recordAdministration'])
         ->middleware('permission:medications.administer.record|clients.update')
         ->name('api.medications.administrations.record');
+
+    Route::post('/clients/{client}/administrations/{administration}/attachments', [MedicationsApiController::class, 'uploadAdministrationAttachment'])
+        ->middleware('permission:medications.administer.record|medications.administer.correct|clients.update')
+        ->name('api.medications.attachments.upload');
+
+    Route::post('/clients/{client}/attachments', [MedicationsApiController::class, 'uploadSupportingAttachment'])
+        ->middleware('permission:medications.administer.record|medications.administer.correct|medications.controlled.record|clients.update')
+        ->name('api.medications.supporting_attachments.upload');
+
+    Route::get('/clients/{client}/administrations/{administration}/attachments/{attachment}/download', [MedicationsApiController::class, 'downloadAdministrationAttachment'])
+        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->name('api.medications.attachments.download');
+
+    Route::get('/clients/{client}/attachments/{attachment}/download', [MedicationsApiController::class, 'downloadSupportingAttachment'])
+        ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
+        ->name('api.medications.supporting_attachments.download');
+
+    Route::delete('/clients/{client}/administrations/{administration}/attachments/{attachment}', [MedicationsApiController::class, 'deleteAdministrationAttachment'])
+        ->middleware('permission:medications.administer.record|medications.administer.correct|clients.update')
+        ->name('api.medications.attachments.delete');
+
+    Route::delete('/clients/{client}/attachments/{attachment}', [MedicationsApiController::class, 'deleteSupportingAttachment'])
+        ->middleware('permission:medications.administer.record|medications.administer.correct|medications.controlled.record|clients.update')
+        ->name('api.medications.supporting_attachments.delete');
 
     Route::post('/clients/{client}/mar/administrations/{administration}/corrections', [MedicationsApiController::class, 'correctAdministration'])
         ->middleware('permission:medications.administer.correct|clients.update')

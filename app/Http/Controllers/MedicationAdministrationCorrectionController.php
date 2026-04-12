@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientMedicationAdministration;
+use App\Services\MedicationIncidentIntegrationService;
 use App\Services\NotificationService;
+use App\Support\EmarUrl;
 use Illuminate\Http\Request;
 
 class MedicationAdministrationCorrectionController extends Controller
@@ -19,6 +21,12 @@ class MedicationAdministrationCorrectionController extends Controller
             'correction_approved_by' => $request->user()->id,
             'correction_approved_at' => now(),
         ]);
+
+        app(MedicationIncidentIntegrationService::class)->resolveUnsafeCorrection(
+            $correction,
+            'Unsafe medication correction approved.',
+            $request->user()->id
+        );
 
         return back()->with('success', 'Correction approved.');
     }
@@ -36,6 +44,12 @@ class MedicationAdministrationCorrectionController extends Controller
             'correction_approved_at' => now(),
             'correction_rejection_reason' => $validated['reason'],
         ]);
+
+        app(MedicationIncidentIntegrationService::class)->resolveUnsafeCorrection(
+            $correction,
+            'Unsafe medication correction rejected.',
+            $request->user()->id
+        );
 
         return back()->with('success', 'Correction rejected.');
     }
@@ -84,9 +98,16 @@ class MedicationAdministrationCorrectionController extends Controller
         $corr->correction_status = 'pending';
         $corr->save();
 
+        app(MedicationIncidentIntegrationService::class)->handleUnsafeCorrection(
+            $administration,
+            $data,
+            $user->id,
+            $corr
+        );
+
         app(NotificationService::class)->notifyCrud($user, 'created', 'medication correction (pending approval)', $corr, $client, [
             'title' => 'Medication correction pending approval',
-            'url' => url("/clients/{$client->id}/mar"),
+            'url' => url(EmarUrl::mar($client)),
             'notify_roles' => ['manager', 'admin'],
         ]);
 

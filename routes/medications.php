@@ -7,6 +7,7 @@ use App\Http\Controllers\MedicationsReportController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\ClientMarController;
 use App\Http\Controllers\Compliance\ComplianceDashboardController;
+use App\Support\EmarUrl;
 use Inertia\Inertia;
 
 /**
@@ -17,34 +18,22 @@ use Inertia\Inertia;
 
 Route::middleware(['auth'])->group(function () {
     // Central medications module - list view
-    Route::get('/medications', [MedicationsController::class, 'index'])
+    Route::get('/medications', function () {
+        return redirect()->to(EmarUrl::daily());
+    })
         ->middleware('permission:medications.view')
         ->name('medications.index');
 
     // Enhanced Medication Dashboard
     Route::get('/medications/dashboard', function () {
-        return Inertia::render('medications/dashboard');
+        return redirect()->to(EmarUrl::dashboard());
     })
         ->middleware('permission:medications.view')
         ->name('medications.dashboard');
 
     // Enhanced MAR (Medication Administration Record)
     Route::get('/medications/enhanced-mar/{client}', function (\App\Models\Client $client) {
-        return Inertia::render('medications/enhanced-mar', [
-            'client' => [
-                'id' => $client->id,
-                'first_name' => $client->first_name,
-                'last_name' => $client->last_name,
-            ],
-            'initialDate' => request('date', now()->toDateString()),
-            'witnesses' => \App\Models\User::staff()
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->filter(fn ($u) => $u->canDo('medications.controlled.witness'))
-                ->values()
-                ->toArray(),
-            'userId' => auth()->id(),
-        ]);
+        return redirect()->to(EmarUrl::mar($client, request('date', now()->toDateString())));
     })
         ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
         ->name('medications.enhanced-mar');

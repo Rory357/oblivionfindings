@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Storage;
 
 class MedicationMarAttachment extends Model
@@ -16,6 +17,8 @@ class MedicationMarAttachment extends Model
     protected $fillable = [
         'client_medication_administration_id',
         'client_id',
+        'attachable_type',
+        'attachable_id',
         'file_name',
         'file_path',
         'mime_type',
@@ -41,6 +44,11 @@ class MedicationMarAttachment extends Model
     public function administration(): BelongsTo
     {
         return $this->belongsTo(ClientMedicationAdministration::class, 'client_medication_administration_id');
+    }
+
+    public function attachable(): MorphTo
+    {
+        return $this->morphTo();
     }
 
     public function client(): BelongsTo

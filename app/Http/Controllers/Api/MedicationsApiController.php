@@ -4,18 +4,33 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ControlledDrugLossReport;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationDashboardAlert;
+use App\Models\MedicationError;
+use App\Models\MedicationMarAttachment;
 use App\Models\TimelineEvent;
+use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationReportingService;
+use App\Services\MedicationScanVerificationService;
 use App\Services\MedicationSafetyService;
 use Carbon\Carbon;
+use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel;
+use Endroid\QrCode\Writer\SvgWriter;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class MedicationsApiController extends Controller
 {
@@ -25,7 +40,249 @@ class MedicationsApiController extends Controller
         protected MedicationReportingService $reportingService,
         protected MedicationIncidentIntegrationService $incidentService,
         protected MedicationAlertService $alertService,
+        protected MedicationScanVerificationService $scanVerificationService,
     ) {}
+
+    private function idempotencyKey(string $scope, string $requestUuid): string
+    {
+        return "emar:idempotency:{$scope}:{$requestUuid}";
+    }
+
+    private function syncPayload(array $data, string $status, bool $duplicate = false, ?string $message = null): array
+    {
+        return array_filter([
+            'status' => $status,
+            'duplicate' => $duplicate,
+            'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+            'client_request_uuid' => $data['client_request_uuid'] ?? null,
+            'captured_offline_at' => $data['captured_offline_at'] ?? null,
+            'origin_device_id' => $data['origin_device_id'] ?? null,
+            'message' => $message,
+        ], fn ($value) => $value !== null);
+    }
+
+    private function withSync(array $payload, array $data, string $status, bool $duplicate = false, ?string $message = null): array
+    {
+        $payload['sync'] = $this->syncPayload($data, $status, $duplicate, $message);
+
+        return $payload;
+    }
+
+    private function getCachedIdempotentResponse(string $scope, array $data): ?array
+    {
+        $requestUuid = $data['client_request_uuid'] ?? null;
+        if (!$requestUuid) {
+            return null;
+        }
+
+        $payload = Cache::get($this->idempotencyKey($scope, $requestUuid));
+        if (!$payload) {
+            return null;
+        }
+
+        return $this->withSync(
+            $payload,
+            $data,
+            'duplicate',
+            true,
+            'This medication request was already processed.',
+        );
+    }
+
+    private function rememberIdempotentResponse(string $scope, array $data, array $payload): array
+    {
+        $requestUuid = $data['client_request_uuid'] ?? null;
+        if ($requestUuid) {
+            Cache::put($this->idempotencyKey($scope, $requestUuid), $payload, now()->addDays(7));
+        }
+
+        return $payload;
+    }
+
+    private function buildConflictPayload(array $data, string $message): array
+    {
+        return $this->withSync([
+            'success' => false,
+            'error' => $message,
+        ], $data, 'conflict', false, $message);
+    }
+
+    private function attachmentTargetTypeForModel(Model $target): string
+    {
+        return match ($target::class) {
+            ClientMedicationAdministration::class => $target->is_correction ? 'correction' : 'administration',
+            ClientControlledDrugDiscrepancy::class => 'discrepancy',
+            ControlledDrugLossReport::class => 'loss_report',
+            MedicationError::class => 'error',
+            default => 'administration',
+        };
+    }
+
+    private function attachmentTargetTypeForAttachment(MedicationMarAttachment $attachment): string
+    {
+        if ($attachment->attachable) {
+            return $this->attachmentTargetTypeForModel($attachment->attachable);
+        }
+
+        if ($attachment->administration) {
+            return $attachment->administration->is_correction ? 'correction' : 'administration';
+        }
+
+        return 'administration';
+    }
+
+    private function resolveAttachmentTarget(Client $client, string $targetType, int $targetId): Model
+    {
+        $target = match ($targetType) {
+            'administration', 'correction' => ClientMedicationAdministration::query()
+                ->with('attachments.uploadedBy:id,name')
+                ->findOrFail($targetId),
+            'discrepancy' => ClientControlledDrugDiscrepancy::query()
+                ->with('attachments.uploadedBy:id,name')
+                ->findOrFail($targetId),
+            'loss_report' => ControlledDrugLossReport::query()
+                ->with('attachments.uploadedBy:id,name')
+                ->findOrFail($targetId),
+            'error' => MedicationError::query()
+                ->with('attachments.uploadedBy:id,name')
+                ->findOrFail($targetId),
+            default => throw ValidationException::withMessages([
+                'target_type' => 'Unsupported medication evidence target.',
+            ]),
+        };
+
+        abort_unless((int) $target->client_id === (int) $client->id, 404);
+
+        if ($targetType === 'correction') {
+            abort_unless($target instanceof ClientMedicationAdministration && $target->is_correction, 404);
+        }
+
+        return $target;
+    }
+
+    private function assertCanManageSupportingAttachment(Request $request, string $targetType): void
+    {
+        $user = $request->user();
+
+        $canManage = match ($targetType) {
+            'administration', 'correction', 'error' => $user->canDo('medications.administer.record')
+                || $user->canDo('medications.administer.correct')
+                || $user->canDo('clients.update'),
+            'discrepancy', 'loss_report' => $user->canDo('medications.controlled.record')
+                || $user->canDo('medications.controlled.view')
+                || $user->canDo('clients.update'),
+            default => false,
+        };
+
+        abort_unless($canManage, 403);
+    }
+
+    private function canDeleteSupportingAttachment(Request $request, MedicationMarAttachment $attachment): bool
+    {
+        $user = $request->user();
+        $targetType = $this->attachmentTargetTypeForAttachment($attachment);
+
+        $canManage = match ($targetType) {
+            'administration', 'correction', 'error' => $user->canDo('medications.administer.correct')
+                || $user->canDo('clients.update'),
+            'discrepancy', 'loss_report' => $user->canDo('medications.controlled.record')
+                || $user->canDo('clients.update'),
+            default => false,
+        };
+
+        return $canManage || (int) $attachment->uploaded_by === (int) $user->id;
+    }
+
+    private function serializeAttachment(MedicationMarAttachment $attachment, bool $canDelete = false): array
+    {
+        $attachment->loadMissing([
+            'uploadedBy:id,name',
+            'attachable',
+            'administration:id,client_id,is_correction',
+        ]);
+
+        $targetType = $this->attachmentTargetTypeForAttachment($attachment);
+        $downloadUrl = in_array($targetType, ['administration', 'correction'], true)
+            ? route('api.medications.attachments.download', [
+                'client' => $attachment->client_id,
+                'administration' => $attachment->client_medication_administration_id,
+                'attachment' => $attachment->id,
+            ])
+            : route('api.medications.supporting_attachments.download', [
+                'client' => $attachment->client_id,
+                'attachment' => $attachment->id,
+            ]);
+
+        return [
+            'id' => $attachment->id,
+            'file_name' => $attachment->file_name,
+            'mime_type' => $attachment->mime_type,
+            'file_size' => $attachment->file_size,
+            'formatted_size' => $attachment->formatted_size,
+            'description' => $attachment->description,
+            'uploaded_at' => $attachment->created_at?->toIso8601String(),
+            'uploaded_by' => $attachment->uploadedBy?->name,
+            'download_url' => $downloadUrl,
+            'target_type' => $targetType,
+            'target_id' => $attachment->attachable_id ?? $attachment->client_medication_administration_id,
+            'can_delete' => $canDelete,
+        ];
+    }
+
+    private function buildMedicationScanPayload(Client $client, ClientMedication $medication): array
+    {
+        $payload = $this->scanVerificationService->payload($client, $medication);
+        $payload['svg_url'] = route('api.medications.scan_code.svg', [
+            'client' => $client->id,
+            'medication' => $medication->id,
+        ]);
+
+        return $payload;
+    }
+
+    private function verifyMedicationScanOrFail(
+        Client $client,
+        ClientMedication $medication,
+        array $data,
+        string $errorKey = 'scan_code'
+    ): array {
+        if (! ($data['scan_verified'] ?? false) || blank($data['scan_code'] ?? null)) {
+            throw ValidationException::withMessages([
+                $errorKey => 'Verify the medication code before continuing.',
+            ]);
+        }
+
+        $result = $this->scanVerificationService->verify(
+            $client,
+            $medication,
+            (string) $data['scan_code']
+        );
+
+        if (! $result['matched']) {
+            throw ValidationException::withMessages([
+                $errorKey => $result['message'],
+            ]);
+        }
+
+        if (
+            filled($data['scan_match_source'] ?? null)
+            && ($data['scan_match_source'] ?? null) !== $result['match_source']
+        ) {
+            throw ValidationException::withMessages([
+                $errorKey => 'The medication verification needs to be repeated.',
+            ]);
+        }
+
+        return [
+            'scan_source' => $data['scan_source'] ?? 'manual',
+            'scan_match_source' => $result['match_source'],
+            'scan_match_label' => $result['match_label'],
+            'scan_code_suffix' => substr(
+                $this->scanVerificationService->normalize((string) $data['scan_code']),
+                -6
+            ),
+        ];
+    }
 
     /**
      * Get enhanced MAR data
@@ -107,6 +364,247 @@ class MedicationsApiController extends Controller
         return response()->json($history);
     }
 
+    public function getScanCode(Request $request, Client $client, ClientMedication $medication)
+    {
+        $this->authorize('viewMedications', $client);
+        abort_unless($medication->client_id === $client->id, 404);
+
+        return response()->json($this->buildMedicationScanPayload($client, $medication));
+    }
+
+    public function getScanCodeSvg(Request $request, Client $client, ClientMedication $medication)
+    {
+        $this->authorize('viewMedications', $client);
+        abort_unless($medication->client_id === $client->id, 404);
+
+        $payload = $this->scanVerificationService->payload($client, $medication);
+
+        $result = new Builder(
+            writer: new SvgWriter(),
+            data: $payload['qr_value'],
+            encoding: new Encoding('UTF-8'),
+            errorCorrectionLevel: ErrorCorrectionLevel::Medium,
+            size: 320,
+            margin: 10,
+        );
+
+        $svg = $result->build();
+
+        return Response::make($svg->getString(), 200, [
+            'Content-Type' => 'image/svg+xml',
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
+    }
+
+    public function verifyScan(Request $request, Client $client, ClientMedication $medication)
+    {
+        $this->authorize('viewMedications', $client);
+        abort_unless($medication->client_id === $client->id, 404);
+
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:255'],
+            'source' => ['nullable', 'string', 'in:manual,scanner'],
+        ]);
+
+        $result = $this->scanVerificationService->verify($client, $medication, $data['code']);
+
+        AuditLogger::log('medications.scan.verify', $medication, [
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'matched' => $result['matched'],
+            'scan_source' => $data['source'] ?? 'manual',
+            'match_source' => $result['match_source'],
+            'match_label' => $result['match_label'],
+            'entered_code_suffix' => substr($this->scanVerificationService->normalize($data['code']), -6),
+        ]);
+
+        return response()->json([
+            ...$result,
+            'scan_reference' => $this->scanVerificationService->payload($client, $medication),
+        ], $result['matched'] ? 200 : 422);
+    }
+
+    public function uploadAdministrationAttachment(
+        Request $request,
+        Client $client,
+        ClientMedicationAdministration $administration
+    ) {
+        $this->authorize('viewMedications', $client);
+        abort_unless($administration->client_id === $client->id, 404);
+
+        $user = $request->user();
+        abort_unless(
+            $user->canDo('medications.administer.record')
+            || $user->canDo('medications.administer.correct')
+            || $user->canDo('clients.update'),
+            403
+        );
+
+        $data = $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store('medication_mar_attachments');
+
+        $attachment = MedicationMarAttachment::create([
+            'client_medication_administration_id' => $administration->id,
+            'client_id' => $client->id,
+            'attachable_type' => ClientMedicationAdministration::class,
+            'attachable_id' => $administration->id,
+            'file_name' => $file->getClientOriginalName(),
+            'file_path' => $path,
+            'mime_type' => $file->getClientMimeType(),
+            'file_size' => $file->getSize(),
+            'description' => $data['description'] ?? null,
+            'uploaded_by' => $user->id,
+        ]);
+
+        $attachment->load('uploadedBy:id,name');
+
+        AuditLogger::log('medications.administration.attachment.uploaded', $administration, [
+            'attachment_id' => $attachment->id,
+            'client_id' => $client->id,
+            'file_name' => $attachment->file_name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'attachment' => $this->serializeAttachment($attachment, true),
+        ]);
+    }
+
+    public function uploadSupportingAttachment(Request $request, Client $client)
+    {
+        $this->authorize('viewMedications', $client);
+
+        $data = $request->validate([
+            'target_type' => ['required', 'string', 'in:administration,correction,discrepancy,loss_report,error'],
+            'target_id' => ['required', 'integer'],
+            'file' => ['required', 'file', 'max:10240'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $this->assertCanManageSupportingAttachment($request, $data['target_type']);
+
+        $target = $this->resolveAttachmentTarget(
+            $client,
+            $data['target_type'],
+            (int) $data['target_id'],
+        );
+
+        $file = $request->file('file');
+        $path = $file->store('medication_mar_attachments');
+
+        $attachment = MedicationMarAttachment::create([
+            'client_medication_administration_id' => $target instanceof ClientMedicationAdministration
+                ? $target->id
+                : null,
+            'client_id' => $client->id,
+            'attachable_type' => $target::class,
+            'attachable_id' => $target->id,
+            'file_name' => $file->getClientOriginalName(),
+            'file_path' => $path,
+            'mime_type' => $file->getClientMimeType(),
+            'file_size' => $file->getSize(),
+            'description' => $data['description'] ?? null,
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        $attachment->load('uploadedBy:id,name');
+
+        AuditLogger::log('medications.supporting_attachment.uploaded', $target, [
+            'attachment_id' => $attachment->id,
+            'client_id' => $client->id,
+            'target_type' => $data['target_type'],
+            'file_name' => $attachment->file_name,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'attachment' => $this->serializeAttachment($attachment, true),
+        ]);
+    }
+
+    public function downloadAdministrationAttachment(
+        Request $request,
+        Client $client,
+        ClientMedicationAdministration $administration,
+        MedicationMarAttachment $attachment
+    ) {
+        $this->authorize('viewMedications', $client);
+        abort_unless($administration->client_id === $client->id, 404);
+        abort_unless($attachment->client_medication_administration_id === $administration->id, 404);
+        abort_unless($attachment->client_id === $client->id, 404);
+
+        return Storage::download($attachment->file_path, $attachment->file_name);
+    }
+
+    public function downloadSupportingAttachment(
+        Request $request,
+        Client $client,
+        MedicationMarAttachment $attachment
+    ) {
+        $this->authorize('viewMedications', $client);
+        abort_unless($attachment->client_id === $client->id, 404);
+
+        $attachment->loadMissing('attachable');
+        abort_unless($attachment->attachable, 404);
+        abort_unless((int) $attachment->attachable->client_id === (int) $client->id, 404);
+
+        return Storage::download($attachment->file_path, $attachment->file_name);
+    }
+
+    public function deleteAdministrationAttachment(
+        Request $request,
+        Client $client,
+        ClientMedicationAdministration $administration,
+        MedicationMarAttachment $attachment
+    ) {
+        $this->authorize('viewMedications', $client);
+        abort_unless($administration->client_id === $client->id, 404);
+        abort_unless($attachment->client_medication_administration_id === $administration->id, 404);
+        abort_unless($attachment->client_id === $client->id, 404);
+
+        abort_unless($this->canDeleteSupportingAttachment($request, $attachment), 403);
+
+        AuditLogger::log('medications.administration.attachment.deleted', $administration, [
+            'attachment_id' => $attachment->id,
+            'client_id' => $client->id,
+            'file_name' => $attachment->file_name,
+        ]);
+
+        $attachment->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function deleteSupportingAttachment(
+        Request $request,
+        Client $client,
+        MedicationMarAttachment $attachment
+    ) {
+        $this->authorize('viewMedications', $client);
+        abort_unless($attachment->client_id === $client->id, 404);
+
+        $attachment->loadMissing('attachable');
+        abort_unless($attachment->attachable, 404);
+        abort_unless((int) $attachment->attachable->client_id === (int) $client->id, 404);
+        abort_unless($this->canDeleteSupportingAttachment($request, $attachment), 403);
+
+        AuditLogger::log('medications.supporting_attachment.deleted', $attachment->attachable, [
+            'attachment_id' => $attachment->id,
+            'client_id' => $client->id,
+            'target_type' => $this->attachmentTargetTypeForAttachment($attachment),
+            'file_name' => $attachment->file_name,
+        ]);
+
+        $attachment->delete();
+
+        return response()->json(['success' => true]);
+    }
+
     /**
      * Record medication administration
      */
@@ -138,7 +636,19 @@ class MedicationsApiController extends Controller
             'site' => ['nullable', 'string', 'max:100'],
             'override_safety' => ['nullable', 'boolean'],
             'override_window' => ['nullable', 'boolean'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
+            'scan_code' => ['nullable', 'string', 'max:255'],
+            'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
+            'scan_verified' => ['nullable', 'boolean'],
+            'scan_match_source' => ['nullable', 'string', 'max:50'],
         ]);
+
+        if ($cached = $this->getCachedIdempotentResponse('administration', $data)) {
+            return response()->json($cached);
+        }
 
         // Require reason for non-given
         if ($data['status'] !== 'given' && empty($data['reason'])) {
@@ -181,6 +691,50 @@ class MedicationsApiController extends Controller
             }
         }
 
+        if (($data['queued_offline'] ?? false) && !$medication->is_prn && !empty($data['scheduled_for'])) {
+            $scheduledFor = Carbon::parse($data['scheduled_for']);
+            $conflictingAdministration = ClientMedicationAdministration::query()
+                ->where('client_id', $client->id)
+                ->where('client_medication_id', $medication->id)
+                ->whereBetween('scheduled_for', [
+                    $scheduledFor->copy()->subMinute(),
+                    $scheduledFor->copy()->addMinute(),
+                ])
+                ->latest('id')
+                ->first();
+
+            if ($conflictingAdministration) {
+                return response()->json(
+                    $this->buildConflictPayload(
+                        $data,
+                        'Medication state changed before this offline administration could sync. Supervisor review is required.',
+                    ),
+                    409
+                );
+            }
+        }
+
+        if (! empty($data['scan_code'])) {
+            $scanResult = $this->scanVerificationService->verify($client, $medication, $data['scan_code']);
+
+            AuditLogger::log('medications.scan.verify', $medication, [
+                'client_id' => $client->id,
+                'client_medication_id' => $medication->id,
+                'matched' => $scanResult['matched'],
+                'scan_source' => $data['scan_source'] ?? 'manual',
+                'match_source' => $scanResult['match_source'],
+                'match_label' => $scanResult['match_label'],
+                'entered_code_suffix' => substr($this->scanVerificationService->normalize($data['scan_code']), -6),
+            ]);
+
+            if (! $scanResult['matched']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $scanResult['message'],
+                ], 422);
+            }
+        }
+
         $result = $this->marService->recordAdministration(
             $client,
             $medication,
@@ -190,7 +744,18 @@ class MedicationsApiController extends Controller
         );
 
         if (!$result['success']) {
-            return response()->json($result, 422);
+            if (
+                $medication->is_prn
+                && ($result['safety_check']['blocked'] ?? false)
+                && $medication->fresh()->isPrnBlocked()
+            ) {
+                $limitIncidentKey = 'emar:prn-over-limit:' . $client->id . ':' . $medication->id . ':' . now()->format('YmdHi');
+                if (Cache::add($limitIncidentKey, true, now()->addMinutes(15))) {
+                    $this->incidentService->handlePrnOverLimit($client, $medication->fresh(), $user->id);
+                }
+            }
+
+            return response()->json($this->withSync($result, $data, 'rejected', false, $result['error'] ?? null), 422);
         }
 
         $administration = $result['administration'];
@@ -215,6 +780,13 @@ class MedicationsApiController extends Controller
                 'status' => $data['status'],
                 'reason' => $data['reason'] ?? null,
                 'witnessed_by' => $data['witnessed_by'] ?? null,
+                'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                'origin_device_id' => $data['origin_device_id'] ?? null,
+                'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                'scan_source' => $data['scan_source'] ?? null,
+                'scan_match_source' => $data['scan_match_source'] ?? null,
+                'scan_verified' => (bool) ($data['scan_verified'] ?? false),
             ]),
             'visibility' => 'internal',
             'is_pinned' => false,
@@ -236,7 +808,7 @@ class MedicationsApiController extends Controller
         // Generate fresh alerts
         $this->alertService->generateClientAlerts($client);
 
-        return response()->json([
+        $payload = $this->withSync([
             'success' => true,
             'administration' => [
                 'id' => $administration->id,
@@ -244,7 +816,11 @@ class MedicationsApiController extends Controller
                 'administered_at' => $administration->administered_at?->toIso8601String(),
             ],
             'safety_check' => $result['safety_check'] ?? null,
-        ]);
+        ], $data, ($data['queued_offline'] ?? false) ? 'synced' : 'processed');
+
+        return response()->json(
+            $this->rememberIdempotentResponse('administration', $data, $payload)
+        );
     }
 
     /**
@@ -325,7 +901,7 @@ class MedicationsApiController extends Controller
 
         // Handle incident for significant corrections
         if ($minutesSince > 240) { // 4 hours
-            $this->incidentService->handleUnsafeCorrection($administration, $data, $user->id);
+            $this->incidentService->handleUnsafeCorrection($administration, $data, $user->id, $correction);
         }
 
         return response()->json([
@@ -682,6 +1258,7 @@ class MedicationsApiController extends Controller
                 'id' => $medication->id,
                 'name' => $medication->name,
                 'on_hand' => $medication->stock?->on_hand,
+                'scan_verification' => $this->buildMedicationScanPayload($client, $medication),
             ],
             'counts' => $counts,
         ]);
@@ -703,7 +1280,15 @@ class MedicationsApiController extends Controller
             'scheduled_time' => ['nullable', 'date_format:H:i'],
             'expected_quantity' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
         ]);
+
+        if ($cached = $this->getCachedIdempotentResponse('scheduled-stock-count:create', $data)) {
+            return response()->json($cached);
+        }
 
         $count = \App\Models\MedicationScheduledStockCount::create([
             'client_id' => $client->id,
@@ -715,14 +1300,18 @@ class MedicationsApiController extends Controller
             'notes' => $data['notes'] ?? null,
         ]);
 
-        return response()->json([
+        $payload = $this->withSync([
             'success' => true,
             'count' => [
                 'id' => $count->id,
                 'scheduled_date' => $count->scheduled_date->toDateString(),
                 'status' => $count->status,
             ],
-        ]);
+        ], $data, 'processed');
+
+        return response()->json(
+            $this->rememberIdempotentResponse('scheduled-stock-count:create', $data, $payload)
+        );
     }
 
     /**
@@ -744,7 +1333,29 @@ class MedicationsApiController extends Controller
             'actual_quantity' => ['required', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
             'witnessed_by' => $requiresWitness ? ['required', 'integer', 'exists:users,id'] : ['nullable'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
+            'scan_code' => ['nullable', 'string', 'max:255'],
+            'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
+            'scan_verified' => ['nullable', 'boolean'],
+            'scan_match_source' => ['nullable', 'string', 'max:50'],
         ]);
+
+        if ($cached = $this->getCachedIdempotentResponse('scheduled-stock-count:complete', $data)) {
+            return response()->json($cached);
+        }
+
+        if ($count->status === 'completed') {
+            return response()->json(
+                $this->buildConflictPayload(
+                    $data,
+                    'This stock count was already completed before the current request could be applied.',
+                ),
+                409
+            );
+        }
 
         if ($requiresWitness && $data['witnessed_by'] === $user->id) {
             return response()->json([
@@ -752,6 +1363,10 @@ class MedicationsApiController extends Controller
                 'error' => 'Witness must be a different user.',
             ], 422);
         }
+
+        $scanAudit = $medication
+            ? $this->verifyMedicationScanOrFail($client, $medication, $data)
+            : null;
 
         $count->complete(
             $data['actual_quantity'],
@@ -767,14 +1382,30 @@ class MedicationsApiController extends Controller
             $medication->stock->save();
         }
 
-        return response()->json([
+        AuditLogger::log('medications.stock.count.completed', $count, array_filter([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication?->id,
+            'actual_quantity' => (int) $data['actual_quantity'],
+            'discrepancy' => $count->discrepancy,
+            'witnessed_by' => $data['witnessed_by'] ?? null,
+            'scan_source' => $scanAudit['scan_source'] ?? null,
+            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
+            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
+            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
+        ], fn ($value) => $value !== null && $value !== ''));
+
+        $payload = $this->withSync([
             'success' => true,
             'count' => [
                 'id' => $count->id,
                 'status' => 'completed',
                 'discrepancy' => $count->discrepancy,
             ],
-        ]);
+        ], $data, ($data['queued_offline'] ?? false) ? 'synced' : 'processed');
+
+        return response()->json(
+            $this->rememberIdempotentResponse('scheduled-stock-count:complete', $data, $payload)
+        );
     }
 
     /**

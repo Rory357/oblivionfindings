@@ -15,8 +15,13 @@ use App\Models\ClientMedicationStock;
 use App\Models\ServiceContext;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\EnhancedMarService;
+use App\Services\MedicationAlertService;
+use App\Services\MedicationIncidentIntegrationService;
 use App\Services\NotificationService;
+use App\Support\EmarUrl;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ClientMedicalController extends Controller
 {
@@ -74,210 +79,7 @@ class ClientMedicalController extends Controller
     public function show(Request $request, Client $client)
     {
         $this->authorize('viewMedications', $client);
-
-        // Audit break-glass medication access
-        $user = $request->user();
-        if ($user && $user->canDo('medications.breakglass')) {
-            $activeBreakGlass = $client->breakGlassAccesses()
-                ->where('user_id', $user->id)
-                ->where('expires_at', '>', now())
-                ->exists();
-
-            if ($activeBreakGlass) {
-                \App\Services\AuditLogger::log('breakglass.medication_access', $client);
-            }
-        }
-
-        // Check for expired consents and pass to frontend
-        $expiredConsents = \App\Services\ConsentValidationService::getExpiredConsents($client);
-        $missingMandatory = \App\Services\ConsentValidationService::getMissingMandatoryConsents($client);
-
-        $client->load([
-            'medicalProfile',
-            'medications.stock',
-            'conditions',
-            'emergencyContacts',
-        ]);
-
-        // Step 14: medication chart attachments (stored as client documents with category = "med_chart")
-        $medCharts = ClientDocument::query()
-            ->where('client_id', $client->id)
-            ->where('category', 'med_chart')
-            ->orderByDesc('effective_date')
-            ->orderByDesc('id')
-            ->get(['id', 'title', 'category', 'version', 'effective_date', 'expiry_date', 'portal_visible']);
-
-        $user = $request->user();
-        $canEdit = $user?->canDo('clients.update') ?? false;
-        $canRecord = $canEdit || ($user?->canDo('medications.administer.record') ?? false);
-        $canStock = $canEdit || ($user?->canDo('medications.stock.update') ?? false);
-
-        $canControlledView = $canEdit || ($user?->canDo('medications.controlled.view') ?? false);
-        $canControlledRecord = $canEdit || ($user?->canDo('medications.controlled.record') ?? false);
-        $canControlledWitness = $canEdit || ($user?->canDo('medications.controlled.witness') ?? false);
-
-        $witnesses = User::staff()
-            ->where(function ($q) {
-                $q->whereHas('roles.permissions', fn ($rp) => $rp->where('key', 'medications.controlled.witness'))
-                    ->orWhereHas('permissionOverrides', fn ($po) => $po
-                        ->where('permissions.key', 'medications.controlled.witness')
-                        ->where('permission_user.allowed', true));
-            })
-            ->whereDoesntHave('permissionOverrides', fn ($po) => $po
-                ->where('permissions.key', 'medications.controlled.witness')
-                ->where('permission_user.allowed', false))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        $administrations = ClientMedicationAdministration::query()
-            ->where('client_id', $client->id)
-            ->with([
-                'medication:id,client_id,name,dosage,frequency',
-                'administeredBy:id,name,email',
-                'serviceContext:id,name,type',
-            ])
-            ->orderByDesc('administered_at')
-            ->orderByDesc('id')
-            ->limit(50)
-            ->get()
-            ->map(function (ClientMedicationAdministration $a) {
-                $lateMinutes = null;
-                if ($a->scheduled_for && $a->administered_at) {
-                    $diff = $a->scheduled_for->diffInMinutes($a->administered_at, false);
-                    $lateMinutes = $diff > 0 ? $diff : 0;
-                }
-
-                return [
-                    'id' => $a->id,
-                    'status' => $a->status,
-                    'reason' => $a->reason,
-                    'dose_given' => $a->dose_given,
-                    'scheduled_for' => $a->scheduled_for,
-                    'administered_at' => $a->administered_at,
-                    'notes' => $a->notes,
-                    'late_minutes' => $lateMinutes,
-                    'shift_id' => $a->shift_id,
-                    'medication' => $a->medication,
-                    'administeredBy' => $a->administeredBy,
-                    'serviceContext' => $a->serviceContext ? [
-                        'id' => $a->serviceContext->id,
-                        'name' => $a->serviceContext->name,
-                        'type' => (string) ($a->serviceContext->type?->value ?? $a->serviceContext->type),
-                    ] : null,
-                ];
-            })
-            ->values();
-
-        $controlledEntries = collect();
-        if ($canControlledView) {
-            $controlledEntries = ClientControlledDrugEntry::query()
-                ->where('client_id', $client->id)
-                ->with([
-                    'medication:id,client_id,name,controlled_drug',
-                    'recordedBy:id,name,email',
-                    'witnessedBy:id,name,email',
-                    'serviceContext:id,name,type',
-                ])
-                ->orderByDesc('recorded_at')
-                ->orderByDesc('id')
-                ->limit(50)
-                ->get()
-                ->map(function (ClientControlledDrugEntry $e) {
-                    return [
-                        'id' => $e->id,
-                        'entry_type' => $e->entry_type,
-                        'quantity' => $e->quantity,
-                        'unit' => $e->unit,
-                        'on_hand_before' => $e->on_hand_before,
-                        'on_hand_after' => $e->on_hand_after,
-                        'reason' => $e->reason,
-                        'notes' => $e->notes,
-                        'recorded_at' => $e->recorded_at,
-                        'medication' => $e->medication,
-                        'recordedBy' => $e->recordedBy,
-                        'witnessedBy' => $e->witnessedBy,
-                        'serviceContext' => $e->serviceContext ? [
-                            'id' => $e->serviceContext->id,
-                            'name' => $e->serviceContext->name,
-                            'type' => (string) ($e->serviceContext->type?->value ?? $e->serviceContext->type),
-                        ] : null,
-                    ];
-                })
-                ->values();
-        }
-
-        $controlledDiscrepancies = collect();
-        if ($canControlledView) {
-            $controlledDiscrepancies = ClientControlledDrugDiscrepancy::query()
-                ->where('client_id', $client->id)
-                ->with([
-                    'medication:id,client_id,name,controlled_drug',
-                    'reportedBy:id,name,email',
-                    'witnessedBy:id,name,email',
-                    'resolvedBy:id,name,email',
-                    'serviceContext:id,name,type',
-                ])
-                ->orderByRaw("status = 'open' desc")
-                ->orderByDesc('reported_at')
-                ->orderByDesc('id')
-                ->limit(50)
-                ->get()
-                ->map(function (ClientControlledDrugDiscrepancy $d) {
-                    return [
-                        'id' => $d->id,
-                        'status' => $d->status,
-                        'difference' => $d->difference,
-                        'on_hand_before' => $d->on_hand_before,
-                        'on_hand_after' => $d->on_hand_after,
-                        'reason' => $d->reason,
-                        'notes' => $d->notes,
-                        'reported_at' => $d->reported_at,
-                        'resolved_at' => $d->resolved_at,
-                        'resolution_notes' => $d->resolution_notes,
-                        'medication' => $d->medication,
-                        'reportedBy' => $d->reportedBy,
-                        'witnessedBy' => $d->witnessedBy,
-                        'resolvedBy' => $d->resolvedBy,
-                        'serviceContext' => $d->serviceContext ? [
-                            'id' => $d->serviceContext->id,
-                            'name' => $d->serviceContext->name,
-                            'type' => (string) ($d->serviceContext->type?->value ?? $d->serviceContext->type),
-                        ] : null,
-                    ];
-                })
-                ->values();
-        }
-
-        return inertia('operations/clients/medical', [
-            'client' => $client->only(['id', 'first_name', 'last_name']),
-            'can_edit' => $canEdit,
-            'can_record' => $canRecord,
-            'can_stock' => $canStock,
-            'profile' => $client->medicalProfile,
-            'medications' => $client->medications,
-            'conditions' => $client->conditions,
-            'emergency_contacts' => $client->emergencyContacts,
-            'administrations' => $administrations,
-            'can_controlled_view' => $canControlledView,
-            'can_controlled_record' => $canControlledRecord,
-            'can_controlled_witness' => $canControlledWitness,
-            'witnesses' => $witnesses,
-            'controlled_entries' => $controlledEntries,
-            'controlled_discrepancies' => $controlledDiscrepancies,
-            'med_charts' => $medCharts,
-            'has_open_controlled_discrepancy' => ClientControlledDrugDiscrepancy::query()
-                ->where('client_id', $client->id)
-                ->whereIn('status', ['open', 'under_review'])
-                ->exists(),
-            'disability_options' => ClientMedicalProfile::DISABILITY_OPTIONS,
-            'allergen_options' => ClientMedicalProfile::ALLERGEN_OPTIONS,
-            'expiredConsents' => $expiredConsents->map(fn ($c) => [
-                'id' => $c->id,
-                'type' => $c->consentType?->name,
-                'expired_at' => $c->expires_at?->toIso8601String(),
-            ]),
-            'missingMandatoryConsents' => $missingMandatory->pluck('name')->values(),
-        ]);
+        return redirect()->to(EmarUrl::medications($client));
     }
 
     public function updateProfile(Request $request, Client $client)
@@ -523,6 +325,8 @@ class ClientMedicalController extends Controller
                 return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
             }
         }
+        $discrepancy = null;
+
         try {
             $stock->save();
             if ($medication->controlled_drug) {
@@ -545,7 +349,7 @@ class ClientMedicalController extends Controller
 
                 // If the counted stock differs from the last known on-hand, flag a discrepancy for review.
                 if ($beforeOnHand !== null && $stock->on_hand !== null && (int) $stock->on_hand !== (int) $beforeOnHand) {
-                    ClientControlledDrugDiscrepancy::create([
+                    $discrepancy = ClientControlledDrugDiscrepancy::create([
                         'client_id' => $client->id,
                         'client_medication_id' => $medication->id,
                         'service_context_id' => $client->service_context_id ?: ServiceContext::defaultId(),
@@ -561,6 +365,12 @@ class ClientMedicalController extends Controller
                     ]);
                 }
             }
+
+            if ($discrepancy) {
+                app(MedicationIncidentIntegrationService::class)
+                    ->handleControlledDiscrepancy($discrepancy, $user->id);
+            }
+
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medication stock', $stock, $client, [
                 'title' => 'Medication stock updated: '.($medication->name ?? 'Medication'),
                 'url' => url("/clients/{$client->id}/medical"),
@@ -640,48 +450,71 @@ class ClientMedicalController extends Controller
 
         $medication->loadMissing('stock');
 
-        $a = new ClientMedicationAdministration;
-        $a->client_id = $client->id;
-        $a->client_medication_id = $medication->id;
-        $a->administered_by = $user->id;
-        $a->shift_id = $data['shift_id'] ?? null;
-        $a->service_context_id = null;
-        if ($a->shift_id) {
-            $shift = \App\Models\Shift::query()->find($a->shift_id);
-            $a->service_context_id = $shift?->service_context_id;
-        }
-        if (! $a->service_context_id) {
-            $a->service_context_id = $client->service_context_id ?: ServiceContext::defaultId();
-        }
-        $a->status = $data['status'];
-        $a->reason = $data['reason'] ?? null;
-        $a->dose_given = $data['dose_given'] ?? null;
-        $a->scheduled_for = $data['scheduled_for'] ?? null;
-        $a->administered_at = $data['administered_at'] ?? now();
-        $a->notes = $data['notes'] ?? null;
         try {
-            $a->save();
+            $result = app(EnhancedMarService::class)->recordAdministration(
+                $client,
+                $medication,
+                $data,
+                $user->id,
+                $data['shift_id'] ?? null
+            );
 
-            // Controlled drug register entry (double-sign).
-            if ($medication->controlled_drug && $a->status === 'given') {
-                $medication->loadMissing('stock');
-                ClientControlledDrugEntry::create([
-                    'client_id' => $client->id,
-                    'client_medication_id' => $medication->id,
-                    'shift_id' => $a->shift_id,
-                    'service_context_id' => $a->service_context_id,
-                    'entry_type' => 'administered',
-                    'quantity' => null,
-                    'unit' => $medication->stock?->unit,
-                    'on_hand_before' => $medication->stock?->on_hand,
-                    'on_hand_after' => $medication->stock?->on_hand,
-                    'reason' => $a->reason,
-                    'notes' => $a->notes,
-                    'recorded_at' => $a->administered_at,
-                    'recorded_by' => $user->id,
-                    'witnessed_by' => (int) $data['witnessed_by'],
-                ]);
+            if (! ($result['success'] ?? false)) {
+                if (
+                    $medication->is_prn
+                    && ($result['safety_check']['blocked'] ?? false)
+                    && $medication->fresh()->isPrnBlocked()
+                ) {
+                    $limitIncidentKey = 'emar:prn-over-limit:' . $client->id . ':' . $medication->id . ':' . now()->format('YmdHi');
+                    if (Cache::add($limitIncidentKey, true, now()->addMinutes(15))) {
+                        app(MedicationIncidentIntegrationService::class)
+                            ->handlePrnOverLimit($client, $medication->fresh(), $user->id);
+                    }
+                }
+
+                return back()->withInput()->with('error', $result['error'] ?? 'Failed to record administration.');
             }
+
+            /** @var ClientMedicationAdministration $a */
+            $a = $result['administration'];
+
+            $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
+            TimelineEvent::create([
+                'source_type' => ClientMedicationAdministration::class,
+                'source_id' => $a->id,
+                'occurred_at' => $a->administered_at ?? now(),
+                'type' => 'medication_' . $data['status'],
+                'actor_user_id' => $user->id,
+                'client_id' => $client->id,
+                'shift_id' => $data['shift_id'] ?? null,
+                'site_id' => $client->site_id,
+                'subject' => $statusLabel . ': ' . $medication->name . ($medication->dosage ? ' ' . $medication->dosage : ''),
+                'body' => $data['notes'] ?? null,
+                'meta' => array_filter([
+                    'medication_name' => $medication->name,
+                    'dosage' => $medication->dosage,
+                    'dose_given' => $data['dose_given'] ?? null,
+                    'status' => $data['status'],
+                    'reason' => $data['reason'] ?? null,
+                    'witnessed_by' => $data['witnessed_by'] ?? null,
+                ]),
+                'visibility' => 'internal',
+                'is_pinned' => false,
+                'created_by' => $user->id,
+            ]);
+
+            if ($data['status'] === 'missed') {
+                app(MedicationIncidentIntegrationService::class)->handleMissedDose($a, $user->id);
+            } elseif ($data['status'] === 'refused' && ($medication->high_risk || $medication->controlled_drug)) {
+                app(MedicationIncidentIntegrationService::class)->handleRefusedDose($a);
+            }
+
+            if (($a->late_minutes ?? null) && $a->late_minutes > 120) {
+                app(MedicationIncidentIntegrationService::class)->handleLateDose($a, $a->late_minutes);
+            }
+
+            app(MedicationAlertService::class)->generateClientAlerts($client);
+
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication administration', $a, $client, [
                 'title' => 'Medication administration recorded',
                 'url' => url("/clients/{$client->id}/medical"),
@@ -716,6 +549,12 @@ class ClientMedicalController extends Controller
         $discrepancy->resolved_by = $user?->id;
         $discrepancy->resolution_notes = $data['resolution_notes'] ?? null;
         $discrepancy->save();
+
+        app(MedicationIncidentIntegrationService::class)->resolveControlledDiscrepancy(
+            $discrepancy,
+            'Controlled drug discrepancy closed from client medical record.',
+            $user?->id
+        );
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'controlled drug discrepancy', $discrepancy, $client, [
             'title' => 'Controlled drug discrepancy closed',

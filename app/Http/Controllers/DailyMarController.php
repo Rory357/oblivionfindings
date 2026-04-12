@@ -7,9 +7,14 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ServiceContext;
 use App\Models\User;
+use App\Models\TimelineEvent;
+use App\Services\EnhancedMarService;
+use App\Services\MedicationAlertService;
+use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MarScheduleService;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class DailyMarController extends Controller
 {
@@ -263,27 +268,72 @@ class DailyMarController extends Controller
             }
         }
 
-        $a = new ClientMedicationAdministration();
-        $a->client_id = $client->id;
-        $a->client_medication_id = $medication->id;
-        $a->administered_by = $user->id;
-        $a->witnessed_by = $data['witnessed_by'] ?? null;
-        $a->shift_id = $data['shift_id'] ?? null;
-        $a->service_context_id = null;
-        if ($a->shift_id) {
-            $shift = \App\Models\Shift::query()->find($a->shift_id);
-            $a->service_context_id = $shift?->service_context_id;
+        $result = app(EnhancedMarService::class)->recordAdministration(
+            $client,
+            $medication,
+            array_merge($data, [
+                'scheduled_for' => $scheduledFor?->toIso8601String(),
+                'administered_at' => $adminAt->toIso8601String(),
+            ]),
+            $user->id,
+            $data['shift_id'] ?? null
+        );
+
+        if (! ($result['success'] ?? false)) {
+            if (
+                $medication->is_prn
+                && ($result['safety_check']['blocked'] ?? false)
+                && $medication->fresh()->isPrnBlocked()
+            ) {
+                $limitIncidentKey = 'emar:prn-over-limit:' . $client->id . ':' . $medication->id . ':' . now()->format('YmdHi');
+                if (Cache::add($limitIncidentKey, true, now()->addMinutes(15))) {
+                    app(MedicationIncidentIntegrationService::class)
+                        ->handlePrnOverLimit($client, $medication->fresh(), $user->id);
+                }
+            }
+
+            return back()->withInput()->with('error', $result['error'] ?? 'Failed to record administration.');
         }
-        if (!$a->service_context_id) {
-            $a->service_context_id = $client->service_context_id ?: ServiceContext::defaultId();
+
+        /** @var ClientMedicationAdministration $a */
+        $a = $result['administration'];
+
+        $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
+        TimelineEvent::create([
+            'source_type' => ClientMedicationAdministration::class,
+            'source_id' => $a->id,
+            'occurred_at' => $a->administered_at ?? now(),
+            'type' => 'medication_' . $data['status'],
+            'actor_user_id' => $user->id,
+            'client_id' => $client->id,
+            'shift_id' => $data['shift_id'] ?? null,
+            'site_id' => $client->site_id,
+            'subject' => $statusLabel . ': ' . $medication->name . ($medication->dosage ? ' ' . $medication->dosage : ''),
+            'body' => $data['notes'] ?? null,
+            'meta' => array_filter([
+                'medication_name' => $medication->name,
+                'dosage' => $medication->dosage,
+                'dose_given' => $data['dose_given'] ?? null,
+                'status' => $data['status'],
+                'reason' => $data['reason'] ?? null,
+                'witnessed_by' => $data['witnessed_by'] ?? null,
+            ]),
+            'visibility' => 'internal',
+            'is_pinned' => false,
+            'created_by' => $user->id,
+        ]);
+
+        if ($data['status'] === 'missed') {
+            app(MedicationIncidentIntegrationService::class)->handleMissedDose($a, $user->id);
+        } elseif ($data['status'] === 'refused' && ($medication->high_risk || $medication->controlled_drug)) {
+            app(MedicationIncidentIntegrationService::class)->handleRefusedDose($a);
         }
-        $a->status = $data['status'];
-        $a->reason = $data['reason'] ?? null;
-        $a->dose_given = $data['dose_given'] ?? null;
-        $a->scheduled_for = $scheduledFor;
-        $a->administered_at = $adminAt;
-        $a->notes = $data['notes'] ?? null;
-        $a->save();
+
+        if (($a->late_minutes ?? null) && $a->late_minutes > 120) {
+            app(MedicationIncidentIntegrationService::class)->handleLateDose($a, $a->late_minutes);
+        }
+
+        app(MedicationAlertService::class)->generateClientAlerts($client);
 
         app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication administration', $a, $client, [
             'title' => 'Medication administration recorded',

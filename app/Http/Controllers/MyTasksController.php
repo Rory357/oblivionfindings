@@ -12,6 +12,7 @@ use App\Models\Timesheet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use App\Support\EmarUrl;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -182,7 +183,7 @@ class MyTasksController extends Controller
                         'dose' => $med->dosage,
                         'scheduled_for' => $scheduled->toIso8601String(),
                         'status' => $status,
-                        'emar_url' => '/emar?client=' . $med->client_id,
+                        'emar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
                     ];
                 }
             }

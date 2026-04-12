@@ -11,6 +11,7 @@ use App\Models\MedicationOrderVersion;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class MedicationReportingService
 {
@@ -446,9 +447,15 @@ class MedicationReportingService
         $dateFrom = $dateFrom ?? now()->subDays(90);
         $dateTo = $dateTo ?? now();
 
-        $query = \App\Models\ClientIncident::whereNotNull('metadata->medication_id')
+        $query = \App\Models\ClientIncident::query()
             ->whereBetween('occurred_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
             ->with(['client:id,first_name,last_name']);
+
+        if (Schema::hasTable('client_incidents') && Schema::hasColumn('client_incidents', 'metadata')) {
+            $query->whereNotNull('metadata->medication_id');
+        } else {
+            $query->whereIn('type', ['medication', 'controlled_drug']);
+        }
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -476,7 +483,7 @@ class MedicationReportingService
                 'severity' => $i->severity,
                 'title' => $i->title,
                 'medication_id' => $i->metadata['medication_id'] ?? null,
-                'medication_name' => $i->metadata['medication_name'] ?? 'Unknown',
+                'medication_name' => $i->metadata['medication_name'] ?? $i->title,
                 'controlled_drug' => $i->metadata['controlled_drug'] ?? false,
                 'high_risk' => $i->metadata['high_risk'] ?? false,
                 'status' => $i->status,

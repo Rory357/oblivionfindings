@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
@@ -10,9 +11,10 @@ use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
 use App\Models\Shift;
 use App\Models\User;
-use App\Notifications\Fleet\FleetControlledDrugTransitNotification;
 use App\Services\AuditLogger;
 use App\Services\CoverageRoleService;
+use App\Services\MedicationIncidentIntegrationService;
+use App\Services\MedicationScanVerificationService;
 use App\Services\ShiftOperationalSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,10 +24,161 @@ use Inertia\Inertia;
 
 class ResidentTransportController extends Controller
 {
+    use HandlesMedicationSync;
+
     public function __construct(
         protected CoverageRoleService $coverageRoles,
         protected ShiftOperationalSnapshotService $snapshots,
+        protected MedicationScanVerificationService $scanVerificationService,
     ) {
+    }
+
+    private function canManageMedicationTransit(?User $user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('fleet.medication.manage')
+            || $user->canDo('medications.administer.record')
+            || $user->canDo('medications.stock.update')
+            || $user->canDo('clients.update')
+        );
+    }
+
+    private function assertCanManageMedicationTransit(Request $request): void
+    {
+        abort_unless(
+            $this->canManageMedicationTransit($request->user()),
+            403,
+            'You do not have permission to manage medications in transit.'
+        );
+    }
+
+    private function buildMedicationScanPayload(Client $client, ClientMedication $medication): array
+    {
+        $payload = $this->scanVerificationService->payload($client, $medication);
+        $payload['svg_url'] = route('api.medications.scan_code.svg', [
+            'client' => $client->id,
+            'medication' => $medication->id,
+        ]);
+
+        return $payload;
+    }
+
+    private function resolveTransitMedication(Client $client, ?int $medicationId): ?ClientMedication
+    {
+        if (! $medicationId) {
+            return null;
+        }
+
+        return ClientMedication::query()
+            ->where('client_id', $client->id)
+            ->find($medicationId);
+    }
+
+    private function verifyMedicationScanOrFail(
+        Client $client,
+        ClientMedication $medication,
+        array $payload,
+        string $errorKey = 'scan_code'
+    ): array {
+        if (! ($payload['scan_verified'] ?? false) || blank($payload['scan_code'] ?? null)) {
+            throw ValidationException::withMessages([
+                $errorKey => 'Verify the medication code before continuing.',
+            ]);
+        }
+
+        $result = $this->scanVerificationService->verify(
+            $client,
+            $medication,
+            (string) $payload['scan_code']
+        );
+
+        if (! $result['matched']) {
+            throw ValidationException::withMessages([
+                $errorKey => $result['message'],
+            ]);
+        }
+
+        if (
+            filled($payload['scan_match_source'] ?? null)
+            && ($payload['scan_match_source'] ?? null) !== $result['match_source']
+        ) {
+            throw ValidationException::withMessages([
+                $errorKey => 'The medication verification needs to be repeated.',
+            ]);
+        }
+
+        return [
+            'scan_source' => $payload['scan_source'] ?? 'manual',
+            'scan_match_source' => $result['match_source'],
+            'scan_match_label' => $result['match_label'],
+            'scan_code_suffix' => substr(
+                $this->scanVerificationService->normalize((string) $payload['scan_code']),
+                -6
+            ),
+        ];
+    }
+
+    private function createTransitMedicationLog(
+        FleetResidentTransport $transport,
+        Client $client,
+        Request $request,
+        array $payload,
+        ?ClientMedication $medication = null,
+        ?array $scanAudit = null
+    ): FleetMedicationTransitLog {
+        $isControlledDrug = (bool) ($medication?->controlled_drug ?? $payload['is_controlled_drug'] ?? false);
+
+        $attributes = [
+            'transport_id' => $transport->id,
+            'client_id' => $client->id,
+            'medication_id' => $medication?->id ?? ($payload['medication_id'] ?? null),
+            'medication_name' => $medication
+                ? trim($medication->name . ($medication->dosage ? ' ' . $medication->dosage : ''))
+                : $payload['medication_name'],
+            'is_controlled_drug' => $isControlledDrug,
+            'packed_by_user_id' => $request->user()->id,
+            'packed_at' => now(),
+            'notes' => $payload['notes'] ?? null,
+        ];
+
+        if ($this->supportsPackedWitnessName()) {
+            $attributes['packed_witness_name'] = filled($payload['witness_name'] ?? null)
+                ? trim((string) $payload['witness_name'])
+                : null;
+        }
+
+        $log = FleetMedicationTransitLog::create($attributes);
+
+        AuditLogger::log('fleet.medication.pack', $log, array_filter([
+            'transport_id' => $transport->id,
+            'client_id' => $client->id,
+            'client_medication_id' => $medication?->id,
+            'medication_name' => $log->medication_name,
+            'controlled_drug' => $isControlledDrug,
+            'packed_witness_name' => $log->packed_witness_name,
+            'scan_source' => $scanAudit['scan_source'] ?? null,
+            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
+            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
+            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
+        ], fn ($value) => $value !== null && $value !== ''));
+
+        if ($isControlledDrug) {
+            app(MedicationIncidentIntegrationService::class)->handleTransitException($log);
+        }
+
+        return $log;
+    }
+
+    private function supportsPackedWitnessName(): bool
+    {
+        static $supportsPackedWitnessName = null;
+
+        if ($supportsPackedWitnessName === null) {
+            $supportsPackedWitnessName = Schema::hasTable('fleet_medication_transit_logs')
+                && Schema::hasColumn('fleet_medication_transit_logs', 'packed_witness_name');
+        }
+
+        return $supportsPackedWitnessName;
     }
 
     public function index(Request $request)
@@ -233,6 +386,11 @@ class ResidentTransportController extends Controller
         // If a client/resident is selected, pass their active medications
         $clientMedications = [];
         $clientIdForContext = $selectedShift?->client_id ?: ($request->filled('client_id') ? (int) $request->input('client_id') : null);
+        $scanClient = $selectedShift?->client;
+
+        if (! $scanClient && $clientIdForContext) {
+            $scanClient = Client::query()->find($clientIdForContext, ['id']);
+        }
 
         if ($clientIdForContext && Schema::hasTable('client_medications')) {
             $clientMedications = ClientMedication::where('client_id', $clientIdForContext)
@@ -242,7 +400,19 @@ class ResidentTransportController extends Controller
                     $q->where('is_prn', true)
                       ->orWhereNotNull('dose_times');
                 })
-                ->get(['id', 'name', 'dosage', 'frequency', 'is_prn', 'controlled_drug', 'dose_times', 'route', 'instructions'])
+                ->get([
+                    'id',
+                    'name',
+                    'dosage',
+                    'frequency',
+                    'is_prn',
+                    'controlled_drug',
+                    'dose_times',
+                    'route',
+                    'instructions',
+                    'barcode',
+                    'nzulm_code',
+                ])
                 ->map(fn ($m) => [
                     'id' => $m->id,
                     'name' => $m->name,
@@ -253,6 +423,9 @@ class ResidentTransportController extends Controller
                     'dose_times' => $m->dose_times,
                     'route' => $m->route,
                     'instructions' => $m->instructions,
+                    'scan_verification' => $scanClient
+                        ? $this->buildMedicationScanPayload($scanClient, $m)
+                        : null,
                 ]);
         }
 
@@ -321,11 +494,19 @@ class ResidentTransportController extends Controller
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             // Medications to pack
             'medications' => ['nullable', 'array'],
-            'medications.*.medication_id' => ['required', 'integer'],
+            'medications.*.medication_id' => ['required', 'integer', 'exists:client_medications,id'],
             'medications.*.medication_name' => ['required', 'string', 'max:255'],
             'medications.*.is_controlled_drug' => ['required', 'boolean'],
             'medications.*.witness_name' => ['nullable', 'string', 'max:255'],
+            'medications.*.scan_code' => ['nullable', 'string', 'max:255'],
+            'medications.*.scan_source' => ['nullable', 'string', 'in:manual,scanner'],
+            'medications.*.scan_verified' => ['nullable', 'boolean'],
+            'medications.*.scan_match_source' => ['nullable', 'string', 'max:50'],
         ]);
+
+        if (! empty($data['medications'])) {
+            $this->assertCanManageMedicationTransit($request);
+        }
 
         $shift = null;
         if (! empty($data['shift_id'])) {
@@ -365,6 +546,47 @@ class ResidentTransportController extends Controller
             $data['resident_id'] = $data['client_id'];
         }
 
+        $medicationClient = null;
+        $preparedTransitMedications = [];
+
+        if (! empty($data['medications'])) {
+            if (empty($data['client_id'])) {
+                throw ValidationException::withMessages([
+                    'medications' => 'Select a resident before packing medications for transport.',
+                ]);
+            }
+
+            $medicationClient = Client::query()->findOrFail((int) $data['client_id']);
+            foreach ($data['medications'] as $med) {
+                $medication = $this->resolveTransitMedication(
+                    $medicationClient,
+                    isset($med['medication_id']) ? (int) $med['medication_id'] : null,
+                );
+
+                if (($med['medication_id'] ?? null) && ! $medication) {
+                    throw ValidationException::withMessages([
+                        'medications' => 'One or more selected medications do not belong to this resident.',
+                    ]);
+                }
+
+                $isControlledDrug = (bool) ($medication?->controlled_drug ?? $med['is_controlled_drug']);
+
+                if ($isControlledDrug && blank($med['witness_name'] ?? null)) {
+                    throw ValidationException::withMessages([
+                        'medications' => 'Controlled drugs require a packing witness name before transport can be logged.',
+                    ]);
+                }
+
+                $preparedTransitMedications[] = [
+                    'payload' => $med,
+                    'medication' => $medication,
+                    'scan_audit' => $medication
+                        ? $this->verifyMedicationScanOrFail($medicationClient, $medication, $med, 'medications')
+                        : null,
+                ];
+            }
+        }
+
         $data['driver_user_id'] = $request->user()->id;
         $data['status'] = 'in_progress';
         $data['passengers_count'] = $data['passengers_count'] ?? 1;
@@ -375,33 +597,42 @@ class ResidentTransportController extends Controller
                 $data['pickup_location'] ?? null,
             )
             : null;
-        $transport = FleetResidentTransport::create([
-            ...collect($data)->except(['medications', 'client_id'])->toArray(),
-            ...($shift
-                ? $this->snapshots->transportSnapshotForShift($shift, $request->user())
-                : [
-                    'site_id' => $clientSnapshot['site_id'] ?? null,
-                    'site_name_snapshot' => $clientSnapshot['site_name'] ?? null,
-                    'shift_location_snapshot' => $clientSnapshot['location'] ?? null,
-                    'service_context_name_snapshot' => $clientSnapshot['service_context_name'] ?? null,
-                    'driver_name_snapshot' => $clientSnapshot['staff_name'] ?? $request->user()->name,
-                ]),
-        ]);
+        $transport = DB::transaction(function () use (
+            $data,
+            $shift,
+            $request,
+            $clientSnapshot,
+            $preparedTransitMedications,
+            $medicationClient
+        ) {
+            $transport = FleetResidentTransport::create([
+                ...collect($data)->except(['medications', 'client_id'])->toArray(),
+                ...($shift
+                    ? $this->snapshots->transportSnapshotForShift($shift, $request->user())
+                    : [
+                        'site_id' => $clientSnapshot['site_id'] ?? null,
+                        'site_name_snapshot' => $clientSnapshot['site_name'] ?? null,
+                        'shift_location_snapshot' => $clientSnapshot['location'] ?? null,
+                        'service_context_name_snapshot' => $clientSnapshot['service_context_name'] ?? null,
+                        'driver_name_snapshot' => $clientSnapshot['staff_name'] ?? $request->user()->name,
+                    ]),
+            ]);
 
-        // Create medication transit logs if medications were packed
-        if (!empty($data['medications']) && !empty($data['client_id']) && Schema::hasTable('fleet_medication_transit_logs')) {
-            foreach ($data['medications'] as $med) {
-                FleetMedicationTransitLog::create([
-                    'transport_id' => $transport->id,
-                    'client_id' => $data['client_id'],
-                    'medication_id' => $med['medication_id'],
-                    'medication_name' => $med['medication_name'],
-                    'is_controlled_drug' => $med['is_controlled_drug'],
-                    'packed_by_user_id' => $request->user()->id,
-                    'packed_at' => now(),
-                ]);
+            if ($medicationClient && Schema::hasTable('fleet_medication_transit_logs')) {
+                foreach ($preparedTransitMedications as $preparedMedication) {
+                    $this->createTransitMedicationLog(
+                        $transport,
+                        $medicationClient,
+                        $request,
+                        $preparedMedication['payload'],
+                        $preparedMedication['medication'],
+                        $preparedMedication['scan_audit'],
+                    );
+                }
             }
-        }
+
+            return $transport;
+        });
 
         AuditLogger::log('fleet.transport.create', $transport, [
             'asset_id' => $data['asset_id'],
@@ -469,9 +700,112 @@ class ResidentTransportController extends Controller
                 ->toArray();
         }
 
+        $canManageMedicationTransit = $this->canManageMedicationTransit($request->user());
+        $transportClient = $transport->resident_id
+            ? Client::query()->find($transport->resident_id, ['id', 'first_name', 'last_name'])
+            : null;
+
+        $availableMedications = [];
+        if ($transportClient && Schema::hasTable('client_medications')) {
+            $availableMedications = ClientMedication::query()
+                ->where('client_id', $transportClient->id)
+                ->where('active', true)
+                ->whereNull('ceased_at')
+                ->where(function ($query) {
+                    $query->where('is_prn', true)
+                        ->orWhereNotNull('dose_times');
+                })
+                ->get([
+                    'id',
+                    'name',
+                    'dosage',
+                    'frequency',
+                    'is_prn',
+                    'controlled_drug',
+                    'dose_times',
+                    'route',
+                    'instructions',
+                ])
+                ->map(fn ($medication) => [
+                    'id' => $medication->id,
+                    'name' => $medication->name,
+                    'dosage' => $medication->dosage,
+                    'frequency' => $medication->frequency,
+                    'is_prn' => (bool) $medication->is_prn,
+                    'controlled_drug' => (bool) $medication->controlled_drug,
+                    'dose_times' => $medication->dose_times,
+                    'route' => $medication->route,
+                    'instructions' => $medication->instructions,
+                    'scan_verification' => $this->buildMedicationScanPayload($transportClient, $medication),
+                ])
+                ->values()
+                ->toArray();
+        }
+
+        $transitLogs = [];
+        if (Schema::hasTable('fleet_medication_transit_logs')) {
+            $transitLogs = FleetMedicationTransitLog::query()
+                ->with([
+                    'client:id,first_name,last_name',
+                    'medication:id,client_id,name,dosage,barcode,nzulm_code',
+                    'packedBy:id,name',
+                    'administeredBy:id,name',
+                    'witnessedBy:id,name',
+                ])
+                ->where('transport_id', $transport->id)
+                ->orderByDesc('packed_at')
+                ->get()
+                ->map(fn ($log) => [
+                    'id' => $log->id,
+                    'client' => $log->client ? [
+                        'id' => $log->client->id,
+                        'name' => trim(($log->client->first_name ?? '') . ' ' . ($log->client->last_name ?? '')),
+                    ] : null,
+                    'medication_id' => $log->medication_id,
+                    'medication_name' => $log->medication_name,
+                    'is_controlled_drug' => $log->is_controlled_drug,
+                    'packed_witness_name' => $log->packed_witness_name,
+                    'packed_by' => $log->packedBy ? [
+                        'id' => $log->packedBy->id,
+                        'name' => $log->packedBy->name,
+                    ] : null,
+                    'packed_at' => optional($log->packed_at)->toISOString(),
+                    'administered_by' => $log->administeredBy ? [
+                        'id' => $log->administeredBy->id,
+                        'name' => $log->administeredBy->name,
+                    ] : null,
+                    'administered_at' => optional($log->administered_at)->toISOString(),
+                    'witnessed_by' => $log->witnessedBy ? [
+                        'id' => $log->witnessedBy->id,
+                        'name' => $log->witnessedBy->name,
+                    ] : null,
+                    'returned_to_house_at' => optional($log->returned_to_house_at)->toISOString(),
+                    'status' => $log->status,
+                    'notes' => $log->notes,
+                    'scan_verification' => $log->client && $log->medication
+                        ? $this->buildMedicationScanPayload($log->client, $log->medication)
+                        : null,
+                ])
+                ->values()
+                ->toArray();
+        }
+
+        $witnesses = $canManageMedicationTransit
+            ? User::query()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                ])
+                ->values()
+                ->toArray()
+            : [];
+
         return Inertia::render('fleet-assets/transports/show', [
             'transport' => [
                 'id' => $transport->id,
+                'resident_id' => $transport->resident_id,
                 'asset' => $transport->asset ? [
                     'id' => $transport->asset->id,
                     'name' => $transport->asset->name,
@@ -514,6 +848,16 @@ class ResidentTransportController extends Controller
             'pre_check_status' => $preCheckStatus,
             'care_needs' => $careNeeds,
             'completion_blockers' => $this->getCompletionBlockers($transport),
+            'medication_context' => [
+                'client' => $transportClient ? [
+                    'id' => $transportClient->id,
+                    'name' => trim(($transportClient->first_name ?? '') . ' ' . ($transportClient->last_name ?? '')),
+                ] : null,
+                'available_medications' => $availableMedications,
+                'transit_logs' => $transitLogs,
+                'witnesses' => $witnesses,
+                'can_manage' => $canManageMedicationTransit,
+            ],
         ]);
     }
 
@@ -595,11 +939,33 @@ class ResidentTransportController extends Controller
 
     public function medicationIndex(Request $request)
     {
+        $selectedTransport = null;
+
+        if ($request->filled('transport_id') && Schema::hasTable('fleet_resident_transports')) {
+            $selectedTransport = FleetResidentTransport::query()
+                ->with(['asset:id,name,asset_tag'])
+                ->find((int) $request->input('transport_id'));
+        }
+
         if (!Schema::hasTable('fleet_medication_transit_logs')) {
             return Inertia::render('fleet-assets/transports/medications', [
                 'logs' => ['data' => [], 'links' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0]],
-                'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status']),
+                'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status', 'transport_id']),
                 'clients' => [],
+                'witnesses' => [],
+                'transport_scope' => $selectedTransport ? [
+                    'id' => $selectedTransport->id,
+                    'resident_name' => $selectedTransport->resident_name,
+                    'transport_type' => $selectedTransport->transport_type,
+                    'status' => $selectedTransport->status,
+                    'departed_at' => optional($selectedTransport->departed_at)->toISOString(),
+                    'arrived_at' => optional($selectedTransport->arrived_at)->toISOString(),
+                    'asset' => $selectedTransport->asset ? [
+                        'id' => $selectedTransport->asset->id,
+                        'name' => $selectedTransport->asset->name,
+                        'asset_tag' => $selectedTransport->asset->asset_tag,
+                    ] : null,
+                ] : null,
                 'stats' => [
                     'total_packed_today' => 0,
                     'controlled_drugs_out' => 0,
@@ -609,7 +975,19 @@ class ResidentTransportController extends Controller
         }
 
         $query = FleetMedicationTransitLog::query()
-            ->with(['client:id,first_name,last_name', 'packedBy:id,name', 'administeredBy:id,name', 'witnessedBy:id,name']);
+            ->with([
+                'client:id,first_name,last_name',
+                'transport:id,resident_name,transport_type,status,departed_at,arrived_at,asset_id',
+                'transport.asset:id,name,asset_tag',
+                'packedBy:id,name',
+                'administeredBy:id,name',
+                'witnessedBy:id,name',
+                'medication',
+            ]);
+
+        if ($request->filled('transport_id')) {
+            $query->where('transport_id', (int) $request->input('transport_id'));
+        }
 
         if ($request->filled('client_id')) {
             $query->where('client_id', (int) $request->input('client_id'));
@@ -639,7 +1017,7 @@ class ResidentTransportController extends Controller
             $all = (clone $query)->latest('packed_at')->limit(5000)->get();
             return response()->streamDownload(function () use ($all) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
+                fputcsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packing Witness', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
                 foreach ($all as $log) {
                     fputcsv($handle, [
                         $log->id,
@@ -647,6 +1025,7 @@ class ResidentTransportController extends Controller
                         $log->medication_name,
                         $log->is_controlled_drug ? 'Yes' : 'No',
                         $log->packedBy?->name ?? '',
+                        $log->packed_witness_name ?? '',
                         optional($log->packed_at)->format('Y-m-d H:i') ?? '',
                         $log->administeredBy?->name ?? '',
                         optional($log->administered_at)->format('Y-m-d H:i') ?? '',
@@ -683,12 +1062,27 @@ class ResidentTransportController extends Controller
             'logs' => [
                 'data' => $logs->getCollection()->map(fn ($log) => [
                     'id' => $log->id,
+                    'transport' => $log->transport ? [
+                        'id' => $log->transport->id,
+                        'resident_name' => $log->transport->resident_name,
+                        'transport_type' => $log->transport->transport_type,
+                        'status' => $log->transport->status,
+                        'departed_at' => optional($log->transport->departed_at)->toISOString(),
+                        'arrived_at' => optional($log->transport->arrived_at)->toISOString(),
+                        'asset' => $log->transport->asset ? [
+                            'id' => $log->transport->asset->id,
+                            'name' => $log->transport->asset->name,
+                            'asset_tag' => $log->transport->asset->asset_tag,
+                        ] : null,
+                    ] : null,
                     'client' => $log->client ? [
                         'id' => $log->client->id,
                         'name' => trim(($log->client->first_name ?? '') . ' ' . ($log->client->last_name ?? '')),
                     ] : null,
+                    'medication_id' => $log->medication_id,
                     'medication_name' => $log->medication_name,
                     'is_controlled_drug' => $log->is_controlled_drug,
+                    'packed_witness_name' => $log->packed_witness_name,
                     'packed_by' => $log->packedBy ? ['id' => $log->packedBy->id, 'name' => $log->packedBy->name] : null,
                     'packed_at' => optional($log->packed_at)->toISOString(),
                     'administered_by' => $log->administeredBy ? ['id' => $log->administeredBy->id, 'name' => $log->administeredBy->name] : null,
@@ -697,6 +1091,9 @@ class ResidentTransportController extends Controller
                     'returned_to_house_at' => optional($log->returned_to_house_at)->toISOString(),
                     'status' => $log->status,
                     'notes' => $log->notes,
+                    'scan_verification' => $log->client && $log->medication
+                        ? $this->buildMedicationScanPayload($log->client, $log->medication)
+                        : null,
                 ])->values(),
                 'links' => $logs->linkCollection()->toArray(),
                 'meta' => [
@@ -705,8 +1102,25 @@ class ResidentTransportController extends Controller
                     'total' => $logs->total(),
                 ],
             ],
-            'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status']),
+            'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status', 'transport_id']),
             'clients' => $clients,
+            'witnesses' => User::query()->orderBy('name')->get(['id', 'name'])->map(fn ($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+            ])->values(),
+            'transport_scope' => $selectedTransport ? [
+                'id' => $selectedTransport->id,
+                'resident_name' => $selectedTransport->resident_name,
+                'transport_type' => $selectedTransport->transport_type,
+                'status' => $selectedTransport->status,
+                'departed_at' => optional($selectedTransport->departed_at)->toISOString(),
+                'arrived_at' => optional($selectedTransport->arrived_at)->toISOString(),
+                'asset' => $selectedTransport->asset ? [
+                    'id' => $selectedTransport->asset->id,
+                    'name' => $selectedTransport->asset->name,
+                    'asset_tag' => $selectedTransport->asset->asset_tag,
+                ] : null,
+            ] : null,
             'stats' => [
                 'total_packed_today' => $totalPackedToday,
                 'controlled_drugs_out' => $controlledDrugsOut,
@@ -717,38 +1131,99 @@ class ResidentTransportController extends Controller
 
     public function packMedication(Request $request, FleetResidentTransport $transport)
     {
+        $this->assertCanManageMedicationTransit($request);
+
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
-            'medication_id' => ['nullable', 'integer'],
+            'medication_id' => ['nullable', 'integer', 'exists:client_medications,id'],
             'medication_name' => ['required', 'string', 'max:255'],
             'is_controlled_drug' => ['required', 'boolean'],
             'witness_name' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'scan_code' => ['nullable', 'string', 'max:255'],
+            'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
+            'scan_verified' => ['nullable', 'boolean'],
+            'scan_match_source' => ['nullable', 'string', 'max:50'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
         ]);
 
-        $log = FleetMedicationTransitLog::create([
-            'transport_id' => $transport->id,
-            'client_id' => $data['client_id'],
-            'medication_id' => $data['medication_id'] ?? null,
-            'medication_name' => $data['medication_name'],
-            'is_controlled_drug' => $data['is_controlled_drug'],
-            'packed_by_user_id' => $request->user()->id,
-            'packed_at' => now(),
-            'notes' => $data['notes'] ?? null,
-        ]);
+        $scope = "fleet-medication-pack:{$transport->id}";
 
-        AuditLogger::log('fleet.medication.pack', $log, [
-            'transport_id' => $transport->id,
-            'medication_name' => $data['medication_name'],
-            'controlled_drug' => $data['is_controlled_drug'],
-        ]);
+        if (
+            $this->medicationSyncRequested($data)
+            && ($cached = $this->getCachedMedicationSyncResponse($scope, $data))
+        ) {
+            return response()->json($cached);
+        }
 
-        // Notify medication managers when a controlled drug is packed
-        if ($data['is_controlled_drug']) {
-            $log->load(['client:id,first_name,last_name', 'packedBy:id,name']);
-            User::whereHas('roles', function ($q) {
-                $q->whereHas('permissions', fn ($p) => $p->where('key', 'fleet.medication.manage'));
-            })->get()->each->notify(new FleetControlledDrugTransitNotification($log));
+        $client = Client::query()->findOrFail((int) $data['client_id']);
+
+        if ($transport->resident_id && (int) $transport->resident_id !== (int) $client->id) {
+            throw ValidationException::withMessages([
+                'client_id' => 'Only medications for the resident assigned to this transport can be packed here.',
+            ]);
+        }
+
+        $medication = $this->resolveTransitMedication(
+            $client,
+            isset($data['medication_id']) ? (int) $data['medication_id'] : null,
+        );
+
+        if (($data['medication_id'] ?? null) && ! $medication) {
+            throw ValidationException::withMessages([
+                'medication_id' => 'The selected medication does not belong to this resident.',
+            ]);
+        }
+
+        $isControlledDrug = (bool) ($medication?->controlled_drug ?? $data['is_controlled_drug']);
+
+        if ($isControlledDrug && blank($data['witness_name'] ?? null)) {
+            throw ValidationException::withMessages([
+                'witness_name' => 'Controlled drugs require a packing witness name.',
+            ]);
+        }
+
+        $scanAudit = $medication
+            ? $this->verifyMedicationScanOrFail($client, $medication, $data)
+            : null;
+
+        $log = $this->createTransitMedicationLog(
+            $transport,
+            $client,
+            $request,
+            $data,
+            $medication,
+            $scanAudit,
+        );
+
+        $payload = [
+            'success' => true,
+            'log' => [
+                'id' => $log->id,
+                'transport_id' => $log->transport_id,
+                'client_id' => $log->client_id,
+                'medication_id' => $log->medication_id,
+                'medication_name' => $log->medication_name,
+                'status' => $log->status,
+                'packed_at' => $log->packed_at?->toIso8601String(),
+            ],
+        ];
+
+        if ($this->medicationSyncRequested($data)) {
+            return response()->json(
+                $this->rememberMedicationSyncResponse(
+                    $scope,
+                    $data,
+                    $this->withMedicationSync(
+                        $payload,
+                        $data,
+                        $this->medicationProcessedStatus($data),
+                    ),
+                ),
+            );
         }
 
         return back()->with('success', 'Medication packed for transit.');
@@ -756,9 +1231,19 @@ class ResidentTransportController extends Controller
 
     public function administerMedication(Request $request, FleetMedicationTransitLog $log)
     {
+        $this->assertCanManageMedicationTransit($request);
+
         $rules = [
             'witnessed_by_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'scan_code' => ['nullable', 'string', 'max:255'],
+            'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
+            'scan_verified' => ['nullable', 'boolean'],
+            'scan_match_source' => ['nullable', 'string', 'max:50'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
         ];
 
         // NZ regulation: controlled drugs require a witness
@@ -767,6 +1252,56 @@ class ResidentTransportController extends Controller
         }
 
         $data = $request->validate($rules);
+
+        $scope = "fleet-medication-administer:{$log->id}";
+
+        if (
+            $this->medicationSyncRequested($data)
+            && ($cached = $this->getCachedMedicationSyncResponse($scope, $data))
+        ) {
+            return response()->json($cached);
+        }
+
+        if ($log->returned_to_house_at) {
+            $message = 'This medication was already returned before the current administration request could be applied.';
+
+            if ($this->medicationSyncRequested($data)) {
+                return response()->json(
+                    $this->buildMedicationConflictPayload($data, $message),
+                    409,
+                );
+            }
+
+            return back()->with('error', $message);
+        }
+
+        if ($log->administered_at) {
+            $message = 'This medication administration was already recorded before the current request could be applied.';
+
+            if ($this->medicationSyncRequested($data)) {
+                return response()->json(
+                    $this->buildMedicationConflictPayload($data, $message),
+                    409,
+                );
+            }
+
+            return back()->with('error', $message);
+        }
+
+        if (
+            $log->is_controlled_drug
+            && isset($data['witnessed_by_user_id'])
+            && (int) $data['witnessed_by_user_id'] === (int) $request->user()->id
+        ) {
+            throw ValidationException::withMessages([
+                'witnessed_by_user_id' => 'Witness must be a different user.',
+            ]);
+        }
+
+        $log->loadMissing(['client', 'medication']);
+        $scanAudit = ($log->client && $log->medication)
+            ? $this->verifyMedicationScanOrFail($log->client, $log->medication, $data)
+            : null;
 
         $log->update([
             'administered_at' => now(),
@@ -778,21 +1313,131 @@ class ResidentTransportController extends Controller
         AuditLogger::log('fleet.medication.administer', $log, [
             'medication_name' => $log->medication_name,
             'controlled_drug' => $log->is_controlled_drug,
+            'scan_source' => $scanAudit['scan_source'] ?? null,
+            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
+            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
+            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
         ]);
+
+        app(MedicationIncidentIntegrationService::class)->resolveTransitException(
+            $log,
+            'Medication administered during transit.',
+            $request->user()->id
+        );
+
+        $payload = [
+            'success' => true,
+            'log' => [
+                'id' => $log->id,
+                'status' => $log->status,
+                'administered_at' => $log->administered_at?->toIso8601String(),
+                'returned_to_house_at' => $log->returned_to_house_at?->toIso8601String(),
+                'witnessed_by_user_id' => $log->witnessed_by_user_id,
+            ],
+        ];
+
+        if ($this->medicationSyncRequested($data)) {
+            return response()->json(
+                $this->rememberMedicationSyncResponse(
+                    $scope,
+                    $data,
+                    $this->withMedicationSync(
+                        $payload,
+                        $data,
+                        $this->medicationProcessedStatus($data),
+                    ),
+                ),
+            );
+        }
 
         return back()->with('success', 'Medication administration recorded.');
     }
 
     public function returnMedication(Request $request, FleetMedicationTransitLog $log)
     {
+        $this->assertCanManageMedicationTransit($request);
+
+        $data = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'scan_code' => ['nullable', 'string', 'max:255'],
+            'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
+            'scan_verified' => ['nullable', 'boolean'],
+            'scan_match_source' => ['nullable', 'string', 'max:50'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
+        ]);
+
+        $scope = "fleet-medication-return:{$log->id}";
+
+        if (
+            $this->medicationSyncRequested($data)
+            && ($cached = $this->getCachedMedicationSyncResponse($scope, $data))
+        ) {
+            return response()->json($cached);
+        }
+
+        if ($log->returned_to_house_at) {
+            $message = 'This medication return was already recorded before the current request could be applied.';
+
+            if ($this->medicationSyncRequested($data)) {
+                return response()->json(
+                    $this->buildMedicationConflictPayload($data, $message),
+                    409,
+                );
+            }
+
+            return back()->with('error', $message);
+        }
+
+        $log->loadMissing(['client', 'medication']);
+        $scanAudit = ($log->client && $log->medication)
+            ? $this->verifyMedicationScanOrFail($log->client, $log->medication, $data)
+            : null;
+
         $log->update([
             'returned_to_house_at' => now(),
-            'notes' => $request->input('notes') ?? $log->notes,
+            'notes' => $data['notes'] ?? $log->notes,
         ]);
 
         AuditLogger::log('fleet.medication.return', $log, [
             'medication_name' => $log->medication_name,
+            'scan_source' => $scanAudit['scan_source'] ?? null,
+            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
+            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
+            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
         ]);
+
+        app(MedicationIncidentIntegrationService::class)->resolveTransitException(
+            $log,
+            'Medication returned from transit.',
+            $request->user()->id
+        );
+
+        $payload = [
+            'success' => true,
+            'log' => [
+                'id' => $log->id,
+                'status' => $log->status,
+                'administered_at' => $log->administered_at?->toIso8601String(),
+                'returned_to_house_at' => $log->returned_to_house_at?->toIso8601String(),
+            ],
+        ];
+
+        if ($this->medicationSyncRequested($data)) {
+            return response()->json(
+                $this->rememberMedicationSyncResponse(
+                    $scope,
+                    $data,
+                    $this->withMedicationSync(
+                        $payload,
+                        $data,
+                        $this->medicationProcessedStatus($data),
+                    ),
+                ),
+            );
+        }
 
         return back()->with('success', 'Medication returned to house.');
     }

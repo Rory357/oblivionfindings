@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Emar;
 
+use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
 use App\Models\ControlledDrugLossReport;
+use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Http\Request;
 
 class CDLossReportController extends Controller
 {
+    use HandlesMedicationSync;
+
     public function index(Request $request)
     {
         $reports = ControlledDrugLossReport::with([
@@ -33,7 +37,20 @@ class CDLossReportController extends Controller
             'police_reference' => ['nullable', 'string', 'max:100'],
             'reported_to_pharmacy' => ['boolean'],
             'pharmacy_name' => ['nullable', 'string', 'max:255'],
+            'client_request_uuid' => ['nullable', 'uuid'],
+            'captured_offline_at' => ['nullable', 'date'],
+            'origin_device_id' => ['nullable', 'string', 'max:255'],
+            'queued_offline' => ['nullable', 'boolean'],
         ]);
+
+        $scope = 'emar-controlled-loss-report';
+
+        if (
+            $this->medicationSyncRequested($validated)
+            && ($cached = $this->getCachedMedicationSyncResponse($scope, $validated))
+        ) {
+            return response()->json($cached);
+        }
 
         $validated['discovered_by'] = $request->user()->id;
         $validated['discovered_at'] = now();
@@ -46,7 +63,38 @@ class CDLossReportController extends Controller
             $validated['pharmacy_notified_at'] = now();
         }
 
-        ControlledDrugLossReport::create($validated);
+        $report = ControlledDrugLossReport::create($validated);
+
+        app(MedicationIncidentIntegrationService::class)
+            ->handleControlledLossReport($report, $request->user()->id);
+
+        $payload = [
+            'success' => true,
+            'report' => [
+                'id' => $report->id,
+                'client_id' => $report->client_id,
+                'client_medication_id' => $report->client_medication_id,
+                'medication_name' => $report->medication_name,
+                'quantity_lost' => $report->quantity_lost,
+                'unit' => $report->unit,
+                'investigation_status' => $report->investigation_status,
+                'discovered_at' => $report->discovered_at?->toIso8601String(),
+            ],
+        ];
+
+        if ($this->medicationSyncRequested($validated)) {
+            return response()->json(
+                $this->rememberMedicationSyncResponse(
+                    $scope,
+                    $validated,
+                    $this->withMedicationSync(
+                        $payload,
+                        $validated,
+                        $this->medicationProcessedStatus($validated),
+                    ),
+                ),
+            );
+        }
 
         return redirect()->back()->with('success', 'Controlled drug loss report submitted.');
     }
@@ -77,6 +125,12 @@ class CDLossReportController extends Controller
             'resolved_by' => $request->user()->id,
             'resolved_at' => now(),
         ]);
+
+        app(MedicationIncidentIntegrationService::class)->resolveControlledLossReport(
+            $report,
+            'Controlled drug loss report resolved.',
+            $request->user()->id
+        );
 
         return redirect()->back()->with('success', 'Loss report resolved.');
     }

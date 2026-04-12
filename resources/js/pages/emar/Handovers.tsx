@@ -2,8 +2,7 @@ import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -11,10 +10,10 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -24,1106 +23,956 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
-    AlertTriangle,
-    ArrowRight,
-    CheckCircle,
-    ClipboardCheck,
-    Pencil,
+    ArrowRightLeft,
+    CheckCircle2,
+    ClipboardList,
+    Clock3,
+    FilePenLine,
+    Pill,
     Plus,
-    Shield,
     Trash2,
-    Users,
-    X,
+    UserRoundCheck,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-const DEFAULT_CHECKLIST_ITEMS = [
-    {
-        label: 'All scheduled medications administered',
-        checked: false,
-        notes: '',
-    },
-    {
-        label: 'PRN medications documented with effectiveness',
-        checked: false,
-        notes: '',
-    },
-    {
-        label: 'Controlled drugs counted and verified',
-        checked: false,
-        notes: '',
-    },
-    { label: 'Stock levels checked for low items', checked: false, notes: '' },
-    {
-        label: 'Medication errors reported and documented',
-        checked: false,
-        notes: '',
-    },
-    { label: 'GP follow-ups documented', checked: false, notes: '' },
-    { label: 'Client refusals followed up', checked: false, notes: '' },
-    { label: 'New prescriptions actioned', checked: false, notes: '' },
-];
-
-type ChecklistItem = { label: string; checked: boolean; notes: string };
-type ClientAttention = {
-    client_id: string;
-    client_name: string;
-    reason: string;
+type PaginationLink = {
+    url: string | null;
+    label: string;
+    active: boolean;
 };
+
 type ShiftOption = {
     id: number;
-    starts_at: string;
-    ends_at: string;
+    starts_at: string | null;
+    ends_at: string | null;
     status: string;
     shift_type: string;
     is_sleepover: boolean;
     is_on_call: boolean;
-    location?: string | null;
-    service_context_name?: string | null;
-    client_name?: string | null;
-    staff_name?: string | null;
+    location: string | null;
+    service_context_name: string | null;
+    client_name: string | null;
+    staff_name: string | null;
+};
+
+type HandoverShift = {
+    id: number;
+    starts_at: string | null;
+    ends_at: string | null;
+    location: string | null;
+    shift_type: string | null;
+    service_context_name: string | null;
+};
+
+type NamedPerson = {
+    id: number;
+    name: string;
+};
+
+type HandoverClient = {
+    id: number;
+    name: string;
 };
 
 type Handover = {
     id: number;
-    handover_at: string;
-    outgoing_user: { id: number; name: string } | null;
-    incoming_user: { id: number; name: string } | null;
-    site: { id: number; name: string } | null;
-    service_context?: { id: number; name: string } | null;
-    shift?: ShiftOption | null;
-    controlled_drugs_verified: boolean;
-    controlled_drug_counts: Array<{
-        medication_id: number;
-        medication_name?: string;
-        expected: number;
-        actual: number;
-        discrepancy: number;
-    }> | null;
-    outstanding_medications: any[] | null;
-    new_prescriptions: any[] | null;
-    ceased_medications: any[] | null;
-    incidents: any[] | null;
-    prn_given: any[] | null;
-    flagged_clients: any[] | null;
-    general_notes: string | null;
-    acknowledged: boolean;
+    status: string;
+    handover_notes: string;
+    client_mood: string | null;
+    created_at: string | null;
+    submitted_at: string | null;
     acknowledged_at: string | null;
-    checklist_items: ChecklistItem[] | null;
-    safety_concerns: string | null;
-    medication_errors_count: number;
-    pending_gp_followups: number;
-    clients_requiring_attention: ClientAttention[] | null;
-    previous_shift_notes_read: boolean;
-    stock_issues_identified: string | null;
-    prescriber_changes_summary: string | null;
+    client: HandoverClient | null;
+    outgoing_staff: NamedPerson | null;
+    incoming_staff: NamedPerson | null;
+    acknowledger: NamedPerson | null;
+    outgoing_shift: HandoverShift | null;
+    incoming_shift: HandoverShift | null;
+    medications_due: string[];
+    follow_up_items: string[];
+    incidents_to_note: string[];
+    tasks_pending: string[];
+    can_submit: boolean;
+    can_acknowledge: boolean;
+    can_edit: boolean;
+    can_delete: boolean;
 };
 
 type Props = {
-    handovers: { data: Handover[]; links: any };
-    staff: { id: number; name: string }[];
+    handovers: {
+        data: Handover[];
+        links: PaginationLink[];
+        meta?: {
+            total?: number;
+            last_page?: number;
+        };
+    };
     shifts: ShiftOption[];
 };
 
-type HandoverFormData = {
-    incoming_user_id: string;
+type FormState = {
     shift_id: string;
-    controlled_drugs_verified: boolean;
-    general_notes: string;
-    checklist_items: ChecklistItem[];
-    safety_concerns: string;
-    clients_requiring_attention: ClientAttention[];
-    stock_issues_identified: string;
-    prescriber_changes_summary: string;
-    previous_shift_notes_read: boolean;
+    incoming_shift_id: string;
+    handover_notes: string;
+    client_mood: string;
+    medications_due_text: string;
+    follow_up_items_text: string;
+    incidents_to_note_text: string;
+    tasks_pending_text: string;
+    submit: boolean;
 };
 
-function getChecklistCompletion(items: ChecklistItem[] | null): string {
-    if (!items || items.length === 0) return '0/0';
-    const checked = items.filter((i) => i.checked).length;
-    return `${checked}/${items.length}`;
+function toMultiline(items: string[]): string {
+    return items.join('\n');
 }
 
-function ChecklistSection({
+function buildFormState(handover: Handover | null): FormState {
+    return {
+        shift_id: handover?.outgoing_shift?.id
+            ? String(handover.outgoing_shift.id)
+            : '',
+        incoming_shift_id: handover?.incoming_shift?.id
+            ? String(handover.incoming_shift.id)
+            : '',
+        handover_notes: handover?.handover_notes ?? '',
+        client_mood: handover?.client_mood ?? '',
+        medications_due_text: toMultiline(handover?.medications_due ?? []),
+        follow_up_items_text: toMultiline(handover?.follow_up_items ?? []),
+        incidents_to_note_text: toMultiline(handover?.incidents_to_note ?? []),
+        tasks_pending_text: toMultiline(handover?.tasks_pending ?? []),
+        submit: true,
+    };
+}
+
+function formatDateTime(value: string | null): string {
+    if (!value) {
+        return 'Not recorded';
+    }
+
+    return new Date(value).toLocaleString('en-NZ', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
+}
+
+function formatShiftTime(start: string | null, end: string | null): string {
+    if (!start) {
+        return 'Time not set';
+    }
+
+    const startLabel = new Date(start).toLocaleString('en-NZ', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
+
+    if (!end) {
+        return startLabel;
+    }
+
+    const endLabel = new Date(end).toLocaleString('en-NZ', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
+
+    return `${startLabel} to ${endLabel}`;
+}
+
+function statusBadge(status: string) {
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+
+    switch (status) {
+        case 'acknowledged':
+            return (
+                <Badge className="bg-emerald-100 text-emerald-700">
+                    {label}
+                </Badge>
+            );
+        case 'submitted':
+            return <Badge className="bg-blue-100 text-blue-700">{label}</Badge>;
+        case 'draft':
+            return <Badge variant="secondary">{label}</Badge>;
+        default:
+            return <Badge variant="outline">{label}</Badge>;
+    }
+}
+
+function shiftLabel(shift: ShiftOption | HandoverShift | null): string {
+    if (!shift) {
+        return 'Shift not set';
+    }
+
+    const details = [
+        shift.shift_type ? shift.shift_type.replace(/_/g, ' ') : null,
+        shift.location ?? null,
+        shift.service_context_name ?? null,
+    ].filter(Boolean);
+
+    return `${formatShiftTime(shift.starts_at, shift.ends_at)}${details.length ? ` • ${details.join(' • ')}` : ''}`;
+}
+
+function ListSection({
+    title,
     items,
-    onChange,
+    emptyLabel,
 }: {
-    items: ChecklistItem[];
-    onChange: (items: ChecklistItem[]) => void;
+    title: string;
+    items: string[];
+    emptyLabel: string;
 }) {
-    function toggleItem(index: number, checked: boolean) {
-        const updated = [...items];
-        const existing = updated[index] ?? {
-            label: '',
-            checked: false,
-            notes: '',
-        };
-        updated[index] = { ...existing, checked };
-        onChange(updated);
-    }
-
-    function updateNotes(index: number, notes: string) {
-        const updated = [...items];
-        const existing = updated[index] ?? {
-            label: '',
-            checked: false,
-            notes: '',
-        };
-        updated[index] = { ...existing, notes };
-        onChange(updated);
-    }
-
     return (
-        <div className="space-y-3">
-            <Label className="flex items-center gap-1.5 text-sm font-semibold">
-                <ClipboardCheck className="h-4 w-4" /> Handover Checklist
-            </Label>
-            <div className="space-y-2 rounded-md border p-3">
-                {items.map((item, index) => (
-                    <div key={index} className="space-y-1">
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id={`checklist-${index}`}
-                                checked={item.checked}
-                                onCheckedChange={(checked) =>
-                                    toggleItem(index, !!checked)
-                                }
-                            />
-                            <Label
-                                htmlFor={`checklist-${index}`}
-                                className="cursor-pointer text-sm font-normal"
-                            >
-                                {item.label}
-                            </Label>
-                        </div>
-                        {item.checked && (
-                            <div className="ml-6">
-                                <Input
-                                    placeholder="Optional notes..."
-                                    value={item.notes}
-                                    onChange={(e) =>
-                                        updateNotes(index, e.target.value)
-                                    }
-                                    className="h-8 text-xs"
-                                />
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function ClientsAttentionSection({
-    clients,
-    onChange,
-}: {
-    clients: ClientAttention[];
-    onChange: (clients: ClientAttention[]) => void;
-}) {
-    function addClient() {
-        onChange([...clients, { client_id: '', client_name: '', reason: '' }]);
-    }
-
-    function removeClient(index: number) {
-        onChange(clients.filter((_, i) => i !== index));
-    }
-
-    function updateClient(
-        index: number,
-        field: keyof ClientAttention,
-        value: string,
-    ) {
-        const updated = [...clients];
-        const existing = updated[index] ?? {
-            client_id: '',
-            client_name: '',
-            reason: '',
-        };
-        updated[index] = { ...existing, [field]: value };
-        onChange(updated);
-    }
-
-    return (
-        <div className="space-y-3">
-            <Label className="flex items-center gap-1.5 text-sm font-semibold">
-                <Users className="h-4 w-4" /> Clients Requiring Attention
-            </Label>
-            <div className="space-y-2">
-                {clients.map((client, index) => (
-                    <div
-                        key={index}
-                        className="flex items-start gap-2 rounded-md border p-2"
-                    >
-                        <div className="flex-1 space-y-1">
-                            <Input
-                                placeholder="Client name"
-                                value={client.client_name}
-                                onChange={(e) =>
-                                    updateClient(
-                                        index,
-                                        'client_name',
-                                        e.target.value,
-                                    )
-                                }
-                                className="h-8 text-xs"
-                            />
-                            <Input
-                                placeholder="Reason for attention"
-                                value={client.reason}
-                                onChange={(e) =>
-                                    updateClient(
-                                        index,
-                                        'reason',
-                                        e.target.value,
-                                    )
-                                }
-                                className="h-8 text-xs"
-                            />
-                        </div>
-                        <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 shrink-0"
-                            onClick={() => removeClient(index)}
+        <div className="space-y-2">
+            <div className="text-sm font-medium">{title}</div>
+            {items.length === 0 ? (
+                <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                    {emptyLabel}
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {items.map((item, index) => (
+                        <div
+                            key={`${title}-${index}`}
+                            className="rounded-md border bg-muted/20 px-3 py-2 text-sm"
                         >
-                            <X className="h-3.5 w-3.5 text-red-500" />
-                        </Button>
-                    </div>
-                ))}
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addClient}
-                >
-                    <Plus className="mr-1 h-3.5 w-3.5" /> Add Client
-                </Button>
-            </div>
+                            {item}
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
 
-function HandoverFormFields({
-    formData,
-    setField,
-    errors,
-    staff,
-    shiftOptions,
-    idPrefix,
+function HandoverDialog({
+    open,
+    onOpenChange,
+    editing,
+    shifts,
 }: {
-    formData: HandoverFormData;
-    setField: (key: keyof HandoverFormData, value: any) => void;
-    errors: Partial<Record<keyof HandoverFormData, string>>;
-    staff: { id: number; name: string }[];
-    shiftOptions: ShiftOption[];
-    idPrefix: string;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    editing: Handover | null;
+    shifts: ShiftOption[];
 }) {
-    const selectedShift = shiftOptions.find(
-        (shift) => String(shift.id) === formData.shift_id,
+    const form = useForm<FormState>(buildFormState(editing));
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        form.setData(buildFormState(editing));
+        form.clearErrors();
+    }, [editing, open]);
+
+    const selectedShift = useMemo(
+        () =>
+            shifts.find((shift) => shift.id === Number(form.data.shift_id)) ??
+            null,
+        [form.data.shift_id, shifts],
     );
 
+    const incomingShiftOptions = useMemo(() => {
+        if (!selectedShift) {
+            return shifts;
+        }
+
+        const matchingClient = shifts.filter(
+            (shift) =>
+                shift.id !== selectedShift.id &&
+                shift.client_name &&
+                selectedShift.client_name &&
+                shift.client_name === selectedShift.client_name &&
+                (shift.starts_at ?? '') >= (selectedShift.starts_at ?? ''),
+        );
+
+        if (matchingClient.length > 0) {
+            return matchingClient;
+        }
+
+        return shifts.filter((shift) => shift.id !== selectedShift.id);
+    }, [selectedShift, shifts]);
+
+    function closeDialog() {
+        onOpenChange(false);
+        form.reset();
+        form.clearErrors();
+    }
+
+    function submit(submitNow: boolean) {
+        const payload = {
+            shift_id: form.data.shift_id ? Number(form.data.shift_id) : null,
+            incoming_shift_id: form.data.incoming_shift_id
+                ? Number(form.data.incoming_shift_id)
+                : null,
+            handover_notes: form.data.handover_notes,
+            client_mood: form.data.client_mood || null,
+            medications_due_text: form.data.medications_due_text || null,
+            follow_up_items_text: form.data.follow_up_items_text || null,
+            incidents_to_note_text: form.data.incidents_to_note_text || null,
+            tasks_pending_text: form.data.tasks_pending_text || null,
+            submit: submitNow,
+        };
+
+        if (editing) {
+            router.put(`/emar/handovers/${editing.id}`, payload, {
+                preserveScroll: true,
+                onSuccess: closeDialog,
+            });
+
+            return;
+        }
+
+        router.post('/emar/handovers', payload, {
+            preserveScroll: true,
+            onSuccess: closeDialog,
+        });
+    }
+
     return (
-        <div className="max-h-[70vh] space-y-4 overflow-y-auto py-4 pr-1">
-            <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}_shift_id`}>Linked Shift</Label>
-                <Select
-                    value={formData.shift_id}
-                    onValueChange={(v) => setField('shift_id', v)}
-                >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select a shift..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="">No linked shift</SelectItem>
-                        {shiftOptions.map((shift) => (
-                            <SelectItem key={shift.id} value={String(shift.id)}>
-                                {`${shift.client_name || 'Client'} • ${new Date(shift.starts_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                {selectedShift && (
-                    <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
-                        <div className="font-medium text-foreground">
-                            {selectedShift.client_name || 'Linked shift'}
-                        </div>
-                        <div className="mt-1">
-                            {String(
-                                selectedShift.shift_type ?? 'standard',
-                            ).replace('_', ' ')}
-                            {selectedShift.service_context_name
-                                ? ` • ${selectedShift.service_context_name}`
-                                : ''}
-                            {selectedShift.location
-                                ? ` • ${selectedShift.location}`
-                                : ''}
-                        </div>
-                        {selectedShift.staff_name ? (
-                            <div className="mt-1">
-                                Assigned staff: {selectedShift.staff_name}
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <ArrowRightLeft className="h-5 w-5" />
+                        {editing
+                            ? 'Edit Medication Handover'
+                            : 'New Medication Handover'}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Capture medication-critical notes on the shared shift
+                        handover record so operations, eMAR, and alerts stay
+                        aligned.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-5">
+                    <div className="space-y-2">
+                        <Label htmlFor="handover_shift_id">
+                            Outgoing shift
+                        </Label>
+                        {editing ? (
+                            <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                                {selectedShift
+                                    ? `${selectedShift.client_name || 'Unassigned client'} • ${shiftLabel(selectedShift)}`
+                                    : 'Shift not found'}
+                            </div>
+                        ) : (
+                            <>
+                                <Select
+                                    value={form.data.shift_id}
+                                    onValueChange={(value) =>
+                                        form.setData((current) => ({
+                                            ...current,
+                                            shift_id: value,
+                                            incoming_shift_id:
+                                                current.incoming_shift_id ===
+                                                value
+                                                    ? ''
+                                                    : current.incoming_shift_id,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger id="handover_shift_id">
+                                        <SelectValue placeholder="Select outgoing shift" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {shifts.map((shift) => (
+                                            <SelectItem
+                                                key={shift.id}
+                                                value={String(shift.id)}
+                                            >
+                                                {shift.client_name ||
+                                                    'Unassigned client'}{' '}
+                                                •{' '}
+                                                {shift.staff_name ||
+                                                    'Unassigned staff'}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {form.errors.shift_id ? (
+                                    <div className="text-xs text-red-600">
+                                        {form.errors.shift_id}
+                                    </div>
+                                ) : null}
+                            </>
+                        )}
+                        {selectedShift ? (
+                            <div className="text-xs text-muted-foreground">
+                                {shiftLabel(selectedShift)}
                             </div>
                         ) : null}
                     </div>
-                )}
-            </div>
 
-            {/* Incoming Staff */}
-            <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}_incoming_user_id`}>
-                    Incoming Staff Member
-                </Label>
-                <Select
-                    value={formData.incoming_user_id}
-                    onValueChange={(v) => setField('incoming_user_id', v)}
-                >
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select incoming staff..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {staff.map((s) => (
-                            <SelectItem key={s.id} value={String(s.id)}>
-                                {s.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                {errors.incoming_user_id && (
-                    <p className="text-sm text-red-600">
-                        {errors.incoming_user_id}
-                    </p>
-                )}
-            </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="handover_incoming_shift_id">
+                            Incoming shift
+                        </Label>
+                        <Select
+                            value={form.data.incoming_shift_id || 'auto'}
+                            onValueChange={(value) =>
+                                form.setData(
+                                    'incoming_shift_id',
+                                    value === 'auto' ? '' : value,
+                                )
+                            }
+                        >
+                            <SelectTrigger id="handover_incoming_shift_id">
+                                <SelectValue placeholder="Select incoming shift or leave automatic" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="auto">
+                                    Let the shared handover workflow infer it
+                                </SelectItem>
+                                {incomingShiftOptions.map((shift) => (
+                                    <SelectItem
+                                        key={shift.id}
+                                        value={String(shift.id)}
+                                    >
+                                        {shift.client_name ||
+                                            'Unassigned client'}{' '}
+                                        •{' '}
+                                        {shift.staff_name || 'Unassigned staff'}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {form.errors.incoming_shift_id ? (
+                            <div className="text-xs text-red-600">
+                                {form.errors.incoming_shift_id}
+                            </div>
+                        ) : null}
+                    </div>
 
-            {/* Controlled Drugs Verified */}
-            <div className="flex items-center gap-2">
-                <Checkbox
-                    id={`${idPrefix}_controlled_drugs_verified`}
-                    checked={formData.controlled_drugs_verified}
-                    onCheckedChange={(checked) =>
-                        setField('controlled_drugs_verified', !!checked)
-                    }
-                />
-                <Label htmlFor={`${idPrefix}_controlled_drugs_verified`}>
-                    Controlled drugs verified
-                </Label>
-            </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="handover_client_mood">
+                                Client presentation / mood
+                            </Label>
+                            <Input
+                                id="handover_client_mood"
+                                value={form.data.client_mood}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'client_mood',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="Settled, anxious, sleepy, escalating..."
+                            />
+                            {form.errors.client_mood ? (
+                                <div className="text-xs text-red-600">
+                                    {form.errors.client_mood}
+                                </div>
+                            ) : null}
+                        </div>
 
-            {/* Checklist */}
-            <ChecklistSection
-                items={formData.checklist_items}
-                onChange={(items) => setField('checklist_items', items)}
-            />
+                        <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+                            Save a draft if you need to come back to it. Submit
+                            once the medication handover is ready for the
+                            incoming shift to review.
+                        </div>
+                    </div>
 
-            {/* Safety Concerns */}
-            <div className="space-y-2">
-                <Label
-                    htmlFor={`${idPrefix}_safety_concerns`}
-                    className="flex items-center gap-1.5 text-sm font-semibold"
-                >
-                    <AlertTriangle className="h-4 w-4 text-amber-500" /> Safety
-                    Concerns
-                </Label>
-                <Textarea
-                    id={`${idPrefix}_safety_concerns`}
-                    value={formData.safety_concerns}
-                    onChange={(e) =>
-                        setField('safety_concerns', e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Any safety issues for the incoming shift..."
-                />
-            </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="handover_notes">
+                            Medication handover notes
+                        </Label>
+                        <Textarea
+                            id="handover_notes"
+                            value={form.data.handover_notes}
+                            onChange={(event) =>
+                                form.setData(
+                                    'handover_notes',
+                                    event.target.value,
+                                )
+                            }
+                            placeholder="Summarise changes, issues, risks, and anything the next shift must know."
+                            className="min-h-[130px]"
+                        />
+                        {form.errors.handover_notes ? (
+                            <div className="text-xs text-red-600">
+                                {form.errors.handover_notes}
+                            </div>
+                        ) : null}
+                    </div>
 
-            {/* Clients Requiring Attention */}
-            <ClientsAttentionSection
-                clients={formData.clients_requiring_attention}
-                onChange={(clients) =>
-                    setField('clients_requiring_attention', clients)
-                }
-            />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="medications_due_text">
+                                Medications still due
+                            </Label>
+                            <Textarea
+                                id="medications_due_text"
+                                value={form.data.medications_due_text}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'medications_due_text',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="One item per line"
+                                className="min-h-[110px]"
+                            />
+                        </div>
 
-            {/* Stock Issues */}
-            <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}_stock_issues`}>Stock Issues</Label>
-                <Textarea
-                    id={`${idPrefix}_stock_issues`}
-                    value={formData.stock_issues_identified}
-                    onChange={(e) =>
-                        setField('stock_issues_identified', e.target.value)
-                    }
-                    rows={2}
-                    placeholder="Any stock level concerns or shortages..."
-                />
-            </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="follow_up_items_text">
+                                Follow-up items
+                            </Label>
+                            <Textarea
+                                id="follow_up_items_text"
+                                value={form.data.follow_up_items_text}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'follow_up_items_text',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="One item per line"
+                                className="min-h-[110px]"
+                            />
+                        </div>
 
-            {/* Prescriber Changes Summary */}
-            <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}_prescriber_changes`}>
-                    Prescriber Changes Summary
-                </Label>
-                <Textarea
-                    id={`${idPrefix}_prescriber_changes`}
-                    value={formData.prescriber_changes_summary}
-                    onChange={(e) =>
-                        setField('prescriber_changes_summary', e.target.value)
-                    }
-                    rows={2}
-                    placeholder="Summary of any prescriber or prescription changes..."
-                />
-            </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="incidents_to_note_text">
+                                Incidents and exceptions to note
+                            </Label>
+                            <Textarea
+                                id="incidents_to_note_text"
+                                value={form.data.incidents_to_note_text}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'incidents_to_note_text',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="One item per line"
+                                className="min-h-[110px]"
+                            />
+                        </div>
 
-            {/* Previous Shift Notes Read */}
-            <div className="flex items-center gap-2">
-                <Checkbox
-                    id={`${idPrefix}_previous_shift_notes_read`}
-                    checked={formData.previous_shift_notes_read}
-                    onCheckedChange={(checked) =>
-                        setField('previous_shift_notes_read', !!checked)
-                    }
-                />
-                <Label htmlFor={`${idPrefix}_previous_shift_notes_read`}>
-                    Previous shift notes read
-                </Label>
-            </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="tasks_pending_text">
+                                Medication tasks still pending
+                            </Label>
+                            <Textarea
+                                id="tasks_pending_text"
+                                value={form.data.tasks_pending_text}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'tasks_pending_text',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="One item per line"
+                                className="min-h-[110px]"
+                            />
+                        </div>
+                    </div>
+                </div>
 
-            {/* General Notes */}
-            <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}_general_notes`}>
-                    General Notes
-                </Label>
-                <Textarea
-                    id={`${idPrefix}_general_notes`}
-                    value={formData.general_notes}
-                    onChange={(e) => setField('general_notes', e.target.value)}
-                    rows={4}
-                    placeholder="Any relevant notes for the incoming staff member..."
-                />
-                {errors.general_notes && (
-                    <p className="text-sm text-red-600">
-                        {errors.general_notes}
-                    </p>
-                )}
-            </div>
-        </div>
+                <DialogFooter className="gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={closeDialog}
+                        disabled={form.processing}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => submit(false)}
+                        disabled={form.processing}
+                    >
+                        {form.processing ? 'Saving...' : 'Save Draft'}
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={() => submit(true)}
+                        disabled={form.processing}
+                    >
+                        {form.processing ? 'Submitting...' : 'Submit Handover'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
-export default function Handovers({ handovers, staff, shifts }: Props) {
-    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
-    const [open, setOpen] = useState(false);
-    const [editOpen, setEditOpen] = useState(false);
-    const [editingHandover, setEditingHandover] = useState<Handover | null>(
-        null,
+export default function Handovers({ handovers, shifts }: Props) {
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [editing, setEditing] = useState<Handover | null>(null);
+
+    const totals = useMemo(
+        () =>
+            handovers.data.reduce(
+                (summary, handover) => {
+                    summary.total += 1;
+
+                    if (handover.status === 'draft') {
+                        summary.draft += 1;
+                    } else if (handover.status === 'submitted') {
+                        summary.submitted += 1;
+                    } else if (handover.status === 'acknowledged') {
+                        summary.acknowledged += 1;
+                    }
+
+                    return summary;
+                },
+                {
+                    total: 0,
+                    draft: 0,
+                    submitted: 0,
+                    acknowledged: 0,
+                },
+            ),
+        [handovers.data],
     );
 
-    const form = useForm<HandoverFormData>({
-        incoming_user_id: '',
-        shift_id: '',
-        controlled_drugs_verified: false,
-        general_notes: '',
-        checklist_items: DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i })),
-        safety_concerns: '',
-        clients_requiring_attention: [],
-        stock_issues_identified: '',
-        prescriber_changes_summary: '',
-        previous_shift_notes_read: false,
-    });
-
-    const editForm = useForm<HandoverFormData>({
-        incoming_user_id: '',
-        shift_id: '',
-        controlled_drugs_verified: false,
-        general_notes: '',
-        checklist_items: DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i })),
-        safety_concerns: '',
-        clients_requiring_attention: [],
-        stock_issues_identified: '',
-        prescriber_changes_summary: '',
-        previous_shift_notes_read: false,
-    });
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post('/emar/handovers', {
-            onSuccess: () => {
-                setOpen(false);
-                form.reset();
-            },
-        });
+    function openCreateDialog() {
+        setEditing(null);
+        setDialogOpen(true);
     }
 
-    function openEdit(h: Handover) {
-        setEditingHandover(h);
-        editForm.setData({
-            incoming_user_id: h.incoming_user?.id?.toString() ?? '',
-            shift_id: h.shift?.id?.toString() ?? '',
-            controlled_drugs_verified: h.controlled_drugs_verified,
-            general_notes: h.general_notes ?? '',
-            checklist_items:
-                h.checklist_items ??
-                DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i })),
-            safety_concerns: h.safety_concerns ?? '',
-            clients_requiring_attention: h.clients_requiring_attention ?? [],
-            stock_issues_identified: h.stock_issues_identified ?? '',
-            prescriber_changes_summary: h.prescriber_changes_summary ?? '',
-            previous_shift_notes_read: h.previous_shift_notes_read,
-        });
-        setEditOpen(true);
+    function openEditDialog(handover: Handover) {
+        setEditing(handover);
+        setDialogOpen(true);
     }
 
-    function submitEdit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!editingHandover) return;
-        editForm.put(`/emar/handovers/${editingHandover.id}`, {
-            onSuccess: () => {
-                setEditOpen(false);
-                setEditingHandover(null);
-                editForm.reset();
-            },
+    function submitHandover(handoverId: number) {
+        router.post(
+            `/emar/handovers/${handoverId}/submit`,
+            {},
+            { preserveScroll: true },
+        );
+    }
+
+    function acknowledgeHandover(handoverId: number) {
+        router.post(
+            `/emar/handovers/${handoverId}/acknowledge`,
+            {},
+            { preserveScroll: true },
+        );
+    }
+
+    function deleteHandover(handoverId: number) {
+        if (!window.confirm('Delete this medication handover draft?')) {
+            return;
+        }
+
+        router.delete(`/emar/handovers/${handoverId}`, {
+            preserveScroll: true,
         });
     }
 
     return (
         <AppLayout>
-            <Head title="eMAR - Medication Handovers" />
+            <Head title="eMAR - Handovers" />
             <PageHeader
                 title="Medication Handovers"
-                description="Shift handover records for medication, including controlled drug counts and outstanding items."
+                description="Medication-focused handover notes now run on the shared shift handover workflow so incoming teams, operations, and eMAR stay in sync."
                 backHref="/emar"
+                actions={
+                    <Button
+                        onClick={openCreateDialog}
+                        disabled={shifts.length === 0}
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Handover
+                    </Button>
+                }
             />
             <PageShell>
-                <div className="mb-4 flex justify-end">
-                    <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" /> New Handover
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                            <form onSubmit={submit}>
-                                <DialogHeader>
-                                    <DialogTitle>New Handover</DialogTitle>
-                                    <DialogDescription>
-                                        Create a new medication shift handover
-                                        record.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <HandoverFormFields
-                                    formData={form.data}
-                                    setField={(key, value) =>
-                                        form.setData(key, value)
-                                    }
-                                    errors={form.errors}
-                                    staff={staff}
-                                    shiftOptions={shifts}
-                                    idPrefix="new"
-                                />
-                                <DialogFooter>
-                                    <Button
-                                        type="submit"
-                                        disabled={form.processing}
-                                    >
-                                        {form.processing
-                                            ? 'Creating...'
-                                            : 'Create Handover'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                <div className="grid gap-4 md:grid-cols-4">
+                    <Card>
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <ArrowRightLeft className="h-8 w-8 text-sky-600" />
+                            <div>
+                                <div className="text-sm text-muted-foreground">
+                                    This Page
+                                </div>
+                                <div className="text-2xl font-semibold">
+                                    {totals.total}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <FilePenLine className="h-8 w-8 text-amber-600" />
+                            <div>
+                                <div className="text-sm text-muted-foreground">
+                                    Drafts
+                                </div>
+                                <div className="text-2xl font-semibold">
+                                    {totals.draft}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <Clock3 className="h-8 w-8 text-blue-600" />
+                            <div>
+                                <div className="text-sm text-muted-foreground">
+                                    Submitted
+                                </div>
+                                <div className="text-2xl font-semibold">
+                                    {totals.submitted}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                            <div>
+                                <div className="text-sm text-muted-foreground">
+                                    Acknowledged
+                                </div>
+                                <div className="text-2xl font-semibold">
+                                    {totals.acknowledged}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
+                {shifts.length === 0 ? (
+                    <Card>
+                        <CardContent className="py-12 text-center">
+                            <ArrowRightLeft className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
+                            <div className="text-lg font-medium">
+                                No recent shifts available
+                            </div>
+                            <div className="mt-2 text-sm text-muted-foreground">
+                                As soon as shifts are available in the shared
+                                operations workflow, medication handovers can be
+                                created from here.
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
+
                 <div className="space-y-4">
-                    {handovers.data.map((h) => {
-                        const hasDiscrepancies = h.controlled_drug_counts?.some(
-                            (c) => c.discrepancy !== 0,
-                        );
-                        const isIncomingUser =
-                            h.incoming_user?.id === auth.user.id;
-                        const checklistCompletion = getChecklistCompletion(
-                            h.checklist_items,
-                        );
-                        const hasSafetyConcerns =
-                            !!h.safety_concerns &&
-                            h.safety_concerns.trim().length > 0;
-                        const clientsCount =
-                            h.clients_requiring_attention?.length ?? 0;
-
-                        return (
-                            <Card
-                                key={h.id}
-                                className={
-                                    hasDiscrepancies
-                                        ? 'border-red-200 dark:border-red-800'
-                                        : ''
-                                }
-                            >
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-medium">
-                                                {h.outgoing_user?.name ??
-                                                    'Unknown'}
-                                            </span>
-                                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                                            <span className="font-medium">
-                                                {h.incoming_user?.name ??
-                                                    'Unknown'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-muted-foreground">
-                                                {h.handover_at
-                                                    ? new Date(
-                                                          h.handover_at,
-                                                      ).toLocaleString(
-                                                          'en-NZ',
-                                                          {
-                                                              dateStyle:
-                                                                  'short',
-                                                              timeStyle:
-                                                                  'short',
-                                                          },
-                                                      )
-                                                    : '—'}
-                                            </span>
-                                            {h.acknowledged ? (
-                                                <Badge className="bg-green-100 text-xs text-green-700">
-                                                    <CheckCircle className="mr-1 h-3 w-3" />{' '}
-                                                    Acknowledged
-                                                </Badge>
-                                            ) : (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="text-xs"
-                                                >
-                                                    Pending
-                                                </Badge>
-                                            )}
-                                            {!h.acknowledged &&
-                                                isIncomingUser && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            router.post(
-                                                                `/emar/handovers/${h.id}/acknowledge`,
-                                                            )
-                                                        }
-                                                    >
-                                                        <CheckCircle className="mr-1 h-3.5 w-3.5" />{' '}
-                                                        Acknowledge
-                                                    </Button>
-                                                )}
-                                            {!h.acknowledged && (
-                                                <>
-                                                    <Button
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        onClick={() =>
-                                                            openEdit(h)
-                                                        }
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        onClick={() => {
-                                                            if (
-                                                                confirm(
-                                                                    'Are you sure you want to delete this handover?',
-                                                                )
-                                                            ) {
-                                                                router.delete(
-                                                                    `/emar/handovers/${h.id}`,
-                                                                );
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-red-500" />
-                                                    </Button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {h.site && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {h.site.name}
-                                        </p>
-                                    )}
-                                    {h.shift && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {h.shift.client_name ||
-                                                'Linked shift'}
-                                            {h.shift.shift_type
-                                                ? ` • ${String(h.shift.shift_type).replace('_', ' ')}`
-                                                : ''}
-                                            {h.shift.service_context_name
-                                                ? ` • ${h.shift.service_context_name}`
-                                                : ''}
-                                            {h.shift.location
-                                                ? ` • ${h.shift.location}`
-                                                : ''}
-                                        </p>
-                                    )}
-                                    {/* Checklist + Safety + Clients indicators */}
-                                    <div className="mt-2 flex items-center gap-3">
-                                        <Badge
-                                            variant="outline"
-                                            className="gap-1 text-xs"
-                                        >
-                                            <ClipboardCheck className="h-3 w-3" />{' '}
-                                            {checklistCompletion} items checked
-                                        </Badge>
-                                        {hasSafetyConcerns && (
-                                            <Badge
-                                                variant="destructive"
-                                                className="gap-1 text-xs"
-                                            >
-                                                <AlertTriangle className="h-3 w-3" />{' '}
-                                                Safety concerns
-                                            </Badge>
-                                        )}
-                                        {clientsCount > 0 && (
-                                            <Badge className="gap-1 bg-amber-100 text-xs text-amber-700">
-                                                <Users className="h-3 w-3" />{' '}
-                                                {clientsCount} client
-                                                {clientsCount !== 1
-                                                    ? 's'
-                                                    : ''}{' '}
-                                                need attention
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                        {/* Controlled Drug Counts */}
-                                        <div>
-                                            <h4 className="mb-2 flex items-center gap-1 text-xs font-semibold">
-                                                <Shield className="h-3.5 w-3.5" />{' '}
-                                                CD Counts
-                                                {h.controlled_drugs_verified ? (
-                                                    <Badge className="ml-1 bg-green-100 text-[10px] text-green-700">
-                                                        Verified
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge
-                                                        variant="destructive"
-                                                        className="ml-1 text-[10px]"
-                                                    >
-                                                        Unverified
-                                                    </Badge>
-                                                )}
-                                            </h4>
-                                            {h.controlled_drug_counts &&
-                                            h.controlled_drug_counts.length >
-                                                0 ? (
-                                                <div className="space-y-1 text-xs">
-                                                    {h.controlled_drug_counts.map(
-                                                        (c, i) => (
-                                                            <div
-                                                                key={i}
-                                                                className="flex justify-between"
-                                                            >
-                                                                <span>
-                                                                    {c.medication_name ??
-                                                                        `Med #${c.medication_id}`}
-                                                                </span>
-                                                                <span
-                                                                    className={
-                                                                        c.discrepancy !==
-                                                                        0
-                                                                            ? 'font-bold text-red-600'
-                                                                            : ''
-                                                                    }
-                                                                >
-                                                                    {c.actual}/
-                                                                    {c.expected}
-                                                                    {c.discrepancy !==
-                                                                        0 &&
-                                                                        ` (${c.discrepancy > 0 ? '+' : ''}${c.discrepancy})`}
-                                                                </span>
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground">
-                                                    No CD counts recorded.
-                                                </p>
-                                            )}
-                                        </div>
-
-                                        {/* Outstanding Items */}
-                                        <div>
-                                            <h4 className="mb-2 text-xs font-semibold">
-                                                Outstanding Items
-                                            </h4>
-                                            <div className="space-y-1 text-xs">
-                                                {h.outstanding_medications &&
-                                                    h.outstanding_medications
-                                                        .length > 0 && (
-                                                        <p>
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="text-[10px]"
-                                                            >
-                                                                {
-                                                                    h
-                                                                        .outstanding_medications
-                                                                        .length
-                                                                }
-                                                            </Badge>{' '}
-                                                            Outstanding meds
-                                                        </p>
-                                                    )}
-                                                {h.new_prescriptions &&
-                                                    h.new_prescriptions.length >
-                                                        0 && (
-                                                        <p>
-                                                            <Badge className="bg-blue-100 text-[10px] text-blue-700">
-                                                                {
-                                                                    h
-                                                                        .new_prescriptions
-                                                                        .length
-                                                                }
-                                                            </Badge>{' '}
-                                                            New prescriptions
-                                                        </p>
-                                                    )}
-                                                {h.ceased_medications &&
-                                                    h.ceased_medications
-                                                        .length > 0 && (
-                                                        <p>
-                                                            <Badge
-                                                                variant="secondary"
-                                                                className="text-[10px]"
-                                                            >
-                                                                {
-                                                                    h
-                                                                        .ceased_medications
-                                                                        .length
-                                                                }
-                                                            </Badge>{' '}
-                                                            Ceased meds
-                                                        </p>
-                                                    )}
-                                                {h.incidents &&
-                                                    h.incidents.length > 0 && (
-                                                        <p>
-                                                            <Badge
-                                                                variant="destructive"
-                                                                className="text-[10px]"
-                                                            >
-                                                                {
-                                                                    h.incidents
-                                                                        .length
-                                                                }
-                                                            </Badge>{' '}
-                                                            Incidents
-                                                        </p>
-                                                    )}
-                                                {h.prn_given &&
-                                                    h.prn_given.length > 0 && (
-                                                        <p>
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="text-[10px]"
-                                                            >
-                                                                {
-                                                                    h.prn_given
-                                                                        .length
-                                                                }
-                                                            </Badge>{' '}
-                                                            PRN given
-                                                        </p>
-                                                    )}
-                                            </div>
-                                        </div>
-
-                                        {/* Notes & Flags */}
-                                        <div>
-                                            <h4 className="mb-2 text-xs font-semibold">
-                                                Notes
-                                            </h4>
-                                            {h.flagged_clients &&
-                                                h.flagged_clients.length >
-                                                    0 && (
-                                                    <div className="mb-2">
-                                                        <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
-                                                            <AlertTriangle className="h-3 w-3" />{' '}
-                                                            {
-                                                                h
-                                                                    .flagged_clients
-                                                                    .length
-                                                            }{' '}
-                                                            flagged client(s)
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            <p className="text-xs text-muted-foreground">
-                                                {h.general_notes ?? 'No notes.'}
-                                            </p>
-                                            {hasSafetyConcerns && (
-                                                <div className="mt-2 rounded-md bg-red-50 p-2 dark:bg-red-950">
-                                                    <p className="flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-300">
-                                                        <AlertTriangle className="h-3 w-3" />{' '}
-                                                        Safety Concerns
-                                                    </p>
-                                                    <p className="mt-0.5 text-xs text-red-600 dark:text-red-400">
-                                                        {h.safety_concerns}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Clients Requiring Attention detail */}
-                                    {h.clients_requiring_attention &&
-                                        h.clients_requiring_attention.length >
-                                            0 && (
-                                            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-950">
-                                                <h4 className="mb-1 flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
-                                                    <Users className="h-3 w-3" />{' '}
-                                                    Clients Requiring Attention
-                                                </h4>
-                                                <div className="space-y-1">
-                                                    {h.clients_requiring_attention.map(
-                                                        (c, i) => (
-                                                            <div
-                                                                key={i}
-                                                                className="flex items-center gap-2 text-xs"
-                                                            >
-                                                                <span className="font-medium">
-                                                                    {
-                                                                        c.client_name
-                                                                    }
-                                                                </span>
-                                                                <span className="text-muted-foreground">
-                                                                    —
-                                                                </span>
-                                                                <span>
-                                                                    {c.reason}
-                                                                </span>
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                    {/* Checklist summary */}
-                                    {h.checklist_items &&
-                                        h.checklist_items.length > 0 && (
-                                            <div className="mt-3">
-                                                <h4 className="mb-1 flex items-center gap-1 text-xs font-semibold">
-                                                    <ClipboardCheck className="h-3 w-3" />{' '}
-                                                    Checklist (
-                                                    {checklistCompletion})
-                                                </h4>
-                                                <div className="grid gap-1 text-xs sm:grid-cols-2">
-                                                    {h.checklist_items.map(
-                                                        (item, i) => (
-                                                            <div
-                                                                key={i}
-                                                                className="flex items-start gap-1.5"
-                                                            >
-                                                                {item.checked ? (
-                                                                    <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-green-600" />
-                                                                ) : (
-                                                                    <X className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
-                                                                )}
-                                                                <span
-                                                                    className={
-                                                                        item.checked
-                                                                            ? ''
-                                                                            : 'text-muted-foreground'
-                                                                    }
-                                                                >
-                                                                    {item.label}
-                                                                    {item.checked &&
-                                                                        item.notes && (
-                                                                            <span className="ml-1 text-muted-foreground">
-                                                                                (
-                                                                                {
-                                                                                    item.notes
-                                                                                }
-
-                                                                                )
-                                                                            </span>
-                                                                        )}
-                                                                </span>
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-
-                    {handovers.data.length === 0 && (
+                    {handovers.data.length === 0 ? (
                         <Card>
-                            <CardContent className="flex flex-col items-center py-12">
-                                <ArrowRight className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <p className="text-muted-foreground">
-                                    No medication handover records.
-                                </p>
+                            <CardContent className="py-14 text-center">
+                                <Pill className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
+                                <div className="text-lg font-medium">
+                                    No medication handovers yet
+                                </div>
+                                <div className="mt-2 text-sm text-muted-foreground">
+                                    Create the first medication handover to
+                                    capture due medicines, exceptions, and
+                                    follow-up tasks for the next shift.
+                                </div>
                             </CardContent>
                         </Card>
+                    ) : (
+                        handovers.data.map((handover) => (
+                            <Card key={handover.id}>
+                                <CardHeader className="gap-4">
+                                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                        <div className="space-y-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <CardTitle className="text-lg">
+                                                    {handover.client?.name ??
+                                                        'Medication handover'}
+                                                </CardTitle>
+                                                {statusBadge(handover.status)}
+                                            </div>
+                                            <div className="text-sm text-muted-foreground">
+                                                Outgoing shift:{' '}
+                                                {shiftLabel(
+                                                    handover.outgoing_shift,
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-muted-foreground">
+                                                Incoming shift:{' '}
+                                                {handover.incoming_shift
+                                                    ? shiftLabel(
+                                                          handover.incoming_shift,
+                                                      )
+                                                    : 'Will be inferred by the shared shift workflow'}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            {handover.can_edit ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        openEditDialog(handover)
+                                                    }
+                                                >
+                                                    <FilePenLine className="mr-1.5 h-4 w-4" />
+                                                    Edit Draft
+                                                </Button>
+                                            ) : null}
+                                            {handover.can_submit ? (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        submitHandover(
+                                                            handover.id,
+                                                        )
+                                                    }
+                                                >
+                                                    Submit
+                                                </Button>
+                                            ) : null}
+                                            {handover.can_acknowledge ? (
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        acknowledgeHandover(
+                                                            handover.id,
+                                                        )
+                                                    }
+                                                >
+                                                    <UserRoundCheck className="mr-1.5 h-4 w-4" />
+                                                    Acknowledge
+                                                </Button>
+                                            ) : null}
+                                            {handover.can_delete ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        deleteHandover(
+                                                            handover.id,
+                                                        )
+                                                    }
+                                                >
+                                                    <Trash2 className="mr-1.5 h-4 w-4" />
+                                                    Delete
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                </CardHeader>
+
+                                <CardContent className="space-y-5">
+                                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                        <div className="rounded-md border bg-muted/20 p-3">
+                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                                Outgoing Staff
+                                            </div>
+                                            <div className="mt-1 text-sm font-medium">
+                                                {handover.outgoing_staff
+                                                    ?.name ?? 'Not set'}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-md border bg-muted/20 p-3">
+                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                                Incoming Staff
+                                            </div>
+                                            <div className="mt-1 text-sm font-medium">
+                                                {handover.incoming_staff
+                                                    ?.name ?? 'Not set'}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-md border bg-muted/20 p-3">
+                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                                Submitted
+                                            </div>
+                                            <div className="mt-1 text-sm font-medium">
+                                                {formatDateTime(
+                                                    handover.submitted_at,
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-md border bg-muted/20 p-3">
+                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                                Acknowledged
+                                            </div>
+                                            <div className="mt-1 text-sm font-medium">
+                                                {handover.acknowledger?.name
+                                                    ? `${handover.acknowledger.name} • ${formatDateTime(
+                                                          handover.acknowledged_at,
+                                                      )}`
+                                                    : formatDateTime(
+                                                          handover.acknowledged_at,
+                                                      )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <ClipboardList className="h-4 w-4 text-slate-500" />
+                                                <div className="font-medium">
+                                                    Medication notes
+                                                </div>
+                                            </div>
+                                            <div className="rounded-md border p-4 text-sm leading-6">
+                                                {handover.handover_notes}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <Pill className="h-4 w-4 text-slate-500" />
+                                                <div className="font-medium">
+                                                    Client presentation
+                                                </div>
+                                            </div>
+                                            <div className="rounded-md border p-4 text-sm">
+                                                {handover.client_mood ||
+                                                    'No client presentation note recorded.'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-4 xl:grid-cols-2">
+                                        <ListSection
+                                            title="Medications Due"
+                                            items={handover.medications_due}
+                                            emptyLabel="No due medications were listed."
+                                        />
+                                        <ListSection
+                                            title="Follow-up Items"
+                                            items={handover.follow_up_items}
+                                            emptyLabel="No follow-up items were listed."
+                                        />
+                                        <ListSection
+                                            title="Incidents To Note"
+                                            items={handover.incidents_to_note}
+                                            emptyLabel="No incidents or medication exceptions were listed."
+                                        />
+                                        <ListSection
+                                            title="Tasks Pending"
+                                            items={handover.tasks_pending}
+                                            emptyLabel="No pending medication tasks were listed."
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))
                     )}
                 </div>
 
-                {/* Edit Handover Dialog */}
-                <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                    <DialogContent className="max-w-2xl">
-                        <form onSubmit={submitEdit}>
-                            <DialogHeader>
-                                <DialogTitle>Edit Handover</DialogTitle>
-                                <DialogDescription>
-                                    Update the handover record details.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <HandoverFormFields
-                                formData={editForm.data}
-                                setField={(key, value) =>
-                                    editForm.setData(key, value)
-                                }
-                                errors={editForm.errors}
-                                staff={staff}
-                                shiftOptions={shifts}
-                                idPrefix="edit"
-                            />
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setEditOpen(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={editForm.processing}
-                                >
-                                    {editForm.processing
-                                        ? 'Saving...'
-                                        : 'Save Changes'}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                <LaravelPagination
+                    links={handovers.links}
+                    lastPage={handovers.meta?.last_page}
+                />
             </PageShell>
+
+            <HandoverDialog
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                editing={editing}
+                shifts={shifts}
+            />
         </AppLayout>
     );
 }

@@ -259,6 +259,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->hourly();
 
+// Send medication alert digests and escalations: every 15 minutes
+app(Schedule::class)
+    ->command('emar:send-alerts')
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes();
+
 // Roadmap Module Scheduled Jobs
 
 // Suggestion ingestion + dedupe sweep: hourly

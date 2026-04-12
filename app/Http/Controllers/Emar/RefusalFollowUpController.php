@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Emar;
 use App\Http\Controllers\Controller;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRefusalFollowup;
+use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -51,7 +52,12 @@ class RefusalFollowUpController extends Controller
             $validated['gp_notification_required'] = true;
         }
 
-        MedicationRefusalFollowup::create($validated);
+        $followup = MedicationRefusalFollowup::create($validated);
+
+        if (! empty($validated['escalated_to_manager'])) {
+            app(MedicationIncidentIntegrationService::class)
+                ->handleRefusalEscalation($followup, $recentRefusals);
+        }
 
         return redirect()->back()->with('success', 'Refusal follow-up recorded successfully.');
     }
@@ -65,6 +71,12 @@ class RefusalFollowUpController extends Controller
             'follow_up_completed_at' => now(),
             'follow_up_completed_by' => Auth::id(),
         ]);
+
+        app(MedicationIncidentIntegrationService::class)->resolveRefusalEscalation(
+            $followup,
+            'Medication refusal follow-up completed.',
+            Auth::id()
+        );
 
         return redirect()->back()->with('success', 'Follow-up marked as completed.');
     }

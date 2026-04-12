@@ -7,8 +7,10 @@ use App\Http\Controllers\Emar\EmarPdfController;
 use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
+use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\EmergencyAccessController;
 use App\Http\Controllers\MedicationAuditController;
+use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationsReportController;
 use Illuminate\Support\Facades\Route;
@@ -147,12 +149,6 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
     Route::delete('/destructions/{destruction}', [EmarController::class, 'destroyDestruction'])->name('emar.destructions.destroy');
 
-    // Handovers
-    Route::post('/handovers', [EmarController::class, 'storeHandover'])->name('emar.handovers.store');
-    Route::put('/handovers/{handover}', [EmarController::class, 'updateHandover'])->name('emar.handovers.update');
-    Route::delete('/handovers/{handover}', [EmarController::class, 'destroyHandover'])->name('emar.handovers.destroy');
-    Route::post('/handovers/{handover}/acknowledge', [EmarController::class, 'acknowledgeHandover'])->name('emar.handovers.acknowledge');
-
     // Pharmacy Orders + Stock
     Route::post('/stock/pharmacy-orders', [EmarController::class, 'storePharmacyOrder'])->name('emar.pharmacy_orders.store');
     Route::put('/stock/pharmacy-orders/{order}', [EmarController::class, 'updatePharmacyOrder'])->name('emar.pharmacy_orders.update');
@@ -168,6 +164,23 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // ─── End CRUD Routes ────────────────────────────────────
 
+    // Shared Shift Handovers (medication-focused eMAR view)
+    Route::post('/handovers', [EmarController::class, 'storeHandover'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny|clients.update')
+        ->name('emar.handovers.store');
+    Route::put('/handovers/{handover}', [EmarController::class, 'updateHandover'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny|clients.update')
+        ->name('emar.handovers.update');
+    Route::post('/handovers/{handover}/submit', [EmarController::class, 'submitHandover'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny|clients.update')
+        ->name('emar.handovers.submit');
+    Route::post('/handovers/{handover}/acknowledge', [EmarController::class, 'acknowledgeHandover'])
+        ->middleware('permission:handovers.viewAny|shifts.update|shifts.viewAssigned|clients.update')
+        ->name('emar.handovers.acknowledge');
+    Route::delete('/handovers/{handover}', [EmarController::class, 'destroyHandover'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny|clients.update')
+        ->name('emar.handovers.destroy');
+
     // Audit trail
     Route::get('/audit', [AuditLogController::class, 'index'])
         ->middleware('permission:medications.audit.view')
@@ -178,8 +191,21 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Emergency access
     Route::get('/emergency-access', [EmergencyAccessController::class, 'index'])
-        ->middleware('permission:medications.breakGlass')
+        ->middleware('permission:medications.breakglass')
         ->name('emar.emergency_access');
+
+    // Canonical break-glass revoke
+    Route::delete('/clients/{client}/break-glass/{access}', [BreakGlassController::class, 'destroy'])
+        ->middleware('permission:medications.breakglass|medications.audit.view')
+        ->name('emar.clients.break_glass.destroy');
+
+    // Correction approval workflow
+    Route::post('/corrections/{correction}/approve', [MedicationAdministrationCorrectionController::class, 'approve'])
+        ->middleware('permission:medications.administer.correct')
+        ->name('emar.corrections.approve');
+    Route::post('/corrections/{correction}/reject', [MedicationAdministrationCorrectionController::class, 'reject'])
+        ->middleware('permission:medications.administer.correct')
+        ->name('emar.corrections.reject');
 
     // Reports
     Route::middleware('permission:reports.viewAny')->group(function () {
@@ -194,25 +220,51 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     });
 
     // ─── Refusal & Withholding Follow-Up ────────────────────
-    Route::post('/refusal-followups', [RefusalFollowUpController::class, 'store'])->name('emar.refusal_followups.store');
-    Route::post('/refusal-followups/{followup}/complete', [RefusalFollowUpController::class, 'complete'])->name('emar.refusal_followups.complete');
-    Route::post('/refusal-followups/{followup}/notify-gp', [RefusalFollowUpController::class, 'notifyGp'])->name('emar.refusal_followups.notify_gp');
+    Route::post('/refusal-followups', [RefusalFollowUpController::class, 'store'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->name('emar.refusal_followups.store');
+    Route::post('/refusal-followups/{followup}/complete', [RefusalFollowUpController::class, 'complete'])
+        ->middleware('permission:medications.administer.correct|clients.update')
+        ->name('emar.refusal_followups.complete');
+    Route::post('/refusal-followups/{followup}/notify-gp', [RefusalFollowUpController::class, 'notifyGp'])
+        ->middleware('permission:medications.administer.correct|clients.update')
+        ->name('emar.refusal_followups.notify_gp');
 
     // ─── Controlled Drug Loss Reports ─────────────────────
-    Route::get('/controlled/loss-reports', [CDLossReportController::class, 'index'])->name('emar.cd_loss.index');
-    Route::post('/controlled/loss-reports', [CDLossReportController::class, 'store'])->name('emar.cd_loss.store');
-    Route::post('/controlled/loss-reports/{report}/investigate', [CDLossReportController::class, 'investigate'])->name('emar.cd_loss.investigate');
-    Route::post('/controlled/loss-reports/{report}/resolve', [CDLossReportController::class, 'resolve'])->name('emar.cd_loss.resolve');
+    Route::get('/controlled/loss-reports', [CDLossReportController::class, 'index'])
+        ->middleware('permission:medications.controlled.view|clients.update')
+        ->name('emar.cd_loss.index');
+    Route::post('/controlled/loss-reports', [CDLossReportController::class, 'store'])
+        ->middleware('permission:medications.controlled.record|clients.update')
+        ->name('emar.cd_loss.store');
+    Route::post('/controlled/loss-reports/{report}/investigate', [CDLossReportController::class, 'investigate'])
+        ->middleware('permission:medications.controlled.record|clients.update')
+        ->name('emar.cd_loss.investigate');
+    Route::post('/controlled/loss-reports/{report}/resolve', [CDLossReportController::class, 'resolve'])
+        ->middleware('permission:medications.controlled.record|clients.update')
+        ->name('emar.cd_loss.resolve');
 
     // ─── Medication Errors ──────────────────────────────────
-    Route::get('/errors', [MedicationErrorController::class, 'index'])->name('emar.errors');
-    Route::post('/errors', [MedicationErrorController::class, 'store'])->name('emar.errors.store');
-    Route::put('/errors/{error}', [MedicationErrorController::class, 'update'])->name('emar.errors.update');
-    Route::post('/errors/{error}/review', [MedicationErrorController::class, 'review'])->name('emar.errors.review');
-    Route::post('/errors/{error}/resolve', [MedicationErrorController::class, 'resolve'])->name('emar.errors.resolve');
+    Route::get('/errors', [MedicationErrorController::class, 'index'])
+        ->middleware('permission:medications.view')
+        ->name('emar.errors');
+    Route::post('/errors', [MedicationErrorController::class, 'store'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->name('emar.errors.store');
+    Route::put('/errors/{error}', [MedicationErrorController::class, 'update'])
+        ->middleware('permission:medications.administer.correct|clients.update')
+        ->name('emar.errors.update');
+    Route::post('/errors/{error}/review', [MedicationErrorController::class, 'review'])
+        ->middleware('permission:medications.administer.correct|clients.update')
+        ->name('emar.errors.review');
+    Route::post('/errors/{error}/resolve', [MedicationErrorController::class, 'resolve'])
+        ->middleware('permission:medications.administer.correct|clients.update')
+        ->name('emar.errors.resolve');
 
     // ─── PDF Exports ─────────────────────────────────────────
-    Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->name('emar.pdf.mar');
-    Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])->name('emar.pdf.cd_register');
-    Route::get('/pdf/round-sheet', [EmarPdfController::class, 'roundSheet'])->name('emar.pdf.round_sheet');
+    Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {
+        Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->name('emar.pdf.mar');
+        Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])->name('emar.pdf.cd_register');
+        Route::get('/pdf/round-sheet', [EmarPdfController::class, 'roundSheet'])->name('emar.pdf.round_sheet');
+    });
 });

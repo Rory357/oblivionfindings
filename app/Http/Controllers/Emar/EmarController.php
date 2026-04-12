@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Emar;
 
+use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientDocument;
 use App\Models\ControlledDrugLossReport;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -14,7 +17,6 @@ use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationCovertAuthorisation;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationDestruction;
-use App\Models\MedicationHandover;
 use App\Models\MedicationInteraction;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationPrescriberOrder;
@@ -25,15 +27,29 @@ use App\Models\MedicationRoundTemplate;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\Site;
 use App\Models\Shift;
+use App\Models\ShiftHandover;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\DoseSchedulingService;
 use App\Services\MedicationAlertService;
+use App\Services\MedicationIncidentIntegrationService;
+use App\Services\MedicationScanVerificationService;
+use App\Services\ShiftHandoverService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class EmarController extends Controller
 {
+    use HandlesMedicationSync;
+
+    public function __construct(
+        protected ShiftHandoverService $handoverService,
+        protected MedicationScanVerificationService $scanVerificationService,
+    ) {
+    }
+
     // ─── Helpers ──────────────────────────────────────────
 
     private function getStaffList()
@@ -44,6 +60,401 @@ class EmarController extends Controller
     private function getClientsList()
     {
         return Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']);
+    }
+
+    private function buildMedicationPermissions(?User $user): array
+    {
+        return [
+            'record' => (bool) $user && ($user->canDo('medications.administer.record') || $user->canDo('clients.update')),
+            'correct' => (bool) $user && ($user->canDo('medications.administer.correct') || $user->canDo('clients.update')),
+            'manage_allergies' => (bool) $user && $user->canDo('clients.update'),
+            'manage_interactions' => (bool) $user && ($user->canDo('medications.administer.correct') || $user->canDo('clients.update')),
+            'manage_stock' => (bool) $user && ($user->canDo('medications.stock.update') || $user->canDo('clients.update')),
+            'view_controlled' => (bool) $user && ($user->canDo('medications.controlled.view') || $user->canDo('clients.update')),
+            'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')),
+            'export_reports' => (bool) $user && ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny')),
+        ];
+    }
+
+    private function buildClientMedicationContext(Client $client): array
+    {
+        $client->loadMissing([
+            'medicalProfile',
+            'conditions',
+            'emergencyContacts',
+        ]);
+
+        return [
+            'profile' => $client->medicalProfile ? [
+                'medical_history' => $client->medicalProfile->medical_history,
+                'mental_health_history' => $client->medicalProfile->mental_health_history,
+                'surgical_history' => $client->medicalProfile->surgical_history,
+                'gp_name' => $client->medicalProfile->gp_name,
+                'gp_practice' => $client->medicalProfile->gp_practice,
+                'gp_phone' => $client->medicalProfile->gp_phone,
+                'hospital_preference' => $client->medicalProfile->hospital_preference,
+                'blood_type' => $client->medicalProfile->blood_type,
+                'organ_donor' => (bool) $client->medicalProfile->organ_donor,
+                'immunisation_notes' => $client->medicalProfile->immunisation_notes,
+                'disabilities' => $client->medicalProfile->disabilities ?? [],
+                'allergies' => $client->medicalProfile->allergies ?? [],
+                'notes' => $client->medicalProfile->notes,
+            ] : null,
+            'conditions' => $client->conditions
+                ->map(fn ($condition) => [
+                    'id' => $condition->id,
+                    'label' => $condition->label,
+                    'severity' => $condition->severity,
+                    'notes' => $condition->notes,
+                ])
+                ->values()
+                ->all(),
+            'emergency_contacts' => $client->emergencyContacts
+                ->sortBy('contact_order')
+                ->map(fn ($contact) => [
+                    'id' => $contact->id,
+                    'name' => $contact->name,
+                    'relationship' => $contact->relationship,
+                    'phone' => $contact->phone,
+                    'email' => $contact->email,
+                    'notes' => $contact->notes,
+                    'preferred_method' => $contact->preferred_method,
+                    'availability' => $contact->availability,
+                    'authorised_health_info' => (bool) $contact->authorised_health_info,
+                ])
+                ->values()
+                ->all(),
+            'medication_charts' => $this->getMedicationCharts($client),
+        ];
+    }
+
+    private function getMedicationCharts(Client $client): array
+    {
+        return ClientDocument::query()
+            ->with('uploadedBy:id,name')
+            ->where('client_id', $client->id)
+            ->where('category', 'med_chart')
+            ->latest()
+            ->get()
+            ->map(fn (ClientDocument $document) => [
+                'id' => $document->id,
+                'title' => $document->title,
+                'original_name' => $document->original_name,
+                'version' => $document->version,
+                'effective_date' => $document->effective_date?->toDateString(),
+                'expiry_date' => $document->expiry_date?->toDateString(),
+                'notes' => $document->notes,
+                'mime_type' => $document->mime_type,
+                'uploaded_at' => $document->created_at?->toIso8601String(),
+                'uploaded_by' => $document->uploadedBy?->name,
+                'download_url' => route('clients.documents.download', ['client' => $client->id, 'document' => $document->id]),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function getBreakGlassState(Client $client): array
+    {
+        $currentUser = request()->user();
+
+        $accesses = ClientBreakGlassAccess::query()
+            ->with('user:id,name')
+            ->where('client_id', $client->id)
+            ->where('expires_at', '>', now())
+            ->orderBy('expires_at')
+            ->get()
+            ->map(fn (ClientBreakGlassAccess $access) => [
+                'id' => $access->id,
+                'user_id' => $access->user_id,
+                'user_name' => $access->user?->name,
+                'reason' => $access->reason,
+                'expires_at' => $access->expires_at?->toIso8601String(),
+                'is_current_user' => (int) $access->user_id === (int) $currentUser?->id,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'active' => !empty($accesses),
+            'accesses' => $accesses,
+        ];
+    }
+
+    private function getPendingCorrections(Client $client): array
+    {
+        return ClientMedicationAdministration::query()
+            ->with([
+                'medication:id,name,dosage',
+                'administeredBy:id,name',
+                'attachments.uploadedBy:id,name',
+            ])
+            ->where('client_id', $client->id)
+            ->where('is_correction', true)
+            ->where('correction_status', 'pending')
+            ->latest('created_at')
+            ->limit(25)
+            ->get()
+            ->map(fn (ClientMedicationAdministration $administration) => [
+                'id' => $administration->id,
+                'original_administration_id' => $administration->corrected_of_id,
+                'medication_name' => $administration->medication?->name ?? 'Unknown',
+                'status' => $administration->status,
+                'dose_given' => $administration->dose_given,
+                'reason' => $administration->reason,
+                'notes' => $administration->notes,
+                'correction_reason' => $administration->correction_reason,
+                'submitted_by' => $administration->administeredBy?->name,
+                'submitted_at' => $administration->created_at?->toIso8601String(),
+                'administered_at' => $administration->administered_at?->toIso8601String(),
+                'attachments' => $administration->attachments
+                    ->map(fn ($attachment) => [
+                        'id' => $attachment->id,
+                        'file_name' => $attachment->file_name,
+                        'mime_type' => $attachment->mime_type,
+                        'file_size' => $attachment->file_size,
+                        'formatted_size' => $attachment->formatted_size,
+                        'description' => $attachment->description,
+                        'uploaded_at' => $attachment->created_at?->toIso8601String(),
+                        'uploaded_by' => $attachment->uploadedBy?->name,
+                        'download_url' => route('api.medications.attachments.download', [
+                            'client' => $administration->client_id,
+                            'administration' => $administration->id,
+                            'attachment' => $attachment->id,
+                        ]),
+                        'can_delete' => (bool) request()->user() && (
+                            request()->user()->canDo('medications.administer.correct')
+                            || request()->user()->canDo('clients.update')
+                            || (int) $attachment->uploaded_by === (int) request()->user()->id
+                        ),
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function getClientAlerts(Client $client): array
+    {
+        return MedicationDashboardAlert::query()
+            ->where('client_id', $client->id)
+            ->where('status', 'active')
+            ->latest()
+            ->limit(20)
+            ->get()
+            ->map(fn (MedicationDashboardAlert $alert) => [
+                'id' => $alert->id,
+                'alert_type' => $alert->alert_type,
+                'severity' => $alert->severity,
+                'message' => $alert->message,
+                'created_at' => $alert->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function getOpenControlledDiscrepancies(Client $client): array
+    {
+        return $client->controlledDrugDiscrepancies()
+            ->with('medication:id,name')
+            ->whereIn('status', ['open', 'under_review'])
+            ->latest('reported_at')
+            ->limit(20)
+            ->get()
+            ->map(fn (ClientControlledDrugDiscrepancy $discrepancy) => [
+                'id' => $discrepancy->id,
+                'medication_name' => $discrepancy->medication?->name,
+                'difference' => $discrepancy->difference,
+                'reason' => $discrepancy->reason,
+                'notes' => $discrepancy->notes,
+                'status' => $discrepancy->status,
+                'reported_at' => $discrepancy->reported_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function serializeAdministration(
+        ?ClientMedicationAdministration $administration,
+        ?string $statusOverride = null,
+        ?string $scheduledForOverride = null,
+    ): array {
+        return [
+            'id' => $administration?->id,
+            'scheduled_for' => $scheduledForOverride ?? $administration?->scheduled_for?->toIso8601String(),
+            'administered_at' => $administration?->administered_at?->toIso8601String(),
+            'status' => $statusOverride ?? $administration?->status,
+            'administered_by' => $administration?->administeredBy?->name,
+            'witnessed_by' => $administration?->witnessedBy?->name,
+            'notes' => $administration?->notes,
+            'reason' => $administration?->reason,
+            'dose_given' => $administration?->dose_given,
+            'outcome' => $administration?->outcome,
+            'site' => $administration?->site,
+            'created_at' => $administration?->created_at?->toIso8601String(),
+            'is_correction' => (bool) $administration?->is_correction,
+            'correction_reason' => $administration?->correction_reason,
+            'correction_status' => $administration?->correction_status,
+            'correction_rejection_reason' => $administration?->correction_rejection_reason,
+            'attachments' => $administration
+                ? $administration->attachments
+                    ->map(fn ($attachment) => [
+                        'id' => $attachment->id,
+                        'file_name' => $attachment->file_name,
+                        'mime_type' => $attachment->mime_type,
+                        'file_size' => $attachment->file_size,
+                        'formatted_size' => $attachment->formatted_size,
+                        'description' => $attachment->description,
+                        'uploaded_at' => $attachment->created_at?->toIso8601String(),
+                        'uploaded_by' => $attachment->uploadedBy?->name,
+                        'download_url' => route('api.medications.attachments.download', [
+                            'client' => $administration->client_id,
+                            'administration' => $administration->id,
+                            'attachment' => $attachment->id,
+                        ]),
+                        'can_delete' => (bool) request()->user() && (
+                            request()->user()->canDo('medications.administer.correct')
+                            || request()->user()->canDo('clients.update')
+                            || (int) $attachment->uploaded_by === (int) request()->user()->id
+                        ),
+                    ])
+                    ->values()
+                    ->all()
+                : [],
+        ];
+    }
+
+    private function serializeSupportingAttachment($attachment, string $downloadRoute): array
+    {
+        return [
+            'id' => $attachment->id,
+            'file_name' => $attachment->file_name,
+            'mime_type' => $attachment->mime_type,
+            'file_size' => $attachment->file_size,
+            'formatted_size' => $attachment->formatted_size,
+            'description' => $attachment->description,
+            'uploaded_at' => $attachment->created_at?->toIso8601String(),
+            'uploaded_by' => $attachment->uploadedBy?->name,
+            'download_url' => route($downloadRoute, [
+                'client' => $attachment->client_id,
+                'attachment' => $attachment->id,
+            ]),
+            'can_delete' => (bool) request()->user() && (
+                request()->user()->canDo('medications.administer.correct')
+                || request()->user()->canDo('medications.controlled.record')
+                || request()->user()->canDo('clients.update')
+                || (int) $attachment->uploaded_by === (int) request()->user()->id
+            ),
+        ];
+    }
+
+    private function buildMedicationScanPayload(Client $client, ClientMedication $medication): array
+    {
+        $payload = $this->scanVerificationService->payload($client, $medication);
+        $payload['svg_url'] = route('api.medications.scan_code.svg', [
+            'client' => $client->id,
+            'medication' => $medication->id,
+        ]);
+
+        return $payload;
+    }
+
+    private function verifyMedicationScanOrFail(
+        Client $client,
+        ClientMedication $medication,
+        array $payload,
+        string $errorKey = 'scan_code'
+    ): array {
+        if (! ($payload['scan_verified'] ?? false) || blank($payload['scan_code'] ?? null)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $errorKey => 'Verify the medication code before continuing.',
+            ]);
+        }
+
+        $result = $this->scanVerificationService->verify(
+            $client,
+            $medication,
+            (string) $payload['scan_code']
+        );
+
+        if (! $result['matched']) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $errorKey => $result['message'],
+            ]);
+        }
+
+        if (
+            filled($payload['scan_match_source'] ?? null)
+            && ($payload['scan_match_source'] ?? null) !== $result['match_source']
+        ) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                $errorKey => 'The medication verification needs to be repeated.',
+            ]);
+        }
+
+        return [
+            'scan_source' => $payload['scan_source'] ?? 'manual',
+            'scan_match_source' => $result['match_source'],
+            'scan_match_label' => $result['match_label'],
+            'scan_code_suffix' => substr(
+                $this->scanVerificationService->normalize((string) $payload['scan_code']),
+                -6
+            ),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function stringifyStructuredItems(mixed $items): array
+    {
+        return collect(is_array($items) ? $items : [])
+            ->map(function ($item) {
+                if (is_string($item)) {
+                    return trim($item);
+                }
+
+                if (! is_array($item)) {
+                    return null;
+                }
+
+                return trim((string) ($item['label']
+                    ?? $item['task']
+                    ?? $item['title']
+                    ?? $item['description']
+                    ?? $item['note']
+                    ?? $item['name']
+                    ?? ''));
+            })
+            ->filter(fn ($item) => filled($item))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{label: string}>
+     */
+    private function parseHandoverText(?string $value): array
+    {
+        return collect(preg_split('/\r\n|\r|\n/', (string) $value) ?: [])
+            ->map(fn ($line) => trim($line))
+            ->filter(fn ($line) => $line !== '')
+            ->map(fn ($line) => ['label' => $line])
+            ->values()
+            ->all();
+    }
+
+    private function siteAccess(): UserSiteAccessService
+    {
+        return app(UserSiteAccessService::class);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function handoverBypassPermissions(): array
+    {
+        return ['shifts.manageAny', 'handovers.viewAny', 'reports.viewAny'];
     }
 
     private function buildMedicationPayload(array $validated): array
@@ -298,6 +709,7 @@ class EmarController extends Controller
     // ─── MAR Charts ────────────────────────────────────────
     public function mar(Request $request)
     {
+        $date = $request->input('date', today()->toDateString());
         $clients = Client::query()
             ->withCount(['medications as active_medications_count' => fn ($q) => $q->active()])
             ->having('active_medications_count', '>', 0)
@@ -306,40 +718,68 @@ class EmarController extends Controller
 
         $selectedClient = null;
         $marData = [];
+        $clientContext = null;
+        $breakGlassAccess = ['active' => false, 'accesses' => []];
+        $pendingCorrections = [];
+        $alerts = [];
+        $controlledDiscrepancies = [];
 
         if ($request->filled('client_id')) {
             $selectedClient = Client::with([
                 'medications' => fn ($q) => $q->active()->orderBy('name'),
                 'medications.stock',
-                'medications.administrations' => fn ($q) => $q->whereDate('scheduled_for', $request->input('date', today()->toDateString()))
-                    ->orWhereDate('administered_at', $request->input('date', today()->toDateString())),
+                'medications.administrations' => fn ($q) => $q
+                    ->whereDate('scheduled_for', $date)
+                    ->orWhereDate('administered_at', $date),
+                'medications.administrations.attachments.uploadedBy:id,name',
             ])->findOrFail($request->client_id);
 
-            $marData = $this->buildMarData($selectedClient, $request->input('date', today()->toDateString()));
+            $this->authorize('viewMedications', $selectedClient);
+
+            $marData = $this->buildMarData($selectedClient, $date);
+            $clientContext = $this->buildClientMedicationContext($selectedClient);
+            $breakGlassAccess = $this->getBreakGlassState($selectedClient);
+            $pendingCorrections = $this->getPendingCorrections($selectedClient);
+            $alerts = $this->getClientAlerts($selectedClient);
+            $controlledDiscrepancies = $this->getOpenControlledDiscrepancies($selectedClient);
         }
 
         return Inertia::render('emar/MarCharts', [
             'clients' => $clients,
             'selectedClient' => $selectedClient,
             'marData' => $marData,
-            'date' => $request->input('date', today()->toDateString()),
+            'date' => $date,
             'staff' => $this->getStaffList(),
-            'allergies' => $selectedClient ? $selectedClient->medicationAllergies()->get(['allergen', 'reaction', 'severity']) : [],
+            'allergies' => $selectedClient ? $selectedClient->medicationAllergies()
+                ->whereNull('deleted_at')
+                ->latest()
+                ->get(['id', 'allergen', 'reaction', 'severity', 'notes', 'identified_date']) : [],
             'interactions' => $selectedClient ? $this->getActiveInteractions($selectedClient) : [],
+            'clientContext' => $clientContext,
+            'breakGlassAccess' => $breakGlassAccess,
+            'pendingCorrections' => $pendingCorrections,
+            'alerts' => $alerts,
+            'controlledDiscrepancies' => $controlledDiscrepancies,
+            'can' => $this->buildMedicationPermissions($request->user()),
         ]);
     }
 
     private function buildMarData(Client $client, string $date): array
     {
-        $medications = $client->medications()->active()->with(['stock', 'administrations' => function ($q) use ($date) {
-            $q->whereDate('scheduled_for', $date)->orWhereDate('administered_at', $date);
-        }])->get();
+        $medications = $client->medications()->active()->with([
+            'stock',
+            'administrations' => function ($q) use ($date) {
+                $q->whereDate('scheduled_for', $date)->orWhereDate('administered_at', $date);
+            },
+            'administrations.administeredBy:id,name',
+            'administrations.witnessedBy:id,name',
+            'administrations.attachments.uploadedBy:id,name',
+        ])->get();
 
         $scheduled = $medications->where('is_prn', false)->values();
         $prn = $medications->where('is_prn', true)->values();
 
-        return [
-            'scheduled' => $scheduled->map(function ($med) use ($date) {
+        $scheduledPayload = $scheduled->map(function ($med) use ($date) {
                 $doseTimes = $med->dose_times ?? [];
 
                 // If no dose_times stored yet, auto-calculate from frequency
@@ -358,16 +798,7 @@ class EmarController extends Controller
                     });
 
                     if ($admin) {
-                        return [
-                            'id' => $admin->id,
-                            'scheduled_for' => $admin->scheduled_for?->toIso8601String(),
-                            'administered_at' => $admin->administered_at?->toIso8601String(),
-                            'status' => $admin->status,
-                            'administered_by' => $admin->administeredBy?->name,
-                            'witnessed_by' => $admin->witnessedBy?->name,
-                            'notes' => $admin->notes,
-                            'reason' => $admin->reason,
-                        ];
+                        return $this->serializeAdministration($admin);
                     }
 
                     // No record yet: determine if pending or missed
@@ -375,32 +806,14 @@ class EmarController extends Controller
                     $scheduledAt = \Carbon\Carbon::parse($scheduledDatetime);
                     $status = $now->greaterThan($scheduledAt->copy()->addHour()) ? 'missed' : 'pending';
 
-                    return [
-                        'id' => null,
-                        'scheduled_for' => $scheduledAt->toIso8601String(),
-                        'administered_at' => null,
-                        'status' => $status,
-                        'administered_by' => null,
-                        'witnessed_by' => null,
-                        'notes' => null,
-                        'reason' => null,
-                    ];
+                    return $this->serializeAdministration(null, $status, $scheduledAt->toIso8601String());
                 })->values();
 
                 // Also include any administration records that don't match a dose_time slot
                 $unmatchedAdmins = $med->administrations->filter(function ($a) use ($doseTimes) {
                     if (!$a->scheduled_for) return true;
                     return !in_array($a->scheduled_for->format('H:i'), $doseTimes);
-                })->map(fn ($a) => [
-                    'id' => $a->id,
-                    'scheduled_for' => $a->scheduled_for?->toIso8601String(),
-                    'administered_at' => $a->administered_at?->toIso8601String(),
-                    'status' => $a->status,
-                    'administered_by' => $a->administeredBy?->name,
-                    'witnessed_by' => $a->witnessedBy?->name,
-                    'notes' => $a->notes,
-                    'reason' => $a->reason,
-                ]);
+                })->map(fn ($a) => $this->serializeAdministration($a));
 
                 return [
                     'id' => $med->id,
@@ -415,9 +828,15 @@ class EmarController extends Controller
                     'witness_required' => $med->requiresWitness(),
                     'dose_times' => $doseTimes,
                     'administrations' => $administrations->merge($unmatchedAdmins)->values(),
+                    'scan_verification' => $this->buildMedicationScanPayload($client, $med),
+                    'stock' => $med->stock ? [
+                        'on_hand' => $med->stock->on_hand,
+                        'unit' => $med->stock->unit,
+                    ] : null,
                 ];
-            }),
-            'prn' => $prn->map(fn ($med) => [
+            })->values();
+
+        $prnPayload = $prn->map(fn ($med) => [
                 'id' => $med->id,
                 'name' => $med->name,
                 'dosage' => $med->formatted_dose,
@@ -426,23 +845,31 @@ class EmarController extends Controller
                 'prn_count_24h' => $med->prn_count_last24_hours,
                 'prn_remaining' => $med->prn_remaining,
                 'controlled_drug' => $med->controlled_drug,
-                'administrations' => $med->administrations->map(fn ($a) => [
-                    'id' => $a->id,
-                    'administered_at' => $a->administered_at?->toIso8601String(),
-                    'status' => $a->status,
-                    'reason' => $a->reason,
-                    'notes' => $a->notes,
-                    'administered_by' => $a->administeredBy?->name,
-                ]),
-            ]),
+                'high_risk' => $med->high_risk,
+                'witness_required' => $med->requiresWitness(),
+                'administrations' => $med->administrations->map(fn ($a) => $this->serializeAdministration($a))->values(),
+                'scan_verification' => $this->buildMedicationScanPayload($client, $med),
+                'stock' => $med->stock ? [
+                    'on_hand' => $med->stock->on_hand,
+                    'unit' => $med->stock->unit,
+                ] : null,
+            ])->values();
+
+        $administrationStatuses = $scheduledPayload
+            ->flatMap(fn ($medication) => collect($medication['administrations']))
+            ->merge($prnPayload->flatMap(fn ($medication) => collect($medication['administrations'])));
+
+        return [
+            'scheduled' => $scheduledPayload,
+            'prn' => $prnPayload,
             'stats' => [
                 'total_scheduled' => $scheduled->count(),
                 'total_prn' => $prn->count(),
-                'given' => $medications->flatMap->administrations->where('status', 'given')->count(),
-                'refused' => $medications->flatMap->administrations->where('status', 'refused')->count(),
-                'withheld' => $medications->flatMap->administrations->where('status', 'withheld')->count(),
-                'missed' => $medications->flatMap->administrations->where('status', 'missed')->count(),
-                'pending' => $medications->flatMap->administrations->where('status', 'pending')->count(),
+                'given' => $administrationStatuses->where('status', 'given')->count(),
+                'refused' => $administrationStatuses->where('status', 'refused')->count(),
+                'withheld' => $administrationStatuses->where('status', 'withheld')->count(),
+                'missed' => $administrationStatuses->where('status', 'missed')->count(),
+                'pending' => $administrationStatuses->where('status', 'pending')->count(),
             ],
         ];
     }
@@ -551,7 +978,11 @@ class EmarController extends Controller
 
         $discrepancies = ClientControlledDrugDiscrepancy::query()
             ->whereIn('status', ['open', 'under_review'])
-            ->with(['client:id,first_name,last_name', 'medication:id,name'])
+            ->with([
+                'client:id,first_name,last_name',
+                'medication:id,name',
+                'attachments.uploadedBy:id,name',
+            ])
             ->latest()
             ->get();
 
@@ -562,24 +993,86 @@ class EmarController extends Controller
             ->limit(20)
             ->get();
 
-        $lossReports = ControlledDrugLossReport::with(['client:id,first_name,last_name', 'discoveredBy:id,name'])
+        $lossReports = ControlledDrugLossReport::with([
+                'client:id,first_name,last_name',
+                'discoveredBy:id,name',
+                'attachments.uploadedBy:id,name',
+            ])
             ->latest()
             ->get();
 
         return Inertia::render('emar/ControlledDrugs', [
             'medications' => $controlledMedications,
             'recentEntries' => $recentEntries,
-            'discrepancies' => $discrepancies,
+            'discrepancies' => $discrepancies->map(fn (ClientControlledDrugDiscrepancy $discrepancy) => [
+                'id' => $discrepancy->id,
+                'client' => $discrepancy->client ? [
+                    'id' => $discrepancy->client->id,
+                    'first_name' => $discrepancy->client->first_name,
+                    'last_name' => $discrepancy->client->last_name,
+                ] : null,
+                'medication' => $discrepancy->medication ? [
+                    'id' => $discrepancy->medication->id,
+                    'name' => $discrepancy->medication->name,
+                ] : null,
+                'difference' => $discrepancy->difference,
+                'reason' => $discrepancy->reason,
+                'notes' => $discrepancy->notes,
+                'status' => $discrepancy->status,
+                'reported_at' => $discrepancy->reported_at?->toIso8601String(),
+                'attachments' => $discrepancy->attachments
+                    ->map(fn ($attachment) => $this->serializeSupportingAttachment(
+                        $attachment,
+                        'api.medications.supporting_attachments.download',
+                    ))
+                    ->values()
+                    ->all(),
+            ])->values(),
             'destructions' => $destructions,
-            'lossReports' => $lossReports,
+            'lossReports' => $lossReports->map(fn (ControlledDrugLossReport $report) => [
+                'id' => $report->id,
+                'client' => $report->client ? [
+                    'id' => $report->client->id,
+                    'first_name' => $report->client->first_name,
+                    'last_name' => $report->client->last_name,
+                ] : null,
+                'medication_name' => $report->medication_name,
+                'quantity_lost' => $report->quantity_lost,
+                'unit' => $report->unit,
+                'circumstances' => $report->circumstances,
+                'reported_to_police' => (bool) $report->reported_to_police,
+                'police_reference' => $report->police_reference,
+                'reported_to_pharmacy' => (bool) $report->reported_to_pharmacy,
+                'pharmacy_name' => $report->pharmacy_name,
+                'discovered_at' => $report->discovered_at?->toIso8601String(),
+                'investigation_status' => $report->investigation_status,
+                'investigation_notes' => $report->investigation_notes,
+                'resolution_outcome' => $report->resolution_outcome,
+                'attachments' => $report->attachments
+                    ->map(fn ($attachment) => $this->serializeSupportingAttachment(
+                        $attachment,
+                        'api.medications.supporting_attachments.download',
+                    ))
+                    ->values()
+                    ->all(),
+            ])->values(),
             'staff' => $this->getStaffList(),
             'clients' => $this->getClientsList(),
+            'can' => [
+                'manage_evidence' => (bool) $request->user() && (
+                    $request->user()->canDo('medications.controlled.record')
+                    || $request->user()->canDo('medications.administer.correct')
+                    || $request->user()->canDo('clients.update')
+                ),
+            ],
         ]);
     }
 
     // ─── Medications Database ──────────────────────────────
     public function medications(Request $request)
     {
+        $selectedClient = null;
+
         $medications = ClientMedication::query()
             ->with(['client:id,first_name,last_name', 'stock'])
             ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%"))
@@ -594,6 +1087,11 @@ class EmarController extends Controller
             ->paginate(50);
 
         $clients = Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']);
+
+        if ($request->filled('client_id')) {
+            $selectedClient = Client::findOrFail($request->client_id);
+            $this->authorize('viewMedications', $selectedClient);
+        }
 
         // Build a map of medication IDs that have known interactions with other active meds for the same client
         $interactionMap = [];
@@ -638,6 +1136,13 @@ class EmarController extends Controller
             'staff' => $this->getStaffList(),
             'filters' => $request->only(['search', 'status', 'type', 'client_id']),
             'interactionMap' => $interactionMap,
+            'selectedClient' => $selectedClient ? [
+                'id' => $selectedClient->id,
+                'first_name' => $selectedClient->first_name,
+                'last_name' => $selectedClient->last_name,
+            ] : null,
+            'clientContext' => $selectedClient ? $this->buildClientMedicationContext($selectedClient) : null,
+            'can' => $this->buildMedicationPermissions($request->user()),
         ]);
     }
 
@@ -667,6 +1172,9 @@ class EmarController extends Controller
                 'is_expired' => $s->isExpired(),
                 'is_expiring_soon' => $s->isExpiringSoon(30),
                 'is_expiring_90' => $s->isExpiringSoon(90),
+                'scan_verification' => $s->medication?->client
+                    ? $this->buildMedicationScanPayload($s->medication->client, $s->medication)
+                    : null,
             ]);
 
         $lowStockCount = $stockItems->where('is_low', true)->count();
@@ -685,7 +1193,24 @@ class EmarController extends Controller
             'expiredCount' => ClientMedicationStock::expired()->count(),
             'pharmacyOrders' => $pharmacyOrders,
             'clients' => $this->getClientsList(),
-            'activeMedications' => ClientMedication::active()->with('client:id,first_name,last_name')->orderBy('name')->get(['id', 'name', 'client_id']),
+            'activeMedications' => ClientMedication::active()
+                ->with('client:id,first_name,last_name')
+                ->orderBy('name')
+                ->get(['id', 'name', 'client_id', 'dosage', 'barcode', 'nzulm_code'])
+                ->map(fn (ClientMedication $medication) => [
+                    'id' => $medication->id,
+                    'name' => $medication->name,
+                    'client_id' => $medication->client_id,
+                    'client' => $medication->client ? [
+                        'first_name' => $medication->client->first_name,
+                        'last_name' => $medication->client->last_name,
+                    ] : null,
+                    'scan_verification' => $medication->client
+                        ? $this->buildMedicationScanPayload($medication->client, $medication)
+                        : null,
+                ])
+                ->values(),
+            'witnesses' => $this->getStaffList(),
         ]);
     }
 
@@ -851,18 +1376,86 @@ class EmarController extends Controller
     // ─── Handovers ─────────────────────────────────────────
     public function handovers(Request $request)
     {
-        $handovers = MedicationHandover::query()
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+
+        $handovers = ShiftHandover::query()
+            ->when($auth->organization_id, fn ($query) => $query->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
             ->with([
-                'outgoingUser:id,name',
-                'incomingUser:id,name',
-                'site:id,name',
-                'serviceContext:id,name',
-                'shift:id,client_id,user_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,status',
-                'shift.client:id,first_name,last_name',
-                'shift.staff:id,name',
+                'client:id,first_name,last_name',
+                'outgoingShift:id,client_id,user_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,status',
+                'outgoingShift.staff:id,name',
+                'outgoingShift.serviceContext:id,name',
+                'incomingShift:id,user_id,starts_at,ends_at,status',
+                'incomingShift.staff:id,name',
+                'outgoingStaff:id,name',
+                'incomingStaff:id,name',
+                'acknowledger:id,name',
             ])
-            ->latest('handover_at')
-            ->paginate(50);
+            ->when(! $this->handoverService->canViewAny($auth), function ($query) use ($auth) {
+                $query->where(function ($nested) use ($auth) {
+                    $nested->where('outgoing_staff_id', $auth->id)
+                        ->orWhere('incoming_staff_id', $auth->id)
+                        ->orWhereHas('outgoingShift', fn ($shiftQuery) => $shiftQuery->where('user_id', $auth->id))
+                        ->orWhereHas('incomingShift', fn ($shiftQuery) => $shiftQuery->where('user_id', $auth->id));
+                });
+            })
+            ->latest('created_at')
+            ->paginate(25)
+            ->through(function (ShiftHandover $handover) use ($auth) {
+                $incomingStaff = $handover->incomingShift?->staff ?? $handover->incomingStaff;
+
+                return [
+                    'id' => $handover->id,
+                    'status' => $handover->status,
+                    'handover_notes' => $handover->handover_notes,
+                    'client_mood' => $handover->client_mood,
+                    'created_at' => $handover->created_at?->toIso8601String(),
+                    'submitted_at' => $handover->submitted_at?->toIso8601String(),
+                    'acknowledged_at' => $handover->acknowledged_at?->toIso8601String(),
+                    'client' => $handover->client ? [
+                        'id' => $handover->client->id,
+                        'name' => trim(($handover->client->first_name ?? '').' '.($handover->client->last_name ?? '')),
+                    ] : null,
+                    'outgoing_staff' => $handover->outgoingStaff ? [
+                        'id' => $handover->outgoingStaff->id,
+                        'name' => $handover->outgoingStaff->name,
+                    ] : null,
+                    'incoming_staff' => $incomingStaff ? [
+                        'id' => $incomingStaff->id,
+                        'name' => $incomingStaff->name,
+                    ] : null,
+                    'acknowledger' => $handover->acknowledger ? [
+                        'id' => $handover->acknowledger->id,
+                        'name' => $handover->acknowledger->name,
+                    ] : null,
+                    'outgoing_shift' => $handover->outgoingShift ? [
+                        'id' => $handover->outgoingShift->id,
+                        'starts_at' => $handover->outgoingShift->starts_at?->toIso8601String(),
+                        'ends_at' => $handover->outgoingShift->ends_at?->toIso8601String(),
+                        'location' => $handover->outgoingShift->location,
+                        'shift_type' => $handover->outgoingShift->shift_type,
+                        'service_context_name' => $handover->outgoingShift->serviceContext?->name,
+                    ] : null,
+                    'incoming_shift' => $handover->incomingShift ? [
+                        'id' => $handover->incomingShift->id,
+                        'starts_at' => $handover->incomingShift->starts_at?->toIso8601String(),
+                        'ends_at' => $handover->incomingShift->ends_at?->toIso8601String(),
+                    ] : null,
+                    'medications_due' => $this->stringifyStructuredItems($handover->medications_due),
+                    'follow_up_items' => $this->stringifyStructuredItems($handover->follow_up_items),
+                    'incidents_to_note' => $this->stringifyStructuredItems($handover->incidents_to_note),
+                    'tasks_pending' => $this->stringifyStructuredItems($handover->tasks_pending),
+                    'can_submit' => $this->handoverService->canSubmit($handover, $auth),
+                    'can_acknowledge' => $this->handoverService->canAcknowledge($handover, $auth),
+                    'can_edit' => $handover->status === ShiftHandoverService::STATUS_DRAFT
+                        && $this->handoverService->canSubmit($handover, $auth),
+                    'can_delete' => $handover->status === ShiftHandoverService::STATUS_DRAFT
+                        && $this->handoverService->canSubmit($handover, $auth),
+                ];
+            })
+            ->withQueryString();
 
         $shifts = Shift::query()
             ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceContext:id,name'])
@@ -887,7 +1480,6 @@ class EmarController extends Controller
 
         return Inertia::render('emar/Handovers', [
             'handovers' => $handovers,
-            'staff' => $this->getStaffList(),
             'shifts' => $shifts,
         ]);
     }
@@ -1411,58 +2003,87 @@ class EmarController extends Controller
 
     public function storeHandover(Request $request)
     {
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+
         $validated = $request->validate([
-            'incoming_user_id' => 'required|exists:users,id',
-            'site_id' => 'nullable|exists:sites,id',
-            'shift_id' => 'nullable|integer|exists:shifts,id',
-            'controlled_drug_counts' => 'nullable|array',
-            'controlled_drugs_verified' => 'nullable|boolean',
-            'outstanding_medications' => 'nullable|array',
-            'new_prescriptions' => 'nullable|array',
-            'ceased_medications' => 'nullable|array',
-            'incidents' => 'nullable|array',
-            'prn_given' => 'nullable|array',
-            'flagged_clients' => 'nullable|array',
-            'general_notes' => 'nullable|string',
-            'checklist_items' => 'nullable|array',
-            'checklist_items.*.label' => 'required|string|max:255',
-            'checklist_items.*.checked' => 'required|boolean',
-            'checklist_items.*.notes' => 'nullable|string|max:500',
-            'safety_concerns' => 'nullable|string|max:5000',
-            'medication_errors_count' => 'nullable|integer|min:0',
-            'pending_gp_followups' => 'nullable|integer|min:0',
-            'clients_requiring_attention' => 'nullable|array',
-            'clients_requiring_attention.*.client_id' => 'nullable|string',
-            'clients_requiring_attention.*.client_name' => 'required|string|max:255',
-            'clients_requiring_attention.*.reason' => 'required|string|max:500',
-            'previous_shift_notes_read' => 'nullable|boolean',
-            'stock_issues_identified' => 'nullable|string|max:5000',
-            'prescriber_changes_summary' => 'nullable|string|max:5000',
+            'shift_id' => ['required', 'integer', 'exists:shifts,id'],
+            'incoming_shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'incoming_staff_id' => ['nullable', 'integer', 'exists:users,id'],
+            'handover_notes' => ['required', 'string', 'max:5000'],
+            'client_mood' => ['nullable', 'string', 'max:255'],
+            'medications_due_text' => ['nullable', 'string'],
+            'follow_up_items_text' => ['nullable', 'string'],
+            'incidents_to_note_text' => ['nullable', 'string'],
+            'tasks_pending_text' => ['nullable', 'string'],
+            'submit' => ['nullable', 'boolean'],
         ]);
 
-        $validated['outgoing_user_id'] = auth()->id();
-        $validated['handover_at'] = now();
-        $validated['acknowledged'] = false;
+        $shift = Shift::query()
+            ->with(['tasks:id,shift_id,label,is_completed', 'incidents:id,shift_id,type,severity,status,occurred_at'])
+            ->findOrFail($validated['shift_id']);
 
-        if (!empty($validated['shift_id'])) {
-            $shift = Shift::query()->with('client:id,site_id')->find($validated['shift_id']);
-            $validated['site_id'] = $shift?->client?->site_id ?? ($validated['site_id'] ?? null);
-            $validated['service_context_id'] = $shift?->service_context_id;
+        $this->siteAccess()->assertCanAccessShift(
+            $auth,
+            $shift,
+            $this->handoverBypassPermissions(),
+            'You are not authorized to create handovers for this site.',
+        );
+
+        if (! $auth->canDo('shifts.manageAny') && (int) $shift->user_id !== (int) $auth->id) {
+            abort(403);
         }
 
-        MedicationHandover::create($validated);
-
-        return redirect()->back();
-    }
-
-    public function acknowledgeHandover(MedicationHandover $handover)
-    {
-        $handover->update([
-            'acknowledged' => true,
-            'acknowledged_at' => now(),
+        $result = $this->handoverService->save($shift, $auth, [
+            'incoming_shift_id' => $validated['incoming_shift_id'] ?? null,
+            'incoming_staff_id' => $validated['incoming_staff_id'] ?? null,
+            'handover_notes' => $validated['handover_notes'],
+            'client_mood' => $validated['client_mood'] ?? null,
+            'medications_due' => $this->parseHandoverText($validated['medications_due_text'] ?? null),
+            'follow_up_items' => $this->parseHandoverText($validated['follow_up_items_text'] ?? null),
+            'incidents_to_note' => $this->parseHandoverText($validated['incidents_to_note_text'] ?? null),
+            'tasks_pending' => $this->parseHandoverText($validated['tasks_pending_text'] ?? null),
+            'submit' => (bool) ($validated['submit'] ?? true),
         ]);
 
-        return redirect()->back();
+        return redirect()->back()->with(
+            'success',
+            $result['action'] === 'draft_saved' ? 'Medication handover draft saved.' : 'Medication handover submitted.',
+        );
+    }
+
+    public function submitHandover(Request $request, ShiftHandover $handover)
+    {
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+        $this->siteAccess()->assertCanAccessHandover(
+            $auth,
+            $handover,
+            $this->handoverBypassPermissions(),
+            'You are not authorized to access handovers for this site.',
+        );
+        abort_unless($this->handoverService->canSubmit($handover, $auth), 403);
+
+        $this->handoverService->submit($handover, $auth);
+
+        return redirect()->back()->with('success', 'Medication handover submitted.');
+    }
+
+    public function acknowledgeHandover(Request $request, ShiftHandover $handover)
+    {
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+        $this->siteAccess()->assertCanAccessHandover(
+            $auth,
+            $handover,
+            $this->handoverBypassPermissions(),
+            'You are not authorized to access handovers for this site.',
+        );
+        abort_unless($this->handoverService->canAcknowledge($handover, $auth), 403);
+
+        $this->handoverService->acknowledge($handover, $auth);
+
+        return redirect()->back()->with('success', 'Medication handover acknowledged.');
     }
 
     // ─── Pharmacy Orders + Stock CRUD ───────────────────────
@@ -1603,9 +2224,38 @@ class EmarController extends Controller
             'notes' => 'nullable|string|max:2000',
             'batch_number' => 'nullable|string|max:100',
             'expiry_date' => 'nullable|date',
+            'scan_code' => 'nullable|string|max:255',
+            'scan_source' => 'nullable|string|in:manual,scanner',
+            'scan_verified' => 'nullable|boolean',
+            'scan_match_source' => 'nullable|string|max:50',
+            'client_request_uuid' => 'nullable|uuid',
+            'captured_offline_at' => 'nullable|date',
+            'origin_device_id' => 'nullable|string|max:255',
+            'queued_offline' => 'nullable|boolean',
         ]);
 
-        DB::transaction(function () use ($validated) {
+        $scope = 'emar-stock-receive';
+
+        if (
+            $this->medicationSyncRequested($validated)
+            && ($cached = $this->getCachedMedicationSyncResponse($scope, $validated))
+        ) {
+            return response()->json($cached);
+        }
+
+        $medication = ClientMedication::query()
+            ->with(['client:id,first_name,last_name', 'stock'])
+            ->findOrFail((int) $validated['client_medication_id']);
+
+        $scanAudit = $this->verifyMedicationScanOrFail(
+            $medication->client,
+            $medication,
+            $validated,
+        );
+
+        $stock = null;
+
+        DB::transaction(function () use ($validated, &$stock) {
             $stock = ClientMedicationStock::firstOrCreate(
                 ['client_medication_id' => $validated['client_medication_id']],
                 ['on_hand' => 0, 'unit' => 'units']
@@ -1620,7 +2270,45 @@ class EmarController extends Controller
             ]);
         });
 
-        return redirect()->back();
+        AuditLogger::log('medications.stock.receive', $stock, array_filter([
+            'client_id' => $medication->client_id,
+            'client_medication_id' => $medication->id,
+            'quantity_received' => (int) $validated['quantity'],
+            'scan_source' => $scanAudit['scan_source'] ?? null,
+            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
+            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
+            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
+            'batch_number' => $validated['batch_number'] ?? null,
+            'expiry_date' => $validated['expiry_date'] ?? null,
+        ], fn ($value) => $value !== null && $value !== ''));
+
+        $payload = [
+            'success' => true,
+            'stock' => [
+                'id' => $stock?->id,
+                'client_medication_id' => $medication->id,
+                'on_hand' => $stock?->on_hand,
+                'unit' => $stock?->unit,
+                'batch_number' => $stock?->batch_number,
+                'expiry_date' => $stock?->expiry_date?->toDateString(),
+            ],
+        ];
+
+        if ($this->medicationSyncRequested($validated)) {
+            return response()->json(
+                $this->rememberMedicationSyncResponse(
+                    $scope,
+                    $validated,
+                    $this->withMedicationSync(
+                        $payload,
+                        $validated,
+                        $this->medicationProcessedStatus($validated),
+                    ),
+                ),
+            );
+        }
+
+        return redirect()->back()->with('success', 'Stock received successfully.');
     }
 
     public function updateStockItem(Request $request, ClientMedicationStock $stock)
@@ -1797,7 +2485,20 @@ class EmarController extends Controller
             'batch_number' => 'nullable|string|max:100',
             'expiry_date' => 'nullable|date',
             'notes' => 'nullable|string|max:2000',
+            'client_request_uuid' => 'nullable|uuid',
+            'captured_offline_at' => 'nullable|date',
+            'origin_device_id' => 'nullable|string|max:255',
+            'queued_offline' => 'nullable|boolean',
         ]);
+
+        $scope = 'emar-controlled-entry';
+
+        if (
+            $this->medicationSyncRequested($validated)
+            && ($cached = $this->getCachedMedicationSyncResponse($scope, $validated))
+        ) {
+            return response()->json($cached);
+        }
 
         $client = Client::findOrFail($validated['client_id']);
         $medication = $this->findControlledMedication($validated['client_id'], $validated['medication_name']);
@@ -1805,7 +2506,22 @@ class EmarController extends Controller
         $onHandAfter = $validated['on_hand_after'] ?? $validated['balance_after'] ?? null;
         $unit = $validated['unit'] ?? $medication?->stock?->unit ?? 'tablets';
 
-        ClientControlledDrugEntry::create([
+        if (
+            $this->medicationSyncRequested($validated)
+            && $medication?->stock
+            && $onHandBefore !== null
+            && (float) $medication->stock->on_hand !== (float) $onHandBefore
+        ) {
+            return response()->json(
+                $this->buildMedicationConflictPayload(
+                    $validated,
+                    'Controlled drug stock changed before this entry could be applied. Please review the current balance before recording it again.',
+                ),
+                409,
+            );
+        }
+
+        $entry = ClientControlledDrugEntry::create([
             'client_id' => $validated['client_id'],
             'client_medication_id' => $medication?->id,
             'service_context_id' => $client->service_context_id,
@@ -1837,7 +2553,41 @@ class EmarController extends Controller
             ]);
         }
 
-        return redirect()->back();
+        $refreshedStock = $medication?->stock()->first();
+
+        $payload = [
+            'success' => true,
+            'entry' => [
+                'id' => $entry->id,
+                'client_medication_id' => $entry->client_medication_id,
+                'entry_type' => $entry->entry_type,
+                'quantity' => $entry->quantity,
+                'unit' => $entry->unit,
+                'recorded_at' => $entry->recorded_at?->toIso8601String(),
+                'on_hand_after' => $entry->on_hand_after,
+            ],
+            'stock' => $refreshedStock ? [
+                'client_medication_id' => $medication->id,
+                'on_hand' => $refreshedStock->on_hand,
+                'unit' => $refreshedStock->unit,
+            ] : null,
+        ];
+
+        if ($this->medicationSyncRequested($validated)) {
+            return response()->json(
+                $this->rememberMedicationSyncResponse(
+                    $scope,
+                    $validated,
+                    $this->withMedicationSync(
+                        $payload,
+                        $validated,
+                        $this->medicationProcessedStatus($validated),
+                    ),
+                ),
+            );
+        }
+
+        return redirect()->back()->with('success', 'Controlled drug entry recorded.');
     }
 
     public function storeBalanceCheck(Request $request)
@@ -1851,15 +2601,45 @@ class EmarController extends Controller
             'actual_balance' => 'required|numeric|min:0',
             'witnessed_by' => 'required|exists:users,id|different:' . auth()->id(),
             'discrepancy_notes' => 'nullable|string|max:2000',
+            'client_request_uuid' => 'nullable|uuid',
+            'captured_offline_at' => 'nullable|date',
+            'origin_device_id' => 'nullable|string|max:255',
+            'queued_offline' => 'nullable|boolean',
         ]);
+
+        $scope = 'emar-controlled-balance-check';
+
+        if (
+            $this->medicationSyncRequested($validated)
+            && ($cached = $this->getCachedMedicationSyncResponse($scope, $validated))
+        ) {
+            return response()->json($cached);
+        }
 
         $client = Client::findOrFail($validated['client_id']);
         $medication = $this->findControlledMedication($validated['client_id'], $validated['medication_name']);
         $expectedBalance = $validated['on_hand_before'] ?? $validated['expected_balance'];
         $actualBalance = $validated['on_hand_after'] ?? $validated['actual_balance'];
 
-        DB::transaction(function () use ($validated, $client, $medication, $expectedBalance, $actualBalance) {
-            ClientControlledDrugEntry::create([
+        if (
+            $this->medicationSyncRequested($validated)
+            && $medication?->stock
+            && (float) $medication->stock->on_hand !== (float) $expectedBalance
+        ) {
+            return response()->json(
+                $this->buildMedicationConflictPayload(
+                    $validated,
+                    'Controlled drug stock changed before this balance check could be applied. Please review the current balance before recording it again.',
+                ),
+                409,
+            );
+        }
+
+        $entry = null;
+        $discrepancy = null;
+
+        DB::transaction(function () use ($validated, $client, $medication, $expectedBalance, $actualBalance, &$discrepancy, &$entry) {
+            $entry = ClientControlledDrugEntry::create([
                 'client_id' => $validated['client_id'],
                 'client_medication_id' => $medication?->id,
                 'service_context_id' => $client->service_context_id,
@@ -1887,7 +2667,7 @@ class EmarController extends Controller
             }
 
             if ($expectedBalance != $actualBalance) {
-                ClientControlledDrugDiscrepancy::create([
+                $discrepancy = ClientControlledDrugDiscrepancy::create([
                     'client_id' => $validated['client_id'],
                     'client_medication_id' => $medication?->id,
                     'service_context_id' => $client->service_context_id,
@@ -1904,7 +2684,49 @@ class EmarController extends Controller
             }
         });
 
-        return redirect()->back();
+        if ($discrepancy) {
+            app(MedicationIncidentIntegrationService::class)
+                ->handleControlledDiscrepancy($discrepancy, auth()->id());
+        }
+
+        $refreshedStock = $medication?->stock()->first();
+
+        $payload = [
+            'success' => true,
+            'entry' => [
+                'id' => $entry?->id,
+                'entry_type' => $entry?->entry_type,
+                'quantity' => $entry?->quantity,
+                'recorded_at' => $entry?->recorded_at?->toIso8601String(),
+            ],
+            'discrepancy' => $discrepancy ? [
+                'id' => $discrepancy->id,
+                'status' => $discrepancy->status,
+                'difference' => $discrepancy->difference,
+                'reported_at' => $discrepancy->reported_at?->toIso8601String(),
+            ] : null,
+            'stock' => $refreshedStock ? [
+                'client_medication_id' => $medication->id,
+                'on_hand' => $refreshedStock->on_hand,
+                'unit' => $refreshedStock->unit,
+            ] : null,
+        ];
+
+        if ($this->medicationSyncRequested($validated)) {
+            return response()->json(
+                $this->rememberMedicationSyncResponse(
+                    $scope,
+                    $validated,
+                    $this->withMedicationSync(
+                        $payload,
+                        $validated,
+                        $this->medicationProcessedStatus($validated),
+                    ),
+                ),
+            );
+        }
+
+        return redirect()->back()->with('success', 'Controlled drug balance check recorded.');
     }
 
     public function resolveDiscrepancy(Request $request, ClientControlledDrugDiscrepancy $discrepancy)
@@ -1924,6 +2746,12 @@ class EmarController extends Controller
             'resolved_at' => now(),
         ]);
 
+        app(MedicationIncidentIntegrationService::class)->resolveControlledDiscrepancy(
+            $discrepancy,
+            'Controlled drug discrepancy resolved.',
+            auth()->id()
+        );
+
         return redirect()->back();
     }
 
@@ -1936,45 +2764,65 @@ class EmarController extends Controller
 
     // ─── Handover Update/Delete ──────────────────────────
 
-    public function updateHandover(Request $request, MedicationHandover $handover)
+    public function updateHandover(Request $request, ShiftHandover $handover)
     {
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+        $this->siteAccess()->assertCanAccessHandover(
+            $auth,
+            $handover,
+            $this->handoverBypassPermissions(),
+            'You are not authorized to access handovers for this site.',
+        );
+        abort_unless($handover->status === ShiftHandoverService::STATUS_DRAFT, 422, 'Only draft handovers can be edited.');
+        abort_unless($this->handoverService->canSubmit($handover, $auth), 403);
+
         $validated = $request->validate([
-            'incoming_user_id' => 'sometimes|exists:users,id',
-            'shift_id' => 'sometimes|nullable|integer|exists:shifts,id',
-            'controlled_drugs_verified' => 'nullable|boolean',
-            'general_notes' => 'nullable|string|max:5000',
-            'checklist_items' => 'nullable|array',
-            'checklist_items.*.label' => 'required|string|max:255',
-            'checklist_items.*.checked' => 'required|boolean',
-            'checklist_items.*.notes' => 'nullable|string|max:500',
-            'safety_concerns' => 'nullable|string|max:5000',
-            'medication_errors_count' => 'nullable|integer|min:0',
-            'pending_gp_followups' => 'nullable|integer|min:0',
-            'clients_requiring_attention' => 'nullable|array',
-            'clients_requiring_attention.*.client_id' => 'nullable|string',
-            'clients_requiring_attention.*.client_name' => 'required|string|max:255',
-            'clients_requiring_attention.*.reason' => 'required|string|max:500',
-            'previous_shift_notes_read' => 'nullable|boolean',
-            'stock_issues_identified' => 'nullable|string|max:5000',
-            'prescriber_changes_summary' => 'nullable|string|max:5000',
+            'incoming_shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'incoming_staff_id' => ['nullable', 'integer', 'exists:users,id'],
+            'handover_notes' => ['required', 'string', 'max:5000'],
+            'client_mood' => ['nullable', 'string', 'max:255'],
+            'medications_due_text' => ['nullable', 'string'],
+            'follow_up_items_text' => ['nullable', 'string'],
+            'incidents_to_note_text' => ['nullable', 'string'],
+            'tasks_pending_text' => ['nullable', 'string'],
+            'submit' => ['nullable', 'boolean'],
         ]);
 
-        if (!empty($validated['shift_id'])) {
-            $shift = Shift::query()->with('client:id,site_id')->find($validated['shift_id']);
-            $validated['site_id'] = $shift?->client?->site_id ?? $handover->site_id;
-            $validated['service_context_id'] = $shift?->service_context_id;
-        }
+        $result = $this->handoverService->save($handover->outgoingShift, $auth, [
+            'incoming_shift_id' => $validated['incoming_shift_id'] ?? null,
+            'incoming_staff_id' => $validated['incoming_staff_id'] ?? null,
+            'handover_notes' => $validated['handover_notes'],
+            'client_mood' => $validated['client_mood'] ?? null,
+            'medications_due' => $this->parseHandoverText($validated['medications_due_text'] ?? null),
+            'follow_up_items' => $this->parseHandoverText($validated['follow_up_items_text'] ?? null),
+            'incidents_to_note' => $this->parseHandoverText($validated['incidents_to_note_text'] ?? null),
+            'tasks_pending' => $this->parseHandoverText($validated['tasks_pending_text'] ?? null),
+            'submit' => (bool) ($validated['submit'] ?? false),
+        ]);
 
-        $handover->update($validated);
-
-        return redirect()->back();
+        return redirect()->back()->with(
+            'success',
+            $result['action'] === 'draft_saved' ? 'Medication handover draft updated.' : 'Medication handover submitted.',
+        );
     }
 
-    public function destroyHandover(MedicationHandover $handover)
+    public function destroyHandover(Request $request, ShiftHandover $handover)
     {
+        $auth = $request->user();
+        abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
+        $this->siteAccess()->assertCanAccessHandover(
+            $auth,
+            $handover,
+            $this->handoverBypassPermissions(),
+            'You are not authorized to access handovers for this site.',
+        );
+        abort_unless($handover->status === ShiftHandoverService::STATUS_DRAFT, 422, 'Only draft handovers can be deleted.');
+        abort_unless($this->handoverService->canSubmit($handover, $auth), 403);
+
         $handover->delete();
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Medication handover draft deleted.');
     }
 
     // ─── Destruction Delete ──────────────────────────────

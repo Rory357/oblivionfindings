@@ -142,9 +142,8 @@ class OperationsPermissionsSeeder extends Seeder
             ['key' => 'family_portal.viewAny', 'description' => 'View Family Portal Settings'],
             ['key' => 'family_portal.manage', 'description' => 'Manage Family Portal Settings'],
 
-            // eMAR
-            ['key' => 'emar.viewAny', 'description' => 'View eMAR Module'],
-            ['key' => 'emar.dashboard.view', 'description' => 'View eMAR Dashboard'],
+            // Canonical medication / eMAR access
+            ['key' => 'medications.view', 'description' => 'View medications / eMAR module'],
         ];
 
         $created = 0;

@@ -3,9 +3,12 @@
 namespace App\Services\Medication;
 
 use App\Enums\AlertSeverity;
+use App\Models\ControlRoomAlert;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
+use App\Services\AuditLogger;
 use App\Services\ControlRoom\SignalProcessingService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -28,6 +31,11 @@ class MedicationSignalService
     public const TYPE_LATE_DOSE = 'medication_late_dose';
     public const TYPE_PRN_OVER_LIMIT = 'medication_prn_over_limit';
     public const TYPE_CONTROLLED_DISCREPANCY = 'medication_controlled_discrepancy';
+    public const TYPE_REFUSED_DOSE = 'medication_refused_dose';
+    public const TYPE_REFUSAL_ESCALATION = 'medication_refusal_escalation';
+    public const TYPE_UNSAFE_CORRECTION = 'medication_unsafe_correction';
+    public const TYPE_CONTROLLED_LOSS = 'medication_controlled_loss';
+    public const TYPE_TRANSIT_EXCEPTION = 'medication_transit_exception';
     public const TYPE_EXPIRED = 'medication_expired';
     public const TYPE_STOCK_OUT = 'medication_stock_out';
     public const TYPE_ERROR = 'medication_error';
@@ -36,13 +44,18 @@ class MedicationSignalService
     // Only operational alerts use these — routine items stay out of CR
     public const SEVERITY_MAP = [
         self::TYPE_CONTROLLED_DISCREPANCY => AlertSeverity::CRITICAL,
+        self::TYPE_CONTROLLED_LOSS => AlertSeverity::CRITICAL,
         self::TYPE_PRN_OVER_LIMIT => AlertSeverity::CRITICAL,
+        self::TYPE_TRANSIT_EXCEPTION => AlertSeverity::HIGH,
         self::TYPE_OVERDUE => AlertSeverity::HIGH,
+        self::TYPE_REFUSAL_ESCALATION => AlertSeverity::HIGH,
         self::TYPE_EXPIRED => AlertSeverity::HIGH,
         self::TYPE_STOCK_OUT => AlertSeverity::HIGH,
         self::TYPE_ERROR => AlertSeverity::HIGH,       // overridden by error severity
+        self::TYPE_UNSAFE_CORRECTION => AlertSeverity::MEDIUM,
         self::TYPE_MISSED_DOSE => AlertSeverity::MEDIUM,
         self::TYPE_LATE_DOSE => AlertSeverity::MEDIUM,  // overridden by lateness
+        self::TYPE_REFUSED_DOSE => AlertSeverity::MEDIUM,
     ];
 
     protected ?SignalSource $signalSource = null;
@@ -72,8 +85,7 @@ class MedicationSignalService
         $idempotencyKey = $this->buildIdempotencyKey(
             $signalType,
             $clientId,
-            $context['client_medication_id'] ?? null,
-            $context['administration_id'] ?? null,
+            $context,
         );
 
         $signalData = [
@@ -175,21 +187,46 @@ class MedicationSignalService
     protected function buildIdempotencyKey(
         string $signalType,
         int $clientId,
-        ?int $medicationId,
-        ?int $administrationId = null,
+        array $context = [],
     ): string {
-        $window = now()->format('Y-m-d H:') . (intdiv((int) now()->format('i'), 30) * 30);
+        $occurredAt = isset($context['occurred_at'])
+            ? Carbon::parse($context['occurred_at'])
+            : now();
+        $window = $occurredAt->format('Y-m-d H:') . (intdiv((int) $occurredAt->format('i'), 30) * 30);
+        $medicationId = $context['client_medication_id'] ?? null;
+        [$entityType, $entityId] = $this->relatedEntityIdentity($context);
 
         $parts = [
             'medication',
             $signalType,
             $clientId,
             $medicationId ?? 'all',
-            $administrationId ?? 'check',
+            $entityType ?? 'check',
+            $entityId ?? 'check',
             $window,
         ];
 
         return hash('sha256', implode('|', $parts));
+    }
+
+    protected function relatedEntityIdentity(array $context): array
+    {
+        foreach ([
+            'medication_error_id' => 'medication_error',
+            'loss_report_id' => 'loss_report',
+            'transport_log_id' => 'transport_log',
+            'discrepancy_id' => 'discrepancy',
+            'followup_id' => 'followup',
+            'correction_id' => 'correction',
+            'administration_id' => 'administration',
+            'client_medication_id' => 'medication',
+        ] as $key => $type) {
+            if (filled($context[$key] ?? null)) {
+                return [$type, $context[$key]];
+            }
+        }
+
+        return [null, null];
     }
 
     /**
@@ -219,5 +256,70 @@ class MedicationSignalService
         }
 
         return $this->signalSource;
+    }
+
+    public function resolveAlerts(
+        string $signalType,
+        array $matchContext,
+        string $reason,
+        string $resolutionSource = 'medication_workflow',
+        array $metadata = [],
+    ): int {
+        $query = ControlRoomAlert::query()
+            ->with('sla')
+            ->unresolved()
+            ->where('source', 'medication')
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.signal_type_code')) = ?",
+                [$signalType]
+            );
+
+        foreach ($matchContext as $key => $value) {
+            if (! preg_match('/^[A-Za-z0-9_]+$/', (string) $key) || $value === null || $value === '') {
+                continue;
+            }
+
+            $query->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.{$key}')) = ?",
+                [(string) $value]
+            );
+        }
+
+        $alerts = $query->get();
+        $resolvedAt = now();
+        $resolvedBy = $metadata['resolved_by_user_id'] ?? null;
+        $resolutionMetadata = $metadata;
+        unset($resolutionMetadata['resolved_by_user_id']);
+
+        foreach ($alerts as $alert) {
+            $context = $alert->context ?? [];
+            $resolution = array_merge([
+                'resolved_at' => $resolvedAt->toISOString(),
+                'reason' => $reason,
+                'source' => $resolutionSource,
+            ], $resolutionMetadata);
+            $history = $context['resolution_history'] ?? [];
+            $history[] = $resolution;
+
+            $alert->update([
+                'status' => ControlRoomAlert::STATUS_RESOLVED,
+                'resolved_at' => $resolvedAt,
+                'resolved_by_user_id' => $resolvedBy,
+                'notes' => $reason,
+                'context' => array_merge($context, [
+                    'resolution' => $resolution,
+                    'resolution_history' => $history,
+                ]),
+            ]);
+
+            $alert->sla?->recordResolution();
+
+            AuditLogger::log('controlRoom.alert.resolve', $alert, [
+                'source' => 'medication_signal_pipeline',
+                'resolution_source' => $resolutionSource,
+            ]);
+        }
+
+        return $alerts->count();
     }
 }

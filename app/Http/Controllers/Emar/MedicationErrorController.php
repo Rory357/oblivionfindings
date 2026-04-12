@@ -6,16 +6,84 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\MedicationError;
+use App\Models\MedicationMarAttachment;
 use App\Models\User;
+use App\Services\MedicationIncidentIntegrationService;
 use App\Services\Medication\MedicationSignalService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class MedicationErrorController extends Controller
 {
+    private function serializeAttachment(MedicationMarAttachment $attachment, Request $request): array
+    {
+        return [
+            'id' => $attachment->id,
+            'file_name' => $attachment->file_name,
+            'mime_type' => $attachment->mime_type,
+            'file_size' => $attachment->file_size,
+            'formatted_size' => $attachment->formatted_size,
+            'description' => $attachment->description,
+            'uploaded_at' => $attachment->created_at?->toIso8601String(),
+            'uploaded_by' => $attachment->uploadedBy?->name,
+            'download_url' => route('api.medications.supporting_attachments.download', [
+                'client' => $attachment->client_id,
+                'attachment' => $attachment->id,
+            ]),
+            'can_delete' => $request->user()->canDo('medications.administer.correct')
+                || $request->user()->canDo('clients.update')
+                || (int) $attachment->uploaded_by === (int) $request->user()->id,
+        ];
+    }
+
+    private function serializeError(MedicationError $error, Request $request): array
+    {
+        return [
+            'id' => $error->id,
+            'error_type' => $error->error_type,
+            'severity' => $error->severity,
+            'description' => $error->description,
+            'immediate_action' => $error->immediate_action,
+            'contributing_factors' => $error->contributing_factors,
+            'review_notes' => $error->review_notes,
+            'outcome' => $error->outcome,
+            'preventive_actions' => $error->preventive_actions,
+            'status' => $error->status,
+            'reported_at' => $error->reported_at?->toIso8601String(),
+            'reviewed_at' => $error->reviewed_at?->toIso8601String(),
+            'client' => $error->client ? [
+                'id' => $error->client->id,
+                'first_name' => $error->client->first_name,
+                'last_name' => $error->client->last_name,
+            ] : null,
+            'medication' => $error->medication ? [
+                'id' => $error->medication->id,
+                'name' => $error->medication->name,
+            ] : null,
+            'reported_by_user' => $error->reportedBy ? [
+                'id' => $error->reportedBy->id,
+                'name' => $error->reportedBy->name,
+            ] : null,
+            'reviewed_by_user' => $error->reviewedBy ? [
+                'id' => $error->reviewedBy->id,
+                'name' => $error->reviewedBy->name,
+            ] : null,
+            'attachments' => $error->attachments
+                ->map(fn (MedicationMarAttachment $attachment) => $this->serializeAttachment($attachment, $request))
+                ->values()
+                ->all(),
+        ];
+    }
+
     public function index(Request $request)
     {
-        $query = MedicationError::with(['client', 'medication', 'reportedBy', 'reviewedBy']);
+        $query = MedicationError::with([
+            'client',
+            'medication',
+            'reportedBy',
+            'reviewedBy',
+            'attachments.uploadedBy:id,name',
+        ]);
 
         // Filters
         if ($request->filled('client_id')) {
@@ -46,7 +114,10 @@ class MedicationErrorController extends Controller
             $query->whereIn('status', ['resolved', 'closed']);
         }
 
-        $errors = $query->orderByDesc('reported_at')->paginate(20)->withQueryString();
+        $errors = $query->orderByDesc('reported_at')
+            ->paginate(20)
+            ->through(fn (MedicationError $error) => $this->serializeError($error, $request))
+            ->withQueryString();
 
         // Stats
         $now = now();
@@ -70,6 +141,11 @@ class MedicationErrorController extends Controller
             'clients' => Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']),
             'staff' => User::orderBy('name')->get(['id', 'name']),
             'filters' => $request->only(['client_id', 'severity', 'error_type', 'status', 'date_from', 'date_to', 'tab']),
+            'can' => [
+                'manage_evidence' => $request->user()->canDo('medications.administer.record')
+                    || $request->user()->canDo('medications.administer.correct')
+                    || $request->user()->canDo('clients.update'),
+            ],
         ]);
     }
 
@@ -97,10 +173,16 @@ class MedicationErrorController extends Controller
                 'client_id' => $validated['client_id'],
                 'title' => 'Medication Error: ' . str_replace('_', ' ', $validated['error_type']),
                 'description' => $validated['description'],
-                'incident_date' => now(),
+                'occurred_at' => now(),
                 'reported_by' => $request->user()->id,
-                'severity' => $validated['severity'] === 'critical' ? 'major' : ($validated['severity'] === 'major' ? 'moderate' : 'minor'),
-                'status' => 'open',
+                'severity' => match ($validated['severity']) {
+                    'critical' => 'critical',
+                    'major' => 'high',
+                    'moderate' => 'medium',
+                    default => 'low',
+                },
+                'status' => 'submitted',
+                'submitted_at' => now(),
                 'type' => 'medication_error',
             ]);
             $incidentId = $incident->id;
@@ -164,6 +246,12 @@ class MedicationErrorController extends Controller
             'reviewed_by' => $error->reviewed_by ?? $request->user()->id,
             'reviewed_at' => $error->reviewed_at ?? now(),
         ]);
+
+        app(MedicationIncidentIntegrationService::class)->resolveMedicationError(
+            $error,
+            'Medication error resolved.',
+            $request->user()->id
+        );
 
         return redirect()->back()->with('success', 'Error resolved successfully.');
     }

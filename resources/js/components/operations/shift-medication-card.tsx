@@ -18,8 +18,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Link, useForm } from '@inertiajs/react';
+import { submitEmarMutation } from '@/lib/emar-offline';
+import { Link, router, useForm } from '@inertiajs/react';
+import axios from 'axios';
+import { AlertTriangle, QrCode, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 type MedicationRow = {
     client_medication_id: number;
@@ -36,7 +40,24 @@ type MedicationRow = {
         dosage?: string | null;
         controlled_drug?: boolean;
         is_prn?: boolean;
+        scan_verification?: ScanVerification | null;
     };
+};
+
+type ScanVerification = {
+    primary_code: string;
+    primary_label: string;
+    primary_source: string;
+    internal_code: string;
+    vendor_barcode?: string | null;
+    nzulm_code?: string | null;
+    requires_internal_code: boolean;
+    svg_url: string;
+    code_options: Array<{
+        source: string;
+        label: string;
+        value: string;
+    }>;
 };
 
 type MedicationSummary = {
@@ -103,6 +124,14 @@ export default function ShiftMedicationCard({
 }: Props) {
     const [open, setOpen] = useState(false);
     const [activeRow, setActiveRow] = useState<MedicationRow | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [scanCode, setScanCode] = useState('');
+    const [scanStatus, setScanStatus] = useState<
+        'idle' | 'verified' | 'mismatch'
+    >('idle');
+    const [scanMessage, setScanMessage] = useState('');
+    const [scanMatchSource, setScanMatchSource] = useState<string | null>(null);
+    const [verifyingScan, setVerifyingScan] = useState(false);
     const canRecordOnShift = canRecord && shiftStatus !== 'completed';
 
     const adminForm = useForm({
@@ -161,17 +190,28 @@ export default function ShiftMedicationCard({
         [activeRow, adminForm.data.status],
     );
 
+    const needsScanVerification = useMemo(
+        () =>
+            !!activeRow &&
+            adminForm.data.status === 'given' &&
+            !!activeRow.medication.scan_verification,
+        [activeRow, adminForm.data.status],
+    );
+
     const canSubmit = useMemo(
         () =>
             !!activeRow &&
             (!needsReason || !!adminForm.data.reason.trim()) &&
-            (!needsWitness || adminForm.data.witnessed_by !== '__none__'),
+            (!needsWitness || adminForm.data.witnessed_by !== '__none__') &&
+            (!needsScanVerification || scanStatus === 'verified'),
         [
             activeRow,
             adminForm.data.reason,
             adminForm.data.witnessed_by,
             needsReason,
+            needsScanVerification,
             needsWitness,
+            scanStatus,
         ],
     );
 
@@ -189,30 +229,108 @@ export default function ShiftMedicationCard({
         );
         adminForm.setData('shift_id', shiftId);
         adminForm.setData('witnessed_by', '__none__');
+        setScanCode('');
+        setScanStatus('idle');
+        setScanMessage('');
+        setScanMatchSource(null);
         setOpen(true);
     };
 
-    const submitAdministration = () => {
+    const verifyScan = async () => {
+        if (!activeRow || !scanCode.trim()) {
+            return;
+        }
+
+        setVerifyingScan(true);
+
+        try {
+            const response = await axios.post(
+                `/api/medications/clients/${clientId}/medications/${activeRow.medication.id}/scan-verify`,
+                {
+                    code: scanCode.trim(),
+                    source: 'manual',
+                },
+            );
+
+            setScanStatus('verified');
+            setScanMessage(
+                response.data.message ?? 'Medication code verified.',
+            );
+            setScanMatchSource(response.data.match_source ?? null);
+        } catch (error: unknown) {
+            const message = axios.isAxiosError(error)
+                ? error.response?.data?.message ||
+                  error.response?.data?.error ||
+                  'This code does not match the selected medication.'
+                : 'This code does not match the selected medication.';
+
+            setScanStatus('mismatch');
+            setScanMessage(message);
+            setScanMatchSource(null);
+        } finally {
+            setVerifyingScan(false);
+        }
+    };
+
+    const submitAdministration = async () => {
         if (!activeRow) return;
 
-        adminForm.transform((data) => ({
-            ...data,
-            administered_at: fromLocalDateTimeInput(data.administered_at),
-            scheduled_for: data.scheduled_for || null,
-            witnessed_by:
-                data.witnessed_by === '__none__' ? null : data.witnessed_by,
-        }));
+        setSubmitting(true);
 
-        adminForm.post(
-            `/operations/clients/${clientId}/medical/medications/${activeRow.medication.id}/administrations`,
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setOpen(false);
-                    setActiveRow(null);
+        try {
+            const result = await submitEmarMutation(
+                `/api/medications/clients/${clientId}/medications/${activeRow.medication.id}/administrations`,
+                {
+                    ...adminForm.data,
+                    administered_at: fromLocalDateTimeInput(
+                        adminForm.data.administered_at,
+                    ),
+                    scheduled_for: adminForm.data.scheduled_for || null,
+                    witnessed_by:
+                        adminForm.data.witnessed_by === '__none__'
+                            ? null
+                            : Number(adminForm.data.witnessed_by),
+                    scan_code:
+                        needsScanVerification && scanStatus === 'verified'
+                            ? scanCode.trim()
+                            : null,
+                    scan_source:
+                        needsScanVerification && scanStatus === 'verified'
+                            ? 'manual'
+                            : null,
+                    scan_verified:
+                        needsScanVerification && scanStatus === 'verified',
+                    scan_match_source:
+                        needsScanVerification && scanStatus === 'verified'
+                            ? scanMatchSource
+                            : null,
                 },
-            },
-        );
+                {
+                    successMessage: 'Medication administration recorded.',
+                    queuedMessage:
+                        'Medication administration saved offline and queued to sync automatically.',
+                },
+            );
+
+            if (result.status === 'conflict') {
+                return;
+            }
+
+            setOpen(false);
+            setActiveRow(null);
+
+            if (result.status !== 'queued') {
+                router.reload();
+            }
+        } catch (error: unknown) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to record medication administration.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -228,13 +346,13 @@ export default function ShiftMedicationCard({
                     </div>
                     <div className="flex items-center gap-2">
                         <Button asChild size="sm" variant="outline">
-                            <Link href={`/operations/clients/${clientId}/mar`}>
+                            <Link href={`/emar/mar?client_id=${clientId}`}>
                                 Open MAR
                             </Link>
                         </Button>
                         <Button asChild size="sm" variant="outline">
                             <Link
-                                href={`/operations/clients/${clientId}/medical`}
+                                href={`/emar/medications?client_id=${clientId}`}
                             >
                                 Medical
                             </Link>
@@ -524,6 +642,141 @@ export default function ShiftMedicationCard({
                                 </div>
                             </div>
 
+                            {activeRow.medication.scan_verification &&
+                            adminForm.data.status === 'given' ? (
+                                <div className="space-y-3 rounded-md border p-4">
+                                    <div className="flex items-center gap-2">
+                                        <QrCode className="h-4 w-4" />
+                                        <div className="text-sm font-medium">
+                                            Medication scan verification
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {activeRow.medication.scan_verification
+                                            .requires_internal_code
+                                            ? 'No supplier barcode is on file for this medication. Use the internal eMAR QR/code below.'
+                                            : 'Verify the pack barcode or one of the registered medication codes before recording a given dose.'}
+                                    </div>
+                                    <div className="grid gap-4 md:grid-cols-[1fr_120px]">
+                                        <div className="space-y-3">
+                                            <div className="space-y-1">
+                                                <Label>
+                                                    Scanned or entered code
+                                                </Label>
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        value={scanCode}
+                                                        onChange={(event) => {
+                                                            setScanCode(
+                                                                event.target
+                                                                    .value,
+                                                            );
+                                                            setScanStatus(
+                                                                'idle',
+                                                            );
+                                                            setScanMessage('');
+                                                            setScanMatchSource(
+                                                                null,
+                                                            );
+                                                        }}
+                                                        placeholder={`Enter ${activeRow.medication.scan_verification.primary_label.toLowerCase()}...`}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={verifyScan}
+                                                        disabled={
+                                                            !scanCode.trim() ||
+                                                            verifyingScan
+                                                        }
+                                                    >
+                                                        {verifyingScan
+                                                            ? 'Checking...'
+                                                            : 'Verify'}
+                                                    </Button>
+                                                </div>
+                                            </div>
+
+                                            {scanMessage ? (
+                                                <div
+                                                    className={`flex items-center gap-2 text-xs ${
+                                                        scanStatus ===
+                                                        'verified'
+                                                            ? 'text-green-700'
+                                                            : 'text-red-600'
+                                                    }`}
+                                                >
+                                                    {scanStatus ===
+                                                    'verified' ? (
+                                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                                    ) : (
+                                                        <AlertTriangle className="h-3.5 w-3.5" />
+                                                    )}
+                                                    {scanMessage}
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-muted-foreground">
+                                                    Verification is required
+                                                    before recording a given
+                                                    dose.
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-1">
+                                                <Label>Codes on file</Label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {activeRow.medication.scan_verification.code_options.map(
+                                                        (option) => (
+                                                            <Button
+                                                                key={`${option.source}-${option.value}`}
+                                                                type="button"
+                                                                variant="secondary"
+                                                                size="sm"
+                                                                className="h-auto justify-start px-2 py-1 font-mono text-xs"
+                                                                onClick={() => {
+                                                                    setScanCode(
+                                                                        option.value,
+                                                                    );
+                                                                    setScanStatus(
+                                                                        'idle',
+                                                                    );
+                                                                    setScanMessage(
+                                                                        '',
+                                                                    );
+                                                                    setScanMatchSource(
+                                                                        null,
+                                                                    );
+                                                                }}
+                                                            >
+                                                                {option.label}:{' '}
+                                                                {option.value}
+                                                            </Button>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="rounded-md border bg-white p-2">
+                                                <img
+                                                    src={
+                                                        activeRow.medication
+                                                            .scan_verification
+                                                            .svg_url
+                                                    }
+                                                    alt="Medication QR code"
+                                                    className="h-24 w-24"
+                                                />
+                                            </div>
+                                            <div className="text-center text-[11px] text-muted-foreground">
+                                                Internal eMAR QR
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : null}
+
                             <div className="space-y-1">
                                 <Label>Status</Label>
                                 <Select
@@ -655,15 +908,16 @@ export default function ShiftMedicationCard({
                             type="button"
                             variant="outline"
                             onClick={() => setOpen(false)}
+                            disabled={submitting}
                         >
                             Cancel
                         </Button>
                         <Button
                             type="button"
-                            disabled={adminForm.processing || !canSubmit}
+                            disabled={submitting || !canSubmit}
                             onClick={submitAdministration}
                         >
-                            Save administration
+                            {submitting ? 'Saving...' : 'Save administration'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

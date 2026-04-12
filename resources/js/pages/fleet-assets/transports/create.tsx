@@ -1,4 +1,5 @@
 import FleetHero from '@/components/fleet-hero';
+import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import {
+    emptyMedicationScanCapture,
+    hasVerifiedMedicationScan,
+    type MedicationScanCapture,
+    type MedicationScanVerification,
+} from '@/lib/medication-scan';
 import { cn } from '@/lib/utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -40,6 +47,7 @@ type ClientMedication = {
     dose_times: string[] | null;
     route: string | null;
     instructions: string | null;
+    scan_verification?: MedicationScanVerification | null;
 };
 
 type ClientOption = {
@@ -153,6 +161,10 @@ export default function TransportCreate({
             medication_name: string;
             is_controlled_drug: boolean;
             witness_name: string;
+            scan_code: string | null;
+            scan_source: 'manual' | 'scanner' | null;
+            scan_verified: boolean;
+            scan_match_source: string | null;
         }>,
     });
 
@@ -162,6 +174,12 @@ export default function TransportCreate({
     );
     const [witnessNames, setWitnessNames] = useState<Record<number, string>>(
         {},
+    );
+    const [scanCaptures, setScanCaptures] = useState<
+        Record<number, MedicationScanCapture>
+    >({});
+    const [submitMode, setSubmitMode] = useState<'transport' | 'pack'>(
+        'transport',
     );
 
     const selectedShift = useMemo(
@@ -185,6 +203,35 @@ export default function TransportCreate({
             form.setData('pickup_location', selectedShift.location);
         }
     }, [selectedShift]);
+
+    useEffect(() => {
+        const availableMedicationIds = new Set(
+            safeMedications.map((medication) => medication.id),
+        );
+
+        setSelectedMedIds((current) => {
+            const next = new Set(
+                [...current].filter((id) => availableMedicationIds.has(id)),
+            );
+
+            return next.size === current.size ? current : next;
+        });
+
+        setScanCaptures((current) =>
+            Object.fromEntries(
+                Object.entries(current).filter(([medicationId]) =>
+                    availableMedicationIds.has(Number(medicationId)),
+                ),
+            ),
+        );
+        setWitnessNames((current) =>
+            Object.fromEntries(
+                Object.entries(current).filter(([medicationId]) =>
+                    availableMedicationIds.has(Number(medicationId)),
+                ),
+            ),
+        );
+    }, [safeMedications]);
 
     const filteredResidents = useMemo(() => {
         if (!form.data.resident_name || form.data.resident_name.length < 1)
@@ -213,7 +260,7 @@ export default function TransportCreate({
                 'selected_shift_id',
             ],
         });
-    }, []);
+    }, [form]);
 
     const handleShiftChange = useCallback(
         (shiftId: string) => {
@@ -264,6 +311,13 @@ export default function TransportCreate({
             const next = new Set(prev);
             if (next.has(med.id)) {
                 next.delete(med.id);
+                form.clearErrors('medications');
+                setScanCaptures((current) => {
+                    const updated = { ...current };
+                    delete updated[med.id];
+
+                    return updated;
+                });
             } else {
                 next.add(med.id);
             }
@@ -271,40 +325,96 @@ export default function TransportCreate({
         });
     }, []);
 
-    const handleSubmit = useCallback(
-        (e: React.FormEvent) => {
-            e.preventDefault();
-            // Build medications array from selected meds
-            const medications = safeMedications
-                .filter((m) => selectedMedIds.has(m.id))
-                .map((m) => ({
-                    medication_id: m.id,
-                    medication_name: m.name + (m.dosage ? ` ${m.dosage}` : ''),
-                    is_controlled_drug: m.controlled_drug,
-                    witness_name: witnessNames[m.id] ?? '',
-                }));
+    const submitTransport = useCallback(
+        (mode: 'transport' | 'pack') => {
+            const medications =
+                mode === 'pack'
+                    ? safeMedications
+                          .filter((m) => selectedMedIds.has(m.id))
+                          .map((m) => ({
+                              medication_id: m.id,
+                              medication_name:
+                                  m.name + (m.dosage ? ` ${m.dosage}` : ''),
+                              is_controlled_drug: m.controlled_drug,
+                              witness_name: witnessNames[m.id] ?? '',
+                              scan_code:
+                                  scanCaptures[m.id]?.code?.trim() || null,
+                              scan_source: hasVerifiedMedicationScan(
+                                  scanCaptures[m.id] ??
+                                      emptyMedicationScanCapture(),
+                              )
+                                  ? scanCaptures[m.id]?.scanSource ?? 'manual'
+                                  : null,
+                              scan_verified: hasVerifiedMedicationScan(
+                                  scanCaptures[m.id] ??
+                                      emptyMedicationScanCapture(),
+                              ),
+                              scan_match_source: hasVerifiedMedicationScan(
+                                  scanCaptures[m.id] ??
+                                      emptyMedicationScanCapture(),
+                              )
+                                  ? scanCaptures[m.id]?.matchSource ?? null
+                                  : null,
+                          }))
+                    : [];
 
-            // Validate controlled drug witness names before submission
-            const missingWitness = medications.find(
-                (m) => m.is_controlled_drug && !m.witness_name.trim(),
-            );
-            if (missingWitness) {
-                form.setError(
-                    'medications',
-                    'All controlled drugs require a witness name.',
+            if (mode === 'pack') {
+                const missingWitness = medications.find(
+                    (m) => m.is_controlled_drug && !m.witness_name.trim(),
                 );
-                return;
+                if (missingWitness) {
+                    form.setError(
+                        'medications',
+                        'All controlled drugs require a witness name.',
+                    );
+                    return;
+                }
+
+                const missingScan = safeMedications
+                    .filter((m) => selectedMedIds.has(m.id))
+                    .find(
+                        (medication) =>
+                            medication.scan_verification &&
+                            !hasVerifiedMedicationScan(
+                                scanCaptures[medication.id] ??
+                                    emptyMedicationScanCapture(),
+                            ),
+                    );
+
+                if (missingScan) {
+                    form.setError(
+                        'medications',
+                        `Verify the medication code for ${missingScan.name} before logging this transport.`,
+                    );
+                    return;
+                }
+            } else {
+                form.clearErrors('medications');
             }
 
+            setSubmitMode(mode);
             form.setData('medications', medications);
-            // Need to post after setData - use transform
             form.transform((data) => ({
                 ...data,
                 medications,
             }));
-            form.post('/fleet-assets/transports');
+            form.post('/fleet-assets/transports', {
+                preserveScroll: true,
+                onFinish: () => {
+                    form.transform((data) => data);
+                    setSubmitMode('transport');
+                },
+            });
         },
-        [form, selectedMedIds, witnessNames, safeMedications],
+        [form, safeMedications, scanCaptures, selectedMedIds, witnessNames],
+    );
+
+    const handleSubmit = useCallback(
+        (e: React.FormEvent) => {
+            e.preventDefault();
+            submitTransport('transport');
+        },
+        [submitTransport],
     );
 
     return (
@@ -799,7 +909,10 @@ export default function TransportCreate({
                                                                         med.id
                                                                     ] ?? ''
                                                                 }
-                                                                onChange={(e) =>
+                                                                onChange={(e) => {
+                                                                    form.clearErrors(
+                                                                        'medications',
+                                                                    );
                                                                     setWitnessNames(
                                                                         (
                                                                             prev,
@@ -810,13 +923,53 @@ export default function TransportCreate({
                                                                                     .target
                                                                                     .value,
                                                                         }),
-                                                                    )
-                                                                }
+                                                                    );
+                                                                }}
                                                                 placeholder="Name of witness"
                                                                 className="mt-1"
                                                             />
                                                         </div>
                                                     )}
+
+                                                {isSelected && (
+                                                    <div className="mt-3 ml-7">
+                                                        <MedicationScanVerificationPanel
+                                                            clientId={
+                                                                form.data.client_id
+                                                                    ? Number(
+                                                                          form
+                                                                              .data
+                                                                              .client_id,
+                                                                      )
+                                                                    : null
+                                                            }
+                                                            medicationId={
+                                                                med.id
+                                                            }
+                                                            scanVerification={
+                                                                med.scan_verification
+                                                            }
+                                                            resetKey={`${form.data.client_id}-${med.id}-${isSelected}`}
+                                                            requirementText="Verification is required before packing this medication for transit."
+                                                            onChange={(
+                                                                capture,
+                                                            ) => {
+                                                                form.clearErrors(
+                                                                    'medications',
+                                                                );
+                                                                setScanCaptures(
+                                                                    (
+                                                                        current,
+                                                                    ) => ({
+                                                                        ...current,
+                                                                        [med.id]:
+                                                                            capture,
+                                                                    }),
+                                                                );
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -829,6 +982,20 @@ export default function TransportCreate({
                                             : ''}{' '}
                                         selected for packing
                                     </div>
+                                )}
+                                {selectedMedIds.size > 0 && (
+                                    <p className="mt-3 text-sm text-muted-foreground">
+                                        You can create the transport first and
+                                        continue medication packing from the
+                                        transport detail screen, or pack the
+                                        selected medications immediately as
+                                        part of this submit.
+                                    </p>
+                                )}
+                                {form.errors.medications && (
+                                    <p className="mt-3 text-sm text-destructive">
+                                        {form.errors.medications}
+                                    </p>
                                 )}
                             </CardContent>
                         </Card>
@@ -871,8 +1038,27 @@ export default function TransportCreate({
                             ) : (
                                 <Save className="mr-2 h-4 w-4" />
                             )}
-                            Log Transport
+                            {submitMode === 'pack'
+                                ? 'Creating Transport...'
+                                : selectedMedIds.size > 0
+                                  ? 'Create Transport Only'
+                                  : 'Log Transport'}
                         </Button>
+                        {selectedMedIds.size > 0 && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={form.processing}
+                                onClick={() => submitTransport('pack')}
+                            >
+                                {form.processing && submitMode === 'pack' ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Pill className="mr-2 h-4 w-4" />
+                                )}
+                                Create and Pack Selected Medications
+                            </Button>
+                        )}
                         <Button variant="outline" asChild>
                             <Link href="/fleet-assets/transports">Cancel</Link>
                         </Button>

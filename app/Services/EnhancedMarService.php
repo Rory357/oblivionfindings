@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ServiceContext;
 use App\Models\Shift;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -13,13 +14,16 @@ class EnhancedMarService
 {
     protected MarScheduleService $scheduleService;
     protected MedicationSafetyService $safetyService;
+    protected MedicationScanVerificationService $scanVerificationService;
 
     public function __construct(
         MarScheduleService $scheduleService,
-        MedicationSafetyService $safetyService
+        MedicationSafetyService $safetyService,
+        MedicationScanVerificationService $scanVerificationService
     ) {
         $this->scheduleService = $scheduleService;
         $this->safetyService = $safetyService;
+        $this->scanVerificationService = $scanVerificationService;
     }
 
     /**
@@ -133,7 +137,7 @@ class EnhancedMarService
         return [
             'id' => $existing?->id,
             'client_medication_id' => $medication->id,
-            'medication' => $this->formatMedication($medication),
+            'medication' => $this->formatMedication($medication, $client),
             'scheduled_for' => $scheduledFor->toIso8601String(),
             'scheduled_time' => $scheduledFor->format('H:i'),
             'schedule_state' => $scheduleState,
@@ -166,7 +170,7 @@ class EnhancedMarService
 
         return [
             'client_medication_id' => $medication->id,
-            'medication' => $this->formatMedication($medication),
+            'medication' => $this->formatMedication($medication, $client),
             'is_prn' => true,
             'prn_reason' => $medication->prn_reason,
             'max_per_day' => $medication->max_per_day,
@@ -185,7 +189,7 @@ class EnhancedMarService
     /**
      * Format medication for display
      */
-    private function formatMedication(ClientMedication $medication): array
+    private function formatMedication(ClientMedication $medication, ?Client $client = null): array
     {
         return [
             'id' => $medication->id,
@@ -208,6 +212,9 @@ class EnhancedMarService
                 'unit' => $medication->stock->unit,
                 'reorder_level' => $medication->stock->reorder_level,
             ] : null,
+            'scan_verification' => $client
+                ? $this->scanVerificationService->payload($client, $medication)
+                : null,
         ];
     }
 
@@ -460,6 +467,10 @@ class EnhancedMarService
             if ($shiftId) {
                 $shift = Shift::find($shiftId);
                 $admin->service_context_id = $shift?->service_context_id;
+            }
+
+            if (! $admin->service_context_id) {
+                $admin->service_context_id = $client->service_context_id ?: ServiceContext::defaultId();
             }
 
             $admin->save();

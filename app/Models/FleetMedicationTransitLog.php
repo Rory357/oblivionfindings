@@ -18,6 +18,7 @@ class FleetMedicationTransitLog extends Model
         'medication_id',
         'medication_name',
         'is_controlled_drug',
+        'packed_witness_name',
         'packed_by_user_id',
         'packed_at',
         'administered_at',

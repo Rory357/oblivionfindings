@@ -91,7 +91,7 @@ class DuskDatabaseSeeder extends Seeder
             'integrations.manage_site_secrets','integrations.manage_tenant_secrets','integrations.view',
             'invoices.create','invoices.send','invoices.update','invoices.viewAny','invoices.void',
             'medications.administer.correct','medications.administer.record','medications.audit.view',
-            'medications.breakGlass','medications.breakglass','medications.controlled.record',
+            'medications.breakglass','medications.controlled.record',
             'medications.reports.export','medications.stock.update','medications.view',
             'mileage.approve','mileage.create','mileage.viewAny','mileage.viewOwn',
             'operations.reports.view','payroll.export',
