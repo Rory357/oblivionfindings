@@ -18,6 +18,7 @@ return new class extends Migration
 
         Schema::create('fleet_incidents', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('tenant_id')->nullable()->index();
             $table->foreignId('asset_id')->constrained('assets');
             $table->foreignId('reported_by_user_id')->constrained('users');
             $table->foreignId('driver_user_id')->nullable()->constrained('users');
@@ -44,6 +45,7 @@ return new class extends Migration
             $table->text('resolution_notes')->nullable();
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

@@ -113,7 +113,8 @@ test('health safety officer can access health safety dashboard', function () {
 
     $response = $this->actingAs($user)->get('/health-safety');
 
-    expect($response->status())->not->toBe(403);
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page->component('health-safety/dashboard'));
 });
 
 // ─── 4. HR API routes require HR permissions ───────────────────────────
