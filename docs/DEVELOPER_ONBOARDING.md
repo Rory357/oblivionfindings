@@ -47,6 +47,8 @@ REDIS_PORT=6379
 ```bash
 php artisan migrate
 php artisan db:seed
+# or, from the frontend toolchain:
+npm run seed
 ```
 
 ### 4. Start Development Server

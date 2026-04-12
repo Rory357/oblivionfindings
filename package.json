@@ -9,6 +9,8 @@
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
         "lint": "eslint . --fix",
+        "seed": "php artisan db:seed",
+        "seed:fresh": "php artisan migrate:fresh --seed",
         "types": "tsc --noEmit"
     },
     "devDependencies": {
