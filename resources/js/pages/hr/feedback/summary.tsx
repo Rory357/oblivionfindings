@@ -1,31 +1,15 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
-import { Star, MessageSquare } from 'lucide-react';
+import { ArrowLeft, BarChart3, CheckCircle2, MessageSquare, Star, TrendingUp, Users } from 'lucide-react';
 
 type User = { id: number; name: string };
-
-type QuestionSummary = {
-    question: string;
-    average_rating: number | null;
-    rating_count: number;
-    min_rating: number | null;
-    max_rating: number | null;
-    comments: string[];
-};
-
-type Summary = {
-    total_reviews: number;
-    questions: Record<string, QuestionSummary>;
-};
-
-type Props = {
-    subjectUser: User;
-    summary: Summary;
-    questions: Record<string, string>;
-};
+type QuestionSummary = { question: string; average_rating: number | null; rating_count: number; min_rating: number | null; max_rating: number | null; comments: string[] };
+type Summary = { total_reviews: number; questions: Record<string, QuestionSummary> };
+type Props = { subjectUser: User; summary: Summary; questions: Record<string, string> };
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
@@ -33,143 +17,195 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Summary', href: '#' },
 ];
 
-function RatingBar({ value, max = 5 }: { value: number | null; max?: number }) {
-    if (value === null) return <span className="text-sm text-muted-foreground">No ratings</span>;
-    const percentage = (value / max) * 100;
-    return (
-        <div className="flex items-center gap-3">
-            <div className="h-3 flex-1 rounded-full bg-muted">
-                <div
-                    className="h-3 rounded-full bg-amber-400 transition-all"
-                    style={{ width: `${percentage}%` }}
-                />
-            </div>
-            <span className="w-12 text-right text-sm font-semibold">{value.toFixed(1)}</span>
-            <span className="text-sm text-muted-foreground">/ {max}</span>
-        </div>
-    );
+const QUESTION_COLORS: Record<string, { bar: string; bg: string; text: string }> = {
+    communication: { bar: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
+    teamwork: { bar: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    leadership: { bar: 'bg-violet-500', bg: 'bg-violet-50', text: 'text-violet-700' },
+    technical: { bar: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700' },
+    initiative: { bar: 'bg-pink-500', bg: 'bg-pink-50', text: 'text-pink-700' },
+    overall: { bar: 'bg-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-700' },
+};
+
+const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500'];
+function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
+function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
+
+function ratingColor(v: number | null): string {
+    if (v === null) return 'text-slate-400';
+    if (v >= 4) return 'text-emerald-600';
+    if (v >= 3) return 'text-amber-600';
+    return 'text-red-600';
+}
+function ratingBarColor(v: number | null): string {
+    if (v === null) return 'bg-slate-200';
+    if (v >= 4) return 'bg-emerald-500';
+    if (v >= 3) return 'bg-amber-400';
+    return 'bg-red-400';
 }
 
 export default function FeedbackSummary({ subjectUser, summary, questions }: Props) {
     const questionKeys = Object.keys(questions);
 
-    // Calculate overall average
-    const allRatings = questionKeys
-        .map((key) => summary.questions[key]?.average_rating)
-        .filter((r): r is number => r !== null && r !== undefined);
-    const overallAvg = allRatings.length > 0
-        ? allRatings.reduce((sum, r) => sum + r, 0) / allRatings.length
-        : null;
+    const allRatings = questionKeys.map(k => summary.questions[k]?.average_rating).filter((r): r is number => r !== null);
+    const overallAvg = allRatings.length > 0 ? allRatings.reduce((s, r) => s + r, 0) / allRatings.length : null;
+    const totalComments = questionKeys.reduce((s, k) => s + (summary.questions[k]?.comments?.length ?? 0), 0);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Feedback Summary - ${subjectUser.name}`} />
-            <div className="flex flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold">Feedback Summary</h1>
-                    <p className="text-sm text-muted-foreground">
-                        360-degree feedback results for <strong>{subjectUser.name}</strong>
-                    </p>
+            <div className="space-y-6 p-4 lg:p-6">
+
+                {/* Hero Banner */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white shadow-lg">
+                    <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
+                    <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
+                    <div className="relative flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <Link href="/hr/feedback"><Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10"><ArrowLeft className="h-5 w-5" /></Button></Link>
+                            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-white/30 text-lg font-bold shadow-md ${avatarColor(subjectUser.id)}`}>
+                                {getInitials(subjectUser.name)}
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold">Feedback Summary</h1>
+                                <p className="text-white/70">360-degree feedback for <strong className="text-white">{subjectUser.name}</strong></p>
+                            </div>
+                        </div>
+                        {overallAvg !== null && (
+                            <div className="flex items-center gap-6">
+                                <div className="text-center">
+                                    <div className="flex items-center gap-1 text-3xl font-bold">
+                                        {overallAvg.toFixed(1)} <Star className="h-6 w-6 fill-amber-300 text-amber-300" />
+                                    </div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/60">Overall</div>
+                                </div>
+                                <div className="h-10 w-px bg-white/20" />
+                                <div className="text-center">
+                                    <div className="text-3xl font-bold">{summary.total_reviews}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/60">Reviews</div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {summary.total_reviews === 0 ? (
-                    <Card>
-                        <CardContent className="py-12 text-center text-muted-foreground">
-                            No completed feedback reviews for this employee yet.
+                    <Card className="border-dashed">
+                        <CardContent className="flex flex-col items-center justify-center py-16">
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
+                                <MessageSquare className="h-8 w-8 text-violet-400" />
+                            </div>
+                            <p className="font-medium">No Feedback Yet</p>
+                            <p className="mt-1 text-sm text-muted-foreground">No completed feedback reviews for this employee.</p>
                         </CardContent>
                     </Card>
                 ) : (
                     <>
-                        {/* Overview */}
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                            <Card>
-                                <CardContent className="pt-6 text-center">
-                                    <div className="text-3xl font-bold">
-                                        {summary.total_reviews}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">Total Reviews</div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-6 text-center">
-                                    <div className="flex items-center justify-center gap-1 text-3xl font-bold">
-                                        {overallAvg !== null ? overallAvg.toFixed(1) : 'N/A'}
-                                        <Star className="h-6 w-6 fill-amber-400 text-amber-400" />
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">Overall Average</div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="pt-6 text-center">
-                                    <div className="text-3xl font-bold">
-                                        {questionKeys.reduce(
-                                            (sum, key) => sum + (summary.questions[key]?.comments?.length ?? 0),
-                                            0
-                                        )}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">Total Comments</div>
-                                </CardContent>
-                            </Card>
+                        {/* KPI Cards */}
+                        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                            {[
+                                { label: 'Total Reviews', value: summary.total_reviews, icon: Users, gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
+                                { label: 'Overall Average', value: overallAvg !== null ? overallAvg.toFixed(1) : 'N/A', icon: Star, gradient: 'from-amber-500/10 to-yellow-500/5', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
+                                { label: 'Highest Area', value: allRatings.length > 0 ? Math.max(...allRatings).toFixed(1) : 'N/A', icon: TrendingUp, gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+                                { label: 'Total Comments', value: totalComments, icon: MessageSquare, gradient: 'from-blue-500/10 to-indigo-500/5', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
+                            ].map((kpi) => {
+                                const Icon = kpi.icon;
+                                return (
+                                    <Card key={kpi.label} className={`group overflow-hidden bg-gradient-to-br ${kpi.gradient} transition-all hover:shadow-md`}>
+                                        <CardContent className="pt-5">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{kpi.label}</p>
+                                                    <p className="mt-1 text-3xl font-bold tracking-tight">{kpi.value}</p>
+                                                </div>
+                                                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${kpi.iconBg} transition-transform group-hover:scale-110`}>
+                                                    <Icon className={`h-5 w-5 ${kpi.iconColor}`} />
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
                         </div>
 
-                        {/* Ratings Chart (bar-style) */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Ratings by Category</CardTitle>
+                        {/* Ratings by Category */}
+                        <Card className="overflow-hidden">
+                            <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
+                                        <BarChart3 className="h-4 w-4 text-violet-600" />
+                                    </div>
+                                    Ratings by Category
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="space-y-5 pt-5">
                                 {questionKeys.map((key) => {
                                     const q = summary.questions[key];
+                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-slate-500', bg: 'bg-slate-50', text: 'text-slate-700' };
+                                    const avg = q?.average_rating;
+                                    const pct = avg !== null && avg !== undefined ? (avg / 5) * 100 : 0;
                                     return (
-                                        <div key={key} className="space-y-1">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium capitalize">{key}</span>
-                                                {q && (
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        {q.rating_count} ratings
-                                                    </Badge>
-                                                )}
+                                        <div key={key}>
+                                            <div className="mb-1.5 flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={`border-0 text-[10px] capitalize ${colors.bg} ${colors.text}`}>{key.replace(/_/g, ' ')}</Badge>
+                                                    {q && <span className="text-[10px] text-muted-foreground">{q.rating_count} rating{q.rating_count !== 1 ? 's' : ''}</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {q?.min_rating !== null && q?.max_rating !== null && q.min_rating !== q.max_rating && (
+                                                        <span className="text-[10px] text-muted-foreground">{q.min_rating} \u2013 {q.max_rating}</span>
+                                                    )}
+                                                    <span className={`text-sm font-bold ${ratingColor(avg ?? null)}`}>{avg !== null && avg !== undefined ? avg.toFixed(1) : '\u2014'}</span>
+                                                    <span className="text-xs text-muted-foreground">/ 5</span>
+                                                </div>
                                             </div>
-                                            <RatingBar value={q?.average_rating ?? null} />
+                                            <div className="h-3 overflow-hidden rounded-full bg-muted">
+                                                <div className={`h-full rounded-full ${ratingBarColor(avg ?? null)} transition-all duration-700`} style={{ width: `${pct}%` }} />
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </CardContent>
                         </Card>
 
-                        {/* Comments (Anonymized) */}
-                        <Card>
-                            <CardHeader>
+                        {/* Comments */}
+                        <Card className="overflow-hidden">
+                            <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-transparent pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <MessageSquare className="h-4 w-4" />
-                                    Feedback Comments (Anonymized)
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
+                                        <MessageSquare className="h-4 w-4 text-blue-600" />
+                                    </div>
+                                    Feedback Comments
+                                    <span className="text-xs font-normal text-muted-foreground">(Anonymised)</span>
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-6">
+                            <CardContent className="space-y-6 pt-5">
                                 {questionKeys.map((key) => {
                                     const q = summary.questions[key];
                                     const comments = q?.comments ?? [];
                                     if (comments.length === 0) return null;
+                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-slate-500', bg: 'bg-slate-50', text: 'text-slate-700' };
                                     return (
                                         <div key={key}>
-                                            <h4 className="mb-2 text-sm font-semibold capitalize">{key}</h4>
-                                            <ul className="space-y-2">
+                                            <div className="mb-2 flex items-center gap-2">
+                                                <Badge className={`border-0 text-[10px] capitalize ${colors.bg} ${colors.text}`}>{key.replace(/_/g, ' ')}</Badge>
+                                                <Badge variant="secondary" className="text-[9px]">{comments.length}</Badge>
+                                            </div>
+                                            <div className="space-y-2 pl-2">
                                                 {comments.map((comment, i) => (
-                                                    <li
-                                                        key={i}
-                                                        className="rounded-md border bg-muted/30 p-3 text-sm"
-                                                    >
+                                                    <div key={i} className="relative rounded-xl border bg-gradient-to-br from-muted/30 to-muted/10 p-3 pl-4 text-sm">
+                                                        <div className="absolute left-0 top-3 bottom-3 w-1 rounded-full bg-primary/20" />
                                                         {comment}
-                                                    </li>
+                                                    </div>
                                                 ))}
-                                            </ul>
+                                            </div>
                                         </div>
                                     );
                                 })}
-                                {questionKeys.every(
-                                    (key) => (summary.questions[key]?.comments?.length ?? 0) === 0
-                                ) && (
-                                    <p className="text-sm text-muted-foreground">No comments provided.</p>
+                                {questionKeys.every(k => (summary.questions[k]?.comments?.length ?? 0) === 0) && (
+                                    <div className="flex flex-col items-center gap-2 py-6">
+                                        <MessageSquare className="h-8 w-8 text-slate-200" />
+                                        <p className="text-sm text-muted-foreground">No comments provided.</p>
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>

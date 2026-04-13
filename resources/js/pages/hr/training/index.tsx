@@ -5,87 +5,32 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
-import { Users, GraduationCap, AlertTriangle, Clock, CheckCircle2, BookOpen, MapPin } from 'lucide-react';
+import {
+    Users, GraduationCap, AlertTriangle, Clock, CheckCircle2,
+    BookOpen, MapPin, ShieldCheck, ArrowRight, TrendingUp, Calendar,
+} from 'lucide-react';
 
-interface Stats {
-    totalRecords: number;
-    expiredCount: number;
-    dueSoonCount: number;
-    completedThisMonth: number;
-}
+interface Stats { totalRecords: number; expiredCount: number; dueSoonCount: number; completedThisMonth: number }
+interface StaffUser { id: number; name: string; email: string }
+interface TrainingCourse { id: number; name: string; code?: string | null; category?: string | null }
+interface TrainingRecord { id: number; user?: StaffUser | null; training_course?: TrainingCourse | null; check_date?: string | null; completed_at?: string | null; expires_at?: string | null; status?: string | null }
+interface SiteSummary { site_id: number; site_name: string; total: number; expired: number }
+interface MatrixEntry { course_id: number; course_name: string; category: string | null; count: number }
+interface RenewalCourse { id: number; name: string; code?: string | null; category?: string | null; training_records_count?: number }
+interface Props { stats: Stats; overdue: TrainingRecord[]; dueSoon: TrainingRecord[]; bySite: SiteSummary[]; matrix: MatrixEntry[]; renewalNeeded: RenewalCourse[]; filters: { site_id: string | null } }
 
-interface StaffUser {
-    id: number;
-    name: string;
-    email: string;
-}
-
-interface TrainingCourse {
-    id: number;
-    name: string;
-    code?: string | null;
-    category?: string | null;
-}
-
-interface TrainingRecord {
-    id: number;
-    user?: StaffUser | null;
-    training_course?: TrainingCourse | null;
-    check_date?: string | null;
-    completed_at?: string | null;
-    expires_at?: string | null;
-    status?: string | null;
-}
-
-interface SiteSummary {
-    site_id: number;
-    site_name: string;
-    total: number;
-    expired: number;
-}
-
-interface MatrixEntry {
-    course_id: number;
-    course_name: string;
-    category: string | null;
-    count: number;
-}
-
-interface RenewalCourse {
-    id: number;
-    name: string;
-    code?: string | null;
-    category?: string | null;
-    training_records_count?: number;
-}
-
-interface Props {
-    stats: Stats;
-    overdue: TrainingRecord[];
-    dueSoon: TrainingRecord[];
-    bySite: SiteSummary[];
-    matrix: MatrixEntry[];
-    renewalNeeded: RenewalCourse[];
-    filters: { site_id: string | null };
-}
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr' },
-    { title: 'Training', href: '/hr/compliance/training' },
-];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'HR', href: '/hr' }, { title: 'Training Dashboard', href: '/hr/compliance/training' }];
 
 function formatDate(value?: string | null): string {
-    if (!value) return '--';
+    if (!value) return '\u2014';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-NZ');
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-
 function daysUntil(value?: string | null): number | null {
     if (!value) return null;
     const target = new Date(value);
     if (Number.isNaN(target.getTime())) return null;
-    const diff = target.getTime() - Date.now();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return Math.ceil((target.getTime() - Date.now()) / 86400000);
 }
 
 export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix, renewalNeeded, filters }: Props) {
@@ -93,256 +38,295 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
         router.get('/hr/compliance/training', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
     }
 
+    const complianceRate = stats.totalRecords > 0 ? Math.round(((stats.totalRecords - stats.expiredCount) / stats.totalRecords) * 100) : 100;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Training Dashboard" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">Training Dashboard</h1>
-                        <p className="text-muted-foreground">Monitor training renewals and overdue records</p>
+            <div className="space-y-6 p-4 lg:p-6">
+
+                {/* Hero Banner */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white shadow-lg">
+                    <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
+                    <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
+                    <div className="absolute left-1/2 top-0 h-32 w-32 rounded-full bg-white/5" />
+                    <div className="relative flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold">Training Dashboard</h1>
+                            <p className="mt-1 text-white/70">Monitor training renewals, compliance and overdue records</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-6">
+                                <div className="text-center">
+                                    <div className="text-3xl font-bold">{complianceRate}%</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/60">Compliance</div>
+                                </div>
+                                <div className="h-10 w-px bg-white/20" />
+                                <div className="text-center">
+                                    <div className="text-3xl font-bold">{stats.totalRecords}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/60">Records</div>
+                                </div>
+                            </div>
+                            <div className="ml-4 flex gap-2">
+                                <Button variant="secondary" size="sm" className="gap-1.5 bg-white/15 text-white border-white/20 hover:bg-white/25 backdrop-blur-sm" asChild>
+                                    <Link href="/hr/compliance"><ShieldCheck className="h-4 w-4" />Compliance</Link>
+                                </Button>
+                                <Button size="sm" className="gap-1.5 bg-white text-primary hover:bg-white/90 shadow-md" asChild>
+                                    <Link href="/hr/training/catalog"><BookOpen className="h-4 w-4" />Course Catalog</Link>
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                    <Button variant="outline" asChild>
-                        <Link href="/hr/compliance">Compliance Dashboard</Link>
-                    </Button>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Total Records</p>
-                                    <p className="text-3xl font-bold">{stats.totalRecords}</p>
-                                </div>
-                                <Users className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Completed This Month</p>
-                                    <p className="text-3xl font-bold text-green-600">{stats.completedThisMonth}</p>
-                                </div>
-                                <GraduationCap className="h-8 w-8 text-green-500" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Due Soon (60 days)</p>
-                                    <p className="text-3xl font-bold text-yellow-600">{stats.dueSoonCount}</p>
-                                </div>
-                                <Clock className="h-8 w-8 text-yellow-500" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Expired</p>
-                                    <p className="text-3xl font-bold text-destructive">{stats.expiredCount}</p>
-                                </div>
-                                <AlertTriangle className="h-8 w-8 text-destructive" />
-                            </div>
-                        </CardContent>
-                    </Card>
+                {/* KPI Cards */}
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    {[
+                        { label: 'Total Records', value: stats.totalRecords, icon: Users, color: 'violet', gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-violet-100', iconColor: 'text-violet-600', borderColor: 'hover:border-violet-300' },
+                        { label: 'Completed This Month', value: stats.completedThisMonth, icon: CheckCircle2, color: 'emerald', gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', borderColor: 'hover:border-emerald-300' },
+                        { label: 'Due Soon (60 days)', value: stats.dueSoonCount, icon: Clock, color: 'amber', gradient: 'from-amber-500/10 to-yellow-500/5', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', borderColor: 'hover:border-amber-300' },
+                        { label: 'Expired', value: stats.expiredCount, icon: AlertTriangle, color: 'red', gradient: 'from-red-500/10 to-rose-500/5', iconBg: 'bg-red-100', iconColor: 'text-red-600', borderColor: 'hover:border-red-300' },
+                    ].map((kpi) => {
+                        const Icon = kpi.icon;
+                        return (
+                            <Card key={kpi.label} className={`group overflow-hidden bg-gradient-to-br ${kpi.gradient} transition-all ${kpi.borderColor} hover:shadow-md`}>
+                                <CardContent className="pt-5">
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{kpi.label}</p>
+                                            <p className="mt-1 text-3xl font-bold tracking-tight">{kpi.value}</p>
+                                        </div>
+                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${kpi.iconBg} transition-transform group-hover:scale-110`}>
+                                            <Icon className={`h-5 w-5 ${kpi.iconColor}`} />
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                                Overdue Training
-                            </CardTitle>
+                {/* Overdue & Due Soon */}
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {/* Overdue */}
+                    <Card className="overflow-hidden border-red-100">
+                        <CardHeader className="border-b bg-gradient-to-r from-red-50 to-transparent pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100">
+                                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                                    </div>
+                                    Overdue Training
+                                    {overdue.length > 0 && <Badge variant="destructive" className="ml-1 text-[10px]">{overdue.length}</Badge>}
+                                </CardTitle>
+                            </div>
                         </CardHeader>
                         <CardContent className="p-0">
                             {overdue.length === 0 ? (
-                                <div className="px-4 py-8 text-center text-muted-foreground">
-                                    <CheckCircle2 className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                                    <p className="text-sm">No overdue training records.</p>
+                                <div className="flex flex-col items-center gap-2 py-12">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
+                                        <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-emerald-600">All clear!</p>
+                                    <p className="text-xs text-muted-foreground">No overdue training records</p>
                                 </div>
                             ) : (
-                                <table className="w-full text-sm">
-                                    <thead className="border-b bg-muted/50">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left font-medium">Staff</th>
-                                            <th className="px-4 py-2 text-left font-medium">Course</th>
-                                            <th className="px-4 py-2 text-left font-medium">Expired</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {overdue.map((record) => (
-                                            <tr key={record.id} className="hover:bg-muted/30">
-                                                <td className="px-4 py-2">
-                                                    <div className="font-medium">{record.user?.name ?? 'Unknown'}</div>
-                                                    <div className="text-xs text-muted-foreground">{record.user?.email ?? '--'}</div>
-                                                </td>
-                                                <td className="px-4 py-2">{record.training_course?.name ?? '--'}</td>
-                                                <td className="px-4 py-2">
-                                                    <div className="font-medium text-destructive">{formatDate(record.expires_at)}</div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                <div className="divide-y">
+                                    {overdue.map((r) => (
+                                        <div key={r.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-red-50/50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-600">
+                                                    {(r.user?.name ?? '?')[0]}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium">{r.user?.name ?? 'Unknown'}</p>
+                                                    <p className="text-[10px] text-muted-foreground">{r.training_course?.name ?? '\u2014'}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xs font-medium text-red-600">{formatDate(r.expires_at)}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                Due Soon (Next 60 Days)
-                            </CardTitle>
+                    {/* Due Soon */}
+                    <Card className="overflow-hidden border-amber-100">
+                        <CardHeader className="border-b bg-gradient-to-r from-amber-50 to-transparent pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
+                                        <Clock className="h-4 w-4 text-amber-600" />
+                                    </div>
+                                    Due Soon
+                                    {dueSoon.length > 0 && <Badge className="ml-1 border-0 bg-amber-100 text-[10px] text-amber-700">{dueSoon.length}</Badge>}
+                                </CardTitle>
+                                <span className="text-[10px] text-muted-foreground">Next 60 days</span>
+                            </div>
                         </CardHeader>
                         <CardContent className="p-0">
                             {dueSoon.length === 0 ? (
-                                <div className="px-4 py-8 text-center text-muted-foreground">
-                                    <BookOpen className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                                    <p className="text-sm">No records expiring soon.</p>
+                                <div className="flex flex-col items-center gap-2 py-12">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50">
+                                        <Calendar className="h-6 w-6 text-slate-300" />
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">No records expiring soon</p>
                                 </div>
                             ) : (
-                                <table className="w-full text-sm">
-                                    <thead className="border-b bg-muted/50">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left font-medium">Staff</th>
-                                            <th className="px-4 py-2 text-left font-medium">Course</th>
-                                            <th className="px-4 py-2 text-left font-medium">Expires</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {dueSoon.map((record) => {
-                                            const days = daysUntil(record.expires_at);
-                                            return (
-                                                <tr key={record.id} className="hover:bg-muted/30">
-                                                    <td className="px-4 py-2 font-medium">{record.user?.name ?? 'Unknown'}</td>
-                                                    <td className="px-4 py-2">{record.training_course?.name ?? '--'}</td>
-                                                    <td className="px-4 py-2 text-muted-foreground">
-                                                        {formatDate(record.expires_at)}
-                                                        {days !== null && (
-                                                            <span className="ml-2 text-xs">
-                                                                ({days <= 0 ? 'expired' : `${days}d`})
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                <div className="divide-y">
+                                    {dueSoon.map((r) => {
+                                        const days = daysUntil(r.expires_at);
+                                        return (
+                                            <div key={r.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-amber-50/50">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700">
+                                                        {(r.user?.name ?? '?')[0]}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium">{r.user?.name ?? 'Unknown'}</p>
+                                                        <p className="text-[10px] text-muted-foreground">{r.training_course?.name ?? '\u2014'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className={`text-xs font-medium ${days !== null && days <= 14 ? 'text-amber-600' : 'text-muted-foreground'}`}>{formatDate(r.expires_at)}</span>
+                                                    {days !== null && days > 0 && <p className="text-[10px] text-muted-foreground">{days} days</p>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </CardContent>
                     </Card>
                 </div>
 
-                <Card>
-                    <CardHeader>
+                {/* Course Renewal Pressure */}
+                <Card className="overflow-hidden">
+                    <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                <GraduationCap className="h-5 w-5" />
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
+                                    <TrendingUp className="h-4 w-4 text-violet-600" />
+                                </div>
                                 Course Renewal Pressure
                             </CardTitle>
-                            <Select value={filters.site_id || '__all__'} onValueChange={(value) => applyFilter('site_id', value === '__all__' ? null : value)}>
-                                <SelectTrigger className="w-56"><SelectValue placeholder="All sites" /></SelectTrigger>
+                            <Select value={filters.site_id || '__all__'} onValueChange={(v) => applyFilter('site_id', v === '__all__' ? null : v)}>
+                                <SelectTrigger className="h-8 w-48 text-xs"><SelectValue placeholder="All sites" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="__all__">All sites</SelectItem>
-                                    {bySite.map((site) => (
-                                        <SelectItem key={site.site_id} value={String(site.site_id)}>{site.site_name}</SelectItem>
-                                    ))}
+                                    {bySite.map((s) => <SelectItem key={s.site_id} value={String(s.site_id)}>{s.site_name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead className="border-b bg-muted/50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left font-medium">Course</th>
-                                    <th className="px-4 py-3 text-left font-medium">Category</th>
-                                    <th className="px-4 py-3 text-center font-medium">Expiring Soon Count</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {matrix.map((entry) => (
-                                    <tr key={entry.course_id} className="hover:bg-muted/30">
-                                        <td className="px-4 py-3 font-medium">{entry.course_name}</td>
-                                        <td className="px-4 py-3">
-                                            <Badge variant="outline" className="capitalize text-xs">{entry.category || '--'}</Badge>
-                                        </td>
-                                        <td className="px-4 py-3 text-center font-medium">{entry.count}</td>
-                                    </tr>
-                                ))}
-                                {matrix.length === 0 && (
+                        {matrix.length === 0 ? (
+                            <div className="flex flex-col items-center gap-2 py-12">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-50">
+                                    <GraduationCap className="h-6 w-6 text-violet-300" />
+                                </div>
+                                <p className="text-sm text-muted-foreground">No courses currently under renewal pressure</p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50/80">
                                     <tr>
-                                        <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
-                                            <GraduationCap className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                            <p>No courses currently under renewal pressure.</p>
-                                        </td>
+                                        <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Course</th>
+                                        <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Category</th>
+                                        <th className="px-4 py-2.5 text-center text-xs font-medium text-muted-foreground">Expiring Soon</th>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {matrix.map((e) => (
+                                        <tr key={e.course_id} className="group transition-colors hover:bg-violet-50/30">
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100">
+                                                        <BookOpen className="h-3.5 w-3.5 text-violet-600" />
+                                                    </div>
+                                                    <span className="font-medium">{e.course_name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">{e.category ? <Badge variant="outline" className="text-[10px] capitalize">{e.category}</Badge> : '\u2014'}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <Badge variant={e.count > 5 ? 'destructive' : e.count > 2 ? 'default' : 'secondary'} className="min-w-[28px] justify-center text-xs">{e.count}</Badge>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </CardContent>
                 </Card>
 
+                {/* By Site & Courses Needing Renewal */}
                 <div className="grid gap-4 lg:grid-cols-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <MapPin className="h-5 w-5" />
+                    <Card className="overflow-hidden">
+                        <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-transparent pb-3">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
+                                    <MapPin className="h-4 w-4 text-blue-600" />
+                                </div>
                                 By Site
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            {bySite.map((site) => (
-                                <div key={site.site_id} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                                    <div>
-                                        <p className="font-medium">{site.site_name}</p>
-                                        <p className="text-xs text-muted-foreground">{site.total} records</p>
+                        <CardContent className="space-y-2 pt-4">
+                            {bySite.length === 0 ? (
+                                <p className="py-6 text-center text-sm text-muted-foreground">No site breakdown available.</p>
+                            ) : bySite.map((site) => {
+                                const pct = site.total > 0 ? Math.round(((site.total - site.expired) / site.total) * 100) : 100;
+                                return (
+                                    <div key={site.site_id} className="group rounded-xl border p-3 transition-all hover:shadow-sm hover:border-blue-200">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium">{site.site_name}</p>
+                                                <p className="text-[10px] text-muted-foreground">{site.total} records</p>
+                                            </div>
+                                            <Badge variant={site.expired > 0 ? 'destructive' : 'secondary'} className="text-xs">
+                                                {site.expired} expired
+                                            </Badge>
+                                        </div>
+                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                            <div className={`h-full rounded-full transition-all duration-700 ${site.expired > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${pct}%` }} />
+                                        </div>
                                     </div>
-                                    <Badge variant={site.expired > 0 ? 'destructive' : 'secondary'}>
-                                        {site.expired} expired
-                                    </Badge>
-                                </div>
-                            ))}
-                            {bySite.length === 0 && (
-                                <p className="text-sm text-muted-foreground">No site breakdown available.</p>
-                            )}
+                                );
+                            })}
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <BookOpen className="h-5 w-5" />
+                    <Card className="overflow-hidden">
+                        <CardHeader className="border-b bg-gradient-to-r from-amber-50 to-transparent pb-3">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
+                                    <GraduationCap className="h-4 w-4 text-amber-600" />
+                                </div>
                                 Courses Needing Renewal
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            {renewalNeeded.map((course) => (
-                                <div key={course.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                                    <div>
-                                        <p className="font-medium">{course.name}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {course.category || '--'} {course.code ? `- ${course.code}` : ''}
-                                        </p>
+                        <CardContent className="space-y-2 pt-4">
+                            {renewalNeeded.length === 0 ? (
+                                <div className="flex flex-col items-center gap-2 py-6">
+                                    <CheckCircle2 className="h-8 w-8 text-emerald-300" />
+                                    <p className="text-sm text-muted-foreground">No courses currently need renewal</p>
+                                </div>
+                            ) : renewalNeeded.map((course) => (
+                                <div key={course.id} className="group flex items-center justify-between rounded-xl border p-3 transition-all hover:shadow-sm hover:border-amber-200">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50">
+                                            <BookOpen className="h-4 w-4 text-amber-500" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">{course.name}</p>
+                                            <p className="text-[10px] text-muted-foreground">{course.category || '\u2014'}{course.code ? ` \u00b7 ${course.code}` : ''}</p>
+                                        </div>
                                     </div>
-                                    <Badge variant="outline">
+                                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-xs text-amber-700">
                                         {course.training_records_count ?? 0} expired
                                     </Badge>
                                 </div>
                             ))}
-                            {renewalNeeded.length === 0 && (
-                                <p className="text-sm text-muted-foreground">No courses currently need renewal.</p>
-                            )}
                         </CardContent>
                     </Card>
                 </div>

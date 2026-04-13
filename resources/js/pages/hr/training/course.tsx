@@ -1,104 +1,41 @@
 import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { UserPlus, CheckCircle } from 'lucide-react';
+import {
+    ArrowLeft, BookOpen, Calendar, CheckCircle2, Clock, Download,
+    MapPin, Monitor, Users, UserPlus, Layers, Zap,
+} from 'lucide-react';
 import { useState, FormEvent } from 'react';
 import { type BreadcrumbItem } from '@/types';
 
-interface Session {
-    id: number;
-    session_date: string;
-    start_time: string | null;
-    end_time: string | null;
-    location: string | null;
-    facilitator: string | null;
-    max_participants: number | null;
-    status: string;
-}
+interface Session { id: number; session_date: string; start_time: string | null; end_time: string | null; location: string | null; facilitator: string | null; max_participants: number | null; status: string }
+interface Enrollment { id: number; status: string; enrolled_at: string; completed_at: string | null; score: string | null; notes: string | null; user: { id: number; name: string } }
+interface Course { id: number; title: string; code: string; description: string | null; category: string | null; delivery_method: string; duration_hours: string; provider: string | null; cost: string | null; is_mandatory: boolean; is_active: boolean; max_participants: number | null; sessions: Session[]; enrollments: Enrollment[] }
+interface UserItem { id: number; name: string }
+interface Props { course: Course; users: UserItem[]; can: { manage: boolean; enroll: boolean } }
 
-interface Enrollment {
-    id: number;
-    status: string;
-    enrolled_at: string;
-    completed_at: string | null;
-    score: string | null;
-    notes: string | null;
-    user: { id: number; name: string };
-}
+const DELIVERY_LABELS: Record<string, string> = { online: 'Online', in_person: 'In Person', blended: 'Blended', self_paced: 'Self-Paced' };
+const DELIVERY_COLORS: Record<string, string> = { online: 'bg-blue-100 text-blue-700', in_person: 'bg-emerald-100 text-emerald-700', blended: 'bg-violet-100 text-violet-700', self_paced: 'bg-amber-100 text-amber-700' };
+const DELIVERY_ICONS: Record<string, typeof Monitor> = { online: Monitor, in_person: MapPin, blended: Layers, self_paced: Zap };
 
-interface Course {
-    id: number;
-    title: string;
-    code: string;
-    description: string | null;
-    category: string | null;
-    delivery_method: string;
-    duration_hours: string;
-    provider: string | null;
-    cost: string | null;
-    is_mandatory: boolean;
-    is_active: boolean;
-    max_participants: number | null;
-    sessions: Session[];
-    enrollments: Enrollment[];
-}
-
-interface UserItem {
-    id: number;
-    name: string;
-}
-
-interface Props {
-    course: Course;
-    users: UserItem[];
-    can: { manage: boolean; enroll: boolean };
-}
-
-const deliveryLabels: Record<string, string> = {
-    online: 'Online',
-    in_person: 'In Person',
-    blended: 'Blended',
-    self_paced: 'Self-Paced',
+const STATUS_COLORS: Record<string, string> = {
+    enrolled: 'bg-blue-100 text-blue-700', in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700',
+    withdrawn: 'bg-slate-100 text-slate-600', failed: 'bg-red-100 text-red-700', scheduled: 'bg-blue-100 text-blue-700', cancelled: 'bg-red-100 text-red-700',
 };
 
-const statusColors: Record<string, string> = {
-    enrolled: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-yellow-100 text-yellow-800',
-    completed: 'bg-green-100 text-green-800',
-    withdrawn: 'bg-slate-100 text-slate-800',
-    failed: 'bg-red-100 text-red-800',
-    scheduled: 'bg-blue-100 text-blue-800',
-    cancelled: 'bg-red-100 text-red-800',
-};
+function formatDate(v?: string | null) { if (!v) return '\u2014'; const d = new Date(v); return isNaN(d.getTime()) ? v : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }); }
+function formatCurrency(v: string | null) { if (!v) return '\u2014'; const n = parseFloat(v); return isNaN(n) ? v : new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n); }
 
-const formatDate = (value?: string | null) => {
-    if (!value) return '-';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-};
-
-const formatDateTime = (value?: string | null) => {
-    if (!value) return '-';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-};
-
-const formatCurrency = (value: string | null) => {
-    if (!value) return '-';
-    const num = parseFloat(value);
-    if (Number.isNaN(num)) return value;
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(num);
-};
+const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
+function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
+function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 
 export default function CourseDetail({ course, users, can }: Props) {
     const [enrollOpen, setEnrollOpen] = useState(false);
@@ -113,253 +50,230 @@ export default function CourseDetail({ course, users, can }: Props) {
         { title: course.title, href: `/hr/training/courses/${course.id}` },
     ];
 
+    const DmIcon = DELIVERY_ICONS[course.delivery_method] || BookOpen;
+    const completedCount = course.enrollments?.filter(e => e.status === 'completed').length ?? 0;
+
     const submitEnroll = (e: FormEvent) => {
         e.preventDefault();
-        router.post('/hr/training/enroll', {
-            ...enrollForm,
-            course_id: course.id,
-            session_id: enrollForm.session_id || null,
-        }, {
-            onSuccess: () => {
-                setEnrollOpen(false);
-                setEnrollForm({ user_id: '', session_id: '', notes: '' });
-            },
+        router.post('/hr/training/enroll', { ...enrollForm, course_id: course.id, session_id: enrollForm.session_id || null }, {
+            onSuccess: () => { setEnrollOpen(false); setEnrollForm({ user_id: '', session_id: '', notes: '' }); },
         });
     };
-
-    const openComplete = (enrollment: Enrollment) => {
-        setSelectedEnrollment(enrollment);
-        setCompleteForm({ score: '', notes: '' });
-        setCompleteOpen(true);
-    };
-
+    const openComplete = (enrollment: Enrollment) => { setSelectedEnrollment(enrollment); setCompleteForm({ score: '', notes: '' }); setCompleteOpen(true); };
     const submitComplete = (e: FormEvent) => {
         e.preventDefault();
         if (!selectedEnrollment) return;
-        router.post(`/hr/training/enrollments/${selectedEnrollment.id}/complete`, {
-            ...completeForm,
-            score: completeForm.score || null,
-        }, {
-            onSuccess: () => setCompleteOpen(false),
-        });
+        router.post(`/hr/training/enrollments/${selectedEnrollment.id}/complete`, { ...completeForm, score: completeForm.score || null }, { onSuccess: () => setCompleteOpen(false) });
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={course.title} />
+            <div className="space-y-6 p-4 lg:p-6">
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-lg font-semibold">{course.title}</h1>
-                            <Badge variant="outline" className="font-mono text-xs">{course.code}</Badge>
-                            {course.is_mandatory && <Badge variant="destructive">Mandatory</Badge>}
+                {/* Hero Banner */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-white shadow-lg">
+                    <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
+                    <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
+                    <div className="relative flex flex-wrap items-start justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                            <Link href="/hr/training/catalog"><Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 shrink-0"><ArrowLeft className="h-5 w-5" /></Button></Link>
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h1 className="text-2xl font-bold">{course.title}</h1>
+                                    <Badge className="border-0 bg-white/20 text-white text-[10px] font-mono">{course.code}</Badge>
+                                    {course.is_mandatory && <Badge className="border-0 bg-red-500/80 text-white text-[10px]">Mandatory</Badge>}
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/70">
+                                    <span className="flex items-center gap-1"><DmIcon className="h-3.5 w-3.5" />{DELIVERY_LABELS[course.delivery_method]}</span>
+                                    <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{course.duration_hours}h</span>
+                                    {course.provider && <span>{course.provider}</span>}
+                                    {course.cost && <span>{formatCurrency(course.cost)}</span>}
+                                </div>
+                                {course.description && <p className="mt-2 max-w-2xl text-sm text-white/60 line-clamp-2">{course.description}</p>}
+                            </div>
                         </div>
-                        <div className="mt-1 text-sm text-slate-500">
-                            {deliveryLabels[course.delivery_method] || course.delivery_method} &middot; {course.duration_hours}h
-                            {course.provider && ` &middot; ${course.provider}`}
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-6">
+                                <div className="text-center">
+                                    <div className="text-3xl font-bold">{course.enrollments?.length ?? 0}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/60">Enrolled</div>
+                                </div>
+                                <div className="h-10 w-px bg-white/20" />
+                                <div className="text-center">
+                                    <div className="text-3xl font-bold">{completedCount}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/60">Completed</div>
+                                </div>
+                            </div>
+                            {can.enroll && (
+                                <Button size="sm" className="ml-4 gap-1.5 bg-white text-violet-700 hover:bg-white/90 shadow-md" onClick={() => setEnrollOpen(true)}>
+                                    <UserPlus className="h-4 w-4" />Enrol Employee
+                                </Button>
+                            )}
                         </div>
                     </div>
-
-                    {can.enroll && (
-                        <Button size="sm" onClick={() => setEnrollOpen(true)}>
-                            <UserPlus className="mr-1.5 h-4 w-4" />
-                            Enroll Employee
-                        </Button>
-                    )}
                 </div>
 
-                {/* Course Info */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Course Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                        {course.description && <p>{course.description}</p>}
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            <div>
-                                <span className="text-slate-500">Category</span>
-                                <p className="mt-0.5">{course.category || '-'}</p>
-                            </div>
-                            <div>
-                                <span className="text-slate-500">Cost</span>
-                                <p className="mt-0.5">{formatCurrency(course.cost)}</p>
-                            </div>
-                            <div>
-                                <span className="text-slate-500">Max Participants</span>
-                                <p className="mt-0.5">{course.max_participants ?? 'Unlimited'}</p>
-                            </div>
-                            <div>
-                                <span className="text-slate-500">Status</span>
-                                <p className="mt-0.5">
-                                    <Badge variant={course.is_active ? 'default' : 'secondary'}>
-                                        {course.is_active ? 'Active' : 'Inactive'}
-                                    </Badge>
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                {/* Course Info Cards */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                        <div className="text-lg font-bold text-violet-700">{course.category || '\u2014'}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-violet-500">Category</div>
+                    </div>
+                    <div className="rounded-xl border p-3 text-center">
+                        <div className="text-lg font-bold">{course.max_participants ?? 'Unlimited'}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Max Participants</div>
+                    </div>
+                    <div className="rounded-xl border p-3 text-center">
+                        <div className="text-lg font-bold">{course.sessions?.length ?? 0}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Sessions</div>
+                    </div>
+                    <div className="rounded-xl border p-3 text-center">
+                        <Badge variant={course.is_active ? 'default' : 'secondary'} className={course.is_active ? 'bg-emerald-100 text-emerald-700 border-0' : ''}>
+                            {course.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">Status</div>
+                    </div>
+                </div>
 
                 {/* Sessions */}
                 {course.sessions?.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Sessions</CardTitle>
+                    <Card className="overflow-hidden">
+                        <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-transparent pb-3">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100"><Calendar className="h-4 w-4 text-blue-600" /></div>
+                                Sessions
+                                <Badge variant="secondary" className="text-[10px]">{course.sessions.length}</Badge>
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Time</TableHead>
-                                        <TableHead>Location</TableHead>
-                                        <TableHead>Facilitator</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {course.sessions.map((session) => (
-                                        <TableRow key={session.id}>
-                                            <TableCell>{formatDate(session.session_date)}</TableCell>
-                                            <TableCell>
-                                                {session.start_time ? `${session.start_time} - ${session.end_time || ''}` : '-'}
-                                            </TableCell>
-                                            <TableCell>{session.location || '-'}</TableCell>
-                                            <TableCell>{session.facilitator || '-'}</TableCell>
-                                            <TableCell>
-                                                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[session.status] ?? ''}`}>
-                                                    {session.status}
-                                                </span>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                            <div className="divide-y">
+                                {course.sessions.map(s => (
+                                    <div key={s.id} className="flex items-center justify-between px-4 py-3 hover:bg-blue-50/30 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 flex-col items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                                                <span className="text-[10px] font-medium leading-none">{new Date(s.session_date).toLocaleDateString('en-NZ', { month: 'short' })}</span>
+                                                <span className="text-sm font-bold leading-none">{new Date(s.session_date).getDate()}</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">{s.start_time ? `${s.start_time} \u2013 ${s.end_time || ''}` : formatDate(s.session_date)}</p>
+                                                <p className="text-[11px] text-muted-foreground">{[s.location, s.facilitator].filter(Boolean).join(' \u00b7 ') || '\u2014'}</p>
+                                            </div>
+                                        </div>
+                                        <Badge className={`border-0 text-[10px] capitalize ${STATUS_COLORS[s.status] || 'bg-slate-100 text-slate-600'}`}>{s.status}</Badge>
+                                    </div>
+                                ))}
+                            </div>
                         </CardContent>
                     </Card>
                 )}
 
                 {/* Enrollments */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Enrollments ({course.enrollments?.length ?? 0})</CardTitle>
+                <Card className="overflow-hidden">
+                    <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100"><Users className="h-4 w-4 text-violet-600" /></div>
+                                Enrolments
+                                <Badge variant="secondary" className="text-[10px]">{course.enrollments?.length ?? 0}</Badge>
+                            </CardTitle>
+                            {can.enroll && (
+                                <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => setEnrollOpen(true)}>
+                                    <UserPlus className="h-3 w-3" />Enrol
+                                </Button>
+                            )}
+                        </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Employee</TableHead>
-                                    <TableHead>Enrolled</TableHead>
-                                    <TableHead>Completed</TableHead>
-                                    <TableHead>Score</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    {can.manage && <TableHead className="w-24"></TableHead>}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {course.enrollments?.map((enrollment) => (
-                                    <TableRow key={enrollment.id}>
-                                        <TableCell className="font-medium">{enrollment.user?.name}</TableCell>
-                                        <TableCell className="text-sm">{formatDateTime(enrollment.enrolled_at)}</TableCell>
-                                        <TableCell className="text-sm">{formatDateTime(enrollment.completed_at)}</TableCell>
-                                        <TableCell>{enrollment.score ? `${enrollment.score}%` : '-'}</TableCell>
-                                        <TableCell>
-                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[enrollment.status] ?? ''}`}>
-                                                {enrollment.status}
-                                            </span>
-                                        </TableCell>
-                                        {can.manage && (
-                                            <TableCell>
-                                                {enrollment.status !== 'completed' && enrollment.status !== 'withdrawn' && (
-                                                    <Button size="sm" variant="outline" onClick={() => openComplete(enrollment)}>
-                                                        <CheckCircle className="mr-1 h-3 w-3" />
-                                                        Complete
+                        {!course.enrollments?.length ? (
+                            <div className="flex flex-col items-center gap-2 py-12">
+                                <Users className="h-8 w-8 text-slate-200" />
+                                <p className="text-sm text-muted-foreground">No enrolments yet</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y">
+                                {course.enrollments.map(e => (
+                                    <div key={e.id} className="flex items-center justify-between px-4 py-3 hover:bg-violet-50/30 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`flex h-9 w-9 items-center justify-center rounded-full text-[10px] font-bold text-white ${avatarColor(e.user.id)}`}>
+                                                {getInitials(e.user.name)}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">{e.user.name}</p>
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    Enrolled {formatDate(e.enrolled_at)}
+                                                    {e.completed_at && ` \u00b7 Completed ${formatDate(e.completed_at)}`}
+                                                    {e.score && ` \u00b7 Score: ${e.score}%`}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Badge className={`border-0 text-[10px] capitalize ${STATUS_COLORS[e.status] || 'bg-slate-100 text-slate-600'}`}>{e.status}</Badge>
+                                            {can.manage && e.status !== 'completed' && e.status !== 'withdrawn' && (
+                                                <Button variant="outline" size="sm" className="gap-1 text-xs h-7" onClick={() => openComplete(e)}>
+                                                    <CheckCircle2 className="h-3 w-3" />Complete
+                                                </Button>
+                                            )}
+                                            {e.status === 'completed' && (
+                                                <a href={`/hr/training/enrollments/${e.id}/certificate`}>
+                                                    <Button variant="ghost" size="sm" className="gap-1 text-xs h-7 text-violet-600">
+                                                        <Download className="h-3 w-3" />Certificate
                                                     </Button>
-                                                )}
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
                                 ))}
-                                {!course.enrollments?.length && (
-                                    <TableRow>
-                                        <TableCell colSpan={can.manage ? 6 : 5} className="py-8 text-center text-sm text-slate-500">
-                                            No enrollments yet.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Enroll Dialog */}
+            {/* Enrol Dialog */}
             <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Enroll Employee</DialogTitle>
-                    </DialogHeader>
+                    <DialogHeader><DialogTitle>Enrol Employee</DialogTitle></DialogHeader>
                     <form onSubmit={submitEnroll} className="space-y-4">
-                        <div>
-                            <Label>Employee</Label>
-                            <Select value={enrollForm.user_id} onValueChange={(val) => setEnrollForm((p) => ({ ...p, user_id: val }))}>
+                        <div className="space-y-1.5">
+                            <Label>Employee *</Label>
+                            <Select value={enrollForm.user_id} onValueChange={v => setEnrollForm(p => ({ ...p, user_id: v }))}>
                                 <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                                <SelectContent>
-                                    {users.map((u) => (
-                                        <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
+                                <SelectContent>{users.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
                         {course.sessions?.length > 0 && (
-                            <div>
+                            <div className="space-y-1.5">
                                 <Label>Session (optional)</Label>
-                                <Select value={enrollForm.session_id || 'none'} onValueChange={(val) => setEnrollForm((p) => ({ ...p, session_id: val === 'none' ? '' : val }))}>
+                                <Select value={enrollForm.session_id || 'none'} onValueChange={v => setEnrollForm(p => ({ ...p, session_id: v === 'none' ? '' : v }))}>
                                     <SelectTrigger><SelectValue placeholder="No specific session" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none">No specific session</SelectItem>
-                                        {course.sessions.map((s) => (
-                                            <SelectItem key={s.id} value={String(s.id)}>
-                                                {formatDate(s.session_date)} {s.start_time || ''} {s.location ? `- ${s.location}` : ''}
-                                            </SelectItem>
-                                        ))}
+                                        {course.sessions.map(s => <SelectItem key={s.id} value={String(s.id)}>{formatDate(s.session_date)} {s.start_time || ''} {s.location ? `\u2013 ${s.location}` : ''}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
                         )}
-                        <div>
-                            <Label>Notes</Label>
-                            <Textarea value={enrollForm.notes} onChange={(e) => setEnrollForm((p) => ({ ...p, notes: e.target.value }))} />
-                        </div>
-                        <div className="flex justify-end gap-2">
+                        <div className="space-y-1.5"><Label>Notes</Label><Textarea value={enrollForm.notes} onChange={e => setEnrollForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" /></div>
+                        <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setEnrollOpen(false)}>Cancel</Button>
-                            <Button type="submit">Enroll</Button>
-                        </div>
+                            <Button type="submit" className="bg-violet-600 hover:bg-violet-700">Enrol</Button>
+                        </DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>
 
-            {/* Complete Enrollment Dialog */}
+            {/* Complete Dialog */}
             <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Complete Enrollment: {selectedEnrollment?.user?.name}</DialogTitle>
-                    </DialogHeader>
+                    <DialogHeader><DialogTitle>Complete Enrolment: {selectedEnrollment?.user?.name}</DialogTitle></DialogHeader>
                     <form onSubmit={submitComplete} className="space-y-4">
-                        <div>
-                            <Label>Score (%)</Label>
-                            <Input type="number" step="0.01" min="0" max="100" value={completeForm.score} onChange={(e) => setCompleteForm((p) => ({ ...p, score: e.target.value }))} />
-                        </div>
-                        <div>
-                            <Label>Notes</Label>
-                            <Textarea value={completeForm.notes} onChange={(e) => setCompleteForm((p) => ({ ...p, notes: e.target.value }))} />
-                        </div>
-                        <div className="flex justify-end gap-2">
+                        <div className="space-y-1.5"><Label>Score (%)</Label><Input type="number" step="0.01" min="0" max="100" value={completeForm.score} onChange={e => setCompleteForm(p => ({ ...p, score: e.target.value }))} placeholder="Optional" /></div>
+                        <div className="space-y-1.5"><Label>Notes</Label><Textarea value={completeForm.notes} onChange={e => setCompleteForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" /></div>
+                        <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setCompleteOpen(false)}>Cancel</Button>
-                            <Button type="submit">Mark Completed</Button>
-                        </div>
+                            <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">Mark Completed</Button>
+                        </DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>

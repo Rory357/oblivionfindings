@@ -836,7 +836,6 @@ class MyHrController extends Controller
 
         return redirect()->back()->with('success', 'Clocked out successfully.');
     }
-
     public function documents(Request $request)
     {
         $user = $request->user();

@@ -57,11 +57,13 @@ class FeedbackController extends Controller
 
         // Stats
         $statusCounts = HrFeedbackRequest::forTenant($tenantId)
+            ->when(! $canManage, fn ($q) => $q->where('reviewer_user_id', $user->id))
             ->selectRaw('status, COUNT(*) as cnt')
             ->groupBy('status')
             ->pluck('cnt', 'status');
 
         $overdueCount = HrFeedbackRequest::forTenant($tenantId)
+            ->when(! $canManage, fn ($q) => $q->where('reviewer_user_id', $user->id))
             ->where('status', 'pending')
             ->where('due_date', '<', now())
             ->count();
