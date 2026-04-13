@@ -13,6 +13,12 @@ use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Policies\HrComplianceMatrixPolicy;
 use App\Domain\Hr\Policies\HrCoursePolicy;
 use App\Domain\Hr\Policies\HrDisciplinaryActionPolicy;
+use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Clinical\Models\ClinicalEvent;
+use App\Domain\Clinical\Models\ClinicalProtocol;
+use App\Domain\Clinical\Policies\ClinicalObservationPolicy;
+use App\Domain\Clinical\Policies\ClinicalEventPolicy;
+use App\Domain\Clinical\Policies\ClinicalProtocolPolicy;
 use App\Domain\Hr\Policies\HrEmployeeProfilePolicy;
 use App\Domain\Hr\Policies\HrExpenseClaimPolicy;
 use App\Domain\Hr\Policies\HrJobPostingPolicy;
@@ -161,6 +167,10 @@ class AuthServiceProvider extends ServiceProvider
         HrDisciplinaryAction::class => HrDisciplinaryActionPolicy::class,
         HrComplianceMatrix::class => HrComplianceMatrixPolicy::class,
         HrCourse::class => HrCoursePolicy::class,
+        // Clinical
+        ClinicalObservation::class => ClinicalObservationPolicy::class,
+        ClinicalEvent::class => ClinicalEventPolicy::class,
+        ClinicalProtocol::class => ClinicalProtocolPolicy::class,
     ];
 
     public function boot(): void

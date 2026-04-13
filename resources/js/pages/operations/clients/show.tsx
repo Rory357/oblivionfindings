@@ -1,6 +1,10 @@
 import ClientLocationTab, {
     type ClientLocationData,
 } from '@/components/client-location-tab';
+import HealthSummaryCard, {
+    type HealthSummary,
+} from '@/components/clinical/health-summary-card';
+import ClientObservationsTab from '@/components/clinical/client-observations-tab';
 import {
     HalfMoonGauge,
     HorizontalBarChart,
@@ -378,6 +382,7 @@ type TabKey =
     | 'medical'
     | 'mar'
     | 'care_plans'
+    | 'observations'
     | 'calendar'
     | 'progress_notes'
     | 'service_agreements'
@@ -447,6 +452,7 @@ export default function ClientShow({
     shifts_summary,
     site_coverage,
     respite,
+    health_summary,
     can,
     location,
     transport,
@@ -518,6 +524,12 @@ export default function ClientShow({
             },
             { key: 'medical', label: 'Medical', icon: Heart, show: true },
             { key: 'mar', label: 'MAR', icon: Pill, show: true },
+            {
+                key: 'observations',
+                label: 'Observations',
+                icon: Stethoscope,
+                show: can.record_observation || can.record_clinical_observation,
+            },
             {
                 key: 'care_plans',
                 label: 'Care Plans',
@@ -598,6 +610,8 @@ export default function ClientShow({
         [
             can.assign_workers,
             can.edit,
+            can.record_observation,
+            can.record_clinical_observation,
             respiteCan?.viewAny,
             documents?.length,
             photos?.length,
@@ -1655,6 +1669,13 @@ export default function ClientShow({
                                             )}
                                         </CardContent>
                                     </Card>
+                                )}
+
+                                {/* Health Summary Card */}
+                                {(can.record_observation || can.record_clinical_observation) && health_summary && (
+                                    <div className="mt-4">
+                                        <HealthSummaryCard summary={health_summary as HealthSummary} />
+                                    </div>
                                 )}
 
                                 {/* Row 2: Main Dashboard Grid */}
@@ -3974,6 +3995,13 @@ export default function ClientShow({
                             </div>
                         );
                     })()}
+
+                {tab === 'observations' && (
+                    <ClientObservationsTab
+                        clientId={client.id}
+                        canRecordClinical={can.record_clinical_observation}
+                    />
+                )}
 
                 {tab === 'care_plans' &&
                     (() => {

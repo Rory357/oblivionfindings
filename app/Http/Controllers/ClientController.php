@@ -45,6 +45,7 @@ use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetIncident;
+use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\ShiftCoverageService;
 use Illuminate\Support\Facades\Schema;
@@ -583,6 +584,7 @@ class ClientController extends Controller
                     'capacity_outcome' => $c->capacity_outcome,
                     'best_interests_decision' => $c->best_interests_decision,
                 ]),
+            'health_summary' => app(ClinicalHealthSummaryService::class)->getSummary($client),
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
                 'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,
@@ -591,6 +593,8 @@ class ClientController extends Controller
                 'manage_onboarding' => $request->user()?->canDo('clients.onboarding.manage') ?? false,
                 'create_shift' => $request->user()?->canDo('shifts.create') ?? false,
                 'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
+                'record_observation' => $request->user()?->canDo('clinical.observations.record') ?? false,
+                'record_clinical_observation' => $request->user()?->canDo('clinical.observations.recordClinical') ?? false,
             ],
             'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
             'family_notes_open_count' => \App\Models\FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),

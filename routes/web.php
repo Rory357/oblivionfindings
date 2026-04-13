@@ -159,6 +159,9 @@ require __DIR__.'/finance.php';
 // Health & Safety module
 require __DIR__.'/health-safety.php';
 
+// Health & Clinical module
+require __DIR__.'/health-clinical.php';
+
 // API routes
 require __DIR__.'/api_medications.php';
 

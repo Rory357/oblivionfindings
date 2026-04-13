@@ -1,3 +1,4 @@
+import ShiftObservationsDueCard from '@/components/clinical/shift-observations-due-card';
 import ShiftFormsCard from '@/components/operations/shift-forms-card';
 import ShiftMedicationCard from '@/components/operations/shift-medication-card';
 import FleetHero from '@/components/fleet-hero';
@@ -506,6 +507,7 @@ export default function ShiftShow({
         if (showCoverage) tabs.push({ key: 'coverage', label: 'Coverage' });
         if (showAssignment) tabs.push({ key: 'assignment', label: 'Assignment' });
         if (showMedications) tabs.push({ key: 'medications', label: 'Medications' });
+        if (can.record_observation) tabs.push({ key: 'observations', label: 'Observations' });
         if (showForms) tabs.push({ key: 'forms', label: 'Forms' });
         if (showTransport) tabs.push({ key: 'transport', label: 'Transport' });
         if (showReplacement) tabs.push({ key: 'replacement', label: 'Replacement' });
@@ -793,6 +795,18 @@ export default function ShiftShow({
                                     {handoverSummary.incoming_staff_name ? (
                                         <p className="text-xs text-muted-foreground">Incoming: {handoverSummary.incoming_staff_name}</p>
                                     ) : null}
+                                    {handoverSummary.observations_summary?.length > 0 && (
+                                        <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
+                                            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Observations</p>
+                                            {(handoverSummary.observations_summary as Array<{type_label: string; summary: string; recorder?: string}>).map((obs: any, i: number) => (
+                                                <p key={i} className="text-xs text-muted-foreground">
+                                                    <span className="font-medium text-foreground">{obs.type_label}</span>
+                                                    {obs.summary ? ` \u2014 ${obs.summary}` : ''}
+                                                    {obs.recorder ? ` (${obs.recorder})` : ''}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">No handover required.</p>
@@ -1990,6 +2004,17 @@ export default function ShiftShow({
                         canRecord={can.record_medication}
                         summary={medications}
                         witnesses={medicationWitnesses}
+                    />
+                ) : null}
+                </div>
+
+                {/* Observations tab */}
+                <div className={resolvedActiveTab !== 'observations' ? 'hidden' : ''}>
+                {can.record_observation && shift.client ? (
+                    <ShiftObservationsDueCard
+                        shiftId={shift.id}
+                        clientId={shift.client.id}
+                        canRecordClinical={can.record_clinical_observation}
                     />
                 ) : null}
                 </div>

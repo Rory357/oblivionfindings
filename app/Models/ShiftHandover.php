@@ -24,6 +24,7 @@ class ShiftHandover extends Model
         'medications_due',
         'incidents_to_note',
         'follow_up_items',
+        'observations_summary',
         'submitted_at',
         'submitted_by',
         'acknowledged_at',
@@ -35,6 +36,7 @@ class ShiftHandover extends Model
         'medications_due' => 'array',
         'incidents_to_note' => 'array',
         'follow_up_items' => 'array',
+        'observations_summary' => 'array',
         'submitted_at' => 'datetime',
         'acknowledged_at' => 'datetime',
     ];

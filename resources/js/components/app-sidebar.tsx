@@ -73,6 +73,7 @@ import {
     ShieldCheck,
     Siren,
     Smartphone,
+    Stethoscope,
     Target,
     Trash2,
     TrendingUp,
@@ -362,6 +363,17 @@ function buildIconNavItems({
         can?.medications?.view || can?.medications?.administer?.record;
     if (hasEmar) {
         items.push({ id: 'emar', icon: Pill, label: 'eMAR', subPanel: true });
+    }
+
+    // Health & Clinical
+    const hasClinical = can?.clinical?.dashboard;
+    if (hasClinical) {
+        items.push({
+            id: 'health-clinical',
+            icon: Stethoscope,
+            label: 'Health & Clinical',
+            href: '/health-clinical',
+        });
     }
 
     // Health & Safety

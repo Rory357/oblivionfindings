@@ -261,6 +261,12 @@ class HandleInertiaRequests extends Middleware
                     'manageRecurring' => $user->canDo('calendar.manage_recurring'),
                 ],
 
+                'clinical' => [
+                    'dashboard' => $user->canDo('clinical.dashboard'),
+                    'observationsRecord' => $user->canDo('clinical.observations.record'),
+                    'observationsRecordClinical' => $user->canDo('clinical.observations.recordClinical'),
+                ],
+
                 'hazards' => [
                     'view' => $user->canDo('hazards.view'),
                     'create' => $user->canDo('hazards.create'),

@@ -424,7 +424,7 @@ class ShiftController extends Controller
                 ->first(),
             'handoverSummary' => (function () use ($shift) {
                 $h = ShiftHandover::where('outgoing_shift_id', $shift->id)
-                    ->select(['id', 'status', 'incoming_staff_id'])
+                    ->select(['id', 'status', 'incoming_staff_id', 'observations_summary'])
                     ->with(['incomingStaff:id,name'])
                     ->latest()
                     ->first();
@@ -433,6 +433,7 @@ class ShiftController extends Controller
                     'id' => $h->id,
                     'status' => $h->status,
                     'incoming_staff_name' => $h->incomingStaff?->name,
+                    'observations_summary' => $h->observations_summary,
                 ] : null;
             })(),
             'can' => [
@@ -448,6 +449,8 @@ class ShiftController extends Controller
                 'assign_shift' => $auth->canDo('shifts.manageAny'),
                 'override_eligibility' => $auth->canDo('shifts.overrideEligibility'),
                 'view_transport' => $auth->canDo('fleet.viewAny') || $auth->canDo('assets.viewAny'),
+                'record_observation' => $auth->canDo('clinical.observations.record') || $auth->canDo('clinical.observations.recordClinical'),
+                'record_clinical_observation' => $auth->canDo('clinical.observations.recordClinical'),
             ],
         ]);
     }

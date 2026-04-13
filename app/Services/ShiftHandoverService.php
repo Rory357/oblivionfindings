@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
@@ -88,6 +89,7 @@ class ShiftHandoverService
                         ->values()
                         ->all(),
                 'follow_up_items' => $this->normalizeStructuredItems($data['follow_up_items'] ?? null),
+                'observations_summary' => $this->buildObservationsSummary($outgoingShift),
                 'status' => self::STATUS_DRAFT,
             ]);
 
@@ -552,6 +554,53 @@ class ShiftHandoverService
             ]);
         }
 
+    }
+
+    /**
+     * Build a snapshot of clinical observations recorded during a shift.
+     *
+     * @return array<int, array{type: string, type_label: string, summary: string, recorded_at: string, recorder: string|null}>|null
+     */
+    protected function buildObservationsSummary(Shift $shift): ?array
+    {
+        $observations = ClinicalObservation::query()
+            ->forShift($shift->id)
+            ->with('recorder:id,name')
+            ->orderBy('recorded_at')
+            ->get();
+
+        if ($observations->isEmpty()) {
+            return null;
+        }
+
+        return $observations->map(function (ClinicalObservation $obs) {
+            return [
+                'type' => $obs->observation_type->value,
+                'type_label' => $obs->observation_type->label(),
+                'summary' => $this->summariseObservation($obs),
+                'recorded_at' => $obs->recorded_at->toISOString(),
+                'recorder' => $obs->recorder?->name,
+            ];
+        })->values()->all();
+    }
+
+    protected function summariseObservation(ClinicalObservation $obs): string
+    {
+        $d = $obs->data;
+
+        return match ($obs->observation_type->value) {
+            'vitals' => implode(', ', array_filter([
+                isset($d['systolic'], $d['diastolic']) ? "BP {$d['systolic']}/{$d['diastolic']}" : null,
+                isset($d['pulse']) ? "P{$d['pulse']}" : null,
+                isset($d['temperature']) ? "{$d['temperature']}\u{00B0}C" : null,
+            ])),
+            'weight' => isset($d['weight_kg']) ? "{$d['weight_kg']} kg" : '',
+            'bowel' => isset($d['bristol_type']) ? "Bristol type {$d['bristol_type']}" : '',
+            'sleep' => isset($d['quality']) ? ucfirst($d['quality']) . ' sleep' : '',
+            'fluid_intake' => isset($d['amount_ml']) ? "{$d['amount_ml']}ml" : '',
+            'pain' => isset($d['score']) ? "Pain {$d['score']}/10" : '',
+            default => $obs->notes ?? '',
+        };
     }
 
     protected function normalizeStructuredItems(mixed $value): ?array
