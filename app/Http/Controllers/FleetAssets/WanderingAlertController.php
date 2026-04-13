@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
-use App\Models\LocationHardware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -14,7 +15,7 @@ class WanderingAlertController extends Controller
 {
     public function index(Request $request)
     {
-        // Query control room alerts from resident tracker sources
+        // Query control room alerts from resident tracker sources.
         $query = ControlRoomAlert::query()
             ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
             ->whereNotNull('client_id');
@@ -29,22 +30,26 @@ class WanderingAlertController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        // Load client data
+        // Load client data.
         $clientIds = $alerts->getCollection()->pluck('client_id')->unique()->filter();
         $clients = Client::whereIn('id', $clientIds)->get()->keyBy('id');
 
-        // Load tracker data for last known location
-        $trackersByClient = LocationHardware::query()
-            ->where('category', LocationHardware::CATEGORY_TRACKER)
-            ->where('linked_person_type', 'client')
-            ->whereIn('linked_person_id', $clientIds)
+        // Load canonical tracking devices assigned to these clients for last-known location.
+        $devicesByClient = Device::query()
+            ->where('domain', 'tracking')
+            ->whereHas('assignments', function ($q) use ($clientIds) {
+                $q->active()
+                    ->where('assignable_type', 'client')
+                    ->whereIn('assignable_id', $clientIds);
+            })
+            ->with(['assignments' => fn ($q) => $q->active()->where('assignable_type', 'client')])
             ->get()
-            ->keyBy('linked_person_id');
+            ->keyBy(fn (Device $d) => $d->assignments->first()?->assignable_id);
 
-        $alertData = $alerts->getCollection()->map(function ($alert) use ($clients, $trackersByClient) {
+        $alertData = $alerts->getCollection()->map(function ($alert) use ($clients, $devicesByClient) {
             $client = $clients->get($alert->client_id);
-            $tracker = $trackersByClient->get($alert->client_id);
-            $meta = $tracker?->meta ?? [];
+            $device = $devicesByClient->get($alert->client_id);
+            $meta = $device?->meta ?? [];
             $context = $alert->context ?? [];
 
             return [
@@ -63,13 +68,13 @@ class WanderingAlertController extends Controller
                     'photo' => $client->profile_photo_url,
                     'house' => $client->site?->name ?? 'Unknown',
                 ] : null,
-                'last_lat' => $meta['lat'] ?? $meta['latitude'] ?? $context['lat'] ?? null,
-                'last_lng' => $meta['lng'] ?? $meta['longitude'] ?? $context['lng'] ?? null,
+                'last_lat' => $device?->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? $context['lat'] ?? null,
+                'last_lng' => $device?->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? $context['lng'] ?? null,
                 'geofence_name' => $context['geofence_name'] ?? $context['zone_name'] ?? null,
             ];
         })->values();
 
-        // Stats
+        // Stats (unchanged — alert queries, not device queries).
         $activeAlerts = ControlRoomAlert::query()
             ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
             ->whereNotNull('client_id')

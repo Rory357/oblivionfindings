@@ -122,13 +122,14 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::post('/bookings/{booking}/reject', [VehicleBookingController::class, 'reject'])->whereNumber('booking')->name('fleet-assets.bookings.reject');
     });
 
-    // Devices
+    // Devices — reads from canonical Security & Devices registry + device_asset_links.
     Route::middleware('permission:fleet.viewAny|assets.trackers.manage')->group(function () {
         Route::get('/devices', [DeviceController::class, 'index'])->name('fleet-assets.devices.index');
         Route::get('/devices/consent', [DeviceController::class, 'consentIndex'])->name('fleet-assets.devices.consent');
-        Route::get('/devices/{tracker}', [DeviceController::class, 'show'])->whereNumber('tracker')->name('fleet-assets.devices.show');
+        Route::get('/devices/{device}', [DeviceController::class, 'show'])->whereNumber('device')->name('fleet-assets.devices.show');
         Route::post('/devices/pair', [DeviceController::class, 'pair'])->name('fleet-assets.devices.pair');
-        Route::post('/devices/{tracker}/unpair', [DeviceController::class, 'unpair'])->whereNumber('tracker')->name('fleet-assets.devices.unpair');
+        Route::post('/devices/{device}/unpair', [DeviceController::class, 'unpair'])->whereNumber('device')->name('fleet-assets.devices.unpair');
+        // Consent routes still use legacy AssetTracker model binding for now.
         Route::post('/devices/{tracker}/consent/grant', [DeviceController::class, 'grantConsent'])->whereNumber('tracker')->name('fleet-assets.devices.consent.grant');
         Route::post('/devices/{tracker}/consent/revoke', [DeviceController::class, 'revokeConsent'])->whereNumber('tracker')->name('fleet-assets.devices.consent.revoke');
     });
@@ -197,10 +198,10 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/resident-tracking/history/{client}', [ResidentTrackingController::class, 'history'])->whereNumber('client')->name('fleet-assets.resident-tracking.history');
     });
 
-    // Resident Tracking — write (assign/unassign require manage)
+    // Resident Tracking — write (assign/unassign use canonical Device model)
     Route::middleware('permission:fleet.manage')->group(function () {
         Route::post('/resident-tracking/assign', [ResidentTrackingController::class, 'assign'])->name('fleet-assets.resident-tracking.assign.store');
-        Route::post('/resident-tracking/{tracker}/unassign', [ResidentTrackingController::class, 'unassign'])->whereNumber('tracker')->name('fleet-assets.resident-tracking.unassign');
+        Route::post('/resident-tracking/{device}/unassign', [ResidentTrackingController::class, 'unassign'])->whereNumber('device')->name('fleet-assets.resident-tracking.unassign');
     });
 
     // Wandering Alerts

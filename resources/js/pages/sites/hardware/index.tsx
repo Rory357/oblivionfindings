@@ -63,6 +63,33 @@ type Site = { id: number; name: string; type: string };
 
 type Room = { id: number; name: string; sort_order: number };
 
+/** Canonical device from Security & Devices registry. */
+type DeviceItem = {
+    id: number;
+    device_uid: string;
+    name: string;
+    domain: string;
+    category: string;
+    subcategory: string | null;
+    manufacturer: string | null;
+    model: string | null;
+    serial_number: string | null;
+    mac_address: string | null;
+    asset_tag: string | null;
+    status: string;
+    health_status: string;
+    provider: string | null;
+    last_seen_at: string | null;
+    battery_level: number | null;
+    firmware_version: string | null;
+    ip_address: string | null;
+    notes: string | null;
+    assignment_type: string | null;
+    assignment_id: number | null;
+    legacy_location_hardware_id: number | null;
+};
+
+/** @deprecated Legacy type — kept for backward compat with UniFi integration sections. */
 type HardwareItem = {
     id: number;
     provider: string;
@@ -162,7 +189,8 @@ type Permissions = {
 
 type Props = {
     site: Site;
-    hardware: HardwareItem[];
+    devices: DeviceItem[];
+    hardware?: HardwareItem[]; // Legacy — may still be passed by some code paths
     rooms: Room[];
     integrations: IntegrationConfig[];
     assets: AssetLite[];
@@ -270,6 +298,7 @@ function formatUnifiHostLabel(host: DiscoveredHost): {
 
 export default function SiteHardware({
     site,
+    devices,
     hardware,
     rooms,
     integrations,
@@ -278,6 +307,9 @@ export default function SiteHardware({
     unifi,
     can,
 }: Props) {
+    // Bridge: legacy code that still references `hardware` uses the
+    // canonical devices list. UniFi sections may still use legacy hardware.
+    const allHardware = hardware ?? [];
     // --- state -----------------------------------------------------------------
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -396,32 +428,35 @@ export default function SiteHardware({
         [discoveredHosts],
     );
 
+    // Stats from canonical device list.
     const stats = useMemo(() => {
-        const total = hardware.length;
-        const online = hardware.filter((h) => h.status === 'online').length;
-        const offline = hardware.filter((h) => h.status === 'offline').length;
-        const unassigned = hardware.filter((h) => !h.room).length;
-        return { total, online, offline, unassigned };
-    }, [hardware]);
+        const total = devices.length;
+        const active = devices.filter((d) => d.status === 'active').length;
+        const offline = devices.filter((d) => d.status === 'offline' || d.status === 'degraded').length;
+        const unassignedRooms = devices.filter((d) => d.assignment_type !== 'room').length;
+        return { total, online: active, offline, unassigned: unassignedRooms };
+    }, [devices]);
 
+    // UniFi devices still use legacy hardware list for integration-specific UI.
     const unifiDevices = useMemo(
-        () => hardware.filter((h) => h.provider === 'unifi'),
-        [hardware],
+        () => allHardware.filter((h) => h.provider === 'unifi'),
+        [allHardware],
     );
 
     const providerOptions = useMemo(() => {
-        const providers = Array.from(new Set(hardware.map((h) => h.provider))).filter(Boolean);
+        const providers = Array.from(new Set(devices.map((d) => d.provider).filter(Boolean) as string[]));
         return providers.sort((a, b) => a.localeCompare(b));
-    }, [hardware]);
+    }, [devices]);
 
+    // Filter over canonical devices.
     const filteredHardware = useMemo(() => {
-        return hardware.filter((h) => {
-            if (filterStatus !== 'all' && h.status !== filterStatus) return false;
-            if (filterCategory !== 'all' && h.category !== filterCategory) return false;
-            if (filterProvider !== 'all' && h.provider !== filterProvider) return false;
+        return devices.filter((d) => {
+            if (filterStatus !== 'all' && d.status !== filterStatus) return false;
+            if (filterCategory !== 'all' && d.category !== filterCategory) return false;
+            if (filterProvider !== 'all' && d.provider !== filterProvider) return false;
             if (search) {
                 const q = search.toLowerCase();
-                const haystack = [h.name, h.asset_tag, h.serial, h.mac, h.provider, h.category, h.room?.name]
+                const haystack = [d.name, d.device_uid, d.asset_tag, d.serial_number, d.mac_address, d.provider, d.category]
                     .filter(Boolean)
                     .join(' ')
                     .toLowerCase();
@@ -429,7 +464,7 @@ export default function SiteHardware({
             }
             return true;
         });
-    }, [hardware, search, filterStatus, filterCategory, filterProvider]);
+    }, [devices, search, filterStatus, filterCategory, filterProvider]);
 
     const categoryKeys = Object.keys(categories);
     const canManageHardware = !!can?.manage_hardware;
@@ -1264,102 +1299,96 @@ export default function SiteHardware({
                     </div>
                 )}
 
-                {/* Hardware list */}
+                {/* Device list — sourced from canonical Security & Devices registry */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">
-                            Hardware Items
-                            {filteredHardware.length !== hardware.length && (
-                                <span className="ml-2 text-sm font-normal text-slate-400">
-                                    Showing {filteredHardware.length} of {hardware.length}
-                                </span>
-                            )}
-                        </CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">
+                                Devices at this Site
+                                {filteredHardware.length !== devices.length && (
+                                    <span className="ml-2 text-sm font-normal text-slate-400">
+                                        Showing {filteredHardware.length} of {devices.length}
+                                    </span>
+                                )}
+                            </CardTitle>
+                            <a
+                                href={`/security-devices/devices/create?domain=&site_id=${site.id}`}
+                                className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                            >
+                                Manage in Security &amp; Devices →
+                            </a>
+                        </div>
                     </CardHeader>
                     <CardContent>
-                        {hardware.length === 0 ? (
+                        {devices.length === 0 ? (
                             <div className="text-center py-12 text-slate-400">
                                 <MonitorSmartphone className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                                <p className="text-lg font-medium mb-1">No hardware registered</p>
-                                <p className="text-sm">Add your first hardware item or sync from an integration.</p>
-                                <Button onClick={openAdd} className="mt-4">
+                                <p className="text-lg font-medium mb-1">No devices assigned to this site</p>
+                                <p className="text-sm">Register and assign devices in Security &amp; Devices.</p>
+                                <a href="/security-devices/devices/create" className="inline-flex items-center gap-1 mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
                                     <Plus className="w-4 h-4 mr-1" />
-                                    Add Hardware
-                                </Button>
+                                    Register Device
+                                </a>
                             </div>
                         ) : filteredHardware.length === 0 ? (
                             <div className="text-center py-8 text-slate-400">
                                 <Search className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                                <p>No hardware items match your filters.</p>
+                                <p>No devices match your filters.</p>
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                                {filteredHardware.map((item) => {
-                                                    const sc = statusConfig[item.status];
-                                                    const StatusIcon = sc.icon;
-                                                    const model = resolveDeviceModel(item);
-                                                    const type = resolveDeviceType(item);
-                                                    return (
-                                                        <div
-                                                            key={item.id}
-                                                            className="rounded-xl border p-4 hover:bg-muted/50 transition-colors"
-                                                        >
+                                {filteredHardware.map((item) => {
+                                    const isOnline = item.status === 'active';
+                                    const isOffline = item.status === 'offline' || item.status === 'degraded';
+                                    const roomName = item.assignment_type === 'room'
+                                        ? rooms.find((r) => r.id === item.assignment_id)?.name
+                                        : null;
+                                    return (
+                                        <a
+                                            key={item.id}
+                                            href={`/security-devices/devices/${item.id}`}
+                                            className="block rounded-xl border p-4 hover:bg-muted/50 transition-colors"
+                                        >
                                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                        <span
-                                                            className={`inline-block w-2.5 h-2.5 rounded-full ${statusDotColor[item.status]}`}
-                                                        />
+                                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-500' : isOffline ? 'bg-red-500' : 'bg-slate-400'}`} />
                                                         <span className="font-medium">{item.name}</span>
-                                                        <Badge variant="outline" className="text-xs">
-                                                            {categories[item.category] || item.category}
-                                                        </Badge>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-xs border-indigo-500/30 text-indigo-300"
-                                                        >
-                                                            {item.provider}
-                                                        </Badge>
-                                                        <Badge variant="outline" className={`text-xs ${sc.className}`}>
-                                                            <StatusIcon className="w-3 h-3 mr-1" />
-                                                            {sc.label}
-                                                        </Badge>
+                                                        <Badge variant="outline" className="font-mono text-[10px]">{item.device_uid}</Badge>
+                                                        <Badge variant="outline" className="text-xs">{item.category?.replace(/_/g, ' ')}</Badge>
+                                                        {item.provider && (
+                                                            <Badge variant="outline" className="text-xs border-indigo-500/30 text-indigo-300">{item.provider}</Badge>
+                                                        )}
+                                                        <Badge variant={isOnline ? 'default' : isOffline ? 'secondary' : 'outline'} className="text-[10px]">{item.status?.replace(/_/g, ' ')}</Badge>
+                                                        <Badge variant={item.health_status === 'healthy' ? 'default' : item.health_status === 'critical' ? 'destructive' : 'outline'} className="text-[10px]">{item.health_status}</Badge>
                                                     </div>
 
                                                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-400">
-                                                        {item.room && (
+                                                        {roomName && (
                                                             <span className="flex items-center gap-1">
                                                                 <DoorOpen className="w-3.5 h-3.5" />
-                                                                {item.room.name}
+                                                                {roomName}
                                                             </span>
                                                         )}
-                                                        {(model || type) && (
+                                                        {(item.manufacturer || item.model) && (
                                                             <span className="text-xs text-slate-500">
-                                                                {[type, model].filter(Boolean).join(' • ')}
+                                                                {[item.manufacturer, item.model].filter(Boolean).join(' ')}
                                                             </span>
                                                         )}
-                                                        {item.linked_asset && (
-                                                            <span className="flex items-center gap-1">
-                                                                <Link2 className="w-3.5 h-3.5" />
-                                                                {item.linked_asset.name}
-                                                                {item.linked_asset.asset_tag && (
-                                                                    <span className="text-xs text-slate-500">
-                                                                        ({item.linked_asset.asset_tag})
-                                                                    </span>
-                                                                )}
-                                                            </span>
+                                                        {item.mac_address && (
+                                                            <span className="font-mono text-xs">MAC: {item.mac_address}</span>
                                                         )}
-                                                        {item.mac && (
-                                                            <span className="font-mono text-xs">MAC: {item.mac}</span>
-                                                        )}
-                                                        {item.serial && (
-                                                            <span className="font-mono text-xs">S/N: {item.serial}</span>
+                                                        {item.serial_number && (
+                                                            <span className="font-mono text-xs">S/N: {item.serial_number}</span>
                                                         )}
                                                         {item.asset_tag && (
                                                             <span className="font-mono text-xs">Tag: {item.asset_tag}</span>
                                                         )}
-                                                        {item.external_ref?.ip && (
-                                                            <span className="text-xs text-slate-500">IP: {item.external_ref.ip}</span>
+                                                        {item.ip_address && (
+                                                            <span className="text-xs text-slate-500">IP: {item.ip_address}</span>
+                                                        )}
+                                                        {item.battery_level !== null && (
+                                                            <span className="text-xs text-slate-500">Battery: {item.battery_level}%</span>
                                                         )}
                                                     </div>
 
@@ -1369,68 +1398,16 @@ export default function SiteHardware({
                                                         </div>
                                                     )}
                                                 </div>
-
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => openEdit(item)}
-                                                        title="Edit"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => openAssignRoom(item)}
-                                                        title="Assign Room"
-                                                    >
-                                                        <DoorOpen className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => openLinkAsset(item)}
-                                                        title="Link Asset"
-                                                    >
-                                                        <Link2 className="w-4 h-4" />
-                                                    </Button>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="text-red-400 hover:text-red-300"
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Delete Hardware</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    Delete &quot;{item.name}&quot;? This action cannot be undone.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction
-                                                                    className="bg-red-600 hover:bg-red-700"
-                                                                    onClick={() => deleteHardware(item.id)}
-                                                                >
-                                                                    Delete
-                                                                </AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </div>
                                             </div>
-                                        </div>
+                                        </a>
                                     );
                                 })}
                             </div>
                         )}
+
+                        {/* Legacy hardware action buttons removed — CRUD now in Security & Devices.
+                            The original edit/delete/assign-room/link-asset buttons are no longer shown
+                            here. Users should manage devices through Security & Devices module. */}
                     </CardContent>
                 </Card>
 

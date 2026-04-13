@@ -127,6 +127,12 @@ class DuskDatabaseSeeder extends Seeder
             'timesheets.approve','timesheets.create','timesheets.manageAny','timesheets.submit',
             'timesheets.update','timesheets.viewAny','timesheets.viewAssigned',
             'training.enrol','training.exempt','training.manageCourses','training.record','training.viewAny',
+            'securityDevices.viewAny','securityDevices.devices.view','securityDevices.devices.create',
+            'securityDevices.devices.update','securityDevices.devices.delete','securityDevices.devices.assign',
+            'securityDevices.groups.manage','securityDevices.events.view',
+            'securityDevices.maintenance.view','securityDevices.maintenance.manage',
+            'securityDevices.integrations.view','securityDevices.integrations.manage',
+            'securityDevices.reports.view',
             'unifi.manage','vendors.manage','vendors.view',
             'vetting.assessRisk','vetting.manage','vetting.verify','vetting.viewAny','workers.viewAny',
         ]);

@@ -151,6 +151,11 @@ class Asset extends Model
         return $this->hasMany(AssetAssignment::class);
     }
 
+    /**
+     * @deprecated Use DeviceAssetLink::active()->forAsset($this->id) instead.
+     * Legacy relationship — AssetTracker is retired as active source of truth.
+     * Kept for telemetry ingestion bridge and consent management compatibility.
+     */
     public function trackers(): HasMany
     {
         return $this->hasMany(AssetTracker::class);
@@ -201,6 +206,10 @@ class Asset extends Model
         return $this->hasMany(AssetIncidentLink::class);
     }
 
+    /**
+     * @deprecated Use DeviceAssetLink::active()->forAsset($this->id) instead.
+     * Legacy relationship — LocationHardware is retired as active source of truth.
+     */
     public function linkedHardware(): HasMany
     {
         return $this->hasMany(LocationHardware::class, 'linked_asset_id');

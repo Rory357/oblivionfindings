@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Domain\SecurityDevices\Models\Device;
 use App\Http\Controllers\Controller;
 use App\Models\Integration\Integration;
 use App\Models\Integration\IntegrationSiteConfig;
@@ -80,29 +81,63 @@ class UnifiSettingsController extends Controller
             ->orderBy('name')
             ->get(['id', 'site_id', 'name']);
 
-        // Synced UniFi devices across tenant locations
-        $syncedDevices = LocationHardware::query()
-            ->where('tenant_id', $tenantId)
-            ->where('provider', self::PROVIDER)
-            ->with(['site:id,name,type', 'room:id,name'])
-            ->orderBy('site_id')
+        // Synced UniFi devices — reads from canonical Security & Devices registry.
+        // Resolves site/room context via device_assignments.
+        $syncedDevices = Device::query()
+            ->forTenant($tenantId)
+            ->byProvider(self::PROVIDER)
+            ->with(['assignments' => fn ($q) => $q->active()])
             ->orderBy('name')
             ->get()
-            ->map(fn (LocationHardware $device) => [
-                'id' => $device->id,
-                'site_id' => $device->site_id,
-                'site_name' => $device->site?->name ?? 'Unknown site',
-                'site_type' => $device->site?->type,
-                'room_id' => $device->room_id,
-                'room_name' => $device->room?->name,
-                'name' => $device->name,
-                'category' => $device->category,
-                'status' => $device->status,
-                'provider_entity_id' => data_get($device->external_ref, 'provider_entity_id'),
-                'provider_type' => data_get($device->meta, 'provider_type') ?: data_get($device->external_ref, 'provider_type'),
-                'model' => data_get($device->external_ref, 'model') ?: data_get($device->meta, 'model_long'),
-                'last_seen_at' => $device->last_seen_at?->toISOString(),
-            ])
+            ->map(function (Device $device) use ($sites, $rooms) {
+                // Resolve site/room from active assignment.
+                $assignment = $device->assignments->first(fn ($a) => $a->released_at === null);
+                $siteId = null;
+                $roomId = null;
+
+                if ($assignment) {
+                    if ($assignment->assignable_type === 'site') {
+                        $siteId = $assignment->assignable_id;
+                    } elseif ($assignment->assignable_type === 'room') {
+                        $roomId = $assignment->assignable_id;
+                        // Resolve site from room.
+                        $room = $rooms->firstWhere('id', $roomId);
+                        $siteId = $room?->site_id;
+                    }
+                }
+
+                $site = $siteId ? $sites->firstWhere('id', $siteId) : null;
+                $room = $roomId ? $rooms->firstWhere('id', $roomId) : null;
+                $extRef = $device->external_ref ?? [];
+                $meta = $device->meta ?? [];
+
+                return [
+                    'id' => $device->id,
+                    'device_uid' => $device->device_uid,
+                    'site_id' => $siteId,
+                    'site_name' => $site?->name ?? 'Unassigned',
+                    'site_type' => $site?->type,
+                    'room_id' => $roomId,
+                    'room_name' => $room?->name,
+                    'name' => $device->name,
+                    'domain' => $device->domain,
+                    'category' => $device->category,
+                    'subcategory' => $device->subcategory,
+                    'status' => $device->status?->value,
+                    'health_status' => $device->health_status?->value,
+                    'provider_entity_id' => $extRef['provider_entity_id'] ?? null,
+                    'provider_type' => $meta['provider_type'] ?? $extRef['provider_type'] ?? null,
+                    'model' => $device->model ?? $extRef['model'] ?? $meta['model_long'] ?? null,
+                    'manufacturer' => $device->manufacturer,
+                    'serial_number' => $device->serial_number,
+                    'mac_address' => $device->mac_address,
+                    'ip_address' => $device->ip_address,
+                    'firmware_version' => $device->firmware_version,
+                    'last_seen_at' => $device->last_seen_at?->toISOString(),
+                    'detail_url' => "/security-devices/devices/{$device->id}",
+                ];
+            })
+            ->sortBy('site_name')
             ->values()
             ->all();
 

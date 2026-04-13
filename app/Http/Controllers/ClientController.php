@@ -37,6 +37,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Models\LocationHardware;
 use App\Models\AssetGeofence;
 use App\Models\ConsentType;
@@ -720,10 +722,12 @@ class ClientController extends Controller
                         'name' => $r->name,
                     ]),
                 ]),
-            'available_trackers' => \App\Models\LocationHardware::where('category', \App\Models\LocationHardware::CATEGORY_TRACKER)
-                ->whereNotIn('status', ['retired'])
+            'available_trackers' => Device::query()
+                ->where('domain', 'tracking')
+                ->whereNotIn('status', ['decommissioned', 'lost'])
+                ->whereDoesntHave('assignments', fn ($q) => $q->active())
                 ->orderBy('name')
-                ->get(['id', 'name', 'status', 'last_seen_at', 'serial', 'site_id', 'meta'])
+                ->get(['id', 'device_uid', 'name', 'status', 'health_status', 'last_seen_at', 'serial_number', 'battery_level'])
                 ->map(fn($t) => [
                     'id' => $t->id,
                     'name' => $t->name,
@@ -1512,32 +1516,38 @@ class ClientController extends Controller
 
     /**
      * Build location/tracker data for the client profile.
+     * Reads from canonical Security & Devices registry.
      */
     private function buildLocationData(Client $client): array
     {
-        $tracker = LocationHardware::query()
-            ->where('category', LocationHardware::CATEGORY_TRACKER)
-            ->where('linked_person_type', 'client')
-            ->where('linked_person_id', $client->id)
+        $tenantId = $client->tenant_id ?? 1;
+
+        // Find the active tracking device assigned to this client.
+        $device = app(DeviceRegistryService::class)
+            ->forClient($tenantId, $client->id)
+            ->where('domain', 'tracking')
             ->first();
 
         $trackerInfo = null;
         $currentLocation = null;
 
-        if ($tracker) {
-            $meta = $tracker->meta ?? [];
-            $lat = $meta['lat'] ?? $meta['latitude'] ?? null;
-            $lng = $meta['lng'] ?? $meta['longitude'] ?? null;
+        if ($device) {
+            $meta = $device->meta ?? [];
+            $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
+            $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
 
             $trackerInfo = [
-                'id' => $tracker->id,
-                'name' => $tracker->name,
-                'serial' => $tracker->serial,
-                'mac' => $tracker->mac,
-                'provider' => $tracker->provider,
-                'status' => $tracker->status ?? 'unknown',
-                'last_seen_at' => optional($tracker->last_seen_at)->toISOString(),
-                'battery' => $meta['battery'] ?? $meta['battery_level'] ?? null,
+                'id' => $device->id,
+                'device_uid' => $device->device_uid,
+                'name' => $device->name,
+                'serial' => $device->serial_number,
+                'mac' => $device->mac_address,
+                'provider' => $device->provider,
+                'status' => $device->status?->value ?? 'unknown',
+                'health_status' => $device->health_status?->value ?? 'unknown',
+                'last_seen_at' => $device->last_seen_at?->toISOString(),
+                'battery' => $device->battery_level,
+                'detail_url' => "/security-devices/devices/{$device->id}",
             ];
 
             if ($lat !== null && $lng !== null) {
@@ -1629,22 +1639,29 @@ class ClientController extends Controller
 
     /**
      * Return location history for a client's personal tracker (JSON).
+     * Reads device identity from canonical registry; history from
+     * integration_events via legacy bridge FK.
      */
     public function locationHistory(Request $request, Client $client)
     {
         $this->authorize('view', $client);
 
-        $tracker = LocationHardware::query()
-            ->where('category', LocationHardware::CATEGORY_TRACKER)
-            ->where('linked_person_type', 'client')
-            ->where('linked_person_id', $client->id)
+        $tenantId = $client->tenant_id ?? 1;
+
+        // Canonical device lookup.
+        $device = app(DeviceRegistryService::class)
+            ->forClient($tenantId, $client->id)
+            ->where('domain', 'tracking')
             ->first();
 
         $locations = [];
 
-        if ($tracker && Schema::hasTable('integration_events')) {
+        // Use legacy bridge FK for integration_events query (not yet migrated).
+        $legacyHardwareId = $device?->legacy_location_hardware_id;
+
+        if ($legacyHardwareId && Schema::hasTable('integration_events')) {
             $query = DB::table('integration_events')
-                ->where('hardware_id', $tracker->id)
+                ->where('hardware_id', $legacyHardwareId)
                 ->whereNotNull('payload');
 
             if ($request->filled('date_from')) {

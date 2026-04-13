@@ -44,6 +44,7 @@ class DatabaseSeeder extends Seeder
         $this->call(FleetManagementSeeder::class);
         $this->call(ControlRoomSeeder::class);
         $this->call(GovernancePermissionsSeeder::class);
+        $this->call(SecurityDevicesPermissionsSeeder::class);
         $this->call(RoadmapPermissionsSeeder::class);
         $this->call(RoadmapSeeder::class);
         $this->call(BoardMemberSeeder::class);

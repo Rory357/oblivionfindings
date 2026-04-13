@@ -159,6 +159,7 @@ class Site extends Model
         return $this->hasMany(SiteRoom::class);
     }
 
+    /** @deprecated Use DeviceRegistryService::forSite() instead. LocationHardware is retired. */
     public function locationHardware(): HasMany
     {
         return $this->hasMany(LocationHardware::class);

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\LocationHardware;
@@ -15,15 +18,56 @@ use Inertia\Inertia;
 
 class SiteHardwareController extends Controller
 {
+    public function __construct(
+        private readonly DeviceRegistryService $registry,
+    ) {}
+
     public function index(Request $request, Site $site)
     {
         $this->authorize('view', $site);
 
-        $hardware = LocationHardware::where('site_id', $site->id)
-            ->with(['room:id,name', 'linkedAsset:id,name,asset_tag'])
+        $user = $request->user();
+        $tenantId = $user?->tenant_id ?? $user?->organization_id ?? $site->tenant_id ?? 1;
+
+        // ── Canonical device list (from Security & Devices) ───────
+        // Devices assigned to this site or any of its rooms.
+        $devices = $this->registry->forSite($tenantId, $site->id)
+            ->with(['assignments' => fn ($q) => $q->active()])
             ->orderBy('category')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function (Device $d) {
+                $active = $d->assignments->first(fn ($a) => $a->released_at === null);
+
+                return [
+                    'id' => $d->id,
+                    'device_uid' => $d->device_uid,
+                    'name' => $d->name,
+                    'domain' => $d->domain,
+                    'category' => $d->category,
+                    'subcategory' => $d->subcategory,
+                    'manufacturer' => $d->manufacturer,
+                    'model' => $d->model,
+                    'serial_number' => $d->serial_number,
+                    'mac_address' => $d->mac_address,
+                    'asset_tag' => $d->asset_tag,
+                    'status' => $d->status?->value,
+                    'health_status' => $d->health_status?->value,
+                    'provider' => $d->provider,
+                    'last_seen_at' => $d->last_seen_at?->toISOString(),
+                    'battery_level' => $d->battery_level,
+                    'firmware_version' => $d->firmware_version,
+                    'ip_address' => $d->ip_address,
+                    'notes' => $d->notes,
+                    // Assignment context for room display.
+                    'assignment_type' => $active?->assignable_type,
+                    'assignment_id' => $active?->assignable_id,
+                    // Legacy bridge for components that still need it.
+                    'legacy_location_hardware_id' => $d->legacy_location_hardware_id,
+                ];
+            });
+
+        // ── Rooms, integrations, assets (unchanged) ───────────────
 
         $rooms = SiteRoom::where('site_id', $site->id)
             ->orderBy('sort_order')
@@ -38,8 +82,7 @@ class SiteHardwareController extends Controller
             ->orderBy('name')
             ->get();
 
-        $user = $request->user();
-        $tenantId = $user?->tenant_id ?? $user?->organization_id ?? $site->tenant_id ?? 1;
+        // ── UniFi integration data (unchanged) ────────────────────
 
         $unifiSecret = IntegrationTenantSecret::query()
             ->forTenant($tenantId)
@@ -68,26 +111,25 @@ class SiteHardwareController extends Controller
             }
         }
 
-
         $secretConfig = is_array($unifiSecret?->config) ? $unifiSecret->config : [];
         $discoveredSites = collect($secretConfig['discovered_sites'] ?? [])
-            ->map(fn (array $site) => [
-                'external_id' => (string) ($site['external_id'] ?? ''),
-                'name' => $site['name'] ?? 'Unknown',
-                'meta' => $site['meta'] ?? [],
+            ->map(fn (array $s) => [
+                'external_id' => (string) ($s['external_id'] ?? ''),
+                'name' => $s['name'] ?? 'Unknown',
+                'meta' => $s['meta'] ?? [],
             ])
-            ->filter(fn (array $site) => $site['external_id'] !== '')
+            ->filter(fn (array $s) => $s['external_id'] !== '')
             ->values()
             ->all();
         $discoveredHosts = collect($secretConfig['discovered_hosts'] ?? [])
-            ->map(fn (array $host) => [
-                'host_id' => (string) ($host['host_id'] ?? ''),
-                'name' => $host['name'] ?? 'Unknown',
-                'model' => $host['model'] ?? null,
-                'role' => $host['role'] ?? null,
-                'controllers' => $host['controllers'] ?? [],
+            ->map(fn (array $h) => [
+                'host_id' => (string) ($h['host_id'] ?? ''),
+                'name' => $h['name'] ?? 'Unknown',
+                'model' => $h['model'] ?? null,
+                'role' => $h['role'] ?? null,
+                'controllers' => $h['controllers'] ?? [],
             ])
-            ->filter(fn (array $host) => $host['host_id'] !== '')
+            ->filter(fn (array $h) => $h['host_id'] !== '')
             ->values()
             ->all();
 
@@ -97,11 +139,11 @@ class SiteHardwareController extends Controller
                 'name' => $site->name,
                 'type' => $site->type,
             ],
-            'hardware' => $hardware,
+            'devices' => $devices,
             'rooms' => $rooms,
             'integrations' => $integrations,
             'assets' => $assets,
-            'categories' => LocationHardware::categories(),
+            'categories' => LocationHardware::categories(), // kept for legacy UniFi room-assignment UI
             'unifi' => [
                 'tenantSecret' => $unifiSecret ? [
                     'status' => $unifiSecret->status,
@@ -139,6 +181,14 @@ class SiteHardwareController extends Controller
         ]);
     }
 
+    // ── Legacy CRUD methods (DEPRECATED) ─────────────────────────
+    // @deprecated These methods operate on LocationHardware which is retired
+    // as the active source of truth. The canonical device registry is now
+    // Security & Devices (devices table). These are kept temporarily for:
+    //   - UniFi integration sync compatibility
+    //   - Room management (rooms are still owned by Sites)
+    // Device CRUD should go through /security-devices/devices/* routes.
+
     public function store(Request $request, Site $site)
     {
         $this->authorize('update', $site);
@@ -157,7 +207,7 @@ class SiteHardwareController extends Controller
         LocationHardware::create([
             ...$validated,
             'provider' => $validated['provider'] ?? 'manual',
-            'tenant_id' => $request->user()->tenant_id,
+            'tenant_id' => $request->user()->tenant_id ?? 1,
             'site_id' => $site->id,
             'status' => LocationHardware::STATUS_UNKNOWN,
         ]);

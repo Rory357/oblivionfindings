@@ -227,13 +227,26 @@ class AssetController extends Controller
             'cof_expires_at' => optional($asset->cof_expires_at)->toDateString(),
             'insurance_expires_at' => optional($asset->insurance_expires_at)->toDateString(),
             'notes' => $asset->notes,
-            'trackers' => $asset->trackers->map(fn ($t) => [
-                'id' => $t->id,
-                'vendor' => $t->vendor,
-                'device_uid' => $t->device_uid,
-                'status' => $t->status,
-                'last_seen_at' => optional($t->last_seen_at)->toISOString(),
-            ])->values(),
+            'trackers' => \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
+                ->active()
+                ->forAsset($asset->id)
+                ->with('device:id,device_uid,name,status,health_status,provider,last_seen_at,battery_level,imei,serial_number')
+                ->get()
+                ->map(fn ($link) => [
+                    'id' => $link->device?->id,
+                    'device_uid' => $link->device?->device_uid,
+                    'name' => $link->device?->name,
+                    'vendor' => $link->device?->provider,
+                    'status' => $link->device?->status?->value,
+                    'health_status' => $link->device?->health_status?->value,
+                    'last_seen_at' => $link->device?->last_seen_at?->toISOString(),
+                    'battery_level' => $link->device?->battery_level,
+                    'link_type' => $link->link_type?->value,
+                    'linked_at' => $link->linked_at?->toISOString(),
+                    'detail_url' => $link->device ? "/security-devices/devices/{$link->device->id}" : null,
+                ])
+                ->filter(fn ($t) => $t['id'] !== null)
+                ->values(),
             'fleet_state' => $asset->fleetState ? [
                 'status' => $asset->fleetState->status,
                 'latitude' => $asset->fleetState->latitude,

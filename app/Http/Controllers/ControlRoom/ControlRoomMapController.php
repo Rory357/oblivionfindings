@@ -17,8 +17,10 @@ class ControlRoomMapController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
-        // Build device query - only those with coordinates
+        // Build device query - only those with coordinates.
+        // Eager-load canonical device for enrichment.
         $deviceQuery = Device::query()
+            ->with('canonicalDevice:id,device_uid,domain,category,health_status')
             ->whereNotNull('latitude')
             ->whereNotNull('longitude');
 
@@ -107,23 +109,31 @@ class ControlRoomMapController extends Controller
         ];
 
         return Inertia::render('control-room/map', [
-            'devices' => $devices->map(fn (Device $d) => [
-                'id' => $d->id,
-                'device_uid' => $d->device_uid,
-                'name' => $d->name,
-                'type' => $d->type,
-                'status' => $d->status,
-                'latitude' => (float) $d->latitude,
-                'longitude' => (float) $d->longitude,
-                'location_description' => $d->location_description,
-                'battery_level' => $d->battery_level,
-                'last_seen_at' => optional($d->last_seen_at)->toISOString(),
-                'vendor' => $d->vendor,
-                'model' => $d->getAttribute('model'),
-                'site_id' => $d->site_id,
-                'client_id' => $d->client_id,
-                'asset_id' => $d->asset_id,
-            ])->values(),
+            'devices' => $devices->map(function (Device $d) {
+                $canonical = $d->canonicalDevice;
+                return [
+                    'id' => $d->id,
+                    'device_uid' => $d->device_uid,
+                    'name' => $d->name,
+                    'type' => $d->type,
+                    'status' => $d->status,
+                    'latitude' => (float) $d->latitude,
+                    'longitude' => (float) $d->longitude,
+                    'location_description' => $d->location_description,
+                    'battery_level' => $d->battery_level,
+                    'last_seen_at' => optional($d->last_seen_at)->toISOString(),
+                    'vendor' => $d->vendor,
+                    'model' => $d->getAttribute('model'),
+                    'site_id' => $d->site_id,
+                    'client_id' => $d->client_id,
+                    'asset_id' => $d->asset_id,
+                    // Canonical enrichment (safe fallback to null).
+                    'canonical_id' => $canonical?->id,
+                    'canonical_device_uid' => $canonical?->device_uid,
+                    'canonical_health_status' => $canonical?->health_status?->value,
+                    'canonical_detail_url' => $canonical ? "/security-devices/devices/{$canonical->id}" : null,
+                ];
+            })->values(),
             'sites' => $sites->map(fn (Site $s) => [
                 'id' => $s->id,
                 'name' => $s->name,

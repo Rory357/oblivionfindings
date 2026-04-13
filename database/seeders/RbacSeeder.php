@@ -245,6 +245,13 @@ class RbacSeeder extends Seeder
             ['key' => 'medications.reports.export', 'description' => 'Export MAR/audit/medications reports', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.breakglass', 'description' => 'Use break-glass emergency access', 'group' => 'medications', 'module' => 'Clinical'],
 
+            // Health & Clinical
+            ['key' => 'clinical.observations.view', 'description' => 'View clinical observations', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.observations.record', 'description' => 'Record clinical observations', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.events.view', 'description' => 'View clinical events', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.events.record', 'description' => 'Record clinical events', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.protocols.manage', 'description' => 'Manage clinical protocols', 'group' => 'clinical', 'module' => 'Clinical'],
+
             // Incidents
             ['key' => 'incidents.viewAny', 'description' => 'View all incidents', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.viewAssigned', 'description' => 'View incidents for assigned clients', 'group' => 'incidents', 'module' => 'Compliance'],
@@ -573,6 +580,9 @@ class RbacSeeder extends Seeder
             'hr.time.viewAny', 'hr.time.approveTeam',
             'sites.damages.view', 'sites.damages.create',
             'sites.ledger.view', 'sites.ledger.create',
+            'clinical.observations.view', 'clinical.observations.record',
+            'clinical.events.view', 'clinical.events.record',
+            'clinical.protocols.manage',
         ]);
 
         // Support Worker
@@ -597,6 +607,8 @@ class RbacSeeder extends Seeder
             'hr.employees.viewOwn', 'hr.leave.viewOwn', 'hr.policies.view', 'hr.policies.attest',
             'sites.damages.view', 'sites.damages.create',
             'sites.ledger.view',
+            'clinical.observations.view', 'clinical.observations.record',
+            'clinical.events.view', 'clinical.events.record',
         ]);
 
         // Finance
@@ -665,6 +677,8 @@ class RbacSeeder extends Seeder
             'hr.time.viewAny', 'hr.time.approveTeam',
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create',
+            'clinical.observations.view', 'clinical.observations.record',
+            'clinical.events.view', 'clinical.events.record',
         ]);
 
         // Health & Safety Officer
@@ -699,6 +713,16 @@ class RbacSeeder extends Seeder
 
         $syncPermissions($nextOfKinRole, [
             'rag.ask.self', 'incidents.view.portal', 'incidents.attachments.view.portal',
+        ]);
+
+        // Clinical Lead: full clinical module access + medications view
+        $syncPermissions($clinicalLead, [
+            'clinical.observations.view', 'clinical.observations.record',
+            'clinical.events.view', 'clinical.events.record',
+            'clinical.protocols.manage',
+            'medications.view', 'medications.orders.manage',
+            'medications.administer.record', 'medications.audit.view',
+            'clients.viewAny',
         ]);
 
         /*

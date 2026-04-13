@@ -40,10 +40,12 @@ class PruneFleetTelemetry implements ShouldQueue
             })
             ->delete();
 
-        // Clean stale states for assets with no active tracker
+        // Clean stale states for assets with no active device link (canonical).
         FleetGeofenceState::query()
             ->whereNotIn('asset_id', function ($q) {
-                $q->select('asset_id')->from('asset_trackers')->where('status', 'paired');
+                $q->select('asset_id')
+                    ->from('device_asset_links')
+                    ->whereNull('unlinked_at');
             })
             ->delete();
     }

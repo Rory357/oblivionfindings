@@ -71,6 +71,10 @@ class Signal extends Model
         return $this->belongsTo(SignalType::class, 'signal_type_id');
     }
 
+    /**
+     * The CR device projection this signal originated from.
+     * For canonical device identity, use: $signal->device?->canonicalDevice
+     */
     public function device(): BelongsTo
     {
         return $this->belongsTo(Device::class, 'device_id');

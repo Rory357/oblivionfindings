@@ -7,6 +7,14 @@ use App\Models\AssetTracker;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 
+/**
+ * @deprecated Device pairing now uses Security & Devices module:
+ * - Fleet pair/unpair: FleetAssets\DeviceController (uses DeviceLinkService)
+ * - Resident assign/unassign: FleetAssets\ResidentTrackingController (uses DeviceAssignmentService)
+ *
+ * This controller operates on legacy AssetTracker and should not receive new traffic.
+ * Routes in routes/assets.php that reference this controller should be retired.
+ */
 class AssetTrackerController extends Controller
 {
     public function store(Request $request, Asset $asset)

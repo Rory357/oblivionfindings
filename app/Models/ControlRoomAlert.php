@@ -107,6 +107,10 @@ class ControlRoomAlert extends Model
         return $this->belongsTo(FleetSignal::class, 'fleet_signal_id');
     }
 
+    /**
+     * The CR device projection linked to this alert.
+     * For canonical device identity, use: $alert->device?->canonicalDevice
+     */
     public function device(): BelongsTo
     {
         return $this->belongsTo(\App\Models\ControlRoom\Device::class, 'device_id');

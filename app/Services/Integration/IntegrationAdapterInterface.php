@@ -19,7 +19,8 @@ interface IntegrationAdapterInterface
     public function discoverSites(IntegrationTenantSecret $secret): array;
 
     /**
-     * Sync devices from the provider into location_hardware table.
+     * Sync devices from the provider into the canonical devices table.
+     * (Previously wrote to location_hardware; now targets Security & Devices registry.)
      * Returns a SyncResult with counts.
      */
     public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult;

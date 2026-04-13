@@ -78,6 +78,15 @@ class FinFixedAsset extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * The operational asset this fixed asset is linked to.
+     * Used to follow the chain: FinFixedAsset → Asset → DeviceAssetLink → Device.
+     */
+    public function linkedAsset(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Asset::class, 'linked_asset_id');
+    }
+
     public function scopeForOrganization($query, ?int $orgId)
     {
         return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));

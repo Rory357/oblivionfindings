@@ -26,6 +26,7 @@ import {
     Calendar,
     CheckCircle,
     Clock,
+    Cpu,
     Download,
     Edit,
     FileText,
@@ -77,19 +78,30 @@ type Inspection = {
     notes: string | null;
 };
 
-type Tracker = {
+/** Linked device from canonical Security & Devices registry via device_asset_links. */
+type LinkedDevice = {
     id: number;
-    vendor: string;
     device_uid: string;
-    imei: string | null;
-    serial_number: string | null;
-    status: string;
+    name: string | null;
+    vendor: string | null;
+    status: string | null;
+    health_status: string | null;
     last_seen_at: string | null;
-    battery_pct: number | null;
-    lat: number | null;
-    lng: number | null;
-    speed_kph: number | null;
+    battery_level: number | null;
+    link_type: string | null;
+    linked_at: string | null;
+    detail_url: string | null;
+    // Legacy compat fields.
+    imei?: string | null;
+    serial_number?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    speed_kph?: number | null;
+    battery_pct?: number | null;
 };
+
+/** @deprecated Use LinkedDevice. Kept as alias for backward compat. */
+type Tracker = LinkedDevice;
 
 type Alert = {
     id: number;
@@ -199,7 +211,9 @@ export default function AssetShow({
     timeline,
 }: Props) {
     const [activeTab, setActiveTab] = useState('overview');
-    const trackers = asset?.trackers ?? [];
+    const linkedDevices: LinkedDevice[] = asset?.trackers ?? [];
+    // Legacy alias for map marker logic and existing references.
+    const trackers = linkedDevices;
     const inspections = asset?.inspections ?? [];
     const documents = asset?.documents ?? [];
     const assignments = asset?.assignments ?? [];
@@ -441,6 +455,65 @@ export default function AssetShow({
                                                 </div>
                                             )}
                                         </dl>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Device Status — canonical linked devices from Security & Devices */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Cpu className="h-4 w-4" />
+                                            Device Status
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {linkedDevices.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {linkedDevices.map((device) => (
+                                                    <a
+                                                        key={device.id}
+                                                        href={device.detail_url ?? `/security-devices/devices/${device.id}`}
+                                                        className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50 transition-colors"
+                                                    >
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium">{device.name ?? device.device_uid}</span>
+                                                                <Badge variant="outline" className="font-mono text-[10px]">{device.device_uid}</Badge>
+                                                                {device.link_type && (
+                                                                    <Badge variant="outline" className="text-[10px]">{device.link_type.replace(/_/g, ' ')}</Badge>
+                                                                )}
+                                                            </div>
+                                                            <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                                                {device.vendor && <span>{device.vendor}</span>}
+                                                                {device.last_seen_at && <span>Seen: {formatDateTime(device.last_seen_at)}</span>}
+                                                                {device.battery_level !== null && device.battery_level !== undefined && (
+                                                                    <span>Battery: {device.battery_level}%</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-1 shrink-0">
+                                                            <Badge variant={device.status === 'active' ? 'default' : device.status === 'offline' ? 'secondary' : 'outline'} className="text-[10px]">
+                                                                {device.status?.replace(/_/g, ' ') ?? 'unknown'}
+                                                            </Badge>
+                                                            {device.health_status && (
+                                                                <Badge variant={device.health_status === 'healthy' ? 'default' : device.health_status === 'critical' ? 'destructive' : 'outline'} className="text-[10px]">
+                                                                    {device.health_status}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-6 text-muted-foreground">
+                                                <Cpu className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                                                <p className="text-sm font-medium">No linked devices</p>
+                                                <p className="text-xs mt-1">
+                                                    Link devices to this asset in{' '}
+                                                    <a href="/security-devices/devices" className="text-primary hover:underline">Security &amp; Devices</a>.
+                                                </p>
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
                             </div>
@@ -754,40 +827,72 @@ export default function AssetShow({
                         <div className="space-y-4">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Paired Devices</CardTitle>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle>Linked Devices</CardTitle>
+                                        <a
+                                            href="/security-devices/devices"
+                                            className="text-xs text-primary hover:underline"
+                                        >
+                                            Manage in Security &amp; Devices
+                                        </a>
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
-                                    {(trackers ?? []).length > 0 ? (
+                                    {linkedDevices.length > 0 ? (
                                         <div className="space-y-2">
-                                            {trackers.map((tracker) => (
-                                                <Link
-                                                    key={tracker.id}
-                                                    href={`/fleet-assets/devices/${tracker.id}`}
-                                                    className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50"
+                                            {linkedDevices.map((device) => (
+                                                <a
+                                                    key={device.id}
+                                                    href={device.detail_url ?? `/security-devices/devices/${device.id}`}
+                                                    className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50 transition-colors"
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <Wifi className={`h-5 w-5 ${tracker.status === 'online' ? 'text-green-500' : 'text-gray-400'}`} />
+                                                        <Cpu className={`h-5 w-5 ${device.status === 'active' ? 'text-green-500' : 'text-gray-400'}`} />
                                                         <div>
-                                                            <div className="font-medium">{tracker.vendor}</div>
+                                                            <div className="font-medium">{device.name ?? device.vendor ?? 'Device'}</div>
                                                             <div className="text-xs text-muted-foreground font-mono">
-                                                                {tracker.device_uid}
-                                                                {tracker.imei && ` | IMEI: ${tracker.imei}`}
+                                                                {device.device_uid}
+                                                                {device.imei && ` | IMEI: ${device.imei}`}
                                                             </div>
+                                                            {device.link_type && (
+                                                                <div className="mt-0.5">
+                                                                    <Badge variant="outline" className="text-[10px]">{device.link_type.replace(/_/g, ' ')}</Badge>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <Badge variant={statusVariant(tracker.status)}>{tracker.status}</Badge>
-                                                        {tracker.last_seen_at && (
+                                                        <div className="flex items-center gap-1 justify-end">
+                                                            <Badge variant={statusVariant(device.status ?? 'unknown')}>{device.status?.replace(/_/g, ' ') ?? 'unknown'}</Badge>
+                                                            {device.health_status && (
+                                                                <Badge variant={device.health_status === 'healthy' ? 'default' : device.health_status === 'critical' ? 'destructive' : 'outline'} className="text-[10px]">
+                                                                    {device.health_status}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        {device.last_seen_at && (
                                                             <div className="mt-1 text-xs text-muted-foreground">
-                                                                Last seen: {formatDateTime(tracker.last_seen_at)}
+                                                                Seen: {formatDateTime(device.last_seen_at)}
+                                                            </div>
+                                                        )}
+                                                        {device.battery_level !== null && device.battery_level !== undefined && (
+                                                            <div className="mt-0.5 text-xs text-muted-foreground">
+                                                                Battery: {device.battery_level}%
                                                             </div>
                                                         )}
                                                     </div>
-                                                </Link>
+                                                </a>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-muted-foreground">No tracking devices paired.</p>
+                                        <div className="text-center py-6 text-muted-foreground">
+                                            <Cpu className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                                            <p className="text-sm font-medium">No linked devices</p>
+                                            <p className="text-xs mt-1">
+                                                Link devices to this asset in{' '}
+                                                <a href="/security-devices/devices" className="text-primary hover:underline">Security &amp; Devices</a>.
+                                            </p>
+                                        </div>
                                     )}
                                 </CardContent>
                             </Card>

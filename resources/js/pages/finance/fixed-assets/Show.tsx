@@ -23,7 +23,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Cpu, Edit, Trash2 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 interface GlAccount {
@@ -76,9 +76,34 @@ interface ScheduleEntry {
     book_value: number;
 }
 
+interface LinkedAssetInfo {
+    id: number;
+    name: string;
+    asset_tag: string | null;
+    category: string | null;
+    status: string | null;
+}
+
+interface LinkedDeviceHealth {
+    id: number;
+    device_uid: string;
+    name: string | null;
+    domain: string | null;
+    category: string | null;
+    status: string | null;
+    health_status: string | null;
+    provider: string | null;
+    last_seen_at: string | null;
+    battery_level: number | null;
+    link_type: string | null;
+    detail_url: string | null;
+}
+
 interface Props {
     asset: FixedAsset;
     depreciationSchedule: ScheduleEntry[];
+    linkedAsset?: LinkedAssetInfo | null;
+    linkedDevices?: LinkedDeviceHealth[];
 }
 
 const formatNZD = (amount: number | string) =>
@@ -119,7 +144,8 @@ const methodLabels: Record<string, string> = {
     diminishing_value: 'Diminishing Value',
 };
 
-export default function FixedAssetShow({ asset, depreciationSchedule }: Props) {
+export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsset, linkedDevices }: Props) {
+    const devices = linkedDevices ?? [];
     const [disposeModalOpen, setDisposeModalOpen] = useState(false);
 
     const disposeForm = useForm({
@@ -371,6 +397,77 @@ export default function FixedAssetShow({ asset, depreciationSchedule }: Props) {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Device Health — read-only from canonical Security & Devices registry */}
+                {(linkedAsset || devices.length > 0) && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Cpu className="h-4 w-4" />
+                                Device Health
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {linkedAsset && (
+                                <div className="mb-3 text-sm text-muted-foreground">
+                                    Linked to asset:{' '}
+                                    <span className="font-medium text-foreground">{linkedAsset.name}</span>
+                                    {linkedAsset.asset_tag && (
+                                        <span className="ml-1 font-mono text-xs">({linkedAsset.asset_tag})</span>
+                                    )}
+                                </div>
+                            )}
+                            {devices.length > 0 ? (
+                                <div className="space-y-2">
+                                    {devices.map((device) => (
+                                        <a
+                                            key={device.id}
+                                            href={device.detail_url ?? '#'}
+                                            className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50 transition-colors"
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium">{device.name ?? device.device_uid}</span>
+                                                    <Badge variant="outline" className="font-mono text-[10px]">{device.device_uid}</Badge>
+                                                </div>
+                                                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                                    {device.domain && <span>{device.domain.replace(/_/g, ' ')}</span>}
+                                                    {device.category && <span>/ {device.category.replace(/_/g, ' ')}</span>}
+                                                    {device.provider && <span>| {device.provider}</span>}
+                                                    {device.last_seen_at && (
+                                                        <span>Seen: {new Date(device.last_seen_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</span>
+                                                    )}
+                                                    {device.battery_level !== null && <span>Battery: {device.battery_level}%</span>}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1 shrink-0">
+                                                <Badge
+                                                    variant={device.status === 'active' ? 'default' : device.status === 'offline' ? 'secondary' : 'outline'}
+                                                    className="text-[10px]"
+                                                >
+                                                    {device.status?.replace(/_/g, ' ') ?? 'unknown'}
+                                                </Badge>
+                                                {device.health_status && (
+                                                    <Badge
+                                                        variant={device.health_status === 'healthy' ? 'default' : device.health_status === 'critical' ? 'destructive' : 'outline'}
+                                                        className="text-[10px]"
+                                                    >
+                                                        {device.health_status}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </a>
+                                    ))}
+                                </div>
+                            ) : linkedAsset ? (
+                                <p className="text-sm text-muted-foreground italic">
+                                    No devices linked to this asset. Manage device links in{' '}
+                                    <a href="/security-devices/devices" className="text-primary hover:underline">Security &amp; Devices</a>.
+                                </p>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Depreciation History */}
                 <Card>

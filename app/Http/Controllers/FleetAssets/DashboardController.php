@@ -4,7 +4,7 @@ namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
-use App\Models\AssetTracker;
+// AssetTracker import removed — retired. Using canonical Device model.
 use App\Models\ControlRoomAlert;
 use App\Models\FleetFuelLog;
 use App\Models\FleetServiceSchedule;
@@ -14,7 +14,8 @@ use App\Models\FleetOuting;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\FleetWorkOrder;
-use App\Models\LocationHardware;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Site;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -26,8 +27,10 @@ class DashboardController extends Controller
     {
         $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
 
-        // Vehicles with state
-        $eagerLoads = ['trackers' => fn ($q) => $q->where('status', 'paired'), 'fleetState'];
+        // Vehicles with state.
+        // Note: 'trackers' eager-load is legacy (AssetTracker). Dashboard only uses
+        // tracker count for stats — actual device data comes from canonical Device model.
+        $eagerLoads = ['fleetState'];
         if ($hasFleetFields) {
             $eagerLoads[] = 'homeSite';
         }
@@ -273,18 +276,21 @@ class DashboardController extends Controller
                 'longitude' => $h->longitude,
             ])->values();
 
-        // Device health
-        $totalDevices = AssetTracker::where('status', 'paired')->count();
-        $onlineDevices = AssetTracker::where('status', 'paired')
+        // Device health — canonical tracking devices.
+        $totalDevices = Device::where('domain', 'tracking')
+            ->whereIn('status', ['active', 'degraded'])
+            ->count();
+        $onlineDevices = Device::where('domain', 'tracking')
+            ->where('status', 'active')
             ->where('last_seen_at', '>', now()->subHours(2))
             ->count();
 
-        // Tracked residents (LocationHardware trackers linked to clients)
-        $trackedResidents = Schema::hasTable('location_hardware')
-            ? LocationHardware::where('category', 'tracker')
-                ->where('linked_person_type', 'client')
-                ->count()
-            : 0;
+        // Tracked residents — canonical device assignments (client-assigned tracking devices).
+        $trackedResidents = DeviceAssignment::query()
+            ->active()
+            ->where('assignable_type', 'client')
+            ->whereHas('device', fn ($q) => $q->where('domain', 'tracking'))
+            ->count();
 
         // Active outings
         $activeOutings = Schema::hasTable('fleet_outings')
@@ -349,11 +355,18 @@ class DashboardController extends Controller
                     'heading_deg' => $v->fleetState->heading_deg,
                     'battery_pct' => $v->fleetState->battery_pct,
                 ] : null,
-                'trackers' => $v->trackers->map(fn ($t) => [
-                    'id' => $t->id,
-                    'vendor' => $t->vendor,
-                    'device_uid' => $t->device_uid,
-                ])->values(),
+                'trackers' => \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
+                    ->active()
+                    ->forAsset($v->id)
+                    ->with('device:id,device_uid,name,provider,status')
+                    ->get()
+                    ->map(fn ($link) => [
+                        'id' => $link->device?->id,
+                        'vendor' => $link->device?->provider,
+                        'device_uid' => $link->device?->device_uid,
+                    ])
+                    ->filter(fn ($t) => $t['id'] !== null)
+                    ->values(),
             ])->values(),
             'stats' => [
                 'total_vehicles' => $totalVehicles,

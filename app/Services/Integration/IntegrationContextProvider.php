@@ -2,9 +2,10 @@
 
 namespace App\Services\Integration;
 
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
-use App\Models\LocationHardware;
 use App\Models\SiteRoom;
 use Illuminate\Support\Carbon;
 
@@ -44,11 +45,11 @@ class IntegrationContextProvider
         $openAlertCount = $alerts->count();
         $criticalAlertCount = $alerts->where('severity', 'critical')->count();
 
-        // Query hardware status for the site
-        $hardwareQuery = LocationHardware::where('site_id', $siteId);
-        $hardwareCount = $hardwareQuery->count();
-        $onlineCount = (clone $hardwareQuery)->where('status', 'online')->count();
-        $offlineCount = (clone $hardwareQuery)->where('status', 'offline')->count();
+        // Query device status for the site (canonical Security & Devices registry).
+        $siteDevices = app(DeviceRegistryService::class)->forSite(1, $siteId);
+        $hardwareCount = (clone $siteDevices)->count();
+        $onlineCount = (clone $siteDevices)->where('status', DeviceStatus::Active->value)->count();
+        $offlineCount = (clone $siteDevices)->where('status', DeviceStatus::Offline->value)->count();
 
         // Query rooms for the site
         $rooms = SiteRoom::where('site_id', $siteId)->get();

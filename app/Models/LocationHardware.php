@@ -11,6 +11,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @deprecated This model is retired as an active source of truth.
+ * The canonical hardware registry is now App\Domain\SecurityDevices\Models\Device.
+ *
+ * Remaining valid uses:
+ * - Bridge FK lookups via device_id for consumers not yet fully migrated
+ * - integration_events.hardware_id references for legacy location history
+ * - UniFi sync adapter writes (will be migrated to write to devices table)
+ *
+ * Do NOT add new queries against this model. Use Device + DeviceAssignment instead.
+ * This model and its table will be archived in a future cleanup PR.
+ */
 class LocationHardware extends Model
 {
     use HasFactory;

@@ -1,5 +1,6 @@
 import {
     Bell,
+    Building2,
     Cctv,
     FileText,
     GitBranch,
@@ -7,6 +8,7 @@ import {
     Key,
     LayoutDashboard,
     type LucideIcon,
+    Server,
     Siren,
     Smartphone,
     Wrench,
@@ -19,6 +21,8 @@ export type SecurityDevicesSectionKey =
     | 'tracking-devices'
     | 'smart-iot-healthcare'
     | 'access-control'
+    | 'it-infrastructure'
+    | 'facilities'
     | 'device-groups'
     | 'alerts-events'
     | 'maintenance-health'
@@ -128,6 +132,36 @@ export const securityDevicesSections: SecurityDevicesSectionConfig[] = [
             'Manage future physical access hardware and entry-point infrastructure.',
             'Provide a clean place for badge, lock, reader, and door controller integrations.',
             'Separate physical access operations from the existing system RBAC area.',
+        ],
+    },
+    {
+        key: 'it-infrastructure',
+        title: 'IT Infrastructure',
+        href: '/security-devices/it-infrastructure',
+        icon: Server,
+        description:
+            'Servers, networking, storage, UPS, endpoints, voice, printing, and rack infrastructure.',
+        futureFocus:
+            'This section manages IT infrastructure hardware with operational health, topology, and lifecycle tracking.',
+        capabilities: [
+            'Track servers, switches, access points, firewalls, and rack infrastructure.',
+            'Monitor UPS, PDU, and power infrastructure health.',
+            'Manage endpoint devices including tablets, kiosks, and shared devices.',
+        ],
+    },
+    {
+        key: 'facilities',
+        title: 'Facilities',
+        href: '/security-devices/facilities',
+        icon: Building2,
+        description:
+            'Leak detection, gas sensors, cold chain, generators, gate controllers, and building safety devices.',
+        futureFocus:
+            'This section manages facilities-connected hardware for building safety, environmental monitoring, and utility controls.',
+        capabilities: [
+            'Track leak sensors, gas detectors, and building safety hardware.',
+            'Monitor cold chain sensors for medication and food storage compliance.',
+            'Manage gate controllers, barriers, and facility access hardware.',
         ],
     },
     {

@@ -654,18 +654,25 @@ class ResidentTransportController extends Controller
             'serviceContext:id,name',
         ]);
 
-        // Vehicle position for live map during active transport
+        // Vehicle position for live map during active transport.
+        // Reads from canonical device linked to the transport vehicle via device_asset_links.
         $vehiclePosition = null;
         if ($transport->status === 'in_progress' && $transport->asset_id) {
-            $tracker = \App\Models\LocationHardware::where('linked_asset_id', $transport->asset_id)
-                ->where('category', \App\Models\LocationHardware::CATEGORY_TRACKER)
-                ->first();
-            if ($tracker && $tracker->meta) {
-                $meta = $tracker->meta;
-                if (($meta['lat'] ?? $meta['latitude'] ?? null) !== null) {
+            $vehicleDevice = \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
+                ->active()
+                ->forAsset($transport->asset_id)
+                ->with('device')
+                ->first()
+                ?->device;
+
+            if ($vehicleDevice) {
+                $meta = $vehicleDevice->meta ?? [];
+                $lat = $vehicleDevice->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
+                $lng = $vehicleDevice->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
+                if ($lat !== null) {
                     $vehiclePosition = [
-                        'lat' => (float) ($meta['lat'] ?? $meta['latitude']),
-                        'lng' => (float) ($meta['lng'] ?? $meta['longitude'] ?? 0),
+                        'lat' => (float) $lat,
+                        'lng' => (float) ($lng ?? 0),
                         'heading' => $meta['heading'] ?? null,
                         'speed' => $meta['speed'] ?? null,
                     ];

@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Portal;
 
+use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
-use App\Models\LocationHardware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -20,7 +20,9 @@ class PortalLocationController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
-        // Check tracking consent
+        $tenantId = $client->tenant_id ?? 1;
+
+        // Tracking consent.
         $trackingConsentType = ConsentType::query()
             ->where('name', 'Asset Location Tracking (Safety)')
             ->first();
@@ -35,28 +37,29 @@ class PortalLocationController extends Controller
                 ->first();
         }
 
-        // Find tracker assigned to this client
-        $tracker = LocationHardware::query()
-            ->where('category', LocationHardware::CATEGORY_TRACKER)
-            ->where('linked_person_type', 'client')
-            ->where('linked_person_id', $client->id)
+        // Canonical device lookup — active tracking device assigned to this client.
+        $device = app(DeviceRegistryService::class)
+            ->forClient($tenantId, $client->id)
+            ->where('domain', 'tracking')
             ->first();
 
         $currentLocation = null;
         $trackerInfo = null;
 
-        if ($tracker) {
-            $meta = $tracker->meta ?? [];
-            $lat = $meta['lat'] ?? $meta['latitude'] ?? null;
-            $lng = $meta['lng'] ?? $meta['longitude'] ?? null;
+        if ($device) {
+            $meta = $device->meta ?? [];
+            $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
+            $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
 
             $trackerInfo = [
-                'id' => $tracker->id,
-                'name' => $tracker->name,
-                'serial' => $tracker->serial,
-                'status' => $tracker->status ?? 'unknown',
-                'last_seen_at' => optional($tracker->last_seen_at)->toISOString(),
-                'battery' => $meta['battery'] ?? $meta['battery_level'] ?? null,
+                'id' => $device->id,
+                'device_uid' => $device->device_uid,
+                'name' => $device->name,
+                'serial' => $device->serial_number,
+                'status' => $device->status?->value ?? 'unknown',
+                'last_seen_at' => $device->last_seen_at?->toISOString(),
+                'battery' => $device->battery_level,
+                'detail_url' => "/security-devices/devices/{$device->id}",
             ];
 
             if ($lat !== null && $lng !== null) {
@@ -70,7 +73,7 @@ class PortalLocationController extends Controller
             }
         }
 
-        // Load geofences for the client's site
+        // Load geofences for the client's site.
         $geofences = [];
         try {
             if ($client->site_id && Schema::hasTable('asset_geofences')) {
@@ -141,17 +144,22 @@ class PortalLocationController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
-        $tracker = LocationHardware::query()
-            ->where('category', LocationHardware::CATEGORY_TRACKER)
-            ->where('linked_person_type', 'client')
-            ->where('linked_person_id', $client->id)
+        $tenantId = $client->tenant_id ?? 1;
+
+        // Canonical device lookup.
+        $device = app(DeviceRegistryService::class)
+            ->forClient($tenantId, $client->id)
+            ->where('domain', 'tracking')
             ->first();
 
         $locations = [];
 
-        if ($tracker && Schema::hasTable('integration_events')) {
+        // Use legacy bridge FK for integration_events query.
+        $legacyHardwareId = $device?->legacy_location_hardware_id;
+
+        if ($legacyHardwareId && Schema::hasTable('integration_events')) {
             $query = DB::table('integration_events')
-                ->where('hardware_id', $tracker->id)
+                ->where('hardware_id', $legacyHardwareId)
                 ->whereNotNull('payload');
 
             if ($request->filled('date_from')) {

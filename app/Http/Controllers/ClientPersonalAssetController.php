@@ -23,7 +23,7 @@ class ClientPersonalAssetController extends Controller
             'location' => ['nullable', 'string', 'max:255'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'room_id' => ['nullable', 'integer', 'exists:site_house_rooms,id'],
-            'tracker_hardware_id' => ['nullable', 'integer', 'exists:location_hardware,id'],
+            'tracker_hardware_id' => ['nullable', 'integer', 'exists:devices,id'],
             'photo' => ['nullable', 'image', 'max:5120'],
             'acquired_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],

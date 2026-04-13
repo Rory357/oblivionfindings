@@ -7,6 +7,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * Control Room device projection — signal pipeline support model.
+ *
+ * This is NOT the canonical device registry. The source of truth for device
+ * identity (name, domain, category, health, assignment) is:
+ *   App\Domain\SecurityDevices\Models\Device
+ *
+ * This model exists to support Control Room-specific concerns:
+ * - Signal pipeline: control_room_signals.device_id references this table
+ * - Alert linkage: control_room_alerts.device_id references this table
+ * - CR-specific status: last_signal_at, stale detection, battery alerts
+ * - Offline detection: DetectCrDeviceOfflineJob monitors this table
+ *
+ * For canonical device identity, use the canonicalDevice() relationship
+ * which follows the canonical_device_id bridge FK to the devices table.
+ *
+ * Do NOT use this model for device inventory, assignment, or ownership queries.
+ */
 class Device extends Model
 {
     use SoftDeletes;
@@ -79,6 +97,16 @@ class Device extends Model
     public function signals(): HasMany
     {
         return $this->hasMany(Signal::class, 'device_id');
+    }
+
+    /**
+     * Link to the canonical Security & Devices device record.
+     * This is the bridge relationship — canonical_device_id was added in
+     * the PR3 bridge migration and populated by sd:migrate-devices.
+     */
+    public function canonicalDevice(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domain\SecurityDevices\Models\Device::class, 'canonical_device_id');
     }
 
     public function scopeOnline($query)

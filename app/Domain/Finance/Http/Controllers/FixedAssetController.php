@@ -125,6 +125,8 @@ class FixedAssetController extends Controller
 
     /**
      * Show a single fixed asset with depreciation history and projected schedule.
+     * Includes device health data when the fixed asset is linked to an operational
+     * asset that has canonical device links.
      */
     public function show(Request $request, FinFixedAsset $fixedAsset)
     {
@@ -139,13 +141,49 @@ class FixedAssetController extends Controller
             'glDepreciationAccount:id,code,name',
             'glExpenseAccount:id,code,name',
             'createdBy:id,name',
+            'linkedAsset:id,name,asset_tag,category,status',
         ]);
 
         $schedule = $this->assetService->getDepreciationSchedule($fixedAsset);
 
+        // Device health: follow FinFixedAsset → Asset → DeviceAssetLink → Device.
+        $linkedDevices = [];
+        if ($fixedAsset->linked_asset_id) {
+            $linkedDevices = \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
+                ->active()
+                ->forAsset($fixedAsset->linked_asset_id)
+                ->with('device:id,device_uid,name,domain,category,status,health_status,provider,last_seen_at,battery_level')
+                ->get()
+                ->map(fn ($link) => [
+                    'id' => $link->device?->id,
+                    'device_uid' => $link->device?->device_uid,
+                    'name' => $link->device?->name,
+                    'domain' => $link->device?->domain,
+                    'category' => $link->device?->category,
+                    'status' => $link->device?->status?->value,
+                    'health_status' => $link->device?->health_status?->value,
+                    'provider' => $link->device?->provider,
+                    'last_seen_at' => $link->device?->last_seen_at?->toISOString(),
+                    'battery_level' => $link->device?->battery_level,
+                    'link_type' => $link->link_type?->value,
+                    'detail_url' => $link->device ? "/security-devices/devices/{$link->device->id}" : null,
+                ])
+                ->filter(fn ($d) => $d['id'] !== null)
+                ->values()
+                ->all();
+        }
+
         return Inertia::render('finance/fixed-assets/Show', [
             'asset' => $fixedAsset,
             'depreciationSchedule' => $schedule,
+            'linkedAsset' => $fixedAsset->linkedAsset ? [
+                'id' => $fixedAsset->linkedAsset->id,
+                'name' => $fixedAsset->linkedAsset->name,
+                'asset_tag' => $fixedAsset->linkedAsset->asset_tag,
+                'category' => $fixedAsset->linkedAsset->category,
+                'status' => $fixedAsset->linkedAsset->status,
+            ] : null,
+            'linkedDevices' => $linkedDevices,
         ]);
     }
 
