@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
@@ -142,6 +143,16 @@ export default function HealthClinicalDashboard({
                     <p className="text-sm text-muted-foreground">
                         Clinical observation compliance and event oversight.
                     </p>
+                </div>
+
+                {/* Quick Nav */}
+                <div>
+                    <Link href="/health-clinical/observations">
+                        <Button variant="outline" size="sm" className="gap-1.5">
+                            <ClipboardList className="h-4 w-4" />
+                            Observation Register
+                        </Button>
+                    </Link>
                 </div>
 
                 {/* KPI Cards */}

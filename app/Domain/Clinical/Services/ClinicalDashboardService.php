@@ -2,12 +2,14 @@
 
 namespace App\Domain\Clinical\Services;
 
+use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
 use App\Enums\AlertSeverity;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 /**
  * Lightweight dashboard metrics for the Health & Clinical module.
@@ -137,6 +139,68 @@ class ClinicalDashboardService
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * Paginated, filterable observation register for cross-client oversight.
+     *
+     * @param  array{
+     *     client_id?: int|null,
+     *     observation_type?: string|null,
+     *     recorded_by?: int|null,
+     *     site_id?: int|null,
+     *     date_from?: string|null,
+     *     date_to?: string|null,
+     * } $filters
+     */
+    public function getObservationRegister(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    {
+        return ClinicalObservation::query()
+            ->with([
+                'client:id,first_name,last_name,site_id',
+                'recorder:id,name',
+                'shift:id,starts_at,ends_at',
+                'site:id,name',
+                'protocolSchedule:id,clinical_protocol_id,due_at,status',
+                'protocolSchedule.protocol:id,name,observation_type,frequency',
+            ])
+            ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
+            ->when($filters['observation_type'] ?? null, function ($q, $type) {
+                $enum = ObservationType::tryFrom($type);
+                if ($enum) {
+                    $q->ofType($enum);
+                }
+            })
+            ->when($filters['recorded_by'] ?? null, fn ($q, $id) => $q->where('recorded_by', $id))
+            ->when($filters['site_id'] ?? null, fn ($q, $id) => $q->where('site_id', $id))
+            ->when($filters['date_from'] ?? null, fn ($q, $d) => $q->where('recorded_at', '>=', Carbon::parse($d)->startOfDay()))
+            ->when($filters['date_to'] ?? null, fn ($q, $d) => $q->where('recorded_at', '<=', Carbon::parse($d)->endOfDay()))
+            ->orderByDesc('recorded_at')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * Hero-card stats for the observation register page.
+     *
+     * @return array{total_7d: int, total_30d: int, by_type: array<string, int>}
+     */
+    public function getObservationRegisterStats(): array
+    {
+        $now = Carbon::now();
+
+        $byType = ClinicalObservation::query()
+            ->where('recorded_at', '>=', $now->copy()->subDays(30))
+            ->selectRaw('observation_type, COUNT(*) as count')
+            ->groupBy('observation_type')
+            ->pluck('count', 'observation_type')
+            ->toArray();
+
+        return [
+            'total_7d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(7))->count(),
+            'total_30d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(30))->count(),
+            'by_type' => $byType,
+        ];
     }
 
     protected function calculateComplianceRate(Carbon $from, Carbon $to): float

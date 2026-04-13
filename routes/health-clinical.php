@@ -21,6 +21,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [HealthClinicalDashboardController::class, 'index'])->name('dashboard');
     });
 
+    // ── Cross-client registers ───────────────────────────────────────
+    Route::prefix('health-clinical')->name('health-clinical.')->group(function () {
+        Route::get('/observations', [HealthClinicalDashboardController::class, 'observations'])
+            ->middleware('permission:clinical.observations.viewAny')
+            ->name('observations.index');
+    });
+
     // ── Client-scoped clinical routes ────────────────────────────────────
     Route::prefix('clients/{client}/clinical')->name('clients.clinical.')->group(function () {
         Route::get('observations', [ClientClinicalController::class, 'observations'])->name('observations.index');
