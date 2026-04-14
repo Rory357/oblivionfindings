@@ -267,6 +267,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->everyFifteenMinutes();
 
+// Sync Governance clinical indicators from Health & Clinical/eMAR: daily at 00:20
+app(Schedule::class)
+    ->command('governance:sync-clinical-data')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('00:20');
+
 // Roadmap Module Scheduled Jobs
 
 // Suggestion ingestion + dedupe sweep: hourly

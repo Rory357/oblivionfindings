@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\AssetTracker;
@@ -30,12 +31,18 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'vehicle',
         ]);
 
-        AssetTracker::create([
+        $tracker = AssetTracker::create([
             'asset_id' => $asset->id,
             'vendor' => 'queclink',
             'device_uid' => 'QUE-001',
+            'imei' => 'QUE-001',
             'status' => 'paired',
             'paired_at' => now(),
+        ]);
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'imei' => 'QUE-001',
+            'legacy_asset_tracker_id' => $tracker->id,
         ]);
 
         $payload = [
@@ -54,11 +61,15 @@ class FleetTelemetryIngestTest extends TestCase
 
         $this->assertDatabaseHas('fleet_telemetry_events', [
             'asset_id' => $asset->id,
+            'asset_tracker_id' => $tracker->id,
+            'device_id' => $device->id,
             'vendor' => 'queclink',
         ]);
 
         $this->assertDatabaseHas('fleet_signals', [
             'asset_id' => $asset->id,
+            'asset_tracker_id' => $tracker->id,
+            'device_id' => $device->id,
             'signal_type' => 'vehicle.sos',
         ]);
     }

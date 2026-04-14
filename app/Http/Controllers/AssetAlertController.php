@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetAlert;
-use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 
 /**
- * @deprecated PR5: AssetAlert is dead code. Asset operational alerts are canonical
- *             ControlRoomAlert records created via FleetSignalService pipeline.
- *             This controller is retained for backward compatibility with routes
- *             that may still be referenced. It will be removed in a future cleanup PR.
+ * @deprecated ControlRoomAlert is the canonical operational alert surface.
+ *             This controller now serves read-only archived asset_alert history
+ *             for legacy Assets/Fleet views. Do not route new alert generation
+ *             or alert lifecycle actions through this controller.
  *
  * @see \App\Http\Controllers\ControlRoom\ControlRoomAlertController
  */
@@ -28,46 +27,10 @@ class AssetAlertController extends Controller
 
         return inertia('assets/alerts/index', [
             'alerts' => $alerts,
-            'can' => [
-                'manage' => $request->user()?->canDo('assets.alerts.manage') ?? false,
+            'archive' => [
+                'mode' => 'read_only',
+                'replacement_url' => '/fleet-assets/alerts',
             ],
         ]);
-    }
-
-    public function acknowledge(Request $request, AssetAlert $alert)
-    {
-        abort_unless($request->user()?->canDo('assets.alerts.manage'), 403);
-
-        if ($alert->status !== 'open') {
-            return back()->with('error', 'Alert is not open.');
-        }
-
-        $alert->update([
-            'status' => 'ack',
-            'acknowledged_by_user_id' => $request->user()?->id,
-            'acknowledged_at' => now(),
-        ]);
-
-        AuditLogger::log('assets.alert.acknowledged', $alert->asset, [
-            'alert_id' => $alert->id,
-        ]);
-
-        return back()->with('success', 'Alert acknowledged.');
-    }
-
-    public function resolve(Request $request, AssetAlert $alert)
-    {
-        abort_unless($request->user()?->canDo('assets.alerts.manage'), 403);
-
-        $alert->update([
-            'status' => 'resolved',
-            'resolved_at' => now(),
-        ]);
-
-        AuditLogger::log('assets.alert.resolved', $alert->asset, [
-            'alert_id' => $alert->id,
-        ]);
-
-        return back()->with('success', 'Alert resolved.');
     }
 }

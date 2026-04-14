@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * For canonical device identity, use the canonicalDevice() relationship
  * which follows the canonical_device_id bridge FK to the devices table.
+ * That FK is intentionally retained in PR26 because Control Room device pages,
+ * map views, and alert/signal enrichment still depend on it.
  *
  * Do NOT use this model for device inventory, assignment, or ownership queries.
  */

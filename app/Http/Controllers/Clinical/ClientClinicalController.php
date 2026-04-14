@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Clinical;
 
+use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
+use App\Enums\AlertSeverity;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use Illuminate\Http\Request;
@@ -15,6 +18,7 @@ class ClientClinicalController extends Controller
 {
     public function __construct(
         protected ClinicalObservationService $observationService,
+        protected ClinicalEventService $eventService,
     ) {}
 
     /**
@@ -95,5 +99,46 @@ class ClientClinicalController extends Controller
         }
 
         return back()->with('success', $type->label() . ' recorded successfully.');
+    }
+
+    /**
+     * Store a new clinical event for a client from Client Profile context.
+     */
+    public function storeEvent(Request $request, Client $client)
+    {
+        $this->authorize('view', $client);
+
+        $user = $request->user();
+
+        if (! $user->canDo('clinical.events.record')) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'event_type' => ['required', Rule::in(array_map(
+                fn (ClinicalEventType $type) => $type->value,
+                ClinicalEventType::cases(),
+            ))],
+            'severity' => ['required', Rule::in(AlertSeverity::ALL)],
+            'occurred_at' => ['required', 'date'],
+            'description' => ['required', 'string', 'max:5000'],
+            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+            'outcome' => ['nullable', 'string', 'max:5000'],
+            'requires_followup' => ['nullable', 'boolean'],
+            'followup_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $event = $this->eventService->record($client, $user, $validated);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'id' => $event->id,
+                'event_type' => $event->event_type->value,
+                'occurred_at' => $event->occurred_at->toISOString(),
+                'requires_followup' => $event->requires_followup,
+            ], 201);
+        }
+
+        return back()->with('success', 'Clinical event recorded successfully.');
     }
 }

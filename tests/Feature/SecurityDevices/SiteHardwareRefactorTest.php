@@ -4,6 +4,7 @@ namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\LocationHardware;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteRoom;
@@ -11,6 +12,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class SiteHardwareRefactorTest extends TestCase
@@ -68,6 +70,7 @@ class SiteHardwareRefactorTest extends TestCase
             $this->assertArrayHasKey('device_uid', $devices[0]);
             $this->assertArrayHasKey('domain', $devices[0]);
             $this->assertArrayHasKey('health_status', $devices[0]);
+            $this->assertArrayNotHasKey('legacy_location_hardware_id', $devices[0]);
         });
     }
 
@@ -205,7 +208,7 @@ class SiteHardwareRefactorTest extends TestCase
 
     // ── Integration/rooms data still present ──────────────────────
 
-    public function test_rooms_and_unifi_data_still_passed(): void
+    public function test_rooms_and_unifi_data_still_passed_without_legacy_site_hardware_props(): void
     {
         SiteRoom::create([
             'tenant_id' => 1,
@@ -217,10 +220,72 @@ class SiteHardwareRefactorTest extends TestCase
             ->get("/sites/{$this->siteA->id}/hardware");
 
         $response->assertInertia(function ($page) {
-            $this->assertNotEmpty($page->toArray()['props']['rooms']);
-            $this->assertArrayHasKey('unifi', $page->toArray()['props']);
-            $this->assertArrayHasKey('categories', $page->toArray()['props']);
-            $this->assertArrayHasKey('can', $page->toArray()['props']);
+            $props = $page->toArray()['props'];
+            $this->assertNotEmpty($props['rooms']);
+            $this->assertArrayHasKey('unifi', $props);
+            $this->assertArrayHasKey('can', $props);
+            $this->assertArrayNotHasKey('hardware', $props);
+            $this->assertArrayNotHasKey('assets', $props);
+            $this->assertArrayNotHasKey('categories', $props);
         });
+    }
+
+    public function test_legacy_site_hardware_crud_routes_are_removed_but_room_bridge_routes_remain(): void
+    {
+        $this->assertFalse(Route::has('sites.hardware.store'));
+        $this->assertFalse(Route::has('sites.hardware.update'));
+        $this->assertFalse(Route::has('sites.hardware.destroy'));
+        $this->assertFalse(Route::has('sites.hardware.linkAsset'));
+        $this->assertFalse(Route::has('sites.hardware.refreshStatus'));
+
+        $this->assertTrue(Route::has('sites.hardware.assignRoom'));
+        $this->assertTrue(Route::has('sites.hardware.manageRooms'));
+    }
+
+    public function test_assign_room_route_updates_canonical_assignment_for_unifi_devices(): void
+    {
+        $room = SiteRoom::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteA->id,
+            'name' => 'Network Closet',
+        ]);
+
+        $shadow = LocationHardware::create([
+            'tenant_id' => 1,
+            'site_id' => $this->siteA->id,
+            'provider' => 'unifi',
+            'category' => LocationHardware::CATEGORY_SWITCH,
+            'name' => 'Core Switch',
+            'status' => LocationHardware::STATUS_ONLINE,
+            'external_ref' => ['provider_entity_id' => 'switch-1'],
+        ]);
+
+        $device = Device::factory()->itInfrastructure()->create([
+            'tenant_id' => 1,
+            'provider' => 'unifi',
+            'name' => 'Core Switch',
+            'legacy_location_hardware_id' => $shadow->id,
+            'external_ref' => ['provider_entity_id' => 'switch-1'],
+        ]);
+
+        DeviceAssignment::create([
+            'device_id' => $device->id,
+            'assignable_type' => 'site',
+            'assignable_id' => $this->siteA->id,
+            'assigned_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/sites/{$this->siteA->id}/hardware/{$device->id}/assign-room", [
+                'room_id' => $room->id,
+            ])
+            ->assertRedirect();
+
+        $active = $device->fresh()->assignments()->active()->first();
+
+        $this->assertNotNull($active);
+        $this->assertEquals('room', $active->assignable_type);
+        $this->assertEquals($room->id, $active->assignable_id);
+        $this->assertEquals($room->id, $shadow->fresh()->room_id);
     }
 }

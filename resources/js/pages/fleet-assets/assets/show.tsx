@@ -105,12 +105,11 @@ type Tracker = LinkedDevice;
 
 type Alert = {
     id: number;
-    type: string;
+    alert_type: string;
     severity: string;
     status: string;
-    triggered_at: string;
+    triggered_at: string | null;
     resolved_at: string | null;
-    message: string | null;
 };
 
 type Assignment = {
@@ -163,7 +162,7 @@ type Props = {
         inspections: Inspection[];
         documents: Document[];
         assignments: Assignment[];
-        alerts: Alert[];
+        archived_alerts: Alert[];
         work_orders: WorkOrder[];
         service_schedules: ServiceSchedule[];
         geofences: any[];
@@ -217,7 +216,7 @@ export default function AssetShow({
     const inspections = asset?.inspections ?? [];
     const documents = asset?.documents ?? [];
     const assignments = asset?.assignments ?? [];
-    const alerts = asset?.alerts ?? [];
+    const alerts = asset?.archived_alerts ?? [];
     const work_orders = asset?.work_orders ?? [];
     const service_schedules = asset?.service_schedules ?? [];
     const can_edit = true;
@@ -261,8 +260,6 @@ export default function AssetShow({
         if (asset.home_site?.latitude) return { lat: Number(asset.home_site.latitude), lng: Number(asset.home_site.longitude) };
         return { lat: -36.8485, lng: 174.7633 };
     }, [trackers, asset.home_site]);
-
-    const activeAlerts = (alerts ?? []).filter((a) => a.status !== 'resolved');
 
     return (
         <AppLayout
@@ -360,12 +357,7 @@ export default function AssetShow({
                         <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
                         <TabsTrigger value="inspections">Inspections</TabsTrigger>
                         <TabsTrigger value="trackers">Trackers</TabsTrigger>
-                        <TabsTrigger value="alerts">
-                            Alerts
-                            {activeAlerts.length > 0 && (
-                                <Badge variant="destructive" className="ml-1">{activeAlerts.length}</Badge>
-                            )}
-                        </TabsTrigger>
+                        <TabsTrigger value="alerts">Archived Alerts</TabsTrigger>
                         <TabsTrigger value="assignments">Assignments</TabsTrigger>
                     </TabsList>
 
@@ -991,53 +983,26 @@ export default function AssetShow({
                     {/* Alerts Tab */}
                     <TabsContent value="alerts">
                         <div className="space-y-4">
-                            {activeAlerts.length > 0 && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <AlertTriangle className="h-4 w-4 text-destructive" />
-                                            Active Alerts
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-2">
-                                            {activeAlerts.map((alert) => (
-                                                <div key={alert.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
-                                                    <div>
-                                                        <div className="font-medium">{alert.type.replace(/_/g, ' ')}</div>
-                                                        {alert.message && <div className="text-xs text-muted-foreground">{alert.message}</div>}
-                                                        <div className="text-xs text-muted-foreground mt-1">
-                                                            {formatDateTime(alert.triggered_at)}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant={statusVariant(alert.severity)}>{alert.severity}</Badge>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => router.post(`/fleet-assets/alerts/${alert.id}/acknowledge`)}
-                                                        >
-                                                            Acknowledge
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Alert History</CardTitle>
+                                    <CardTitle>Archived Asset Alert History</CardTitle>
                                 </CardHeader>
                                 <CardContent>
+                                    <p className="mb-3 text-sm text-muted-foreground">
+                                        These legacy asset alerts are retained for history only. Active operational alerts now live in
+                                        {' '}
+                                        <Link href="/fleet-assets/alerts" className="text-primary hover:underline">Fleet Alerts</Link>
+                                        {' '}
+                                        and
+                                        {' '}
+                                        <Link href="/control-room" className="text-primary hover:underline">Control Room</Link>.
+                                    </p>
                                     {(alerts ?? []).length > 0 ? (
                                         <div className="space-y-2">
                                             {alerts.map((alert) => (
                                                 <div key={alert.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
                                                     <div>
-                                                        <div className="font-medium">{alert.type.replace(/_/g, ' ')}</div>
+                                                        <div className="font-medium">{alert.alert_type.replace(/_/g, ' ')}</div>
                                                         <div className="text-xs text-muted-foreground">
                                                             {formatDateTime(alert.triggered_at)}
                                                         </div>
@@ -1050,7 +1015,7 @@ export default function AssetShow({
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-muted-foreground">No alerts recorded.</p>
+                                        <p className="text-sm text-muted-foreground">No archived asset alerts recorded.</p>
                                     )}
                                 </CardContent>
                             </Card>

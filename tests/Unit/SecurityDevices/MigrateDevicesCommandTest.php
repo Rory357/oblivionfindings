@@ -13,6 +13,7 @@ use App\Models\SiteRoom;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class MigrateDevicesCommandTest extends TestCase
@@ -41,7 +42,6 @@ class MigrateDevicesCommandTest extends TestCase
             'linked_person_id' => null,
             'notes' => null,
             'meta' => null,
-            'device_id' => null,
             'created_at' => now(),
             'updated_at' => now(),
             'deleted_at' => null,
@@ -100,7 +100,6 @@ class MigrateDevicesCommandTest extends TestCase
             'last_seen_at' => null,
             'consent_id' => null,
             'vendor_metadata' => null,
-            'device_id' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -108,6 +107,15 @@ class MigrateDevicesCommandTest extends TestCase
         return DB::table('asset_trackers')->insertGetId(
             array_merge($defaults, $overrides)
         );
+    }
+
+    private function canonicalControlRoomDevice(int $controlRoomDeviceId): ?Device
+    {
+        $canonicalId = DB::table('control_room_devices')
+            ->where('id', $controlRoomDeviceId)
+            ->value('canonical_device_id');
+
+        return $canonicalId ? Device::find($canonicalId) : null;
     }
 
     // ── Phase A: location_hardware ────────────────────────────────
@@ -120,15 +128,10 @@ class MigrateDevicesCommandTest extends TestCase
 
         $device = Device::where('legacy_location_hardware_id', $lhId)->first();
         $this->assertNotNull($device);
+        $this->assertEquals($lhId, $device->legacy_location_hardware_id);
         $this->assertEquals('Lobby Cam', $device->name);
         $this->assertEquals('security', $device->domain);
         $this->assertEquals('cctv', $device->category);
-
-        // Bridge FK back-filled.
-        $this->assertEquals(
-            $device->id,
-            DB::table('location_hardware')->where('id', $lhId)->value('device_id')
-        );
     }
 
     public function test_maps_all_location_hardware_categories(): void
@@ -284,7 +287,7 @@ class MigrateDevicesCommandTest extends TestCase
 
         $this->artisan('sd:migrate-devices')->assertSuccessful();
 
-        $device = Device::where('legacy_control_room_device_id', $crId)->first();
+        $device = $this->canonicalControlRoomDevice($crId);
         $this->assertNotNull($device);
         $this->assertEquals('Alarm Panel 1', $device->name);
         $this->assertEquals('security', $device->domain);
@@ -318,7 +321,10 @@ class MigrateDevicesCommandTest extends TestCase
 
         $device = Device::first();
         $this->assertEquals($lhId, $device->legacy_location_hardware_id);
-        $this->assertEquals($crId, $device->legacy_control_room_device_id);
+        $this->assertEquals(
+            $device->id,
+            DB::table('control_room_devices')->where('id', $crId)->value('canonical_device_id')
+        );
         // Battery merged from CR.
         $this->assertEquals(85, $device->battery_level);
     }
@@ -333,7 +339,7 @@ class MigrateDevicesCommandTest extends TestCase
 
         $this->artisan('sd:migrate-devices')->assertSuccessful();
 
-        $device = Device::where('legacy_control_room_device_id', $crId)->first();
+        $device = $this->canonicalControlRoomDevice($crId);
         $assignment = DeviceAssignment::where('device_id', $device->id)->active()->first();
 
         $this->assertNotNull($assignment);
@@ -355,6 +361,7 @@ class MigrateDevicesCommandTest extends TestCase
 
         $device = Device::where('legacy_asset_tracker_id', $atId)->first();
         $this->assertNotNull($device);
+        $this->assertEquals($atId, $device->legacy_asset_tracker_id);
         $this->assertEquals('tracking', $device->domain);
         $this->assertEquals('vehicle_tracker', $device->category);
         $this->assertEquals('123456789012345', $device->imei);
@@ -446,6 +453,17 @@ class MigrateDevicesCommandTest extends TestCase
         $this->assertEquals(0, DeviceAssetLink::count());
     }
 
+    public function test_pr26_bridge_cleanup_keeps_only_live_bridge_columns(): void
+    {
+        $this->assertFalse(Schema::hasColumn('devices', 'legacy_control_room_device_id'));
+        $this->assertFalse(Schema::hasColumn('location_hardware', 'device_id'));
+        $this->assertFalse(Schema::hasColumn('asset_trackers', 'device_id'));
+
+        $this->assertTrue(Schema::hasColumn('devices', 'legacy_location_hardware_id'));
+        $this->assertTrue(Schema::hasColumn('devices', 'legacy_asset_tracker_id'));
+        $this->assertTrue(Schema::hasColumn('control_room_devices', 'canonical_device_id'));
+    }
+
     public function test_idempotent_second_run(): void
     {
         $this->insertLocationHardware();
@@ -464,22 +482,21 @@ class MigrateDevicesCommandTest extends TestCase
     {
         $this->insertLocationHardware();
         $this->insertAssetTracker();
+        $crId = $this->insertControlRoomDevice();
 
         $this->artisan('sd:migrate-devices')->assertSuccessful();
         $this->assertGreaterThan(0, Device::count());
+        $this->assertNotNull(
+            DB::table('control_room_devices')->where('id', $crId)->value('canonical_device_id')
+        );
 
         $this->artisan('sd:migrate-devices', ['--rollback' => true])->assertSuccessful();
 
         $this->assertEquals(0, Device::count());
         $this->assertEquals(0, DeviceAssignment::count());
         $this->assertEquals(0, DeviceAssetLink::count());
-
-        // Bridge FKs cleared.
         $this->assertNull(
-            DB::table('location_hardware')->whereNotNull('device_id')->first()
-        );
-        $this->assertNull(
-            DB::table('asset_trackers')->whereNotNull('device_id')->first()
+            DB::table('control_room_devices')->where('id', $crId)->value('canonical_device_id')
         );
     }
 }

@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Clinical;
 
+use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
+use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
 use App\Domain\Clinical\Services\ClinicalProtocolService;
+use App\Enums\AlertSeverity;
 use App\Http\Controllers\Controller;
 use App\Models\Shift;
 use Illuminate\Http\Request;
@@ -15,6 +18,7 @@ class ShiftClinicalController extends Controller
 {
     public function __construct(
         protected ClinicalObservationService $observationService,
+        protected ClinicalEventService $eventService,
         protected ClinicalProtocolService $protocolService,
     ) {}
 
@@ -95,6 +99,59 @@ class ShiftClinicalController extends Controller
         }
 
         return back()->with('success', $type->label() . ' recorded successfully.');
+    }
+
+    /**
+     * Store a clinical event from shift context.
+     */
+    public function storeEvent(Request $request, Shift $shift)
+    {
+        $this->authorizeShiftAccess($request, $shift);
+
+        $user = $request->user();
+
+        if (! $user->canDo('clinical.events.record')) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'event_type' => ['required', Rule::in(array_map(
+                fn (ClinicalEventType $type) => $type->value,
+                ClinicalEventType::cases(),
+            ))],
+            'severity' => ['required', Rule::in(AlertSeverity::ALL)],
+            'occurred_at' => ['required', 'date'],
+            'description' => ['required', 'string', 'max:5000'],
+            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+            'outcome' => ['nullable', 'string', 'max:5000'],
+            'requires_followup' => ['nullable', 'boolean'],
+            'followup_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $shift->loadMissing('client');
+
+        if (! $shift->client) {
+            abort(422, 'Shift has no associated client.');
+        }
+
+        $event = $this->eventService->record(
+            $shift->client,
+            $user,
+            $validated,
+            $shift,
+        );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'id' => $event->id,
+                'event_type' => $event->event_type->value,
+                'occurred_at' => $event->occurred_at->toISOString(),
+                'requires_followup' => $event->requires_followup,
+                'shift_id' => $event->shift_id,
+            ], 201);
+        }
+
+        return back()->with('success', 'Clinical event recorded successfully.');
     }
 
     /**

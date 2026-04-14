@@ -1,4 +1,5 @@
 import ShiftObservationsDueCard from '@/components/clinical/shift-observations-due-card';
+import ShiftClinicalEventCard from '@/components/clinical/shift-clinical-event-card';
 import ShiftFormsCard from '@/components/operations/shift-forms-card';
 import ShiftMedicationCard from '@/components/operations/shift-medication-card';
 import FleetHero from '@/components/fleet-hero';
@@ -313,6 +314,9 @@ type Props = {
         assign_shift?: boolean;
         override_eligibility?: boolean;
         view_transport?: boolean;
+        record_observation?: boolean;
+        record_clinical_observation?: boolean;
+        record_event?: boolean;
     };
 };
 
@@ -507,12 +511,12 @@ export default function ShiftShow({
         if (showCoverage) tabs.push({ key: 'coverage', label: 'Coverage' });
         if (showAssignment) tabs.push({ key: 'assignment', label: 'Assignment' });
         if (showMedications) tabs.push({ key: 'medications', label: 'Medications' });
-        if (can.record_observation) tabs.push({ key: 'observations', label: 'Observations' });
+        if (can.record_observation || can.record_event) tabs.push({ key: 'observations', label: 'Observations' });
         if (showForms) tabs.push({ key: 'forms', label: 'Forms' });
         if (showTransport) tabs.push({ key: 'transport', label: 'Transport' });
         if (showReplacement) tabs.push({ key: 'replacement', label: 'Replacement' });
         return tabs;
-    }, [tasks.length, notes.length, handover.length, incidents.length, showCoverage, showAssignment, showMedications, showForms, showTransport, showReplacement]);
+    }, [tasks.length, notes.length, handover.length, incidents.length, showCoverage, showAssignment, showMedications, showForms, showTransport, showReplacement, can.record_observation, can.record_event]);
 
     const [activeTab, setActiveTab] = useState('tasks');
     const resolvedActiveTab = shiftTabs.some(t => t.key === activeTab) ? activeTab : shiftTabs[0]?.key ?? 'tasks';
@@ -2010,13 +2014,19 @@ export default function ShiftShow({
 
                 {/* Observations tab */}
                 <div className={resolvedActiveTab !== 'observations' ? 'hidden' : ''}>
-                {can.record_observation && shift.client ? (
-                    <ShiftObservationsDueCard
-                        shiftId={shift.id}
-                        clientId={shift.client.id}
-                        canRecordClinical={can.record_clinical_observation}
-                    />
-                ) : null}
+                    <div className="space-y-4">
+                        {can.record_observation && shift.client ? (
+                            <ShiftObservationsDueCard
+                                shiftId={shift.id}
+                                clientId={shift.client.id}
+                                canRecordClinical={Boolean(can.record_clinical_observation)}
+                            />
+                        ) : null}
+
+                        {can.record_event ? (
+                            <ShiftClinicalEventCard shiftId={shift.id} />
+                        ) : null}
+                    </div>
                 </div>
 
                 {/* Forms tab */}

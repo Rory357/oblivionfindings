@@ -1,12 +1,10 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
-import { FLEET_COLORS } from '@/components/fleet-charts';
 import { Card, CardContent } from '@/components/ui/card';
 import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -50,28 +48,15 @@ type ControlRoomAlert = {
 
 type AssetAlert = {
     id: number;
-    source: 'asset';
     alert_type: string;
     severity: string;
     status: string;
     triggered_at: string | null;
+    acknowledged_at: string | null;
     resolved_at: string | null;
     context: unknown;
     asset: { id: number; name: string; asset_tag?: string } | null;
     tracker: { id: number; vendor: string; device_uid: string } | null;
-};
-
-type MergedAlert = {
-    id: string;
-    source: string;
-    alert_type: string;
-    severity: string;
-    status: string;
-    triggered_at: string | null;
-    resolved_at: string | null;
-    asset: { id: number; name: string; asset_tag?: string } | null;
-    notes?: string | null;
-    assigned_to?: { id: number; name: string } | null;
 };
 
 type Props = {
@@ -80,7 +65,7 @@ type Props = {
         links?: Array<{ url: string | null; label: string; active: boolean }>;
         meta?: { current_page: number; last_page: number; total: number };
     };
-    asset_alerts: AssetAlert[];
+    archived_asset_alerts: AssetAlert[];
     filters: {
         severity?: string;
         status?: string;
@@ -107,19 +92,20 @@ function severityVariant(severity: string): 'default' | 'secondary' | 'destructi
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (status) {
-        case 'active': return 'destructive';
-        case 'acknowledged': return 'default';
+        case 'open': return 'destructive';
+        case 'ack': return 'default';
+        case 'triaging': return 'outline';
         case 'resolved': return 'secondary';
         case 'closed': return 'secondary';
         default: return 'outline';
     }
 }
 
-export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_alerts: rawAssetAlerts, filters: rawFilters }: Props) {
+export default function AlertsIndex({ control_room_alerts: rawCrAlerts, archived_asset_alerts: rawArchivedAssetAlerts, filters: rawFilters }: Props) {
     const crAlerts = rawCrAlerts?.data ?? [];
     const crMeta = rawCrAlerts?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const crLinks = rawCrAlerts?.links ?? [];
-    const assetAlerts = rawAssetAlerts ?? [];
+    const archivedAssetAlerts = rawArchivedAssetAlerts ?? [];
     const filters = rawFilters ?? {};
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -146,41 +132,12 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
         );
     }
 
-    const mergedAlerts: MergedAlert[] = [
-        ...crAlerts.map((a) => ({
-            id: `cr-${a.id}`,
-            source: 'control_room' as const,
-            alert_type: a.alert_type ?? '',
-            severity: a.severity ?? '',
-            status: a.status ?? '',
-            triggered_at: a.triggered_at,
-            resolved_at: a.resolved_at,
-            asset: a.asset,
-            notes: a.notes,
-            assigned_to: a.assigned_to,
-        })),
-        ...assetAlerts.map((a) => ({
-            id: `asset-${a.id}`,
-            source: 'asset' as const,
-            alert_type: a.alert_type ?? '',
-            severity: a.severity ?? '',
-            status: a.status ?? '',
-            triggered_at: a.triggered_at,
-            resolved_at: a.resolved_at,
-            asset: a.asset,
-        })),
-    ].sort((a, b) => {
-        const dateA = a.triggered_at ? new Date(a.triggered_at).getTime() : 0;
-        const dateB = b.triggered_at ? new Date(b.triggered_at).getTime() : 0;
-        return dateB - dateA;
-    });
-
-    // KPI counts
-    const activeAlerts = mergedAlerts.filter((a) => a.status === 'active');
-    const criticalCount = activeAlerts.filter((a) => a.severity === 'critical').length;
-    const highCount = activeAlerts.filter((a) => a.severity === 'high').length;
-    const mediumCount = activeAlerts.filter((a) => a.severity === 'medium').length;
-    const lowAlertCount = activeAlerts.filter((a) => a.severity === 'low').length;
+    const operationalAlerts = crAlerts;
+    const unresolvedOperationalAlerts = operationalAlerts.filter((a) => !['resolved', 'closed'].includes(a.status));
+    const criticalCount = unresolvedOperationalAlerts.filter((a) => a.severity === 'critical').length;
+    const highCount = unresolvedOperationalAlerts.filter((a) => a.severity === 'high').length;
+    const mediumCount = unresolvedOperationalAlerts.filter((a) => a.severity === 'medium').length;
+    const lowAlertCount = unresolvedOperationalAlerts.filter((a) => a.severity === 'low').length;
 
     const severityTotal = criticalCount + highCount + mediumCount + lowAlertCount;
     const severityBars = [
@@ -203,13 +160,13 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
     }, []);
 
     const toggleSelectAll = useCallback(() => {
-        const crIds = mergedAlerts.filter((a) => a.source === 'control_room').map((a) => a.id);
+        const crIds = operationalAlerts.map((a) => `cr-${a.id}`);
         if (selectedIds.length === crIds.length) {
             setSelectedIds([]);
         } else {
             setSelectedIds(crIds);
         }
-    }, [mergedAlerts, selectedIds.length]);
+    }, [operationalAlerts, selectedIds.length]);
 
     const handleBulkAction = useCallback((action: string) => {
         if (selectedIds.length === 0) return;
@@ -231,7 +188,7 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
             <PageShell>
                 <FleetHero
                     title="Alerts"
-                    description="Fleet and asset alerts, notifications, and escalations."
+                    description="Active fleet and asset operations alerts from Control Room, with archived legacy asset alert history kept separately below."
                     actions={
                         <Button variant="outline" size="sm" asChild>
                             <Link href="/control-room">
@@ -244,7 +201,7 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
 
                 {/* Dark KPI Cards */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                    <FleetStatCard label="TOTAL ACTIVE" value={activeAlerts.length} icon={Bell} subtitle="Unresolved alerts" />
+                    <FleetStatCard label="TOTAL OPEN" value={unresolvedOperationalAlerts.length} icon={Bell} subtitle="Operational Control Room alerts" />
                     <FleetStatCard label="CRITICAL" value={criticalCount} icon={Zap} color="red" valueClassName="text-red-400" subtitle="Immediate attention" />
                     <FleetStatCard label="HIGH" value={highCount} icon={ShieldAlert} color="amber" valueClassName="text-orange-400" subtitle="High priority" />
                     <FleetStatCard label="MEDIUM" value={mediumCount} icon={AlertTriangle} color="amber" valueClassName="text-yellow-400" subtitle="Medium severity" />
@@ -304,8 +261,9 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All statuses</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="acknowledged">Acknowledged</SelectItem>
+                            <SelectItem value="open">Open</SelectItem>
+                            <SelectItem value="ack">Acknowledged</SelectItem>
+                            <SelectItem value="triaging">Triaging</SelectItem>
                             <SelectItem value="resolved">Resolved</SelectItem>
                             <SelectItem value="closed">Closed</SelectItem>
                         </SelectContent>
@@ -320,12 +278,11 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
                                 <th className="px-4 py-3 text-left font-medium w-8">
                                     <input
                                         type="checkbox"
-                                        checked={mergedAlerts.filter((a) => a.source === 'control_room').length > 0 && selectedIds.length === mergedAlerts.filter((a) => a.source === 'control_room').length}
+                                        checked={operationalAlerts.length > 0 && selectedIds.length === operationalAlerts.length}
                                         onChange={toggleSelectAll}
                                         className="h-3.5 w-3.5 rounded border-gray-300"
                                     />
                                 </th>
-                                <th className="px-4 py-3 text-left font-medium">Source</th>
                                 <th className="px-4 py-3 text-left font-medium">Type</th>
                                 <SortHeader field="severity">Severity</SortHeader>
                                 <SortHeader field="status">Status</SortHeader>
@@ -335,21 +292,16 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
                             </tr>
                         </thead>
                         <tbody>
-                            {mergedAlerts.length > 0 ? (
-                                mergedAlerts.map((alert) => (
+                            {operationalAlerts.length > 0 ? (
+                                operationalAlerts.map((alert) => (
                                     <tr key={alert.id} className={`border-b transition-colors hover:bg-muted/30 transition-colors ${SEVERITY_BORDER[alert.severity] ?? ''}`}>
                                         <td className="px-4 py-3">
-                                            {alert.source === 'control_room' && (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.includes(alert.id)}
-                                                    onChange={() => toggleSelect(alert.id)}
-                                                    className="h-3.5 w-3.5 rounded border-gray-300"
-                                                />
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Badge variant="outline">{alert.source === 'control_room' ? 'CR' : 'Asset'}</Badge>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(`cr-${alert.id}`)}
+                                                onChange={() => toggleSelect(`cr-${alert.id}`)}
+                                                className="h-3.5 w-3.5 rounded border-gray-300"
+                                            />
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
@@ -379,20 +331,20 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex gap-1">
-                                                {alert.source === 'control_room' && alert.status === 'active' && (
+                                                {alert.status === 'open' && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => router.post(`/fleet-assets/alerts/${alert.id.replace('cr-', '')}/acknowledge`)}
+                                                        onClick={() => router.post(`/fleet-assets/alerts/${alert.id}/acknowledge`)}
                                                     >
                                                         Acknowledge
                                                     </Button>
                                                 )}
-                                                {alert.source === 'control_room' && (alert.status === 'active' || alert.status === 'acknowledged') && (
+                                                {['open', 'ack', 'triaging'].includes(alert.status) && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => router.post(`/fleet-assets/alerts/${alert.id.replace('cr-', '')}/resolve`)}
+                                                        onClick={() => router.post(`/fleet-assets/alerts/${alert.id}/resolve`)}
                                                     >
                                                         <CheckCircle className="mr-1 h-3 w-3" />
                                                         Resolve
@@ -404,14 +356,65 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, asset_al
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-12">
-                                        <FleetEmptyState icon={Bell} title="No active alerts" description="Fleet alerts appear here when triggered by geofence breaches, speed violations, or other configured rules." />
+                                    <td colSpan={7} className="px-4 py-12">
+                                        <FleetEmptyState icon={Bell} title="No operational alerts" description="Control Room fleet alerts appear here when triggered by geofence breaches, speed violations, or other configured rules." />
                                     </td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
                 </div>
+
+                <Card>
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Archived Asset Alert History</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Legacy <code>asset_alerts</code> records are retained for historical visibility only and are no longer part of the active operational alert workflow.
+                                </p>
+                            </div>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/assets/alerts">Open Archive</Link>
+                            </Button>
+                        </div>
+
+                        {archivedAssetAlerts.length > 0 ? (
+                            <div className="space-y-2">
+                                {archivedAssetAlerts.map((alert) => (
+                                    <div key={alert.id} className="flex items-start justify-between gap-3 rounded-md border p-3 text-sm">
+                                        <div className="min-w-0">
+                                            <div className="font-medium">{alert.alert_type.replace(/_/g, ' ')}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                {alert.asset ? (
+                                                    <Link href={`/fleet-assets/assets/${alert.asset.id}`} className="text-primary hover:underline">
+                                                        {alert.asset.name}
+                                                    </Link>
+                                                ) : (
+                                                    'Unknown asset'
+                                                )}
+                                                {alert.tracker ? ` • ${alert.tracker.vendor} ${alert.tracker.device_uid}` : ''}
+                                            </div>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                Triggered {alert.triggered_at ? formatDateTime(alert.triggered_at) : '---'}
+                                                {alert.acknowledged_at ? ` • Acknowledged ${formatDateTime(alert.acknowledged_at)}` : ''}
+                                                {alert.resolved_at ? ` • Resolved ${formatDateTime(alert.resolved_at)}` : ''}
+                                            </div>
+                                        </div>
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            <Badge variant={severityVariant(alert.severity)} className="text-xs font-bold uppercase">
+                                                {alert.severity}
+                                            </Badge>
+                                            <Badge variant={statusVariant(alert.status)}>{alert.status}</Badge>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">No archived asset alerts matched the current filters.</p>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Bulk Action Bar */}
                 {selectedIds.length > 0 && (

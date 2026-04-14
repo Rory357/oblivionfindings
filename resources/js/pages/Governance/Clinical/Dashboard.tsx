@@ -1,124 +1,207 @@
-import { Head, Link } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { HeartPulse, TrendingUp, TrendingDown, Minus, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { Head, Link } from '@inertiajs/react';
+import { ArrowUpRight, Minus, TrendingDown, TrendingUp } from 'lucide-react';
 
-interface Indicator {
-  id: number;
-  name: string;
-  category: string;
-  target_value: number;
-  target_direction: 'above' | 'below' | 'equal';
-  unit: string;
-  reporting_frequency: string;
-}
+type Indicator = {
+    id: number;
+    indicator_code: string;
+    name: string;
+    category: string;
+    category_label: string;
+    definition: string | null;
+    data_source: string | null;
+    unit: string | null;
+    target_value: number | null;
+    target_direction: 'above' | 'below' | 'equal';
+    reporting_frequency: string;
+    is_active: boolean;
+    is_automated: boolean;
+};
 
-interface Snapshot {
-  id: number;
-  period_start: string;
-  period_end: string;
-  indicator_values: Array<{ indicator_id: number; value: number }>;
-  narrative: string | null;
-}
+type SnapshotValue = {
+    indicator_id: number;
+    indicator_code: string;
+    value: number;
+    status: 'normal' | 'warning' | 'critical';
+    trend: 'up' | 'down' | 'stable';
+    source_href: string | null;
+    source_label: string | null;
+};
 
-interface Props extends PageProps {
-  indicators: Indicator[];
-  latestSnapshot: Snapshot | null;
-}
+type Snapshot = {
+    id: number;
+    period_start: string | null;
+    period_end: string | null;
+    indicator_values: SnapshotValue[];
+    narrative: string | null;
+};
 
-export default function ClinicalDashboard({ auth, indicators, latestSnapshot }: Props) {
-  const [showForm, setShowForm] = useState(false);
+type Props = {
+    indicators: Indicator[];
+    latestSnapshot: Snapshot | null;
+    sourceHint: string;
+};
 
-  const getLatestValue = (indicatorId: number): number | null => {
-    if (!latestSnapshot) return null;
-    const entry = latestSnapshot.indicator_values.find(v => v.indicator_id === indicatorId);
-    return entry?.value ?? null;
-  };
+const statusStyles: Record<SnapshotValue['status'], string> = {
+    normal: 'bg-emerald-100 text-emerald-800',
+    warning: 'bg-amber-100 text-amber-800',
+    critical: 'bg-red-100 text-red-800',
+};
 
-  const isOnTarget = (indicator: Indicator, value: number | null): boolean | null => {
-    if (value === null) return null;
-    switch (indicator.target_direction) {
-      case 'above': return value >= indicator.target_value;
-      case 'below': return value <= indicator.target_value;
-      case 'equal': return value === indicator.target_value;
+function formatPeriod(start: string | null, end: string | null): string {
+    if (!start || !end) {
+        return 'Current period';
     }
-  };
 
-  const getCategoryLabel = (cat: string) => ({
-    medication_safety: 'Medication Safety',
-    incident_rates: 'Incident Rates',
-    restraint_usage: 'Restraint Usage',
-    infection_control: 'Infection Control',
-    falls: 'Falls',
-    client_outcomes: 'Client Outcomes',
-    other: 'Other',
-  }[cat] || cat);
+    return `${new Date(start).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    })} - ${new Date(end).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    })}`;
+}
 
-  const grouped = indicators.reduce((acc, ind) => {
-    (acc[ind.category] = acc[ind.category] || []).push(ind);
-    return acc;
-  }, {} as Record<string, Indicator[]>);
+export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHint }: Props) {
+    const getLatestValue = (indicatorId: number): SnapshotValue | null =>
+        latestSnapshot?.indicator_values.find((value) => value.indicator_id === indicatorId) ?? null;
 
-  return (
-    <AppLayout>
-      <Head title="Clinical Governance" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Clinical Governance Dashboard</h1>
-            <p className="text-gray-500 mt-1">Key clinical quality and safety indicators</p>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/governance/clinical/trends">
-              <Button variant="outline"><TrendingUp className="w-4 h-4 mr-2" /> Trends</Button>
-            </Link>
-          </div>
-        </div>
+    const grouped = indicators.reduce<Record<string, Indicator[]>>((carry, indicator) => {
+        carry[indicator.category_label] = carry[indicator.category_label] ?? [];
+        carry[indicator.category_label].push(indicator);
 
-        {Object.entries(grouped).map(([category, inds]) => (
-          <div key={category} className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">{getCategoryLabel(category)}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {inds.map(indicator => {
-                const value = getLatestValue(indicator.id);
-                const onTarget = isOnTarget(indicator, value);
-                return (
-                  <Card key={indicator.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700">{indicator.name}</span>
-                        {onTarget !== null && (
-                          <Badge className={cn('text-xs', onTarget ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800')}>
-                            {onTarget ? 'On Target' : 'Off Target'}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-bold">{value !== null ? value : '—'}</span>
-                        <span className="text-sm text-gray-500">{indicator.unit}</span>
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        Target: {indicator.target_direction === 'above' ? '≥' : indicator.target_direction === 'below' ? '≤' : '='} {indicator.target_value} {indicator.unit}
-                      </div>
+        return carry;
+    }, {});
+
+    return (
+        <AppLayout>
+            <Head title="Clinical Governance" />
+
+            <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Clinical Governance</h1>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Automated clinical indicator snapshot for Governance oversight.
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Link href="/governance/clinical/trends">
+                            <Button variant="outline">Trends</Button>
+                        </Link>
+                    </div>
+                </div>
+
+                <Card className="border-sky-200 bg-sky-50/70">
+                    <CardContent className="flex flex-col gap-2 p-4 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="font-medium">Automated source</p>
+                            <p className="text-sky-800/90">{sourceHint}</p>
+                        </div>
+                        <Badge variant="secondary" className="w-fit bg-white text-sky-800">
+                            {formatPeriod(latestSnapshot?.period_start ?? null, latestSnapshot?.period_end ?? null)}
+                        </Badge>
                     </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                </Card>
 
-        {indicators.length === 0 && (
-          <Card><CardContent className="p-8 text-center text-gray-500">No clinical indicators configured yet.</CardContent></Card>
-        )}
-      </div>
-    </AppLayout>
-  );
+                {Object.entries(grouped).map(([categoryLabel, categoryIndicators]) => (
+                    <div key={categoryLabel} className="space-y-3">
+                        <h2 className="text-lg font-semibold text-gray-900">{categoryLabel}</h2>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            {categoryIndicators.map((indicator) => {
+                                const latestValue = getLatestValue(indicator.id);
+
+                                return (
+                                    <Card key={indicator.id}>
+                                        <CardContent className="space-y-4 p-5">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-gray-900">
+                                                        {indicator.name}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-gray-500">
+                                                        {indicator.definition ?? indicator.data_source ?? 'Automated indicator'}
+                                                    </p>
+                                                </div>
+                                                <Badge
+                                                    className={cn(
+                                                        'capitalize',
+                                                        latestValue ? statusStyles[latestValue.status] : 'bg-slate-100 text-slate-700',
+                                                    )}
+                                                >
+                                                    {latestValue?.status ?? 'No data'}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="flex items-end justify-between gap-3">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-3xl font-bold text-gray-900">
+                                                        {latestValue ? latestValue.value : '—'}
+                                                    </span>
+                                                    {indicator.unit && (
+                                                        <span className="text-xs uppercase tracking-wide text-gray-500">
+                                                            {indicator.unit}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-gray-500">
+                                                    {latestValue?.trend === 'up' ? (
+                                                        <TrendingUp className="h-4 w-4" />
+                                                    ) : latestValue?.trend === 'down' ? (
+                                                        <TrendingDown className="h-4 w-4" />
+                                                    ) : (
+                                                        <Minus className="h-4 w-4" />
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-3 text-xs text-gray-500">
+                                                <span>
+                                                    Target: {indicator.target_direction === 'below' ? '≤' : indicator.target_direction === 'above' ? '≥' : '='}{' '}
+                                                    {indicator.target_value ?? '—'}
+                                                </span>
+                                                <span className="capitalize">{indicator.reporting_frequency}</span>
+                                            </div>
+
+                                            {latestValue?.source_href && latestValue.source_label && (
+                                                <Link href={latestValue.source_href}>
+                                                    <Button variant="ghost" size="sm" className="h-8 px-0 text-sky-700">
+                                                        {latestValue.source_label}
+                                                        <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                                                    </Button>
+                                                </Link>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+
+                {latestSnapshot?.narrative && (
+                    <Card>
+                        <CardContent className="space-y-2 p-5">
+                            <p className="text-sm font-semibold text-gray-900">Narrative</p>
+                            <p className="text-sm leading-6 text-gray-600">{latestSnapshot.narrative}</p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {indicators.length === 0 && (
+                    <Card>
+                        <CardContent className="p-8 text-center text-sm text-gray-500">
+                            No automated clinical governance indicators are available yet.
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+        </AppLayout>
+    );
 }

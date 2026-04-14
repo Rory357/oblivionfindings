@@ -8,9 +8,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import EventRecordSheet from '@/components/clinical/event-record-sheet';
 import ObservationRecordSheet, {
     OBSERVATION_TYPES,
 } from '@/components/clinical/observation-record-sheet';
+import { router } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -77,10 +79,14 @@ function formatTime(iso: string): string {
 
 export default function ClientObservationsTab({
     clientId,
+    canRecordObservation,
     canRecordClinical,
+    canRecordEvent,
 }: {
     clientId: number;
+    canRecordObservation: boolean;
     canRecordClinical: boolean;
+    canRecordEvent: boolean;
 }) {
     const [observations, setObservations] = useState<Observation[]>([]);
     const [loading, setLoading] = useState(true);
@@ -89,6 +95,7 @@ export default function ClientObservationsTab({
     const [total, setTotal] = useState(0);
     const [typeFilter, setTypeFilter] = useState<string>('all');
     const [sheetOpen, setSheetOpen] = useState(false);
+    const [eventSheetOpen, setEventSheetOpen] = useState(false);
 
     const fetchObservations = useCallback(
         async (p: number, type: string) => {
@@ -132,6 +139,14 @@ export default function ClientObservationsTab({
         [fetchObservations, typeFilter],
     );
 
+    const handleEventRecorded = useCallback(() => {
+        router.reload({
+            only: ['events', 'health_summary'],
+            preserveScroll: true,
+            preserveState: true,
+        });
+    }, []);
+
     return (
         <>
             <Card>
@@ -162,13 +177,25 @@ export default function ClientObservationsTab({
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <Button
-                                size="sm"
-                                onClick={() => setSheetOpen(true)}
-                            >
-                                <Plus className="mr-1 h-3.5 w-3.5" />
-                                Record
-                            </Button>
+                            {canRecordEvent ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEventSheetOpen(true)}
+                                >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    Event
+                                </Button>
+                            ) : null}
+                            {canRecordObservation ? (
+                                <Button
+                                    size="sm"
+                                    onClick={() => setSheetOpen(true)}
+                                >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    Observation
+                                </Button>
+                            ) : null}
                         </div>
                     </CardTitle>
                 </CardHeader>
@@ -268,12 +295,23 @@ export default function ClientObservationsTab({
                 </CardContent>
             </Card>
 
-            <ObservationRecordSheet
-                clientId={clientId}
-                open={sheetOpen}
-                onOpenChange={handleSheetClose}
-                canRecordClinical={canRecordClinical}
-            />
+            {canRecordObservation ? (
+                <ObservationRecordSheet
+                    clientId={clientId}
+                    open={sheetOpen}
+                    onOpenChange={handleSheetClose}
+                    canRecordClinical={canRecordClinical}
+                />
+            ) : null}
+
+            {canRecordEvent ? (
+                <EventRecordSheet
+                    clientId={clientId}
+                    open={eventSheetOpen}
+                    onOpenChange={setEventSheetOpen}
+                    onRecorded={handleEventRecorded}
+                />
+            ) : null}
         </>
     );
 }

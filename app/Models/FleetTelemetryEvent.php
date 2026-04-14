@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\SecurityDevices\Models\Device;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,6 +11,7 @@ class FleetTelemetryEvent extends Model
     protected $fillable = [
         'asset_id',
         'asset_tracker_id',
+        'device_id',
         'vendor',
         'vendor_message_id',
         'occurred_at',
@@ -56,5 +58,10 @@ class FleetTelemetryEvent extends Model
     public function tracker(): BelongsTo
     {
         return $this->belongsTo(AssetTracker::class, 'asset_tracker_id');
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(Device::class);
     }
 }

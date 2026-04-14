@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Requests\StoreSiteRequest;
 use App\Http\Requests\UpdateSiteRequest;
 use App\Models\Asset;
@@ -128,6 +129,8 @@ class SiteController extends Controller
         ]);
 
         $user = $request->user();
+        $tenantId = $site->tenant_id ?? $user?->tenant_id ?? $user?->organization_id ?? 1;
+        $siteDevices = app(DeviceRegistryService::class)->forSite($tenantId, $site->id);
 
         // Assets linked to this site (includes both site-owned assets and client-owned assets stored at the site)
         $assets = Asset::query()
@@ -336,7 +339,7 @@ class SiteController extends Controller
                     'is_preferred' => (bool) $v->is_preferred,
                 ]),
             'credentialCount' => \App\Models\SiteCredential::where('site_id', $site->id)->count(),
-            'hardwareCount' => \App\Models\LocationHardware::where('site_id', $site->id)->count(),
+            'hardwareCount' => (clone $siteDevices)->count(),
             'integrationStatus' => \App\Models\Integration\IntegrationSiteConfig::where('site_id', $site->id)
                 ->where('is_active', true)
                 ->get()

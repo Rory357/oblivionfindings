@@ -36,6 +36,7 @@ class ClinicalEventService
      *     outcome?: string|null,
      *     witnesses?: array|null,
      *     requires_followup?: bool,
+     *     followup_notes?: string|null,
      * } $input
      */
     public function record(
@@ -64,6 +65,7 @@ class ClinicalEventService
             'outcome' => $input['outcome'] ?? null,
             'witnesses' => $input['witnesses'] ?? null,
             'requires_followup' => $input['requires_followup'] ?? false,
+            'followup_notes' => ($input['requires_followup'] ?? false) ? ($input['followup_notes'] ?? null) : null,
             'status' => 'open',
         ]);
 
@@ -194,6 +196,18 @@ class ClinicalEventService
 
         if ($event->immediate_action_taken) {
             $parts[] = 'Action taken: ' . $event->immediate_action_taken;
+        }
+
+        if ($event->outcome) {
+            $parts[] = 'Outcome: ' . $event->outcome;
+        }
+
+        if ($event->requires_followup) {
+            $parts[] = 'Follow-up required';
+        }
+
+        if ($event->followup_notes) {
+            $parts[] = 'Follow-up notes: ' . $event->followup_notes;
         }
 
         return implode(' · ', $parts);

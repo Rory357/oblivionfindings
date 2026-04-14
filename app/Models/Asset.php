@@ -154,7 +154,8 @@ class Asset extends Model
     /**
      * @deprecated Use DeviceAssetLink::active()->forAsset($this->id) instead.
      * Legacy relationship — AssetTracker is retired as active source of truth.
-     * Kept for telemetry ingestion bridge and consent management compatibility.
+     * Kept for telemetry ingestion bridge, consent compatibility, and the
+     * legacy asset detail tracker pair/unpair UI.
      */
     public function trackers(): HasMany
     {
@@ -171,6 +172,12 @@ class Asset extends Model
         return $this->hasMany(AssetTelemetryHistory::class);
     }
 
+    /**
+     * @deprecated Legacy asset_alert history only.
+     * ControlRoomAlert is the active operational alert surface.
+     *
+     * Kept for archived asset alert visibility in asset/fleet detail views.
+     */
     public function alerts(): HasMany
     {
         return $this->hasMany(AssetAlert::class);
@@ -209,6 +216,8 @@ class Asset extends Model
     /**
      * @deprecated Use DeviceAssetLink::active()->forAsset($this->id) instead.
      * Legacy relationship — LocationHardware is retired as active source of truth.
+     * Kept only for historical/bridge reads; manual link editing UI was removed
+     * in PR27.
      */
     public function linkedHardware(): HasMany
     {

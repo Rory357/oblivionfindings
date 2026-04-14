@@ -79,6 +79,9 @@ export default function ClientSummary({ client, summary, observation_types, even
                         <p className="mt-1 text-sm text-gray-500">Health & Clinical Summary</p>
                     </div>
                     <div className="flex gap-2">
+                        <Link href={`/health-clinical/clients/${client.id}/trends`}>
+                            <Button variant="outline" size="sm">Observation Trends</Button>
+                        </Link>
                         <Link href={`/operations/clients/${client.id}`}>
                             <Button variant="outline" size="sm">Client Profile</Button>
                         </Link>

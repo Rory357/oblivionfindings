@@ -8,6 +8,7 @@ use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\LocationHardware;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\SyncResult;
+use App\Services\Integration\UnifiOperationalBridgeService;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +16,10 @@ use Illuminate\Support\Facades\Log;
 class UnifiAdapter implements IntegrationAdapterInterface
 {
     private const BASE_URL = 'https://api.ui.com/v1';
+
+    public function __construct(
+        private readonly UnifiOperationalBridgeService $runtime,
+    ) {}
 
     /**
      * Map UniFi device type prefixes to our hardware categories.
@@ -286,63 +291,13 @@ class UnifiAdapter implements IntegrationAdapterInterface
                             continue;
                         }
 
-                        $productLine = strtolower((string) ($device['productLine'] ?? ''));
-                        $category = $this->resolveCategory($device['model'] ?? $device['shortname'] ?? '');
-                        if ($productLine === 'protect' && $category === LocationHardware::CATEGORY_OTHER) {
-                            $category = LocationHardware::CATEGORY_CAMERA;
-                        }
+                        $device['_resolved_host_id'] = $targetHostId;
+                        $sync = $this->runtime->syncInventoryDevice($siteConfig, $device);
 
-                        $lastSeenAt = $this->parseDeviceTimestamp(
-                            $device['lastSeen']
-                                ?? $device['last_seen']
-                                ?? $device['startupTime']
-                                ?? $device['adoptionTime']
-                                ?? null
-                        );
-
-                        $hardware = LocationHardware::where('tenant_id', $siteConfig->tenant_id)
-                            ->where('site_id', $siteConfig->site_id)
-                            ->where('provider', 'unifi')
-                            ->whereJsonContains('external_ref->provider_entity_id', $providerEntityId)
-                            ->first();
-
-                        $attributes = [
-                            'tenant_id' => $siteConfig->tenant_id,
-                            'site_id' => $siteConfig->site_id,
-                            'provider' => 'unifi',
-                            'category' => $category,
-                            'name' => $this->resolveDeviceName($device),
-                            'serial' => $device['serial'] ?? null,
-                            'mac' => $device['mac'] ?? null,
-                            'status' => $this->mapDeviceStatus($device['status'] ?? $device['state'] ?? null),
-                            'last_seen_at' => $lastSeenAt ?? now(),
-                            'external_ref' => [
-                                'provider' => 'unifi',
-                                'provider_entity_id' => $providerEntityId,
-                                'provider_type' => $device['shortname'] ?? $device['productLine'] ?? null,
-                                'model' => $device['model'] ?? null,
-                                'firmware' => $device['version'] ?? $device['firmware_version'] ?? null,
-                                'ip' => $device['ip'] ?? null,
-                                'source_app' => $productLine ?: null,
-                                'host_id' => $targetHostId,
-                            ],
-                            'meta' => [
-                                'provider_type' => $device['shortname'] ?? null,
-                                'model_long' => $device['model'] ?? $device['model_long_name'] ?? null,
-                                'product_line' => $productLine ?: null,
-                                'firmware_status' => $device['firmwareStatus'] ?? null,
-                                'uptime' => $device['uptime'] ?? null,
-                                'experience_score' => $device['satisfaction'] ?? null,
-                                'host_id' => $targetHostId,
-                            ],
-                        ];
-
-                        if ($hardware) {
-                            $hardware->update($attributes);
-                            $updated++;
-                        } else {
-                            LocationHardware::create($attributes);
+                        if ($sync['created']) {
                             $created++;
+                        } else {
+                            $updated++;
                         }
                     } catch (\Throwable $e) {
                         Log::warning('UniFi syncDevices: error processing device', [
@@ -468,28 +423,6 @@ class UnifiAdapter implements IntegrationAdapterInterface
         }
 
         return LocationHardware::CATEGORY_OTHER;
-    }
-
-    /**
-     * Map a UniFi device state integer to our status string.
-     */
-    private function mapDeviceStatus(mixed $state): string
-    {
-        if (is_string($state)) {
-            $value = strtolower($state);
-
-            return match ($value) {
-                'online', 'connected', 'up' => LocationHardware::STATUS_ONLINE,
-                'offline', 'disconnected', 'down' => LocationHardware::STATUS_OFFLINE,
-                default => LocationHardware::STATUS_UNKNOWN,
-            };
-        }
-
-        return match ($state) {
-            1 => LocationHardware::STATUS_ONLINE,
-            0 => LocationHardware::STATUS_OFFLINE,
-            default => LocationHardware::STATUS_UNKNOWN,
-        };
     }
 
     /**
@@ -889,16 +822,4 @@ class UnifiAdapter implements IntegrationAdapterInterface
         return $productLine !== '' ? $productLine : 'device';
     }
 
-    private function parseDeviceTimestamp(?string $value): ?\Carbon\Carbon
-    {
-        if (!$value) {
-            return null;
-        }
-
-        try {
-            return \Carbon\Carbon::parse($value);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
 }

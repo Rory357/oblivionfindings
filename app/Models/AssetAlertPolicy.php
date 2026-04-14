@@ -7,8 +7,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @deprecated PR5: Superseded by SignalRule for asset alert routing.
- *             Asset alert policies are no longer used — FleetSignalService
- *             handles asset signal emission and SignalRules handle routing.
+ *             Asset alert policies are no longer used in active runtime.
+ *             This model remains only for historical schema compatibility
+ *             with archived asset_alert rows that may still reference a policy.
  */
 class AssetAlertPolicy extends Model
 {

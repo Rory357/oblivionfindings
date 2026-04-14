@@ -7,6 +7,7 @@ use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\LocationHardware;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Integration\UnifiOperationalBridgeService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,7 +32,10 @@ class PullIntegrationHealthJob implements ShouldQueue
         public ?int $siteId = null,
     ) {}
 
-    public function handle(IntegrationAdapterRegistry $registry): void
+    public function handle(
+        IntegrationAdapterRegistry $registry,
+        UnifiOperationalBridgeService $unifiRuntime,
+    ): void
     {
         try {
             $adapter = $registry->resolve($this->provider);
@@ -92,7 +96,17 @@ class PullIntegrationHealthJob implements ShouldQueue
 
                 foreach ($healthResults as $entry) {
                     try {
-                        $hardware = LocationHardware::find($entry['hardware_id']);
+                        if ($this->provider === 'unifi') {
+                            if ($unifiRuntime->applyHealthUpdate($siteConfig, $entry)) {
+                                $updated++;
+                            } else {
+                                $errored++;
+                            }
+
+                            continue;
+                        }
+
+                        $hardware = LocationHardware::find($entry['hardware_id'] ?? null);
 
                         if (!$hardware) {
                             $errored++;

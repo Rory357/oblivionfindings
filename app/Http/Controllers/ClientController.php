@@ -39,7 +39,6 @@ use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
-use App\Models\LocationHardware;
 use App\Models\AssetGeofence;
 use App\Models\ConsentType;
 use App\Models\FleetResidentTransport;
@@ -597,6 +596,7 @@ class ClientController extends Controller
                 'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
                 'record_observation' => $request->user()?->canDo('clinical.observations.record') ?? false,
                 'record_clinical_observation' => $request->user()?->canDo('clinical.observations.recordClinical') ?? false,
+                'record_event' => $request->user()?->canDo('clinical.events.record') ?? false,
             ],
             'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
             'family_notes_open_count' => \App\Models\FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
@@ -1639,8 +1639,9 @@ class ClientController extends Controller
 
     /**
      * Return location history for a client's personal tracker (JSON).
-     * Reads device identity from canonical registry; history from
-     * integration_events via legacy bridge FK.
+     * Reads device identity from the canonical registry and prefers
+     * integration_events.canonical_device_id for history. A narrow legacy
+     * fallback remains for unmapped historical rows during the transition.
      */
     public function locationHistory(Request $request, Client $client)
     {
@@ -1654,45 +1655,8 @@ class ClientController extends Controller
             ->where('domain', 'tracking')
             ->first();
 
-        $locations = [];
-
-        // Use legacy bridge FK for integration_events query (not yet migrated).
-        $legacyHardwareId = $device?->legacy_location_hardware_id;
-
-        if ($legacyHardwareId && Schema::hasTable('integration_events')) {
-            $query = DB::table('integration_events')
-                ->where('hardware_id', $legacyHardwareId)
-                ->whereNotNull('payload');
-
-            if ($request->filled('date_from')) {
-                $query->where('created_at', '>=', $request->input('date_from'));
-            }
-            if ($request->filled('date_to')) {
-                $query->where('created_at', '<=', $request->input('date_to') . ' 23:59:59');
-            }
-
-            $events = $query->orderBy('created_at', 'desc')
-                ->limit(500)
-                ->get();
-
-            $locations = $events->map(function ($event) {
-                $payload = is_string($event->payload) ? json_decode($event->payload, true) : (array) $event->payload;
-                $lat = $payload['lat'] ?? $payload['latitude'] ?? null;
-                $lng = $payload['lng'] ?? $payload['longitude'] ?? null;
-
-                if ($lat === null || $lng === null) {
-                    return null;
-                }
-
-                return [
-                    'lat' => (float) $lat,
-                    'lng' => (float) $lng,
-                    'timestamp' => $event->created_at,
-                    'speed' => $payload['speed'] ?? null,
-                    'battery' => $payload['battery'] ?? null,
-                ];
-            })->filter()->values();
-        }
+        $locations = app(\App\Services\Integration\IntegrationEventHistoryService::class)
+            ->forDevice($device, $request->only(['date_from', 'date_to']));
 
         return response()->json(['locations' => $locations]);
     }

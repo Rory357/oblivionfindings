@@ -9,7 +9,6 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class PortalLocationController extends Controller
@@ -152,45 +151,8 @@ class PortalLocationController extends Controller
             ->where('domain', 'tracking')
             ->first();
 
-        $locations = [];
-
-        // Use legacy bridge FK for integration_events query.
-        $legacyHardwareId = $device?->legacy_location_hardware_id;
-
-        if ($legacyHardwareId && Schema::hasTable('integration_events')) {
-            $query = DB::table('integration_events')
-                ->where('hardware_id', $legacyHardwareId)
-                ->whereNotNull('payload');
-
-            if ($request->filled('date_from')) {
-                $query->where('created_at', '>=', $request->input('date_from'));
-            }
-            if ($request->filled('date_to')) {
-                $query->where('created_at', '<=', $request->input('date_to') . ' 23:59:59');
-            }
-
-            $events = $query->orderBy('created_at', 'desc')
-                ->limit(500)
-                ->get();
-
-            $locations = $events->map(function ($event) {
-                $payload = is_string($event->payload) ? json_decode($event->payload, true) : (array) $event->payload;
-                $lat = $payload['lat'] ?? $payload['latitude'] ?? null;
-                $lng = $payload['lng'] ?? $payload['longitude'] ?? null;
-
-                if ($lat === null || $lng === null) {
-                    return null;
-                }
-
-                return [
-                    'lat' => (float) $lat,
-                    'lng' => (float) $lng,
-                    'timestamp' => $event->created_at,
-                    'speed' => $payload['speed'] ?? null,
-                    'battery' => $payload['battery'] ?? null,
-                ];
-            })->filter()->values();
-        }
+        $locations = app(\App\Services\Integration\IntegrationEventHistoryService::class)
+            ->forDevice($device, $request->only(['date_from', 'date_to']));
 
         return response()->json([
             'locations' => $locations,

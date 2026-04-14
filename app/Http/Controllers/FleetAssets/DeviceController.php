@@ -5,14 +5,15 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
-use App\Models\AssetTracker;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Services\AuditLogger;
+use App\Services\Fleet\FleetDeviceRuntimeService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -20,6 +21,7 @@ class DeviceController extends Controller
 {
     public function __construct(
         private readonly DeviceLinkService $linkService,
+        private readonly FleetDeviceRuntimeService $deviceRuntime,
     ) {}
 
     /**
@@ -99,21 +101,13 @@ class DeviceController extends Controller
             'activeAssetLinks.asset:id,name,asset_tag,category,status',
         ]);
 
-        // Telemetry still comes from legacy AssetTracker via bridge FK.
-        $telemetrySnapshots = collect();
-        if ($device->legacy_asset_tracker_id) {
-            $legacyTracker = AssetTracker::with([
-                'telemetrySnapshots' => fn ($q) => $q->latest()->limit(20),
-            ])->find($device->legacy_asset_tracker_id);
-
-            if ($legacyTracker) {
-                $telemetrySnapshots = $legacyTracker->telemetrySnapshots->map(fn ($s) => [
-                    'id' => $s->id,
-                    'created_at' => $s->created_at?->toISOString(),
-                    'data' => $s->toArray(),
-                ]);
-            }
-        }
+        $telemetrySnapshots = $this->deviceRuntime
+            ->recentSnapshotsForDevice($device)
+            ->map(fn ($snapshot) => [
+                'id' => $snapshot->id,
+                'created_at' => $snapshot->created_at?->toISOString(),
+                'data' => $snapshot->toArray(),
+            ]);
 
         $activeLink = $device->activeAssetLinks->first();
 
@@ -213,80 +207,94 @@ class DeviceController extends Controller
     }
 
     /**
-     * Consent management — still reads from legacy AssetTracker for now.
-     * Consent records are tied to the legacy tracker model. This will be
-     * migrated to device_assignments.consent_id in a future PR.
+     * Consent management now resolves through canonical devices first.
+     * DeviceAssignment.consent_id is the primary source when present; legacy
+     * AssetTracker consent remains a narrow compatibility fallback.
      */
     public function consentIndex(Request $request)
     {
-        $trackers = AssetTracker::query()
+        $devices = Device::query()
+            ->where('domain', 'tracking')
+            ->where(function ($query) {
+                $query->whereNotNull('legacy_asset_tracker_id')
+                    ->orWhereHas('activeAssetLinks');
+            })
             ->with([
-                'asset:id,name,asset_tag,client_id',
-                'asset.client:id,first_name,last_name',
-                'consent:id,status,given_at,withdrawn_at,given_by_user_id,expires_at',
-                'consent.givenBy:id,name',
+                'activeAssetLinks.asset:id,name,asset_tag,client_id',
+                'activeAssetLinks.asset.client:id,first_name,last_name',
+                'assignments' => fn ($query) => $query
+                    ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                    ->whereNull('released_at')
+                    ->with([
+                        'consent:id,client_id,status,given_at,withdrawn_at,given_by_user_id,expires_at',
+                        'consent.givenBy:id,name',
+                    ])
+                    ->latest('assigned_at'),
+                'legacyAssetTracker.asset:id,name,asset_tag,client_id',
+                'legacyAssetTracker.asset.client:id,first_name,last_name',
+                'legacyAssetTracker.consent:id,client_id,status,given_at,withdrawn_at,given_by_user_id,expires_at',
+                'legacyAssetTracker.consent.givenBy:id,name',
             ])
             ->orderByDesc('updated_at')
             ->get();
 
-        $devices = $trackers->map(function (AssetTracker $t) {
-            $consent = $t->consent;
-            $consentValid = $consent ? $consent->isValid() : false;
-
-            if (!$consent) {
-                $consentStatus = 'pending';
-            } elseif ($consent->status === 'withdrawn' || $consent->withdrawn_at) {
-                $consentStatus = 'revoked';
-            } elseif ($consentValid) {
-                $consentStatus = 'consented';
-            } elseif ($consent->isExpired()) {
-                $consentStatus = 'expired';
-            } else {
-                $consentStatus = 'pending';
-            }
+        $deviceRows = $devices->map(function (Device $device) {
+            $assignment = $device->assignments->first();
+            $tracker = $device->legacyAssetTracker;
+            $consent = $assignment?->consent ?? $tracker?->consent;
+            $asset = $device->activeAssetLinks->first()?->asset ?? $tracker?->asset;
+            $client = $asset?->client;
 
             return [
-                'id' => $t->id,
-                'vendor' => $t->vendor,
-                'device_uid' => $t->device_uid,
-                'status' => $t->status,
-                'consent_status' => $consentStatus,
+                'id' => $device->id,
+                'vendor' => $device->provider,
+                'device_uid' => $device->device_uid,
+                'status' => $device->status?->value,
+                'consent_status' => $this->deviceRuntime->mapConsentStatus($consent),
                 'consent_given_at' => optional($consent?->given_at)->toISOString(),
                 'consent_withdrawn_at' => optional($consent?->withdrawn_at)->toISOString(),
                 'consent_expires_at' => optional($consent?->expires_at)->toISOString(),
                 'consent_given_by' => $consent?->givenBy?->name,
-                'asset' => $t->asset ? [
-                    'id' => $t->asset->id,
-                    'name' => $t->asset->name,
-                    'asset_tag' => $t->asset->asset_tag,
+                'asset' => $asset ? [
+                    'id' => $asset->id,
+                    'name' => $asset->name,
+                    'asset_tag' => $asset->asset_tag,
                 ] : null,
-                'client_name' => $t->asset?->client
-                    ? trim($t->asset->client->first_name . ' ' . $t->asset->client->last_name)
+                'client_name' => $client
+                    ? trim($client->first_name . ' ' . $client->last_name)
                     : null,
             ];
         });
 
         $stats = [
-            'total' => $devices->count(),
-            'consented' => $devices->where('consent_status', 'consented')->count(),
-            'revoked' => $devices->where('consent_status', 'revoked')->count(),
-            'pending' => $devices->where('consent_status', 'pending')->count(),
-            'expired' => $devices->where('consent_status', 'expired')->count(),
+            'total' => $deviceRows->count(),
+            'consented' => $deviceRows->where('consent_status', 'consented')->count(),
+            'revoked' => $deviceRows->where('consent_status', 'revoked')->count(),
+            'pending' => $deviceRows->where('consent_status', 'pending')->count(),
+            'expired' => $deviceRows->where('consent_status', 'expired')->count(),
         ];
 
         return Inertia::render('fleet-assets/devices/consent', [
-            'devices' => $devices->values(),
+            'devices' => $deviceRows->values(),
             'stats' => $stats,
         ]);
     }
 
-    public function grantConsent(Request $request, AssetTracker $tracker)
+    public function grantConsent(Request $request, Device $device)
     {
         $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $tracker->load('asset.client');
+        $context = $this->deviceRuntime->resolveConsentContext($device);
+        $assignment = $context['assignment'];
+        $tracker = $context['tracker'];
+        $asset = $context['asset'];
+        $client = $context['client'];
+
+        if (!$client) {
+            return back()->withErrors(['consent' => 'A linked client is required before consent can be recorded.']);
+        }
 
         $consentType = ConsentType::query()
             ->where('name', 'Fleet Tracking')
@@ -309,10 +317,8 @@ class DeviceController extends Controller
 
         $currentVersion = $consentType->currentVersion()->first();
 
-        $oldConsent = $tracker->consent;
-
         $consent = ClientConsent::create([
-            'client_id' => $tracker->asset?->client_id,
+            'client_id' => $client->id,
             'consent_type_id' => $consentType->id,
             'consent_type_version_id' => $currentVersion?->id,
             'status' => 'given',
@@ -324,14 +330,26 @@ class DeviceController extends Controller
             'updated_by' => $request->user()->id,
         ]);
 
-        if ($oldConsent) {
+        collect([
+            $context['assignment_consent'],
+            $context['tracker_consent'],
+        ])->filter()->unique('id')->each(function (ClientConsent $oldConsent) use ($consent): void {
             $oldConsent->update(['superseded_by_consent_id' => $consent->id]);
+        });
+
+        if ($assignment) {
+            $assignment->update(['consent_id' => $consent->id]);
         }
 
-        $tracker->update(['consent_id' => $consent->id]);
+        if ($tracker) {
+            $tracker->update(['consent_id' => $consent->id]);
+        }
 
-        AuditLogger::log('assets.tracker.consent.granted', $tracker->asset, [
-            'tracker_id' => $tracker->id,
+        AuditLogger::log('assets.tracker.consent.granted', $asset ?? $device, [
+            'device_id' => $device->id,
+            'tracker_id' => $tracker?->id,
+            'assignment_id' => $assignment?->id,
+            'client_id' => $client->id,
             'consent_id' => $consent->id,
             'granted_by' => $request->user()->id,
         ]);
@@ -339,30 +357,41 @@ class DeviceController extends Controller
         return back()->with('success', 'Location tracking consent granted.');
     }
 
-    public function revokeConsent(Request $request, AssetTracker $tracker)
+    public function revokeConsent(Request $request, Device $device)
     {
         $request->validate([
             'reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $consent = $tracker->consent;
+        $context = $this->deviceRuntime->resolveConsentContext($device);
+        $assignment = $context['assignment'];
+        $tracker = $context['tracker'];
+        $asset = $context['asset'];
+        $consents = collect([
+            $context['assignment_consent'],
+            $context['tracker_consent'],
+        ])->filter()->unique('id');
 
-        if (!$consent) {
+        if ($consents->isEmpty()) {
             return back()->withErrors(['consent' => 'No active consent to revoke.']);
         }
 
-        $consent->update([
-            'status' => 'withdrawn',
-            'withdrawn_at' => now(),
-            'withdrawn_by_user_id' => $request->user()->id,
-            'withdrawal_reason' => $request->input('reason'),
-            'withdrawal_acknowledged' => true,
-            'updated_by' => $request->user()->id,
-        ]);
+        $consents->each(function (ClientConsent $consent) use ($request): void {
+            $consent->update([
+                'status' => 'withdrawn',
+                'withdrawn_at' => now(),
+                'withdrawn_by_user_id' => $request->user()->id,
+                'withdrawal_reason' => $request->input('reason'),
+                'withdrawal_acknowledged' => true,
+                'updated_by' => $request->user()->id,
+            ]);
+        });
 
-        AuditLogger::log('assets.tracker.consent.revoked', $tracker->asset, [
-            'tracker_id' => $tracker->id,
-            'consent_id' => $consent->id,
+        AuditLogger::log('assets.tracker.consent.revoked', $asset ?? $device, [
+            'device_id' => $device->id,
+            'tracker_id' => $tracker?->id,
+            'assignment_id' => $assignment?->id,
+            'consent_ids' => $consents->pluck('id')->values()->all(),
             'revoked_by' => $request->user()->id,
             'reason' => $request->input('reason'),
         ]);

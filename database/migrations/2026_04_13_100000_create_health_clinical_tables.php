@@ -8,6 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        foreach ([
+            'clinical_observations',
+            'clinical_events',
+            'clinical_protocols',
+            'clinical_protocol_schedules',
+        ] as $table) {
+            if (Schema::hasTable($table)) {
+                return;
+            }
+        }
+
         // ── Clinical Protocols ─────────────────────────────────────────────
         Schema::create('clinical_protocols', function (Blueprint $table) {
             $table->id();

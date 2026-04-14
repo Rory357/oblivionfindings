@@ -1,131 +1,176 @@
-import { Head } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Activity, Target, TrendingUp, TrendingDown } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 
-interface Indicator {
+type Indicator = {
     id: number;
+    indicator_code: string;
     name: string;
     category: string;
-    target_value: number;
-    target_direction: string;
-    unit: string;
+    category_label: string;
+    unit: string | null;
+    target_value: number | null;
+    target_direction: 'above' | 'below' | 'equal';
     is_active: boolean;
-}
+};
 
-interface Snapshot {
+type SnapshotValue = {
+    indicator_id: number;
+    indicator_code: string;
+    value: number;
+    status: 'normal' | 'warning' | 'critical';
+    trend: 'up' | 'down' | 'stable';
+    source_href: string | null;
+    source_label: string | null;
+};
+
+type Snapshot = {
     id: number;
-    period_start: string;
-    period_end: string;
-    indicator_values: Array<{ indicator_id: number; value: number }>;
+    period_start: string | null;
+    period_end: string | null;
+    indicator_values: SnapshotValue[];
     narrative: string | null;
-}
+};
 
-interface Props extends PageProps {
+type Props = {
     snapshots: Snapshot[];
     indicators: Indicator[];
+    sourceHint: string;
+};
+
+const statusClasses: Record<SnapshotValue['status'], string> = {
+    normal: 'bg-emerald-100 text-emerald-800',
+    warning: 'bg-amber-100 text-amber-800',
+    critical: 'bg-red-100 text-red-800',
+};
+
+function formatPeriod(start: string | null, end: string | null): string {
+    if (!start || !end) {
+        return 'Current period';
+    }
+
+    return `${new Date(start).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    })} - ${new Date(end).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    })}`;
 }
 
-function isOnTarget(value: number, target: number, direction: string): boolean {
-    if (direction === 'above' || direction === 'higher') return value >= target;
-    if (direction === 'below' || direction === 'lower') return value <= target;
-    return value === target;
+function formatColumnDate(date: string | null): string {
+    if (!date) {
+        return 'Current';
+    }
+
+    return new Date(date).toLocaleDateString('en-NZ', {
+        month: 'short',
+        year: '2-digit',
+    });
 }
 
-export default function ClinicalTrends({ auth, snapshots, indicators }: Props) {
-    const activeIndicators = indicators.filter((ind) => ind.is_active);
-    const latest = snapshots[0] ?? null;
-    const recentSnapshots = snapshots.slice(0, 6);
+export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Props) {
+    const latestSnapshot = snapshots[0] ?? null;
+    const activeIndicators = indicators.filter((indicator) => indicator.is_active);
+    const historicalSnapshots = snapshots.slice(0, 6).reverse();
 
-    const getLatestValue = (indicatorId: number): number | null => {
-        if (!latest) return null;
-        const entry = latest.indicator_values.find((v) => v.indicator_id === indicatorId);
-        return entry ? entry.value : null;
-    };
-
-    const getSnapshotValue = (snapshot: Snapshot, indicatorId: number): number | null => {
-        const entry = snapshot.indicator_values.find((v) => v.indicator_id === indicatorId);
-        return entry ? entry.value : null;
-    };
-
-    const formatPeriod = (start: string, end: string) => {
-        const s = new Date(start).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' });
-        const e = new Date(end).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' });
-        return s === e ? s : `${s} - ${e}`;
-    };
-
-    const formatDate = (d: string) =>
-        new Date(d).toLocaleDateString('en-NZ', { month: 'short', year: '2-digit' });
+    const valueFor = (snapshot: Snapshot | null, indicatorId: number): SnapshotValue | null =>
+        snapshot?.indicator_values.find((value) => value.indicator_id === indicatorId) ?? null;
 
     return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Governance', href: '/governance/dashboard' },
-                { title: 'Clinical', href: '/governance/clinical' },
-                { title: 'Trends', href: '#' },
-            ]}
-        >
+        <AppLayout>
             <Head title="Clinical Governance Trends" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Clinical Governance Trends</h1>
-                    <p className="text-gray-500 mt-1">Indicator performance tracking over time</p>
+            <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Clinical Governance Trends</h1>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Recent automated snapshot history for the Governance clinical indicators.
+                        </p>
+                    </div>
+                    <Link href="/governance/clinical">
+                        <Button variant="outline">Dashboard</Button>
+                    </Link>
                 </div>
 
-                {/* Current Indicator Values */}
-                <Card className="mb-6">
+                <Card className="border-sky-200 bg-sky-50/70">
+                    <CardContent className="flex flex-col gap-2 p-4 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="font-medium">Automated source</p>
+                            <p className="text-sky-800/90">{sourceHint}</p>
+                        </div>
+                        <Badge variant="secondary" className="w-fit bg-white text-sky-800">
+                            {formatPeriod(latestSnapshot?.period_start ?? null, latestSnapshot?.period_end ?? null)}
+                        </Badge>
+                    </CardContent>
+                </Card>
+
+                <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Activity className="w-5 h-5" />
-                            Current Indicator Values
-                        </CardTitle>
-                        {latest && (
-                            <CardDescription>
-                                Period: {formatPeriod(latest.period_start, latest.period_end)}
-                            </CardDescription>
-                        )}
+                        <CardTitle>Current Snapshot</CardTitle>
+                        <CardDescription>
+                            {latestSnapshot
+                                ? formatPeriod(latestSnapshot.period_start, latestSnapshot.period_end)
+                                : 'No snapshot recorded yet.'}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {!latest ? (
-                            <p className="text-center text-gray-500 py-8">No snapshots recorded yet.</p>
+                        {!latestSnapshot ? (
+                            <p className="py-8 text-center text-sm text-gray-500">
+                                No clinical governance snapshots are available yet.
+                            </p>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {activeIndicators.map((ind) => {
-                                    const value = getLatestValue(ind.id);
-                                    const onTarget = value !== null ? isOnTarget(value, ind.target_value, ind.target_direction) : false;
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                {activeIndicators.map((indicator) => {
+                                    const latestValue = valueFor(latestSnapshot, indicator.id);
+
                                     return (
-                                        <div
-                                            key={ind.id}
-                                            className={cn(
-                                                'p-4 rounded-lg border',
-                                                onTarget ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50',
-                                            )}
-                                        >
-                                            <div className="flex items-start justify-between">
+                                        <div key={indicator.id} className="rounded-xl border p-4">
+                                            <div className="flex items-start justify-between gap-3">
                                                 <div>
-                                                    <p className="text-sm font-medium text-gray-900">{ind.name}</p>
-                                                    <p className="text-xs text-gray-500 capitalize">{ind.category}</p>
+                                                    <p className="text-sm font-semibold text-gray-900">
+                                                        {indicator.name}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {indicator.category_label}
+                                                    </p>
                                                 </div>
-                                                {onTarget ? (
-                                                    <TrendingUp className="w-4 h-4 text-green-500" />
-                                                ) : (
-                                                    <TrendingDown className="w-4 h-4 text-red-500" />
-                                                )}
+                                                <Badge
+                                                    className={cn(
+                                                        latestValue ? statusClasses[latestValue.status] : 'bg-slate-100 text-slate-700',
+                                                    )}
+                                                >
+                                                    {latestValue?.status ?? 'No data'}
+                                                </Badge>
                                             </div>
-                                            <div className="mt-2 flex items-baseline gap-2">
-                                                <span className="text-2xl font-bold">
-                                                    {value !== null ? value : '-'}
-                                                </span>
-                                                <span className="text-xs text-gray-500">{ind.unit}</span>
-                                            </div>
-                                            <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                                                <Target className="w-3 h-3" />
-                                                Target: {ind.target_direction} {ind.target_value} {ind.unit}
+
+                                            <div className="mt-3 flex items-end justify-between gap-3">
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-2xl font-bold text-gray-900">
+                                                        {latestValue ? latestValue.value : '—'}
+                                                    </span>
+                                                    {indicator.unit && (
+                                                        <span className="text-xs uppercase tracking-wide text-gray-500">
+                                                            {indicator.unit}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-gray-500">
+                                                    {latestValue?.trend === 'up' ? (
+                                                        <TrendingUp className="h-4 w-4" />
+                                                    ) : latestValue?.trend === 'down' ? (
+                                                        <TrendingDown className="h-4 w-4" />
+                                                    ) : (
+                                                        <Minus className="h-4 w-4" />
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -135,61 +180,49 @@ export default function ClinicalTrends({ auth, snapshots, indicators }: Props) {
                     </CardContent>
                 </Card>
 
-                {/* Historical Table */}
-                {recentSnapshots.length > 0 && activeIndicators.length > 0 && (
-                    <Card className="mb-6">
+                {historicalSnapshots.length > 0 && activeIndicators.length > 0 && (
+                    <Card>
                         <CardHeader>
                             <CardTitle>Historical Performance</CardTitle>
-                            <CardDescription>Last {recentSnapshots.length} periods</CardDescription>
+                            <CardDescription>Last {historicalSnapshots.length} recorded monthly snapshots.</CardDescription>
                         </CardHeader>
                         <CardContent className="overflow-x-auto">
                             <table className="w-full text-sm">
-                                <thead className="border-b bg-muted/50">
+                                <thead className="border-b bg-muted/40">
                                     <tr>
                                         <th className="px-4 py-3 text-left font-medium">Indicator</th>
-                                        <th className="px-4 py-3 text-center font-medium">Target</th>
-                                        {recentSnapshots
-                                            .slice()
-                                            .reverse()
-                                            .map((snap) => (
-                                                <th key={snap.id} className="px-4 py-3 text-center font-medium whitespace-nowrap">
-                                                    {formatDate(snap.period_end)}
-                                                </th>
-                                            ))}
+                                        {historicalSnapshots.map((snapshot) => (
+                                            <th key={snapshot.id} className="px-4 py-3 text-center font-medium whitespace-nowrap">
+                                                {formatColumnDate(snapshot.period_end)}
+                                            </th>
+                                        ))}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {activeIndicators.map((ind) => (
-                                        <tr key={ind.id} className="hover:bg-muted/30">
+                                    {activeIndicators.map((indicator) => (
+                                        <tr key={indicator.id}>
                                             <td className="px-4 py-3">
-                                                <div className="font-medium">{ind.name}</div>
-                                                <div className="text-xs text-gray-500 capitalize">{ind.category}</div>
+                                                <div className="font-medium text-gray-900">{indicator.name}</div>
+                                                <div className="text-xs text-gray-500">
+                                                    Target {indicator.target_direction === 'below' ? '≤' : indicator.target_direction === 'above' ? '≥' : '='}{' '}
+                                                    {indicator.target_value ?? '—'}
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-3 text-center text-xs text-gray-500">
-                                                {ind.target_direction} {ind.target_value}
-                                            </td>
-                                            {recentSnapshots
-                                                .slice()
-                                                .reverse()
-                                                .map((snap) => {
-                                                    const val = getSnapshotValue(snap, ind.id);
-                                                    const onTarget = val !== null ? isOnTarget(val, ind.target_value, ind.target_direction) : false;
-                                                    return (
-                                                        <td key={snap.id} className="px-4 py-3 text-center">
-                                                            {val !== null ? (
-                                                                <Badge className={cn(
-                                                                    onTarget
-                                                                        ? 'bg-green-100 text-green-800'
-                                                                        : 'bg-red-100 text-red-800',
-                                                                )}>
-                                                                    {val}
-                                                                </Badge>
-                                                            ) : (
-                                                                <span className="text-gray-400">-</span>
-                                                            )}
-                                                        </td>
-                                                    );
-                                                })}
+                                            {historicalSnapshots.map((snapshot) => {
+                                                const entry = valueFor(snapshot, indicator.id);
+
+                                                return (
+                                                    <td key={snapshot.id} className="px-4 py-3 text-center">
+                                                        {entry ? (
+                                                            <Badge className={cn(statusClasses[entry.status])}>
+                                                                {entry.value}
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-gray-400">—</span>
+                                                        )}
+                                                    </td>
+                                                );
+                                            })}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -198,19 +231,16 @@ export default function ClinicalTrends({ auth, snapshots, indicators }: Props) {
                     </Card>
                 )}
 
-                {/* Narrative */}
-                {latest?.narrative && (
+                {latestSnapshot?.narrative && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Clinical Narrative</CardTitle>
+                            <CardTitle>Narrative</CardTitle>
                             <CardDescription>
-                                {formatPeriod(latest.period_start, latest.period_end)}
+                                {formatPeriod(latestSnapshot.period_start, latestSnapshot.period_end)}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
-                                {latest.narrative}
-                            </div>
+                            <p className="text-sm leading-6 text-gray-600">{latestSnapshot.narrative}</p>
                         </CardContent>
                     </Card>
                 )}

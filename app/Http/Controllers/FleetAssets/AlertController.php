@@ -38,7 +38,7 @@ class AlertController extends Controller
 
     public function index(Request $request)
     {
-        // Control room alerts from fleet/asset sources
+        // Canonical operational alerts from fleet/asset sources.
         $crQuery = ControlRoomAlert::query()
             ->with(['asset:id,name,asset_tag', 'assignedTo:id,name'])
             ->whereIn('source', ['fleet', 'asset', 'tracker', 'geofence']);
@@ -69,34 +69,32 @@ class AlertController extends Controller
             ->paginate(25, ['*'], 'cr_page')
             ->withQueryString();
 
-        // Asset-level alerts
-        $assetQuery = AssetAlert::query()
+        // Archived legacy asset_alerts history.
+        $archivedAssetAlertQuery = AssetAlert::query()
             ->with(['asset:id,name,asset_tag', 'tracker:id,vendor,device_uid']);
 
         if ($request->filled('status')) {
-            $assetQuery->where('status', $request->input('status'));
-        } else {
-            $assetQuery->whereNotIn('status', ['resolved']);
+            $archivedAssetAlertQuery->where('status', $request->input('status'));
         }
 
         if ($request->filled('severity')) {
-            $assetQuery->where('severity', $request->input('severity'));
+            $archivedAssetAlertQuery->where('severity', $request->input('severity'));
         }
 
         if ($request->filled('asset_id')) {
-            $assetQuery->where('asset_id', (int) $request->input('asset_id'));
+            $archivedAssetAlertQuery->where('asset_id', (int) $request->input('asset_id'));
         }
 
-        $assetAlerts = $assetQuery->latest('triggered_at')
-            ->limit(50)
+        $archivedAssetAlerts = $archivedAssetAlertQuery->latest('triggered_at')
+            ->limit(25)
             ->get()
             ->map(fn ($a) => [
                 'id' => $a->id,
-                'source' => 'asset',
                 'alert_type' => $a->alert_type,
                 'severity' => $a->severity,
                 'status' => $a->status,
                 'triggered_at' => optional($a->triggered_at)->toISOString(),
+                'acknowledged_at' => optional($a->acknowledged_at)->toISOString(),
                 'resolved_at' => optional($a->resolved_at)->toISOString(),
                 'context' => $a->context,
                 'asset' => $a->asset ? ['id' => $a->asset->id, 'name' => $a->asset->name, 'asset_tag' => $a->asset->asset_tag] : null,
@@ -126,7 +124,7 @@ class AlertController extends Controller
                     'total' => $controlRoomAlerts->total(),
                 ],
             ],
-            'asset_alerts' => $assetAlerts,
+            'archived_asset_alerts' => $archivedAssetAlerts,
             'filters' => $request->only(['status', 'severity', 'asset_id']),
         ]);
     }

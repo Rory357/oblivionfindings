@@ -28,7 +28,7 @@ test('assets alerts page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/assets/alerts')
-            ->waitForText('Alert', 10)
-            ->assertSee('Alert');
+            ->waitForText('Archived', 10)
+            ->assertSee('Archived Asset Alerts');
     });
 });

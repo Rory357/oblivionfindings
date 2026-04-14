@@ -84,12 +84,8 @@ class MigrateDevicesCommand extends Command
         $this->locationHardwareScanned = $rows->count();
 
         foreach ($rows as $row) {
-            // Idempotency: skip if already migrated.
-            if ($row->device_id) {
-                $this->skipped++;
-                continue;
-            }
-
+            // PR26 keeps devices.legacy_location_hardware_id as the surviving
+            // idempotency bridge for location history compatibility.
             $existing = Device::where('legacy_location_hardware_id', $row->id)->first();
             if ($existing) {
                 $this->skipped++;
@@ -137,11 +133,6 @@ class MigrateDevicesCommand extends Command
 
             DB::transaction(function () use ($deviceData, $row) {
                 $device = Device::create($deviceData);
-
-                // Back-fill bridge FK on legacy table.
-                DB::table('location_hardware')
-                    ->where('id', $row->id)
-                    ->update(['device_id' => $device->id]);
 
                 $this->devicesCreated++;
 
@@ -227,12 +218,6 @@ class MigrateDevicesCommand extends Command
                 continue;
             }
 
-            $existing = Device::where('legacy_control_room_device_id', $row->id)->first();
-            if ($existing) {
-                $this->skipped++;
-                continue;
-            }
-
             // Attempt deduplication against devices already created in Phase A.
             $match = $this->findDuplicateDevice($row);
 
@@ -240,7 +225,7 @@ class MigrateDevicesCommand extends Command
                 // Merge signal-pipeline fields into existing device.
                 if (!$dryRun) {
                     DB::transaction(function () use ($match, $row) {
-                        $updates = ['legacy_control_room_device_id' => $row->id];
+                        $updates = [];
 
                         // Merge health/signal fields if the CR device has newer data.
                         if ($row->last_signal_at && (!$match->last_signal_at || $row->last_signal_at > $match->last_signal_at->toDateTimeString())) {
@@ -258,7 +243,9 @@ class MigrateDevicesCommand extends Command
                             $updates['location_description'] = $row->location_description;
                         }
 
-                        $match->update($updates);
+                        if ($updates !== []) {
+                            $match->update($updates);
+                        }
 
                         DB::table('control_room_devices')
                             ->where('id', $row->id)
@@ -292,7 +279,6 @@ class MigrateDevicesCommand extends Command
                 'provider' => $row->vendor, // best-effort provider mapping
                 'external_ref' => $row->external_ref ? ['cr_external_ref' => $row->external_ref] : null,
                 'config' => $row->config ? json_decode($row->config, true) : null,
-                'legacy_control_room_device_id' => $row->id,
             ];
 
             if ($dryRun) {
@@ -381,12 +367,8 @@ class MigrateDevicesCommand extends Command
         $this->assetTrackersScanned = $rows->count();
 
         foreach ($rows as $row) {
-            // Idempotency.
-            if ($row->device_id ?? null) {
-                $this->skipped++;
-                continue;
-            }
-
+            // PR26 keeps devices.legacy_asset_tracker_id as the surviving
+            // idempotency bridge for legacy telemetry and consent reads.
             $existing = Device::where('legacy_asset_tracker_id', $row->id)->first();
             if ($existing) {
                 $this->skipped++;
@@ -403,10 +385,6 @@ class MigrateDevicesCommand extends Command
                             'legacy_asset_tracker_id' => $row->id,
                             'imei' => $match->imei ?: ($row->imei ?: null),
                         ]);
-
-                        DB::table('asset_trackers')
-                            ->where('id', $row->id)
-                            ->update(['device_id' => $match->id]);
 
                         // Create asset link if not already present.
                         $existingLink = DeviceAssetLink::where('device_id', $match->id)
@@ -465,10 +443,6 @@ class MigrateDevicesCommand extends Command
 
             DB::transaction(function () use ($deviceData, $row) {
                 $device = Device::create($deviceData);
-
-                DB::table('asset_trackers')
-                    ->where('id', $row->id)
-                    ->update(['device_id' => $device->id]);
 
                 $this->devicesCreated++;
 
@@ -733,10 +707,8 @@ class MigrateDevicesCommand extends Command
     {
         $this->warn('Rolling back migrated devices...');
 
-        $count = Device::whereNotNull('legacy_location_hardware_id')
-            ->orWhereNotNull('legacy_control_room_device_id')
-            ->orWhereNotNull('legacy_asset_tracker_id')
-            ->count();
+        $deviceIds = $this->migratedDeviceIdsForRollback();
+        $count = $deviceIds->count();
 
         if ($count === 0) {
             $this->info('No migrated devices found.');
@@ -745,17 +717,10 @@ class MigrateDevicesCommand extends Command
 
         $this->info("Found {$count} migrated devices.");
 
-        // Clear bridge FKs on legacy tables.
-        DB::table('location_hardware')->whereNotNull('device_id')->update(['device_id' => null]);
+        // Clear the surviving Control Room projection bridge. The temporary
+        // location_hardware.device_id and asset_trackers.device_id FKs were
+        // removed in PR26 after audit confirmed they were no longer used.
         DB::table('control_room_devices')->whereNotNull('canonical_device_id')->update(['canonical_device_id' => null]);
-        DB::table('asset_trackers')->whereNotNull('device_id')->update(['device_id' => null]);
-
-        // Get IDs of migrated devices for cascade cleanup.
-        $deviceIds = Device::where(function ($q) {
-            $q->whereNotNull('legacy_location_hardware_id')
-                ->orWhereNotNull('legacy_control_room_device_id')
-                ->orWhereNotNull('legacy_asset_tracker_id');
-        })->pluck('id');
 
         // Delete related records (assignments, links, events, etc.)
         DeviceAssignment::whereIn('device_id', $deviceIds)->delete();
@@ -767,6 +732,26 @@ class MigrateDevicesCommand extends Command
         $this->info("Rolled back {$count} devices and their assignments/links.");
 
         return self::SUCCESS;
+    }
+
+    private function migratedDeviceIdsForRollback(): \Illuminate\Support\Collection
+    {
+        $canonicalDeviceIds = Device::query()
+            ->where(function ($q) {
+                $q->whereNotNull('legacy_location_hardware_id')
+                    ->orWhereNotNull('legacy_asset_tracker_id');
+            })
+            ->pluck('id');
+
+        $controlRoomDeviceIds = DB::table('control_room_devices')
+            ->whereNotNull('canonical_device_id')
+            ->pluck('canonical_device_id');
+
+        return $canonicalDeviceIds
+            ->merge($controlRoomDeviceIds)
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     // ── Reporting ─────────────────────────────────────────────────

@@ -20,6 +20,7 @@ class FleetSignalService
                 [
                     'asset_id' => $payload['asset_id'],
                     'asset_tracker_id' => $payload['asset_tracker_id'] ?? null,
+                    'device_id' => $payload['device_id'] ?? null,
                     'geofence_id' => $payload['geofence_id'] ?? null,
                     'trip_id' => $payload['trip_id'] ?? null,
                     'driver_session_id' => $payload['driver_session_id'] ?? null,
@@ -53,9 +54,13 @@ class FleetSignalService
             $occurredAt = $occurredAt->toISOString();
         }
 
+        $deviceIdentity = $payload['asset_tracker_id']
+            ?? $payload['device_id']
+            ?? '';
+
         $base = implode('|', [
             $payload['asset_id'] ?? '',
-            $payload['asset_tracker_id'] ?? '',
+            $deviceIdentity,
             $payload['signal_type'] ?? '',
             $payload['geofence_id'] ?? '',
             $occurredAt,

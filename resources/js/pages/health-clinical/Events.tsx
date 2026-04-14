@@ -1,4 +1,3 @@
-import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter, X } from 'lucide-react';
 import { useState } from 'react';
@@ -23,37 +23,71 @@ type PaginatedData<T> = {
     total: number;
 };
 
-type ClinicalEvent = {
+type EventRecord = {
     id: number;
     client_id: number;
     event_type: string;
     severity: string;
     occurred_at: string;
     description: string;
-    follow_up_required: boolean;
-    follow_up_completed_at: string | null;
+    requires_followup: boolean;
+    followup_completed_at: string | null;
     reviewed_at: string | null;
-    client: { id: number; first_name: string; last_name: string } | null;
+    status: string;
+    client:
+        | {
+              id: number;
+              first_name: string;
+              last_name: string;
+              site_id: number | null;
+              site?: { id: number; name: string } | null;
+          }
+        | null;
+    site: { id: number; name: string } | null;
     reporter: { id: number; name: string } | null;
     reviewer: { id: number; name: string } | null;
 };
 
-type ClientOption = { id: number; first_name: string; last_name: string };
+type Stats = {
+    total_7d: number;
+    total_30d: number;
+    pending_follow_ups: number;
+    unreviewed: number;
+};
+
+type SelectOption = {
+    value: string;
+    label: string;
+};
+
+type FilterOptions = {
+    clients: Array<{ id: number; first_name: string; last_name: string }>;
+    sites: Array<{ id: number; name: string }>;
+    event_types: SelectOption[];
+    severities: SelectOption[];
+    follow_up_statuses: SelectOption[];
+    review_statuses: SelectOption[];
+};
 
 type Filters = {
     client_id?: string;
     event_type?: string;
     severity?: string;
+    site_id?: string;
+    follow_up_status?: string;
+    review_status?: string;
     date_from?: string;
     date_to?: string;
 };
 
 type Props = {
-    events: PaginatedData<ClinicalEvent>;
+    events: PaginatedData<EventRecord>;
+    stats: Stats;
     filters: Filters;
-    clients: ClientOption[];
-    event_types: Record<string, string>;
+    filter_options: FilterOptions;
 };
+
+const ALL_SENTINEL = '__all__';
 
 const severityColor: Record<string, string> = {
     low: 'bg-blue-100 text-blue-800',
@@ -62,48 +96,116 @@ const severityColor: Record<string, string> = {
     critical: 'bg-red-100 text-red-800',
 };
 
-export default function Events({ events, filters, clients, event_types }: Props) {
-    const [localFilters, setLocalFilters] = useState<Filters>({
+function formatNzDate(iso: string): string {
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+export default function EventRegister({
+    events,
+    stats,
+    filters,
+    filter_options,
+}: Props) {
+    const [local, setLocal] = useState<Filters>({
         client_id: filters.client_id ?? '',
         event_type: filters.event_type ?? '',
         severity: filters.severity ?? '',
+        site_id: filters.site_id ?? '',
+        follow_up_status: filters.follow_up_status ?? '',
+        review_status: filters.review_status ?? '',
         date_from: filters.date_from ?? '',
         date_to: filters.date_to ?? '',
     });
 
     const applyFilters = () => {
         const clean = Object.fromEntries(
-            Object.entries(localFilters).filter(([, v]) => v !== '' && v !== undefined),
+            Object.entries(local).filter(([, value]) => value !== '' && value !== undefined),
         );
-        router.get('/health-clinical/events', clean, { preserveState: true, replace: true });
+
+        router.get('/health-clinical/events', clean, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
     const clearFilters = () => {
-        setLocalFilters({});
-        router.get('/health-clinical/events', {}, { preserveState: true, replace: true });
+        setLocal({});
+        router.get('/health-clinical/events', {}, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
-    const hasFilters = Object.values(localFilters).some((v) => v !== '' && v !== undefined);
+    const hasFilters = Object.values(local).some((value) => value !== '' && value !== undefined);
+
+    const eventTypeLabel = (value: string) =>
+        filter_options.event_types.find((type) => type.value === value)?.label ?? value;
+
+    const siteName = (event: EventRecord) =>
+        event.site?.name ?? event.client?.site?.name ?? '—';
 
     return (
         <AppLayout>
-            <Head title="Clinical Event Register" />
-            <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+            <Head title="Clinical Event Register — Health & Clinical" />
+
+            <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
+                        <h1 className="text-2xl font-bold tracking-tight">
                             Clinical Event Register
                         </h1>
-                        <p className="mt-1 text-sm text-gray-500">
-                            All clinical events across clients
+                        <p className="text-sm text-muted-foreground">
+                            Cross-client oversight of recorded clinical events.
                         </p>
                     </div>
                     <Link href="/health-clinical">
-                        <Button variant="outline" size="sm">Dashboard</Button>
+                        <Button variant="outline" size="sm">
+                            Dashboard
+                        </Button>
                     </Link>
                 </div>
 
-                {/* Filters */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-xl border bg-gradient-to-br from-rose-50 to-orange-50 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-500">
+                            Last 7 days
+                        </p>
+                        <p className="mt-1 text-2xl font-bold text-rose-700">
+                            {stats.total_7d}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-yellow-50 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">
+                            Last 30 days
+                        </p>
+                        <p className="mt-1 text-2xl font-bold text-amber-700">
+                            {stats.total_30d}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border bg-gradient-to-br from-red-50 to-rose-50 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-red-500">
+                            Pending follow-up
+                        </p>
+                        <p className="mt-1 text-2xl font-bold text-red-700">
+                            {stats.pending_follow_ups}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-gray-50 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                            Unreviewed
+                        </p>
+                        <p className="mt-1 text-2xl font-bold text-slate-700">
+                            {stats.unreviewed}
+                        </p>
+                    </div>
+                </div>
+
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-sm">
@@ -111,65 +213,199 @@ export default function Events({ events, filters, clients, event_types }: Props)
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
                             <div>
                                 <Label className="text-xs">Client</Label>
-                                <Select value={localFilters.client_id ?? ''} onValueChange={(v) => setLocalFilters((f) => ({ ...f, client_id: v === '__all__' ? '' : v }))}>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All clients" /></SelectTrigger>
+                                <Select
+                                    value={local.client_id || ALL_SENTINEL}
+                                    onValueChange={(value) =>
+                                        setLocal((current) => ({
+                                            ...current,
+                                            client_id: value === ALL_SENTINEL ? '' : value,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="All clients" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="__all__">All clients</SelectItem>
-                                        {clients.map((c) => (
-                                            <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
+                                        <SelectItem value={ALL_SENTINEL}>All clients</SelectItem>
+                                        {filter_options.clients.map((client) => (
+                                            <SelectItem key={client.id} value={String(client.id)}>
+                                                {client.first_name} {client.last_name}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div>
                                 <Label className="text-xs">Type</Label>
-                                <Select value={localFilters.event_type ?? ''} onValueChange={(v) => setLocalFilters((f) => ({ ...f, event_type: v === '__all__' ? '' : v }))}>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All types" /></SelectTrigger>
+                                <Select
+                                    value={local.event_type || ALL_SENTINEL}
+                                    onValueChange={(value) =>
+                                        setLocal((current) => ({
+                                            ...current,
+                                            event_type: value === ALL_SENTINEL ? '' : value,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="All types" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="__all__">All types</SelectItem>
-                                        {Object.entries(event_types).map(([k, v]) => (
-                                            <SelectItem key={k} value={k}>{v}</SelectItem>
+                                        <SelectItem value={ALL_SENTINEL}>All types</SelectItem>
+                                        {filter_options.event_types.map((type) => (
+                                            <SelectItem key={type.value} value={type.value}>
+                                                {type.label}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div>
                                 <Label className="text-xs">Severity</Label>
-                                <Select value={localFilters.severity ?? ''} onValueChange={(v) => setLocalFilters((f) => ({ ...f, severity: v === '__all__' ? '' : v }))}>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All" /></SelectTrigger>
+                                <Select
+                                    value={local.severity || ALL_SENTINEL}
+                                    onValueChange={(value) =>
+                                        setLocal((current) => ({
+                                            ...current,
+                                            severity: value === ALL_SENTINEL ? '' : value,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="All severities" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="__all__">All</SelectItem>
-                                        <SelectItem value="low">Low</SelectItem>
-                                        <SelectItem value="medium">Medium</SelectItem>
-                                        <SelectItem value="high">High</SelectItem>
-                                        <SelectItem value="critical">Critical</SelectItem>
+                                        <SelectItem value={ALL_SENTINEL}>All severities</SelectItem>
+                                        {filter_options.severities.map((severity) => (
+                                            <SelectItem key={severity.value} value={severity.value}>
+                                                {severity.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label className="text-xs">Follow-up</Label>
+                                <Select
+                                    value={local.follow_up_status || ALL_SENTINEL}
+                                    onValueChange={(value) =>
+                                        setLocal((current) => ({
+                                            ...current,
+                                            follow_up_status: value === ALL_SENTINEL ? '' : value,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="Any status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ALL_SENTINEL}>Any status</SelectItem>
+                                        {filter_options.follow_up_statuses.map((status) => (
+                                            <SelectItem key={status.value} value={status.value}>
+                                                {status.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label className="text-xs">Review</Label>
+                                <Select
+                                    value={local.review_status || ALL_SENTINEL}
+                                    onValueChange={(value) =>
+                                        setLocal((current) => ({
+                                            ...current,
+                                            review_status: value === ALL_SENTINEL ? '' : value,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="Any review status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ALL_SENTINEL}>Any review status</SelectItem>
+                                        {filter_options.review_statuses.map((status) => (
+                                            <SelectItem key={status.value} value={status.value}>
+                                                {status.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label className="text-xs">Site</Label>
+                                <Select
+                                    value={local.site_id || ALL_SENTINEL}
+                                    onValueChange={(value) =>
+                                        setLocal((current) => ({
+                                            ...current,
+                                            site_id: value === ALL_SENTINEL ? '' : value,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="All sites" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ALL_SENTINEL}>All sites</SelectItem>
+                                        {filter_options.sites.map((site) => (
+                                            <SelectItem key={site.id} value={String(site.id)}>
+                                                {site.name}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div>
                                 <Label className="text-xs">From</Label>
-                                <Input type="date" className="h-8 text-xs" value={localFilters.date_from ?? ''} onChange={(e) => setLocalFilters((f) => ({ ...f, date_from: e.target.value }))} />
+                                <Input
+                                    type="date"
+                                    className="h-8 text-xs"
+                                    value={local.date_from ?? ''}
+                                    onChange={(event) =>
+                                        setLocal((current) => ({
+                                            ...current,
+                                            date_from: event.target.value,
+                                        }))
+                                    }
+                                />
                             </div>
                             <div>
                                 <Label className="text-xs">To</Label>
-                                <Input type="date" className="h-8 text-xs" value={localFilters.date_to ?? ''} onChange={(e) => setLocalFilters((f) => ({ ...f, date_to: e.target.value }))} />
+                                <Input
+                                    type="date"
+                                    className="h-8 text-xs"
+                                    value={local.date_to ?? ''}
+                                    onChange={(event) =>
+                                        setLocal((current) => ({
+                                            ...current,
+                                            date_to: event.target.value,
+                                        }))
+                                    }
+                                />
                             </div>
                         </div>
                         <div className="mt-3 flex gap-2">
-                            <Button size="sm" onClick={applyFilters}>Apply</Button>
-                            {hasFilters && <Button size="sm" variant="ghost" onClick={clearFilters} className="gap-1"><X className="h-3 w-3" /> Clear</Button>}
+                            <Button size="sm" onClick={applyFilters}>
+                                Apply
+                            </Button>
+                            {hasFilters && (
+                                <Button size="sm" variant="ghost" onClick={clearFilters} className="gap-1">
+                                    <X className="h-3 w-3" /> Clear
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Table */}
                 <Card>
                     <CardContent className="p-0">
                         {events.data.length === 0 ? (
-                            <div className="p-8 text-center text-sm text-muted-foreground">No events match the selected filters.</div>
+                            <div className="p-8 text-center text-sm text-muted-foreground">
+                                No clinical events match the selected filters.
+                            </div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
@@ -178,44 +414,79 @@ export default function Events({ events, filters, clients, event_types }: Props)
                                             <th className="px-4 py-3 text-left font-medium">Client</th>
                                             <th className="px-4 py-3 text-left font-medium">Type</th>
                                             <th className="px-4 py-3 text-left font-medium">Severity</th>
+                                            <th className="px-4 py-3 text-left font-medium">Summary</th>
                                             <th className="px-4 py-3 text-left font-medium">Occurred</th>
                                             <th className="px-4 py-3 text-left font-medium">Reported by</th>
+                                            <th className="px-4 py-3 text-left font-medium">Site</th>
                                             <th className="px-4 py-3 text-left font-medium">Follow-up</th>
-                                            <th className="px-4 py-3 text-left font-medium">Reviewed</th>
+                                            <th className="px-4 py-3 text-left font-medium">Review</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {events.data.map((evt) => (
-                                            <tr key={evt.id} className="border-b transition-colors hover:bg-muted/20">
+                                        {events.data.map((event) => (
+                                            <tr
+                                                key={event.id}
+                                                className={`border-b transition-colors hover:bg-muted/20 ${
+                                                    event.severity === 'critical' ? 'bg-red-50/40' : ''
+                                                }`}
+                                            >
                                                 <td className="px-4 py-3">
-                                                    {evt.client ? (
-                                                        <Link href={`/operations/clients/${evt.client.id}`} className="font-medium text-blue-600 hover:underline">
-                                                            {evt.client.first_name} {evt.client.last_name}
+                                                    {event.client ? (
+                                                        <Link
+                                                            href={`/operations/clients/${event.client.id}`}
+                                                            className="font-medium text-blue-600 hover:underline"
+                                                        >
+                                                            {event.client.first_name} {event.client.last_name}
                                                         </Link>
-                                                    ) : '—'}
+                                                    ) : (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <Badge variant="outline" className="text-xs">{event_types[evt.event_type] ?? evt.event_type}</Badge>
+                                                    <Badge variant="outline" className="text-[10px]">
+                                                        {eventTypeLabel(event.event_type)}
+                                                    </Badge>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <Badge className={`text-xs ${severityColor[evt.severity] ?? ''}`}>{evt.severity}</Badge>
+                                                    <Badge className={`text-[10px] ${severityColor[event.severity] ?? ''}`}>
+                                                        {event.severity}
+                                                    </Badge>
+                                                </td>
+                                                <td className="max-w-[260px] truncate px-4 py-3 text-xs text-muted-foreground">
+                                                    {event.description || '—'}
+                                                </td>
+                                                <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
+                                                    {formatNzDate(event.occurred_at)}
+                                                </td>
+                                                <td className="px-4 py-3 text-xs">
+                                                    {event.reporter?.name ?? '—'}
                                                 </td>
                                                 <td className="px-4 py-3 text-xs text-muted-foreground">
-                                                    {new Date(evt.occurred_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    {siteName(event)}
                                                 </td>
-                                                <td className="px-4 py-3 text-xs">{evt.reporter?.name ?? '—'}</td>
                                                 <td className="px-4 py-3 text-xs">
-                                                    {!evt.follow_up_required ? (
-                                                        <span className="text-muted-foreground">N/A</span>
-                                                    ) : evt.follow_up_completed_at ? (
-                                                        <Badge variant="secondary" className="text-xs">Done</Badge>
+                                                    {!event.requires_followup ? (
+                                                        <span className="text-muted-foreground">None</span>
+                                                    ) : event.followup_completed_at ? (
+                                                        <Badge variant="secondary" className="text-[10px]">
+                                                            Complete
+                                                        </Badge>
                                                     ) : (
-                                                        <Badge variant="destructive" className="text-xs">Pending</Badge>
+                                                        <Badge variant="destructive" className="text-[10px]">
+                                                            Pending
+                                                        </Badge>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-xs">
-                                                    {evt.reviewed_at ? (
-                                                        <Badge variant="secondary" className="text-xs">{evt.reviewer?.name}</Badge>
+                                                    {event.reviewed_at ? (
+                                                        <div className="space-y-1">
+                                                            <Badge variant="secondary" className="text-[10px]">
+                                                                Reviewed
+                                                            </Badge>
+                                                            <p className="text-muted-foreground">
+                                                                {event.reviewer?.name ?? '—'}
+                                                            </p>
+                                                        </div>
                                                     ) : (
                                                         <span className="text-muted-foreground">Unreviewed</span>
                                                     )}
@@ -226,14 +497,26 @@ export default function Events({ events, filters, clients, event_types }: Props)
                                 </table>
                             </div>
                         )}
+
                         {events.last_page > 1 && (
                             <div className="flex items-center justify-between border-t px-4 py-3">
                                 <p className="text-xs text-muted-foreground">
                                     Page {events.current_page} of {events.last_page} ({events.total} total)
                                 </p>
                                 <div className="flex gap-1">
-                                    {events.links.map((link, i) => (
-                                        <Button key={i} variant={link.active ? 'default' : 'outline'} size="sm" className="h-7 min-w-[28px] px-2 text-xs" disabled={!link.url} onClick={() => link.url && router.get(link.url, {}, { preserveState: true })} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                    {events.links.map((link, index) => (
+                                        <Button
+                                            key={index}
+                                            variant={link.active ? 'default' : 'outline'}
+                                            size="sm"
+                                            className="h-7 min-w-[28px] px-2 text-xs"
+                                            disabled={!link.url}
+                                            onClick={() =>
+                                                link.url &&
+                                                router.get(link.url, {}, { preserveState: true })
+                                            }
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                        />
                                     ))}
                                 </div>
                             </div>

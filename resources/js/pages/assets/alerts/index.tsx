@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 
 type AlertRow = {
     id: number;
@@ -12,18 +12,25 @@ type AlertRow = {
 };
 
 export default function AssetAlertsIndex() {
-    const { alerts, can } = usePage().props as any;
+    const { alerts, archive } = usePage().props as any;
     const rows: AlertRow[] = alerts?.data ?? [];
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Assets', href: '/assets' }, { title: 'Alerts', href: '/assets/alerts' }]}>
-            <Head title="Asset Alerts" />
+        <AppLayout breadcrumbs={[{ title: 'Assets', href: '/assets' }, { title: 'Archived Alerts', href: '/assets/alerts' }]}>
+            <Head title="Archived Asset Alerts" />
             <div className="space-y-4 p-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Active asset alerts</CardTitle>
+                        <CardTitle className="text-base">Archived Asset Alerts</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
+                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                            These records are retained as legacy asset alert history only. Active operational alerts now live in{' '}
+                            <Link href={archive?.replacement_url ?? '/fleet-assets/alerts'} className="font-medium text-blue-600 hover:underline">
+                                Fleet Alerts
+                            </Link>
+                            {' '}and Control Room.
+                        </div>
                         {rows.length ? (
                             rows.map((a) => (
                                 <div key={a.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
@@ -43,33 +50,11 @@ export default function AssetAlertsIndex() {
                                         )}
                                     </div>
                                 </div>
-                                <div className="shrink-0 text-right text-xs text-slate-600">
-                                    <div>{a.triggered_at ?? ''}</div>
-                                    {can?.manage ? (
-                                        <div className="mt-2 flex items-center justify-end gap-2">
-                                            {a.status === 'open' ? (
-                                                <button
-                                                    className="text-xs text-blue-600 hover:underline"
-                                                    onClick={() => router.post(`/assets/alerts/${a.id}/acknowledge`)}
-                                                >
-                                                    Acknowledge
-                                                </button>
-                                            ) : null}
-                                            {a.status !== 'resolved' ? (
-                                                <button
-                                                    className="text-xs text-green-600 hover:underline"
-                                                    onClick={() => router.post(`/assets/alerts/${a.id}/resolve`)}
-                                                >
-                                                    Resolve
-                                                </button>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-                                </div>
+                                <div className="shrink-0 text-right text-xs text-slate-600">{a.triggered_at ?? ''}</div>
                             </div>
                         ))
                     ) : (
-                        <div className="text-sm text-slate-500">No alerts.</div>
+                        <div className="text-sm text-slate-500">No archived asset alerts.</div>
                         )}
                     </CardContent>
                 </Card>

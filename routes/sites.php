@@ -133,23 +133,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/hardware', [SiteHardwareController::class, 'index'])
             ->name('sites.hardware.index')
             ->middleware('permission:siteHardware.view');
-        Route::post('/hardware', [SiteHardwareController::class, 'store'])
-            ->name('sites.hardware.store')
-            ->middleware('permission:siteHardware.manage');
-        Route::put('/hardware/{hardware}', [SiteHardwareController::class, 'update'])
-            ->name('sites.hardware.update')
-            ->middleware('permission:siteHardware.manage');
-        Route::delete('/hardware/{hardware}', [SiteHardwareController::class, 'destroy'])
-            ->name('sites.hardware.destroy')
-            ->middleware('permission:siteHardware.manage');
+        // Remaining room-management routes:
+        // - assignRoom: stable URL retained, but writes canonical device_assignments
+        //   and only mirrors LocationHardware as compatibility metadata
+        // - manageRooms: room management remains in the Sites module
         Route::post('/hardware/{hardware}/assign-room', [SiteHardwareController::class, 'assignRoom'])
             ->name('sites.hardware.assignRoom')
-            ->middleware('permission:siteHardware.manage');
-        Route::post('/hardware/{hardware}/link-asset', [SiteHardwareController::class, 'linkAsset'])
-            ->name('sites.hardware.linkAsset')
-            ->middleware('permission:siteHardware.manage');
-        Route::post('/hardware/refresh-status', [SiteHardwareController::class, 'refreshStatus'])
-            ->name('sites.hardware.refreshStatus')
             ->middleware('permission:siteHardware.manage');
         Route::post('/hardware/rooms', [SiteHardwareController::class, 'manageRooms'])
             ->name('sites.hardware.manageRooms')

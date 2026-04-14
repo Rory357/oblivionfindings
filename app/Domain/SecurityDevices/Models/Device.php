@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Models\Asset;
+use App\Models\AssetTracker;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
+/**
+ * Canonical Security & Devices registry.
+ *
+ * Remaining legacy bridge columns kept intentionally in PR26:
+ * - legacy_location_hardware_id: temporarily retained for integration event
+ *   backfill plus the narrow LocationHardware compatibility shadow that still
+ *   supports integration event provenance and UniFi bridge metadata
+ * - legacy_asset_tracker_id: retained for telemetry lineage backfill,
+ *   compatibility fallback, and migration metadata while fleet runtime paths
+ *   move to canonical device identity
+ *
+ * Removed in PR26:
+ * - legacy_control_room_device_id: superseded by the surviving
+ *   control_room_devices.canonical_device_id projection bridge
+ */
 class Device extends Model
 {
     use HasFactory;
@@ -57,7 +73,6 @@ class Device extends Model
         'location_description',
         'notes',
         'legacy_location_hardware_id',
-        'legacy_control_room_device_id',
         'legacy_asset_tracker_id',
         'created_by_user_id',
     ];
@@ -119,6 +134,11 @@ class Device extends Model
     public function activeAssetLinks(): HasMany
     {
         return $this->assetLinks()->whereNull('unlinked_at');
+    }
+
+    public function legacyAssetTracker(): BelongsTo
+    {
+        return $this->belongsTo(AssetTracker::class, 'legacy_asset_tracker_id');
     }
 
     public function parentRelationships(): HasMany

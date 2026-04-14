@@ -6,15 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -40,7 +33,6 @@ import {
     Pencil,
     Trash2,
     DoorOpen,
-    Link2,
     Wifi,
     WifiOff,
     HelpCircle,
@@ -79,6 +71,8 @@ type DeviceItem = {
     status: string;
     health_status: string;
     provider: string | null;
+    provider_entity_id?: string | null;
+    provider_type?: string | null;
     last_seen_at: string | null;
     battery_level: number | null;
     firmware_version: string | null;
@@ -86,37 +80,16 @@ type DeviceItem = {
     notes: string | null;
     assignment_type: string | null;
     assignment_id: number | null;
-    legacy_location_hardware_id: number | null;
 };
 
-/** @deprecated Legacy type — kept for backward compat with UniFi integration sections. */
-type HardwareItem = {
-    id: number;
-    provider: string;
-    category: string;
-    name: string;
-    asset_tag?: string;
-    serial?: string;
-    mac?: string;
-    status: 'online' | 'offline' | 'unknown' | 'retired';
-    last_seen_at?: string;
-    room?: { id: number; name: string } | null;
-    linked_asset?: { id: number; name: string; asset_tag?: string } | null;
-    notes?: string;
-    external_ref?: {
-        provider_entity_id?: string | null;
-        provider_type?: string | null;
-        model?: string | null;
-        firmware?: string | null;
-        ip?: string | null;
-    } | null;
-    meta?: {
-        provider_type?: string | null;
-        model_long?: string | null;
-        experience_score?: number | string | null;
-        uptime?: number | null;
-    } | null;
-};
+type UnifiOperationalStatus =
+    | 'active'
+    | 'offline'
+    | 'degraded'
+    | 'maintenance'
+    | 'decommissioned'
+    | 'in_stock'
+    | 'lost';
 
 type IntegrationConfig = {
     id: number;
@@ -179,8 +152,6 @@ type UnifiIntegration = {
     accessSecret?: UnifiAccessSecret;
 };
 
-type AssetLite = { id: number; name: string; asset_tag?: string };
-
 type Permissions = {
     manage_hardware?: boolean;
     manage_site_integrations?: boolean;
@@ -190,11 +161,8 @@ type Permissions = {
 type Props = {
     site: Site;
     devices: DeviceItem[];
-    hardware?: HardwareItem[]; // Legacy — may still be passed by some code paths
     rooms: Room[];
     integrations: IntegrationConfig[];
-    assets: AssetLite[];
-    categories: Record<string, string>;
     unifi: UnifiIntegration;
     can: Permissions;
 };
@@ -204,10 +172,10 @@ type Props = {
 // ---------------------------------------------------------------------------
 
 const statusConfig: Record<
-    HardwareItem['status'],
+    UnifiOperationalStatus,
     { label: string; className: string; icon: typeof Wifi }
 > = {
-    online: {
+    active: {
         label: 'Online',
         className: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
         icon: Wifi,
@@ -217,23 +185,31 @@ const statusConfig: Record<
         className: 'bg-red-500/20 text-red-400 border-red-500/30',
         icon: WifiOff,
     },
-    unknown: {
-        label: 'Unknown',
-        className: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+    degraded: {
+        label: 'Degraded',
+        className: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
         icon: HelpCircle,
     },
-    retired: {
+    maintenance: {
+        label: 'Maintenance',
+        className: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+        icon: HelpCircle,
+    },
+    decommissioned: {
         label: 'Retired',
         className: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
         icon: Ban,
     },
-};
-
-const statusDotColor: Record<HardwareItem['status'], string> = {
-    online: 'bg-emerald-500',
-    offline: 'bg-red-500',
-    unknown: 'bg-slate-400',
-    retired: 'bg-slate-500 opacity-50',
+    in_stock: {
+        label: 'In Stock',
+        className: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+        icon: HelpCircle,
+    },
+    lost: {
+        label: 'Lost',
+        className: 'bg-red-500/10 text-red-300 border-red-500/20',
+        icon: Ban,
+    },
 };
 
 const connectionStatusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle }> = {
@@ -299,28 +275,16 @@ function formatUnifiHostLabel(host: DiscoveredHost): {
 export default function SiteHardware({
     site,
     devices,
-    hardware,
     rooms,
     integrations,
-    assets,
-    categories,
     unifi,
     can,
 }: Props) {
-    // Bridge: legacy code that still references `hardware` uses the
-    // canonical devices list. UniFi sections may still use legacy hardware.
-    const allHardware = hardware ?? [];
     // --- state -----------------------------------------------------------------
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterProvider, setFilterProvider] = useState<string>('all');
-
-    const [showAddDialog, setShowAddDialog] = useState(false);
-    const [editingItem, setEditingItem] = useState<HardwareItem | null>(null);
-
-    const [assignRoomItem, setAssignRoomItem] = useState<HardwareItem | null>(null);
-    const [linkAssetItem, setLinkAssetItem] = useState<HardwareItem | null>(null);
 
     const [showAddRoom, setShowAddRoom] = useState(false);
     const [editingRoomId, setEditingRoomId] = useState<number | null>(null);
@@ -335,30 +299,7 @@ export default function SiteHardware({
     const [syncingAccessEvents, setSyncingAccessEvents] = useState(false);
 
     // --- forms -----------------------------------------------------------------
-    const hwForm = useForm<{
-        name: string;
-        category: string;
-        provider: string;
-        room_id: string;
-        asset_tag: string;
-        serial: string;
-        mac: string;
-        notes: string;
-    }>({
-        name: '',
-        category: '',
-        provider: 'manual',
-        room_id: '',
-        asset_tag: '',
-        serial: '',
-        mac: '',
-        notes: '',
-    });
-
     const roomForm = useForm<{ name: string }>({ name: '' });
-
-    const assignRoomForm = useForm<{ room_id: string }>({ room_id: '' });
-    const linkAssetForm = useForm<{ linked_asset_id: string }>({ linked_asset_id: '' });
 
     const mapForm = useForm<{
         mapped_external_site_id: string;
@@ -437,15 +378,24 @@ export default function SiteHardware({
         return { total, online: active, offline, unassigned: unassignedRooms };
     }, [devices]);
 
-    // UniFi devices still use legacy hardware list for integration-specific UI.
     const unifiDevices = useMemo(
-        () => allHardware.filter((h) => h.provider === 'unifi'),
-        [allHardware],
+        () => devices.filter((device) => device.provider === 'unifi'),
+        [devices],
     );
 
     const providerOptions = useMemo(() => {
         const providers = Array.from(new Set(devices.map((d) => d.provider).filter(Boolean) as string[]));
         return providers.sort((a, b) => a.localeCompare(b));
+    }, [devices]);
+
+    const deviceStatusOptions = useMemo(() => {
+        const statuses = Array.from(new Set(devices.map((d) => d.status).filter(Boolean)));
+        return statuses.sort((a, b) => a.localeCompare(b));
+    }, [devices]);
+
+    const deviceCategoryOptions = useMemo(() => {
+        const categories = Array.from(new Set(devices.map((d) => d.category).filter(Boolean)));
+        return categories.sort((a, b) => a.localeCompare(b));
     }, [devices]);
 
     // Filter over canonical devices.
@@ -466,7 +416,6 @@ export default function SiteHardware({
         });
     }, [devices, search, filterStatus, filterCategory, filterProvider]);
 
-    const categoryKeys = Object.keys(categories);
     const canManageHardware = !!can?.manage_hardware;
     const canManageSiteIntegrations = !!can?.manage_site_integrations;
     const canManageTenantIntegrations = !!can?.manage_tenant_integrations;
@@ -475,7 +424,7 @@ export default function SiteHardware({
     const [deviceRoomDraft, setDeviceRoomDraft] = useState<Record<number, string>>(
         () => unifiDevices.reduce<Record<number, string>>((acc, d) => ({
             ...acc,
-            [d.id]: d.room?.id ? String(d.room.id) : 'unassigned',
+            [d.id]: d.assignment_type === 'room' && d.assignment_id ? String(d.assignment_id) : 'unassigned',
         }), {}),
     );
 
@@ -505,7 +454,7 @@ export default function SiteHardware({
             const next = { ...prev };
             unifiDevices.forEach((d) => {
                 if (!(d.id in next)) {
-                    next[d.id] = d.room?.id ? String(d.room.id) : 'unassigned';
+                    next[d.id] = d.assignment_type === 'room' && d.assignment_id ? String(d.assignment_id) : 'unassigned';
                 }
             });
             return next;
@@ -513,63 +462,6 @@ export default function SiteHardware({
     }, [unifiDevices]);
 
     // --- handlers --------------------------------------------------------------
-    function openAdd() {
-        hwForm.reset();
-        hwForm.setData({
-            name: '',
-            category: categoryKeys[0] || '',
-            provider: 'manual',
-            room_id: '',
-            asset_tag: '',
-            serial: '',
-            mac: '',
-            notes: '',
-        });
-        setEditingItem(null);
-        setShowAddDialog(true);
-    }
-
-    function openEdit(item: HardwareItem) {
-        setEditingItem(item);
-        hwForm.setData({
-            name: item.name,
-            category: item.category,
-            provider: item.provider,
-            room_id: item.room?.id?.toString() || '',
-            asset_tag: item.asset_tag || '',
-            serial: item.serial || '',
-            mac: item.mac || '',
-            notes: item.notes || '',
-        });
-        setShowAddDialog(true);
-    }
-
-    function closeHwDialog() {
-        setShowAddDialog(false);
-        setEditingItem(null);
-        hwForm.reset();
-    }
-
-    function submitHardware(e: React.FormEvent) {
-        e.preventDefault();
-        if (editingItem) {
-            hwForm.put(`/sites/${site.id}/hardware/${editingItem.id}`, {
-                preserveScroll: true,
-                onSuccess: closeHwDialog,
-            });
-        } else {
-            hwForm.post(`/sites/${site.id}/hardware`, {
-                preserveScroll: true,
-                onSuccess: closeHwDialog,
-            });
-        }
-    }
-
-    function deleteHardware(id: number) {
-        if (!confirm('Are you sure you want to delete this hardware item?')) return;
-        router.delete(`/sites/${site.id}/hardware/${id}`, { preserveScroll: true });
-    }
-
     // Rooms
     function submitRoom(e: React.FormEvent) {
         e.preventDefault();
@@ -619,42 +511,6 @@ export default function SiteHardware({
                 onFinish: () => setSavingRoomId(null),
             },
         );
-    }
-
-    // Assign room
-    function openAssignRoom(item: HardwareItem) {
-        setAssignRoomItem(item);
-        assignRoomForm.setData('room_id', item.room?.id?.toString() || '');
-    }
-
-    function submitAssignRoom(e: React.FormEvent) {
-        e.preventDefault();
-        if (!assignRoomItem) return;
-        assignRoomForm.post(`/sites/${site.id}/hardware/${assignRoomItem.id}/assign-room`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setAssignRoomItem(null);
-                assignRoomForm.reset();
-            },
-        });
-    }
-
-    // Link asset
-    function openLinkAsset(item: HardwareItem) {
-        setLinkAssetItem(item);
-        linkAssetForm.setData('linked_asset_id', item.linked_asset?.id?.toString() || '');
-    }
-
-    function submitLinkAsset(e: React.FormEvent) {
-        e.preventDefault();
-        if (!linkAssetItem) return;
-        linkAssetForm.post(`/sites/${site.id}/hardware/${linkAssetItem.id}/link-asset`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setLinkAssetItem(null);
-                linkAssetForm.reset();
-            },
-        });
     }
 
     // Sync devices
@@ -775,7 +631,7 @@ export default function SiteHardware({
 
     // --- helpers ---------------------------------------------------------------
     function hwCountInRoom(roomId: number) {
-        return hardware.filter((h) => h.room?.id === roomId).length;
+        return devices.filter((device) => device.assignment_type === 'room' && device.assignment_id === roomId).length;
     }
 
     function formatDate(dateStr?: string) {
@@ -793,12 +649,20 @@ export default function SiteHardware({
         }
     }
 
-    function resolveDeviceType(item: HardwareItem): string | null {
-        return item.meta?.provider_type || item.external_ref?.provider_type || null;
+    function resolveDeviceType(item: DeviceItem): string | null {
+        return item.provider_type || item.subcategory || null;
     }
 
-    function resolveDeviceModel(item: HardwareItem): string | null {
-        return item.meta?.model_long || item.external_ref?.model || null;
+    function resolveDeviceModel(item: DeviceItem): string | null {
+        return item.model || null;
+    }
+
+    function getOperationalStatus(status: string) {
+        return statusConfig[status as UnifiOperationalStatus] ?? {
+            label: 'Unknown',
+            className: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+            icon: HelpCircle,
+        };
     }
 
     // --- render ----------------------------------------------------------------
@@ -820,9 +684,11 @@ export default function SiteHardware({
                             <Badge variant="outline" className="text-slate-300">
                                 {stats.total} item{stats.total !== 1 ? 's' : ''}
                             </Badge>
-                            <Button onClick={openAdd}>
-                                <Plus className="w-4 h-4 mr-1" />
-                                Add Hardware
+                            <Button asChild>
+                                <a href={`/security-devices/devices/create?domain=&site_id=${site.id}`}>
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Register Device
+                                </a>
                             </Button>
                         </div>
                     }
@@ -842,7 +708,7 @@ export default function SiteHardware({
                                 </div>
                                 <div>
                                     <div className="text-2xl font-bold">{stats.total}</div>
-                                    <div className="text-sm text-slate-400">Total Hardware</div>
+                                    <div className="text-sm text-slate-400">Total Devices</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -1243,27 +1109,28 @@ export default function SiteHardware({
                 </Card>
 
                 {/* Search / Filter bar */}
-                {hardware.length > 0 && (
+                {devices.length > 0 && (
                     <div className="flex flex-col gap-3 sm:flex-row">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <Input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Search hardware by name, tag, serial, MAC..."
+                                placeholder="Search devices by name, tag, serial, MAC..."
                                 className="pl-10"
                             />
                         </div>
                         <Select value={filterStatus} onValueChange={setFilterStatus}>
-                            <SelectTrigger className="w-full sm:w-40">
+                            <SelectTrigger className="w-full sm:w-44">
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Statuses</SelectItem>
-                                <SelectItem value="online">Online</SelectItem>
-                                <SelectItem value="offline">Offline</SelectItem>
-                                <SelectItem value="unknown">Unknown</SelectItem>
-                                <SelectItem value="retired">Retired</SelectItem>
+                                {deviceStatusOptions.map((status) => (
+                                    <SelectItem key={status} value={status}>
+                                        {status.replace(/_/g, ' ')}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                         {providerOptions.length > 0 && (
@@ -1281,16 +1148,16 @@ export default function SiteHardware({
                                 </SelectContent>
                             </Select>
                         )}
-                        {categoryKeys.length > 0 && (
+                        {deviceCategoryOptions.length > 0 && (
                             <Select value={filterCategory} onValueChange={setFilterCategory}>
                                 <SelectTrigger className="w-full sm:w-44">
                                     <SelectValue placeholder="Category" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Categories</SelectItem>
-                                    {categoryKeys.map((key) => (
-                                        <SelectItem key={key} value={key}>
-                                            {categories[key]}
+                                    {deviceCategoryOptions.map((category) => (
+                                        <SelectItem key={category} value={category}>
+                                            {category.replace(/_/g, ' ')}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -1405,9 +1272,10 @@ export default function SiteHardware({
                             </div>
                         )}
 
-                        {/* Legacy hardware action buttons removed — CRUD now in Security & Devices.
-                            The original edit/delete/assign-room/link-asset buttons are no longer shown
-                            here. Users should manage devices through Security & Devices module. */}
+                        {/* Manual LocationHardware CRUD was removed in PR27.
+                            Device creation/editing now lives in Security & Devices.
+                            UniFi room assignment below now writes canonical assignment state first
+                            and only mirrors the legacy shadow row as compatibility metadata. */}
                     </CardContent>
                 </Card>
 
@@ -1465,7 +1333,7 @@ export default function SiteHardware({
                                         </TableHeader>
                                         <TableBody>
                                             {unifiDevices.map((device) => {
-                                                const sc = statusConfig[device.status];
+                                                const sc = getOperationalStatus(device.status);
                                                 const StatusIcon = sc.icon;
                                                 const model = resolveDeviceModel(device);
                                                 const type = resolveDeviceType(device);
@@ -1480,20 +1348,20 @@ export default function SiteHardware({
                                                                 {[
                                                                     type ? `Type ${type}` : null,
                                                                     model ? `Model ${model}` : null,
-                                                                    device.external_ref?.firmware ? `FW ${device.external_ref.firmware}` : null,
-                                                                    device.external_ref?.ip ? `IP ${device.external_ref.ip}` : null,
+                                                                    device.firmware_version ? `FW ${device.firmware_version}` : null,
+                                                                    device.ip_address ? `IP ${device.ip_address}` : null,
                                                                 ]
                                                                     .filter(Boolean)
                                                                     .join(' • ') || '—'}
                                                             </div>
                                                             <div className="text-xs text-slate-500 mt-1">
-                                                                {[device.mac ? `MAC ${device.mac}` : null, device.serial ? `S/N ${device.serial}` : null, device.external_ref?.provider_entity_id ? `ID ${device.external_ref.provider_entity_id}` : null]
+                                                                {[device.mac_address ? `MAC ${device.mac_address}` : null, device.serial_number ? `S/N ${device.serial_number}` : null, device.provider_entity_id ? `ID ${device.provider_entity_id}` : null]
                                                                     .filter(Boolean)
                                                                     .join(' • ') || '—'}
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
-                                                            {categories[device.category] || device.category}
+                                                            {device.category.replace(/_/g, ' ')}
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge variant="outline" className={`text-xs ${sc.className}`}>
@@ -1781,244 +1649,6 @@ export default function SiteHardware({
                     </div>
                 )}
             </PageShell>
-
-            {/* ================================================================== */}
-            {/* Dialogs                                                            */}
-            {/* ================================================================== */}
-
-            {/* Add / Edit Hardware Dialog */}
-            <Dialog open={showAddDialog} onOpenChange={(open) => !open && closeHwDialog()}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>{editingItem ? 'Edit Hardware' : 'Add Hardware'}</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={submitHardware} className="space-y-4">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="sm:col-span-2">
-                                <Label>Name *</Label>
-                                <Input
-                                    value={hwForm.data.name}
-                                    onChange={(e) => hwForm.setData('name', e.target.value)}
-                                    placeholder="e.g., Main Router, Kitchen Camera"
-                                    required
-                                />
-                                {hwForm.errors.name && (
-                                    <p className="text-xs text-red-400 mt-1">{hwForm.errors.name}</p>
-                                )}
-                            </div>
-                            <div>
-                                <Label>Category *</Label>
-                                <Select
-                                    value={hwForm.data.category || undefined}
-                                    onValueChange={(v) => hwForm.setData('category', v)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {categoryKeys.map((key) => (
-                                            <SelectItem key={key} value={key}>
-                                                {categories[key]}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {hwForm.errors.category && (
-                                    <p className="text-xs text-red-400 mt-1">{hwForm.errors.category}</p>
-                                )}
-                            </div>
-                            <div>
-                                <Label>Provider</Label>
-                                <Input
-                                    value={hwForm.data.provider}
-                                    onChange={(e) => hwForm.setData('provider', e.target.value)}
-                                    placeholder="manual"
-                                />
-                            </div>
-                            <div>
-                                <Label>Room</Label>
-                                <Select
-                                    value={hwForm.data.room_id || undefined}
-                                    onValueChange={(v) => hwForm.setData('room_id', v)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="No room assigned" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {rooms.map((room) => (
-                                            <SelectItem key={room.id} value={room.id.toString()}>
-                                                {room.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label>Asset Tag</Label>
-                                <Input
-                                    value={hwForm.data.asset_tag}
-                                    onChange={(e) => hwForm.setData('asset_tag', e.target.value)}
-                                    placeholder="Optional"
-                                />
-                            </div>
-                            <div>
-                                <Label>Serial Number</Label>
-                                <Input
-                                    value={hwForm.data.serial}
-                                    onChange={(e) => hwForm.setData('serial', e.target.value)}
-                                    placeholder="Optional"
-                                />
-                            </div>
-                            <div>
-                                <Label>MAC Address</Label>
-                                <Input
-                                    value={hwForm.data.mac}
-                                    onChange={(e) => hwForm.setData('mac', e.target.value)}
-                                    placeholder="AA:BB:CC:DD:EE:FF"
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <Label>Notes</Label>
-                            <Textarea
-                                value={hwForm.data.notes}
-                                onChange={(e) => hwForm.setData('notes', e.target.value)}
-                                placeholder="Any additional notes..."
-                                rows={3}
-                            />
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                            <Button type="button" variant="outline" onClick={closeHwDialog}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={hwForm.processing}>
-                                {hwForm.processing
-                                    ? 'Saving...'
-                                    : editingItem
-                                      ? 'Save Changes'
-                                      : 'Add Hardware'}
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            {/* Assign Room Dialog */}
-            <Dialog
-                open={!!assignRoomItem}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setAssignRoomItem(null);
-                        assignRoomForm.reset();
-                    }
-                }}
-            >
-                <DialogContent className="sm:max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Assign Room</DialogTitle>
-                    </DialogHeader>
-                    {assignRoomItem && (
-                        <form onSubmit={submitAssignRoom} className="space-y-4">
-                            <p className="text-sm text-slate-400">
-                                Assign <span className="text-slate-200 font-medium">{assignRoomItem.name}</span> to a
-                                room.
-                            </p>
-                            <div>
-                                <Label>Room</Label>
-                                <Select
-                                    value={assignRoomForm.data.room_id || undefined}
-                                    onValueChange={(v) => assignRoomForm.setData('room_id', v)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a room" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {rooms.map((room) => (
-                                            <SelectItem key={room.id} value={room.id.toString()}>
-                                                {room.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setAssignRoomItem(null);
-                                        assignRoomForm.reset();
-                                    }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={assignRoomForm.processing}>
-                                    {assignRoomForm.processing ? 'Saving...' : 'Assign'}
-                                </Button>
-                            </div>
-                        </form>
-                    )}
-                </DialogContent>
-            </Dialog>
-
-            {/* Link Asset Dialog */}
-            <Dialog
-                open={!!linkAssetItem}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setLinkAssetItem(null);
-                        linkAssetForm.reset();
-                    }
-                }}
-            >
-                <DialogContent className="sm:max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Link Asset</DialogTitle>
-                    </DialogHeader>
-                    {linkAssetItem && (
-                        <form onSubmit={submitLinkAsset} className="space-y-4">
-                            <p className="text-sm text-slate-400">
-                                Link <span className="text-slate-200 font-medium">{linkAssetItem.name}</span> to an
-                                asset record.
-                            </p>
-                            <div>
-                                <Label>Asset</Label>
-                                <Select
-                                    value={linkAssetForm.data.linked_asset_id || undefined}
-                                    onValueChange={(v) => linkAssetForm.setData('linked_asset_id', v)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select an asset" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {assets.map((asset) => (
-                                            <SelectItem key={asset.id} value={asset.id.toString()}>
-                                                {asset.name}
-                                                {asset.asset_tag ? ` (${asset.asset_tag})` : ''}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setLinkAssetItem(null);
-                                        linkAssetForm.reset();
-                                    }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={linkAssetForm.processing}>
-                                    {linkAssetForm.processing ? 'Saving...' : 'Link'}
-                                </Button>
-                            </div>
-                        </form>
-                    )}
-                </DialogContent>
-            </Dialog>
         </AppLayout>
     );
 }

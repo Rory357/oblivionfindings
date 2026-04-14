@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\SecurityDevices\Models\Device;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -11,6 +12,7 @@ class FleetSignal extends Model
     protected $fillable = [
         'asset_id',
         'asset_tracker_id',
+        'device_id',
         'geofence_id',
         'trip_id',
         'driver_session_id',
@@ -34,6 +36,11 @@ class FleetSignal extends Model
     public function tracker(): BelongsTo
     {
         return $this->belongsTo(AssetTracker::class, 'asset_tracker_id');
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(Device::class);
     }
 
     public function geofence(): BelongsTo

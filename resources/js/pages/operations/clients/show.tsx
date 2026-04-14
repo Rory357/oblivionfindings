@@ -333,6 +333,9 @@ type Props = {
         pin_handover?: boolean;
         manage_onboarding?: boolean;
         create_shift?: boolean;
+        record_observation?: boolean;
+        record_clinical_observation?: boolean;
+        record_event?: boolean;
     };
     location?: ClientLocationData;
     transport?: {
@@ -528,7 +531,10 @@ export default function ClientShow({
                 key: 'observations',
                 label: 'Observations',
                 icon: Stethoscope,
-                show: can.record_observation || can.record_clinical_observation,
+                show:
+                    can.record_observation ||
+                    can.record_clinical_observation ||
+                    can.record_event,
             },
             {
                 key: 'care_plans',
@@ -612,6 +618,7 @@ export default function ClientShow({
             can.edit,
             can.record_observation,
             can.record_clinical_observation,
+            can.record_event,
             respiteCan?.viewAny,
             documents?.length,
             photos?.length,
@@ -1672,7 +1679,7 @@ export default function ClientShow({
                                 )}
 
                                 {/* Health Summary Card */}
-                                {(can.record_observation || can.record_clinical_observation) && health_summary && (
+                                {(can.record_observation || can.record_clinical_observation || can.record_event) && health_summary && (
                                     <div className="mt-4">
                                         <HealthSummaryCard summary={health_summary as HealthSummary} />
                                     </div>
@@ -3999,7 +4006,14 @@ export default function ClientShow({
                 {tab === 'observations' && (
                     <ClientObservationsTab
                         clientId={client.id}
-                        canRecordClinical={can.record_clinical_observation}
+                        canRecordObservation={Boolean(
+                            can.record_observation ||
+                                can.record_clinical_observation,
+                        )}
+                        canRecordClinical={Boolean(
+                            can.record_clinical_observation,
+                        )}
+                        canRecordEvent={Boolean(can.record_event)}
                     />
                 )}
 

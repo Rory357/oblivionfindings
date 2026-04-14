@@ -11,15 +11,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * The canonical device registry is now App\Domain\SecurityDevices\Models\Device.
  * Device-to-asset links are managed via device_asset_links (DeviceAssetLink model).
  *
- * Remaining valid uses (temporary bridge):
+ * Remaining intentional uses:
  * - FleetTelemetryIngestService: vendor+device_uid lookup for telemetry routing
- * - Consent management (consentIndex, grantConsent, revokeConsent): tied to consent_id FK
- * - Telemetry snapshot relationships: asset_telemetry_snapshots.asset_tracker_id FK
- * - Fleet signal audit trail: fleet_signals.asset_tracker_id FK
+ * - Compatibility fallback for consent-linked tracker rows when no canonical
+ *   assignment consent exists yet
+ * - Telemetry/signal lineage: asset_tracker_id remains on historical tables
+ * - Canonical device backfill/fallback via devices.legacy_asset_tracker_id
  *
  * Do NOT add new queries against this model for device identity or ownership.
  * Use Device + DeviceAssetLink + DeviceAssignment instead.
- * This model and its table will be archived in a future cleanup PR.
+ * The temporary asset_trackers.device_id bridge FK was removed in PR26 after
+ * audit confirmed no live consumers still depended on it.
+ * This model remains intentionally for telemetry lineage, ingest routing, and
+ * consent compatibility until those remaining bridges are explicitly retired.
  */
 class AssetTracker extends Model
 {

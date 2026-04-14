@@ -2,7 +2,9 @@
 
 namespace App\Domain\Clinical\Services;
 
+use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
+use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
@@ -200,6 +202,173 @@ class ClinicalDashboardService
             'total_7d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(7))->count(),
             'total_30d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(30))->count(),
             'by_type' => $byType,
+        ];
+    }
+
+    /**
+     * Paginated, filterable event register for cross-client oversight.
+     *
+     * @param  array{
+     *     client_id?: int|null,
+     *     event_type?: string|null,
+     *     severity?: string|null,
+     *     site_id?: int|null,
+     *     follow_up_status?: string|null,
+     *     review_status?: string|null,
+     *     date_from?: string|null,
+     *     date_to?: string|null,
+     * } $filters
+     */
+    public function getEventRegister(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    {
+        return ClinicalEvent::query()
+            ->with([
+                'client:id,first_name,last_name,site_id',
+                'client.site:id,name',
+                'site:id,name',
+                'reporter:id,name',
+                'reviewer:id,name',
+            ])
+            ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
+            ->when($filters['event_type'] ?? null, function ($q, $type) {
+                $enum = ClinicalEventType::tryFrom($type);
+
+                if ($enum) {
+                    $q->ofType($enum);
+                }
+            })
+            ->when($filters['severity'] ?? null, fn ($q, $severity) => $q->where('severity', $severity))
+            ->when($filters['site_id'] ?? null, function ($q, $siteId) {
+                $q->where(function ($siteQuery) use ($siteId) {
+                    $siteQuery->where('site_id', $siteId)
+                        ->orWhere(function ($legacySiteQuery) use ($siteId) {
+                            $legacySiteQuery
+                                ->whereNull('site_id')
+                                ->whereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
+                        });
+                });
+            })
+            ->when($filters['follow_up_status'] ?? null, function ($q, $status) {
+                match ($status) {
+                    'none' => $q->where('requires_followup', false),
+                    'required' => $q->where('requires_followup', true),
+                    'pending' => $q->where('requires_followup', true)->whereNull('followup_completed_at'),
+                    'completed' => $q->where('requires_followup', true)->whereNotNull('followup_completed_at'),
+                    default => null,
+                };
+            })
+            ->when($filters['review_status'] ?? null, function ($q, $status) {
+                if ($status === 'reviewed') {
+                    $q->whereNotNull('reviewed_at');
+                }
+
+                if ($status === 'unreviewed') {
+                    $q->whereNull('reviewed_at');
+                }
+            })
+            ->when($filters['date_from'] ?? null, fn ($q, $date) => $q->where('occurred_at', '>=', Carbon::parse($date)->startOfDay()))
+            ->when($filters['date_to'] ?? null, fn ($q, $date) => $q->where('occurred_at', '<=', Carbon::parse($date)->endOfDay()))
+            ->orderByDesc('occurred_at')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * Hero-card stats for the event register page.
+     *
+     * @return array{total_7d: int, total_30d: int, pending_follow_ups: int, unreviewed: int}
+     */
+    public function getEventRegisterStats(): array
+    {
+        $now = Carbon::now();
+
+        return [
+            'total_7d' => ClinicalEvent::where('occurred_at', '>=', $now->copy()->subDays(7))->count(),
+            'total_30d' => ClinicalEvent::where('occurred_at', '>=', $now->copy()->subDays(30))->count(),
+            'pending_follow_ups' => ClinicalEvent::query()
+                ->where('requires_followup', true)
+                ->whereNull('followup_completed_at')
+                ->count(),
+            'unreviewed' => ClinicalEvent::query()
+                ->whereNull('reviewed_at')
+                ->count(),
+        ];
+    }
+
+    /**
+     * Paginated, filterable protocol register for cross-client management.
+     *
+     * @param  array{
+     *     client_id?: int|null,
+     *     observation_type?: string|null,
+     *     frequency?: string|null,
+     *     status?: string|null,
+     * } $filters
+     */
+    public function getProtocolRegister(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    {
+        $now = Carbon::now();
+
+        return ClinicalProtocol::query()
+            ->with([
+                'client:id,first_name,last_name',
+                'creator:id,name',
+            ])
+            ->withCount([
+                'schedules',
+                'schedules as pending_schedules_count' => fn ($query) => $query->where('status', 'pending'),
+                'schedules as overdue_schedules_count' => fn ($query) => $query
+                    ->where('status', 'pending')
+                    ->where('due_at', '<', $now),
+                'schedules as completed_schedules_30d_count' => fn ($query) => $query
+                    ->where('status', 'completed')
+                    ->where('completed_at', '>=', $now->copy()->subDays(30)),
+            ])
+            ->when($filters['client_id'] ?? null, fn ($query, $id) => $query->where('client_id', $id))
+            ->when($filters['observation_type'] ?? null, function ($query, $type) {
+                $enum = ObservationType::tryFrom($type);
+
+                if ($enum) {
+                    $query->ofType($enum);
+                }
+            })
+            ->when($filters['frequency'] ?? null, function ($query, $frequency) {
+                $enum = ProtocolFrequency::tryFrom($frequency);
+
+                if ($enum) {
+                    $query->where('frequency', $enum);
+                }
+            })
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('is_active', $status === 'active'))
+            ->orderByDesc('is_active')
+            ->orderByDesc('updated_at')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * Hero-card stats for the protocol register page.
+     *
+     * @return array{
+     *     active_protocols: int,
+     *     inactive_protocols: int,
+     *     schedules_due: int,
+     *     schedules_overdue: int,
+     *     compliance_rate_30d: float,
+     * }
+     */
+    public function getProtocolRegisterStats(): array
+    {
+        $kpis = $this->getKpis();
+
+        return [
+            'active_protocols' => $kpis['protocols_active'],
+            'inactive_protocols' => ClinicalProtocol::query()
+                ->where('is_active', false)
+                ->count(),
+            'schedules_due' => $kpis['schedules_due'],
+            'schedules_overdue' => $kpis['schedules_overdue'],
+            'compliance_rate_30d' => $kpis['compliance_rate_30d'],
         ];
     }
 

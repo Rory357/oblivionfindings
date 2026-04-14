@@ -34,7 +34,7 @@ class DuskDatabaseSeeder extends Seeder
 
         // Seed ALL permission keys used by routes and assign to admin role
         $permissionKeys = collect([
-            'assets.alerts.manage','assets.alertsView','assets.assignments.manage','assets.create','assets.delete',
+            'assets.alerts.manage','assets.alerts.view','assets.assignments.manage','assets.create','assets.delete',
             'assets.documents.manage','assets.geofences.manage','assets.inspections.record','assets.maintenance.record',
             'assets.ownership.manage','assets.scan.record','assets.telemetry.ingest','assets.trackers.manage',
             'assets.update','assets.viewAny','assets.viewAssigned','audit.viewAny','billing.viewAny',

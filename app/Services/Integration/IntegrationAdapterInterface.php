@@ -27,7 +27,9 @@ interface IntegrationAdapterInterface
 
     /**
      * Pull device health/status updates.
-     * Returns an array of ['hardware_id' => int, 'status' => string, 'last_seen_at' => string].
+     * Returns an array of health updates. Adapters should prefer canonical
+     * identifiers (for example `device_id` or a stable provider entity id)
+     * and only include `hardware_id` as a legacy fallback when required.
      */
     public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array;
 

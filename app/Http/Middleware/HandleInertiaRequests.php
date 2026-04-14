@@ -221,7 +221,6 @@ class HandleInertiaRequests extends Middleware
                     'telemetryIngest' => $user->canDo('assets.telemetry.ingest'),
                     'telemetryView' => $user->canDo('assets.telemetry.view'),
                     'alertsView' => $user->canDo('assets.alerts.view'),
-                    'alertsManage' => $user->canDo('assets.alerts.manage'),
                     'scanRecord' => $user->canDo('assets.scan.record'),
                     'geofencesManage' => $user->canDo('assets.geofences.manage'),
                 ],

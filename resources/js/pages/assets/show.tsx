@@ -38,7 +38,7 @@ type Asset = {
 };
 
 export default function AssetShow() {
-    const { asset, inspections, maintenance, documents, trackers, alerts, scan_events, geofences, can } = usePage().props as any;
+    const { asset, inspections, maintenance, documents, trackers, archived_alerts, scan_events, geofences, can } = usePage().props as any;
 
     const a: Asset = asset;
 
@@ -625,11 +625,14 @@ export default function AssetShow() {
 
                                     <Card>
                                         <CardHeader>
-                                            <CardTitle className="text-base">Recent alerts</CardTitle>
+                                            <CardTitle className="text-base">Archived asset alert history</CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-2">
-                                            {alerts?.length ? (
-                                                alerts.map((al: any) => (
+                                            <div className="text-xs text-slate-500">
+                                                These legacy alert records are retained for history only. Active operational alerts now live in Fleet Alerts and Control Room.
+                                            </div>
+                                            {archived_alerts?.length ? (
+                                                archived_alerts.map((al: any) => (
                                                     <div key={al.id} className="rounded-md border p-3">
                                                         <div className="flex flex-wrap items-center gap-2 text-sm">
                                                             <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{al.alert_type}</span>
@@ -640,7 +643,7 @@ export default function AssetShow() {
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-sm text-slate-500">No alerts.</div>
+                                                <div className="text-sm text-slate-500">No archived asset alerts.</div>
                                             )}
                                         </CardContent>
                                     </Card>

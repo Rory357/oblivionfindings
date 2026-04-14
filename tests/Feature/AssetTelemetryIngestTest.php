@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Asset;
 use App\Models\AssetTracker;
 use App\Models\Site;
@@ -37,6 +38,11 @@ class AssetTelemetryIngestTest extends TestCase
             'status' => 'paired',
             'paired_at' => now(),
         ]);
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'quicklink',
+            'device_uid' => 'DEV-123',
+            'legacy_asset_tracker_id' => $tracker->id,
+        ]);
 
         $response = $this->withHeader('X-Telemetry-Token', 'test-token')->postJson('/telemetry/ingest/quicklink', [
             'device_uid' => 'DEV-123',
@@ -50,6 +56,7 @@ class AssetTelemetryIngestTest extends TestCase
         $this->assertDatabaseHas('asset_telemetry_snapshots', [
             'asset_id' => $asset->id,
             'asset_tracker_id' => $tracker->id,
+            'device_id' => $device->id,
         ]);
     }
 }

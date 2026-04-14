@@ -2,6 +2,7 @@
 
 namespace App\Models\Integration;
 
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\ControlRoomAlert;
 use App\Models\LocationHardware;
@@ -28,6 +29,7 @@ class IntegrationEvent extends Model
         'site_id',
         'room_id',
         'hardware_id',
+        'canonical_device_id',
         'provider',
         'source_app',
         'source_event_id',
@@ -65,6 +67,15 @@ class IntegrationEvent extends Model
     public function hardware(): BelongsTo
     {
         return $this->belongsTo(LocationHardware::class, 'hardware_id');
+    }
+
+    /**
+     * Canonical device identity for user-facing history and future reads.
+     * hardware_id remains as legacy provenance / fallback only.
+     */
+    public function canonicalDevice(): BelongsTo
+    {
+        return $this->belongsTo(Device::class, 'canonical_device_id');
     }
 
     /**
@@ -117,6 +128,11 @@ class IntegrationEvent extends Model
     public function scopeForSite($query, int $siteId)
     {
         return $query->where('site_id', $siteId);
+    }
+
+    public function scopeForCanonicalDevice($query, int $deviceId)
+    {
+        return $query->where('canonical_device_id', $deviceId);
     }
 
     public function scopeSince($query, $datetime)

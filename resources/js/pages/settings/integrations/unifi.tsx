@@ -60,6 +60,7 @@ type SyncedDevice = {
     name: string;
     category: string;
     status: string;
+    health_status?: string | null;
     provider_entity_id?: string | null;
     provider_type?: string | null;
     model?: string | null;
@@ -119,6 +120,23 @@ function fmt(value?: string | null): string {
     if (!value) return '---';
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+}
+
+function deviceStatusBadge(status?: string | null): { label: string; className: string } {
+    switch (status) {
+        case 'active':
+            return { label: 'Online', className: 'border-emerald-500/30 text-emerald-500' };
+        case 'offline':
+            return { label: 'Offline', className: 'border-red-500/30 text-red-500' };
+        case 'degraded':
+            return { label: 'Degraded', className: 'border-amber-500/30 text-amber-500' };
+        case 'maintenance':
+            return { label: 'Maintenance', className: 'border-blue-500/30 text-blue-500' };
+        case 'decommissioned':
+            return { label: 'Retired', className: 'border-slate-500/30 text-slate-500' };
+        default:
+            return { label: status || 'Unknown', className: 'border-slate-500/30 text-slate-500' };
+    }
 }
 
 function formatUnifiSiteLabel(site: DiscoveredSite): {
@@ -359,7 +377,10 @@ export default function UnifiIntegration({
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Location</TableHead><TableHead>Room</TableHead><TableHead>Device</TableHead><TableHead>Type</TableHead><TableHead>Model</TableHead><TableHead>Status</TableHead><TableHead>Last Seen</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
                                     <TableBody>
-                                        {filteredDevices.map((d) => (
+                                        {filteredDevices.map((d) => {
+                                            const badge = deviceStatusBadge(d.status);
+
+                                            return (
                                             <TableRow key={d.id}>
                                                 <TableCell><div className="font-medium">{d.site_name}</div><div className="text-xs text-muted-foreground">{siteTypeLabel(d.site_type)}</div></TableCell>
                                                 <TableCell className="min-w-[190px]">
@@ -374,11 +395,11 @@ export default function UnifiIntegration({
                                                 <TableCell><div className="font-medium">{d.name}</div>{d.provider_entity_id && <div className="text-xs text-muted-foreground font-mono">{d.provider_entity_id}</div>}</TableCell>
                                                 <TableCell>{d.provider_type || d.category || '---'}</TableCell>
                                                 <TableCell>{d.model || '---'}</TableCell>
-                                                <TableCell><Badge variant="outline" className={d.status === 'online' ? 'border-emerald-500/30 text-emerald-500' : d.status === 'offline' ? 'border-red-500/30 text-red-500' : 'border-slate-500/30 text-slate-500'}>{d.status}</Badge></TableCell>
+                                                <TableCell><Badge variant="outline" className={badge.className}>{badge.label}</Badge></TableCell>
                                                 <TableCell>{fmt(d.last_seen_at)}</TableCell>
                                                 <TableCell><Button size="sm" variant="outline" onClick={() => { const raw = deviceRoomDraft[d.id]; const roomId = !raw || raw === 'unassigned' ? null : Number(raw); setAssigningDeviceId(d.id); router.put(`/settings/integrations/unifi/hardware/${d.id}/room`, { room_id: roomId }, { preserveScroll: true, onFinish: () => setAssigningDeviceId(null) }); }} disabled={assigningDeviceId === d.id}>{assigningDeviceId === d.id ? 'Saving...' : 'Save Room'}</Button></TableCell>
                                             </TableRow>
-                                        ))}
+                                        )})}
                                         {filteredDevices.length === 0 && <TableRow><TableCell colSpan={8} className="text-sm text-muted-foreground">No synced devices for this filter yet.</TableCell></TableRow>}
                                     </TableBody>
                                 </Table>

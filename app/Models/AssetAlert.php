@@ -6,12 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * @deprecated PR5: This model is DEAD CODE. AssetAlertService::openAlert() is never called
- *             anywhere in the codebase. Asset operational alerts (SOS, tamper, geofence)
- *             flow through FleetSignalService → SignalProcessingService → ControlRoomAlert.
+ * @deprecated ControlRoomAlert is the canonical operational alert record.
+ *             This model remains only for archived asset_alert history.
  *
- *             This model and its table are retained for historical data only.
- *             No new writes should target this model.
+ *             Do not add new alert-generation or alert-lifecycle flows that
+ *             write here.
  *
  * @see \App\Models\ControlRoomAlert — canonical operational alert
  */

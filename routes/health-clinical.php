@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Clinical\ClientClinicalController;
+use App\Http\Controllers\Clinical\HealthClinicalClientTrendsController;
 use App\Http\Controllers\Clinical\HealthClinicalDashboardController;
+use App\Http\Controllers\Clinical\HealthClinicalProtocolController;
 use App\Http\Controllers\Clinical\ShiftClinicalController;
 use App\Http\Controllers\HealthClinical\HealthClinicalController;
 use Illuminate\Support\Facades\Route;
@@ -30,21 +32,33 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/observations', [HealthClinicalController::class, 'storeObservation'])
             ->middleware('permission:clinical.observations.record')
             ->name('observations.store');
-        Route::get('/events', [HealthClinicalController::class, 'events'])
-            ->middleware('permission:clinical.events.view')
+        Route::get('/events', [HealthClinicalDashboardController::class, 'events'])
+            ->middleware('permission:clinical.events.viewAny')
             ->name('events.index');
         Route::post('/events', [HealthClinicalController::class, 'storeEvent'])
             ->middleware('permission:clinical.events.record')
             ->name('events.store');
-        Route::get('/protocols', [HealthClinicalController::class, 'protocols'])
-            ->middleware('permission:clinical.observations.view')
+        Route::get('/protocols', [HealthClinicalProtocolController::class, 'index'])
+            ->middleware('permission:clinical.protocols.viewAny|clinical.protocols.manage')
             ->name('protocols.index');
-        Route::post('/protocols', [HealthClinicalController::class, 'storeProtocol'])
+        Route::get('/protocols/create', [HealthClinicalProtocolController::class, 'create'])
+            ->middleware('permission:clinical.protocols.manage')
+            ->name('protocols.create');
+        Route::post('/protocols', [HealthClinicalProtocolController::class, 'store'])
             ->middleware('permission:clinical.protocols.manage')
             ->name('protocols.store');
-        Route::put('/protocols/{protocol}', [HealthClinicalController::class, 'updateProtocol'])
+        Route::get('/protocols/{protocol}/edit', [HealthClinicalProtocolController::class, 'edit'])
+            ->middleware('permission:clinical.protocols.manage')
+            ->name('protocols.edit');
+        Route::put('/protocols/{protocol}', [HealthClinicalProtocolController::class, 'update'])
             ->middleware('permission:clinical.protocols.manage')
             ->name('protocols.update');
+        Route::patch('/protocols/{protocol}/toggle-active', [HealthClinicalProtocolController::class, 'toggleActive'])
+            ->middleware('permission:clinical.protocols.manage')
+            ->name('protocols.toggle-active');
+        Route::get('/clients/{client}/trends', [HealthClinicalClientTrendsController::class, 'show'])
+            ->middleware('permission:clinical.observations.viewAny|clinical.observations.viewAssigned')
+            ->name('clients.trends');
         Route::get('/clients/{client}/summary', [HealthClinicalController::class, 'clientSummary'])
             ->middleware('permission:clinical.observations.view')
             ->name('clients.summary');
@@ -54,12 +68,14 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('clients/{client}/clinical')->name('clients.clinical.')->group(function () {
         Route::get('observations', [ClientClinicalController::class, 'observations'])->name('observations.index');
         Route::post('observations', [ClientClinicalController::class, 'store'])->name('observations.store');
+        Route::post('events', [ClientClinicalController::class, 'storeEvent'])->name('events.store');
     });
 
     // ── Shift-scoped clinical routes ───────────────────────────────────
     Route::prefix('shifts/{shift}/clinical')->name('shifts.clinical.')->group(function () {
         Route::get('observations/due', [ShiftClinicalController::class, 'dueObservations'])->name('observations.due');
         Route::post('observations', [ShiftClinicalController::class, 'store'])->name('observations.store');
+        Route::post('events', [ShiftClinicalController::class, 'storeEvent'])->name('events.store');
     });
 
 });

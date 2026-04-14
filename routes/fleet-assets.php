@@ -129,9 +129,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/devices/{device}', [DeviceController::class, 'show'])->whereNumber('device')->name('fleet-assets.devices.show');
         Route::post('/devices/pair', [DeviceController::class, 'pair'])->name('fleet-assets.devices.pair');
         Route::post('/devices/{device}/unpair', [DeviceController::class, 'unpair'])->whereNumber('device')->name('fleet-assets.devices.unpair');
-        // Consent routes still use legacy AssetTracker model binding for now.
-        Route::post('/devices/{tracker}/consent/grant', [DeviceController::class, 'grantConsent'])->whereNumber('tracker')->name('fleet-assets.devices.consent.grant');
-        Route::post('/devices/{tracker}/consent/revoke', [DeviceController::class, 'revokeConsent'])->whereNumber('tracker')->name('fleet-assets.devices.consent.revoke');
+        Route::post('/devices/{device}/consent/grant', [DeviceController::class, 'grantConsent'])->whereNumber('device')->name('fleet-assets.devices.consent.grant');
+        Route::post('/devices/{device}/consent/revoke', [DeviceController::class, 'revokeConsent'])->whereNumber('device')->name('fleet-assets.devices.consent.revoke');
     });
 
     // Geofences

@@ -250,7 +250,7 @@ class AssetController extends Controller
                 'last_seen_at' => $t->last_seen_at?->toDateTimeString(),
                 'consent_id' => $t->consent_id,
             ]),
-            'alerts' => $asset->alerts->sortByDesc('triggered_at')->values()->take(5)->map(fn($a) => [
+            'archived_alerts' => $asset->alerts->sortByDesc('triggered_at')->values()->take(5)->map(fn($a) => [
                 'id' => $a->id,
                 'alert_type' => $a->alert_type,
                 'severity' => $a->severity,
@@ -279,7 +279,6 @@ class AssetController extends Controller
                 'downloadQr' => ($user?->canDo('assets.qr.download') ?? false) && ($user?->can('view', $asset) ?? false),
                 'manageTrackers' => $user?->canDo('assets.trackers.manage') ?? false,
                 'manageGeofences' => $user?->canDo('assets.geofences.manage') ?? false,
-                'manageAlerts' => $user?->canDo('assets.alerts.manage') ?? false,
             ],
         ]);
     }

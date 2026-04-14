@@ -196,7 +196,7 @@ class AssetController extends Controller
             $timeline->push([
                 'type' => 'alert',
                 'date' => optional($item->triggered_at)->toISOString(),
-                'summary' => "{$item->alert_type} ({$item->severity})",
+                'summary' => "Legacy asset alert: {$item->alert_type} ({$item->severity})",
                 'id' => $item->id,
             ]);
         }
@@ -273,12 +273,13 @@ class AssetController extends Controller
                 'status' => $w->status,
                 'created_at' => optional($w->created_at)->toISOString(),
             ])->values(),
-            'alerts' => $asset->alerts->map(fn ($a) => [
+            'archived_alerts' => $asset->alerts->map(fn ($a) => [
                 'id' => $a->id,
                 'alert_type' => $a->alert_type,
                 'severity' => $a->severity,
                 'status' => $a->status,
                 'triggered_at' => optional($a->triggered_at)->toISOString(),
+                'resolved_at' => optional($a->resolved_at)->toISOString(),
             ])->values(),
             'geofences' => $asset->geofences->map(fn ($g) => [
                 'id' => $g->id,

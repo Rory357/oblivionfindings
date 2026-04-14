@@ -39,7 +39,6 @@ class DatabaseSeeder extends Seeder
         $this->call(NzComplianceObligationsSeeder::class);
         $this->call(AssetCategoriesSeeder::class);
         $this->call(AssetProcedureTemplatesSeeder::class);
-        $this->call(AssetAlertPoliciesSeeder::class);
         $this->call(FleetDemoSeeder::class);
         $this->call(FleetManagementSeeder::class);
         $this->call(ControlRoomSeeder::class);

@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
-use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,16 +11,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * @deprecated This model is retired as an active source of truth.
- * The canonical hardware registry is now App\Domain\SecurityDevices\Models\Device.
+ * @deprecated This model is no longer the canonical hardware registry.
+ * The source of truth for device identity is now
+ * App\Domain\SecurityDevices\Models\Device.
  *
- * Remaining valid uses:
- * - Bridge FK lookups via device_id for consumers not yet fully migrated
- * - integration_events.hardware_id references for legacy location history
- * - UniFi sync adapter writes (will be migrated to write to devices table)
+ * Remaining intentional uses:
+ * - integration_events.hardware_id references for legacy/unbackfilled location history
+ * - narrow UniFi compatibility shadow rows mirrored from canonical Device state
+ *   for provider provenance, fallback linkage, and room metadata
+ * - Narrow compatibility fallback when integration events do not yet have
+ *   canonical_device_id populated
  *
- * Do NOT add new queries against this model. Use Device + DeviceAssignment instead.
- * This model and its table will be archived in a future cleanup PR.
+ * Do NOT add new operational queries against this model. Use Device +
+ * DeviceAssignment instead.
+ * The temporary location_hardware.device_id bridge FK was removed in PR26 after
+ * audit confirmed no live consumers still depended on it.
+ * Manual CRUD/link-edit routes for this model were removed in PR27.
+ * This model remains intentionally as compatibility shadow + historical support
+ * until the remaining LocationHardware legacy bridges are explicitly retired.
  */
 class LocationHardware extends Model
 {
@@ -118,17 +125,6 @@ class LocationHardware extends Model
     public function events(): HasMany
     {
         return $this->hasMany(IntegrationEvent::class, 'hardware_id');
-    }
-
-    /**
-     * Get canonical Control Room alerts for this hardware device.
-     *
-     * Integration events now create ControlRoomAlert records via the signal pipeline.
-     * The device_id field on ControlRoomAlert stores the hardware_id.
-     */
-    public function alerts(): HasMany
-    {
-        return $this->hasMany(ControlRoomAlert::class, 'device_id');
     }
 
     /* ---------------------------------------------------------------

@@ -110,15 +110,6 @@ Route::middleware(['auth'])->group(function () {
             ->name('assets.documents.download');
     });
 
-    Route::middleware('permission:assets.alerts.manage')->group(function () {
-        Route::post('/assets/alerts/{alert}/acknowledge', [AssetAlertController::class, 'acknowledge'])
-            ->whereNumber('alert')
-            ->name('assets.alerts.acknowledge');
-        Route::post('/assets/alerts/{alert}/resolve', [AssetAlertController::class, 'resolve'])
-            ->whereNumber('alert')
-            ->name('assets.alerts.resolve');
-    });
-
     // Asset creation
     Route::middleware('permission:assets.create')->group(function () {
         Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.create');

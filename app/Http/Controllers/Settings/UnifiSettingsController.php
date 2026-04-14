@@ -8,10 +8,10 @@ use App\Models\Integration\Integration;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Integration\IntegrationTenantSecret;
-use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Integration\UnifiOperationalBridgeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
@@ -544,15 +544,25 @@ class UnifiSettingsController extends Controller
     }
 
     /**
-     * Assign or clear room for a synced UniFi hardware item.
+     * Assign or clear room for a synced UniFi device.
+     *
+     * The stable /hardware/{id}/room URL is retained for UI compatibility,
+     * but the route parameter now represents the canonical devices.id value.
      */
-    public function assignHardwareRoom(Request $request, LocationHardware $hardware)
+    public function assignHardwareRoom(
+        Request $request,
+        int $hardware,
+        UnifiOperationalBridgeService $runtime,
+    )
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
         $tenantId = $this->resolveTenantId($user);
 
-        abort_unless($hardware->tenant_id === $tenantId && $hardware->provider === self::PROVIDER, 404);
+        $device = Device::query()
+            ->forTenant($tenantId)
+            ->byProvider(self::PROVIDER)
+            ->findOrFail($hardware);
 
         $validated = $request->validate([
             'room_id' => ['nullable', 'integer', 'exists:site_rooms,id'],
@@ -563,15 +573,19 @@ class UnifiSettingsController extends Controller
         if ($roomId !== null) {
             $room = SiteRoom::query()
                 ->where('tenant_id', $tenantId)
-                ->where('site_id', $hardware->site_id)
                 ->find($roomId);
 
             if (!$room) {
+                return redirect()->back()->with('error', 'Selected room does not belong to this tenant.');
+            }
+
+            $currentSiteId = $runtime->resolveSiteId($device);
+            if ($currentSiteId !== null && $room->site_id !== $currentSiteId) {
                 return redirect()->back()->with('error', 'Selected room does not belong to the device location.');
             }
         }
 
-        $hardware->update(['room_id' => $roomId]);
+        $runtime->syncRoomAssignment($device, $room ?? null, $user?->id);
 
         return redirect()->back()->with('success', 'Device room assignment updated.');
     }

@@ -3,18 +3,16 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Controllers\Controller;
-use App\Models\Site;
-use App\Models\LocationHardware;
-use App\Models\SiteRoom;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationTenantSecret;
+use App\Models\Site;
+use App\Models\SiteRoom;
+use App\Services\Integration\UnifiOperationalBridgeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
-use Inertia\Inertia;
 
 class SiteHardwareController extends Controller
 {
@@ -38,6 +36,8 @@ class SiteHardwareController extends Controller
             ->get()
             ->map(function (Device $d) {
                 $active = $d->assignments->first(fn ($a) => $a->released_at === null);
+                $externalRef = is_array($d->external_ref) ? $d->external_ref : [];
+                $meta = is_array($d->meta) ? $d->meta : [];
 
                 return [
                     'id' => $d->id,
@@ -54,6 +54,8 @@ class SiteHardwareController extends Controller
                     'status' => $d->status?->value,
                     'health_status' => $d->health_status?->value,
                     'provider' => $d->provider,
+                    'provider_entity_id' => $externalRef['provider_entity_id'] ?? null,
+                    'provider_type' => $meta['provider_type'] ?? $externalRef['provider_type'] ?? null,
                     'last_seen_at' => $d->last_seen_at?->toISOString(),
                     'battery_level' => $d->battery_level,
                     'firmware_version' => $d->firmware_version,
@@ -62,12 +64,10 @@ class SiteHardwareController extends Controller
                     // Assignment context for room display.
                     'assignment_type' => $active?->assignable_type,
                     'assignment_id' => $active?->assignable_id,
-                    // Legacy bridge for components that still need it.
-                    'legacy_location_hardware_id' => $d->legacy_location_hardware_id,
                 ];
             });
 
-        // ── Rooms, integrations, assets (unchanged) ───────────────
+        // ── Rooms and integrations (unchanged) ────────────────────
 
         $rooms = SiteRoom::where('site_id', $site->id)
             ->orderBy('sort_order')
@@ -75,11 +75,6 @@ class SiteHardwareController extends Controller
 
         $integrations = IntegrationSiteConfig::where('site_id', $site->id)
             ->where('is_active', true)
-            ->get();
-
-        $assets = $site->assets()
-            ->select(['id', 'name', 'asset_tag'])
-            ->orderBy('name')
             ->get();
 
         // ── UniFi integration data (unchanged) ────────────────────
@@ -142,8 +137,6 @@ class SiteHardwareController extends Controller
             'devices' => $devices,
             'rooms' => $rooms,
             'integrations' => $integrations,
-            'assets' => $assets,
-            'categories' => LocationHardware::categories(), // kept for legacy UniFi room-assignment UI
             'unifi' => [
                 'tenantSecret' => $unifiSecret ? [
                     'status' => $unifiSecret->status,
@@ -181,104 +174,41 @@ class SiteHardwareController extends Controller
         ]);
     }
 
-    // ── Legacy CRUD methods (DEPRECATED) ─────────────────────────
-    // @deprecated These methods operate on LocationHardware which is retired
-    // as the active source of truth. The canonical device registry is now
-    // Security & Devices (devices table). These are kept temporarily for:
-    //   - UniFi integration sync compatibility
-    //   - Room management (rooms are still owned by Sites)
-    // Device CRUD should go through /security-devices/devices/* routes.
-
-    public function store(Request $request, Site $site)
+    // ── Remaining room-management methods ────────────────────────
+    // Sites still owns room management itself, but UniFi room placement now
+    // writes canonical DeviceAssignment state first and only mirrors the
+    // linked LocationHardware row as compatibility metadata.
+    public function assignRoom(
+        Request $request,
+        Site $site,
+        int $hardware,
+        UnifiOperationalBridgeService $runtime,
+    )
     {
         $this->authorize('update', $site);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'category' => 'required|string|in:' . implode(',', array_keys(LocationHardware::categories())),
-            'provider' => 'nullable|string|max:100',
-            'room_id' => 'nullable|exists:site_rooms,id',
-            'asset_tag' => 'nullable|string|max:100',
-            'serial' => 'nullable|string|max:255',
-            'mac' => 'nullable|string|max:50',
-            'notes' => 'nullable|string',
-        ]);
+        $device = Device::query()
+            ->forTenant($site->tenant_id ?? 1)
+            ->byProvider('unifi')
+            ->findOrFail($hardware);
 
-        LocationHardware::create([
-            ...$validated,
-            'provider' => $validated['provider'] ?? 'manual',
-            'tenant_id' => $request->user()->tenant_id ?? 1,
-            'site_id' => $site->id,
-            'status' => LocationHardware::STATUS_UNKNOWN,
-        ]);
-
-        return redirect()->back()->with('success', 'Hardware added successfully.');
-    }
-
-    public function update(Request $request, Site $site, LocationHardware $hardware)
-    {
-        $this->authorize('update', $site);
-        abort_unless($hardware->site_id === $site->id, 404);
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'category' => 'required|string|in:' . implode(',', array_keys(LocationHardware::categories())),
-            'provider' => 'nullable|string|max:100',
-            'room_id' => 'nullable|exists:site_rooms,id',
-            'asset_tag' => 'nullable|string|max:100',
-            'serial' => 'nullable|string|max:255',
-            'mac' => 'nullable|string|max:50',
-            'notes' => 'nullable|string',
-        ]);
-
-        $hardware->update($validated);
-
-        return redirect()->back()->with('success', 'Hardware updated successfully.');
-    }
-
-    public function destroy(Request $request, Site $site, LocationHardware $hardware)
-    {
-        $this->authorize('update', $site);
-        abort_unless($hardware->site_id === $site->id, 404);
-
-        $hardware->delete();
-
-        return redirect()->back()->with('success', 'Hardware deleted successfully.');
-    }
-
-    public function assignRoom(Request $request, Site $site, LocationHardware $hardware)
-    {
-        $this->authorize('update', $site);
-        abort_unless($hardware->site_id === $site->id, 404);
+        $currentSiteId = $runtime->resolveSiteId($device);
+        abort_unless($currentSiteId === null || $currentSiteId === $site->id, 404);
 
         $validated = $request->validate([
             'room_id' => 'nullable|exists:site_rooms,id',
         ]);
 
-        $hardware->update(['room_id' => $validated['room_id']]);
+        $room = null;
+        if (!empty($validated['room_id'])) {
+            $room = SiteRoom::query()
+                ->where('site_id', $site->id)
+                ->findOrFail($validated['room_id']);
+        }
+
+        $runtime->syncRoomAssignment($device, $room, $request->user()?->id);
 
         return redirect()->back()->with('success', 'Hardware room assignment updated.');
-    }
-
-    public function linkAsset(Request $request, Site $site, LocationHardware $hardware)
-    {
-        $this->authorize('update', $site);
-        abort_unless($hardware->site_id === $site->id, 404);
-
-        $validated = $request->validate([
-            'linked_asset_id' => 'nullable|exists:assets,id',
-        ]);
-
-        $hardware->update(['linked_asset_id' => $validated['linked_asset_id']]);
-
-        return redirect()->back()->with('success', 'Hardware asset link updated.');
-    }
-
-    public function refreshStatus(Request $request, Site $site)
-    {
-        $this->authorize('view', $site);
-
-        return redirect()->back()->with('info', 'Status refresh will be available when integration adapters are configured.');
     }
 
     public function manageRooms(Request $request, Site $site)

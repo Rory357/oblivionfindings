@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Models\Asset;
-use App\Models\AssetTracker;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Notifications\Fleet\FleetVehicleOverdueNotification;
@@ -13,7 +12,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 class FleetAutoAlertJob implements ShouldQueue
 {

@@ -37,7 +37,7 @@ class SiteRoom extends Model
         return $this->belongsTo(Site::class);
     }
 
-    /** @deprecated Use DeviceAssignment where assignable_type='room' instead. LocationHardware is retired. */
+    /** @deprecated Use DeviceAssignment where assignable_type='room' instead. LocationHardware remains only as a compatibility shadow / historical bridge. */
     public function hardware(): HasMany
     {
         return $this->hasMany(LocationHardware::class, 'room_id');

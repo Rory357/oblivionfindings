@@ -451,6 +451,7 @@ class ShiftController extends Controller
                 'view_transport' => $auth->canDo('fleet.viewAny') || $auth->canDo('assets.viewAny'),
                 'record_observation' => $auth->canDo('clinical.observations.record') || $auth->canDo('clinical.observations.recordClinical'),
                 'record_clinical_observation' => $auth->canDo('clinical.observations.recordClinical'),
+                'record_event' => $auth->canDo('clinical.events.record'),
             ],
         ]);
     }
