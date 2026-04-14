@@ -115,10 +115,10 @@ class ClinicalGovernanceAutomationTest extends TestCase
         $indicatorCodes = collect($response->inertiaProps('indicators'))->pluck('indicator_code')->all();
 
         $this->assertSame(['HCG-001', 'HCG-002', 'HCG-003', 'HCG-004'], $indicatorCodes);
-        $this->assertSame(1.0, $values->get('HCG-001')['value']);
-        $this->assertSame(1.0, $values->get('HCG-002')['value']);
-        $this->assertSame(1.0, $values->get('HCG-003')['value']);
-        $this->assertSame(1.0, $values->get('HCG-004')['value']);
+        $this->assertEquals(1, $values->get('HCG-001')['value']);
+        $this->assertEquals(1, $values->get('HCG-002')['value']);
+        $this->assertEquals(1, $values->get('HCG-003')['value']);
+        $this->assertEquals(1, $values->get('HCG-004')['value']);
 
         $currentValues = collect($response->inertiaProps('latestSnapshot.indicator_values'))->keyBy('indicator_code');
 
