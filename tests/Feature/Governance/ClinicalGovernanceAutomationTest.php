@@ -151,4 +151,33 @@ class ClinicalGovernanceAutomationTest extends TestCase
         $this->assertDatabaseCount('clinical_governance_snapshots', 1);
         $this->assertEquals(2, $values->get('HCG-002')['value']);
     }
+
+    public function test_governance_clinical_manage_route_stores_manual_indicator_with_schema_compatible_fields(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $response = $this->actingAs($admin)->post('/governance/clinical/indicators', [
+            'name' => 'Complaints escalated to governance',
+            'category' => 'complaints',
+            'description' => 'Manual indicator tracked outside the automated H&C feed.',
+            'target_value' => 2,
+            'target_direction' => 'below',
+            'unit' => 'count',
+            'reporting_frequency' => 'monthly',
+        ]);
+
+        $response->assertRedirect();
+
+        $indicator = ClinicalGovernanceIndicator::query()->sole();
+
+        $this->assertSame('HCG-MANUAL-001', $indicator->indicator_code);
+        $this->assertSame('complaints', $indicator->category);
+        $this->assertSame('Complaints escalated to governance', $indicator->name);
+        $this->assertSame('Manual indicator tracked outside the automated H&C feed.', $indicator->definition);
+        $this->assertSame('Manual governance input', $indicator->data_source);
+        $this->assertSame('count', $indicator->unit);
+        $this->assertSame('monthly', $indicator->frequency);
+        $this->assertFalse((bool) $indicator->is_automated);
+        $this->assertTrue((bool) $indicator->is_active);
+    }
 }

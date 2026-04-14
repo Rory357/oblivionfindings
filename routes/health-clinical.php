@@ -60,7 +60,7 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('permission:clinical.observations.viewAny|clinical.observations.viewAssigned')
             ->name('clients.trends');
         Route::get('/clients/{client}/summary', [HealthClinicalController::class, 'clientSummary'])
-            ->middleware('permission:clinical.observations.view')
+            ->middleware('permission:clinical.observations.viewAny|clinical.observations.viewAssigned')
             ->name('clients.summary');
     });
 

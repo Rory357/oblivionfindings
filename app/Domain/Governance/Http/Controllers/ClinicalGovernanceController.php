@@ -7,6 +7,8 @@ use App\Domain\Governance\Models\ClinicalGovernanceSnapshot;
 use App\Domain\Governance\Services\ClinicalGovernanceAutomationService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ClinicalGovernanceController extends Controller
@@ -31,18 +33,31 @@ class ClinicalGovernanceController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'category' => 'required|in:medication_safety,incident_rates,restraint_usage,infection_control,falls,client_outcomes,other',
+            'category' => ['required', Rule::in(array_keys(ClinicalGovernanceIndicator::CATEGORIES))],
+            'definition' => 'nullable|string',
             'description' => 'nullable|string',
             'target_value' => 'required|numeric',
-            'target_direction' => 'required|in:above,below,equal',
+            'target_direction' => 'nullable|in:above,below,equal',
             'unit' => 'required|string|max:50',
-            'reporting_frequency' => 'required|in:weekly,monthly,quarterly',
+            'frequency' => 'nullable|in:monthly,quarterly',
+            'reporting_frequency' => 'nullable|in:monthly,quarterly',
+            'warning_threshold' => 'nullable|numeric',
+            'critical_threshold' => 'nullable|numeric',
         ]);
 
         ClinicalGovernanceIndicator::create([
-            ...$validated,
+            'indicator_code' => $this->nextManualIndicatorCode(),
+            'category' => $validated['category'],
+            'name' => $validated['name'],
+            'definition' => $validated['definition'] ?? $validated['description'] ?? null,
+            'data_source' => 'Manual governance input',
+            'unit' => $validated['unit'],
+            'target_value' => $validated['target_value'],
+            'warning_threshold' => $validated['warning_threshold'] ?? null,
+            'critical_threshold' => $validated['critical_threshold'] ?? null,
+            'frequency' => $validated['frequency'] ?? $validated['reporting_frequency'] ?? 'monthly',
+            'is_automated' => false,
             'is_active' => true,
-            'created_by' => auth()->id(),
         ]);
 
         return redirect()->back()->with('success', 'Clinical indicator added.');
@@ -138,5 +153,16 @@ class ClinicalGovernanceController extends Controller
             'narrative' => $snapshot->narrative,
             'summary' => $snapshot->summary ?? [],
         ];
+    }
+
+    protected function nextManualIndicatorCode(): string
+    {
+        $latest = ClinicalGovernanceIndicator::query()
+            ->where('indicator_code', 'like', 'HCG-MANUAL-%')
+            ->pluck('indicator_code')
+            ->map(fn (string $code) => (int) Str::afterLast($code, '-'))
+            ->max();
+
+        return sprintf('HCG-MANUAL-%03d', ($latest ?? 0) + 1);
     }
 }

@@ -225,6 +225,19 @@ class HealthClinicalController extends Controller
 
     public function clientSummary(Request $request, Client $client): \Inertia\Response
     {
+        $auth = $request->user();
+        abort_unless(
+            $auth && (
+                $auth->canDo('clinical.observations.viewAny')
+                || $auth->canDo('clinical.observations.viewAssigned')
+            ),
+            403
+        );
+
+        if (! $auth->canDo('clinical.observations.viewAny')) {
+            $this->authorize('view', $client);
+        }
+
         $summary = $this->summaryService->forClient($client->id);
 
         return Inertia::render('health-clinical/ClientSummary', [

@@ -28,8 +28,10 @@ class ClinicalObservationTrendsControllerTest extends TestCase
     {
         $user = $this->createUserWithRole('clinical_lead');
         $supportWorker = $this->createUserWithRole('support_worker');
+        $unassignedSupportWorker = $this->createUserWithRole('support_worker');
         $unauthorizedUser = User::factory()->create(['approved_at' => now()]);
         $client = Client::factory()->create();
+        $client->supportWorkers()->attach($supportWorker->id);
 
         ClinicalObservation::factory()->weight()->create([
             'client_id' => $client->id,
@@ -102,6 +104,10 @@ class ClinicalObservationTrendsControllerTest extends TestCase
                 ->where('has_chartable_data', true)
                 ->where('chartable_observation_count', 4)
             );
+
+        $this->actingAs($unassignedSupportWorker)
+            ->get('/health-clinical/clients/' . $client->id . '/trends')
+            ->assertForbidden();
 
         $this->actingAs($unauthorizedUser)
             ->get('/health-clinical/clients/' . $client->id . '/trends')

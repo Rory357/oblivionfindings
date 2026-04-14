@@ -247,10 +247,19 @@ class RbacSeeder extends Seeder
 
             // Health & Clinical
             ['key' => 'clinical.observations.view', 'description' => 'View clinical observations', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.observations.viewAny', 'description' => 'View all clinical observations', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.observations.viewAssigned', 'description' => 'View observations for assigned clients', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.observations.record', 'description' => 'Record clinical observations', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.observations.recordClinical', 'description' => 'Record clinical observations (vitals, pain)', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.observations.correct', 'description' => 'Submit observation corrections', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.events.view', 'description' => 'View clinical events', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.events.viewAny', 'description' => 'View all clinical events', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.events.viewAssigned', 'description' => 'View clinical events for assigned clients', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.events.record', 'description' => 'Record clinical events', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.events.review', 'description' => 'Review and close clinical events', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.protocols.viewAny', 'description' => 'View clinical protocols', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.protocols.manage', 'description' => 'Manage clinical protocols', 'group' => 'clinical', 'module' => 'Clinical'],
+            ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Incidents
             ['key' => 'incidents.viewAny', 'description' => 'View all incidents', 'group' => 'incidents', 'module' => 'Compliance'],
@@ -581,8 +590,11 @@ class RbacSeeder extends Seeder
             'sites.damages.view', 'sites.damages.create',
             'sites.ledger.view', 'sites.ledger.create',
             'clinical.observations.view', 'clinical.observations.record',
+            'clinical.observations.viewAny', 'clinical.observations.recordClinical', 'clinical.observations.correct',
             'clinical.events.view', 'clinical.events.record',
-            'clinical.protocols.manage',
+            'clinical.events.viewAny', 'clinical.events.review',
+            'clinical.protocols.viewAny', 'clinical.protocols.manage',
+            'clinical.dashboard',
         ]);
 
         // Support Worker
@@ -608,7 +620,9 @@ class RbacSeeder extends Seeder
             'sites.damages.view', 'sites.damages.create',
             'sites.ledger.view',
             'clinical.observations.view', 'clinical.observations.record',
+            'clinical.observations.viewAssigned',
             'clinical.events.view', 'clinical.events.record',
+            'clinical.events.viewAssigned',
         ]);
 
         // Finance
@@ -678,7 +692,11 @@ class RbacSeeder extends Seeder
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create',
             'clinical.observations.view', 'clinical.observations.record',
+            'clinical.observations.viewAny', 'clinical.observations.recordClinical',
             'clinical.events.view', 'clinical.events.record',
+            'clinical.events.viewAny',
+            'clinical.protocols.viewAny',
+            'clinical.dashboard',
         ]);
 
         // Health & Safety Officer
@@ -718,8 +736,11 @@ class RbacSeeder extends Seeder
         // Clinical Lead: full clinical module access + medications view
         $syncPermissions($clinicalLead, [
             'clinical.observations.view', 'clinical.observations.record',
+            'clinical.observations.viewAny', 'clinical.observations.recordClinical', 'clinical.observations.correct',
             'clinical.events.view', 'clinical.events.record',
-            'clinical.protocols.manage',
+            'clinical.events.viewAny', 'clinical.events.review',
+            'clinical.protocols.viewAny', 'clinical.protocols.manage',
+            'clinical.dashboard',
             'medications.view', 'medications.orders.manage',
             'medications.administer.record', 'medications.audit.view',
             'clients.viewAny',

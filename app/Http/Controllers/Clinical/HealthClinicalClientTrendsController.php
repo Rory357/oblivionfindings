@@ -30,6 +30,10 @@ class HealthClinicalClientTrendsController extends Controller
             403
         );
 
+        if (! $auth->canDo('clinical.observations.viewAny')) {
+            $this->authorize('view', $client);
+        }
+
         $validated = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
