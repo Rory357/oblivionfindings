@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -112,66 +113,24 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
         >
             <Head title="Emergency Drills" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Emergency Drills</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Schedule, run, and track emergency evacuation drills
-                        </div>
-                    </div>
-                    <Link href="/health-safety/drills/create">
-                        <Button size="sm">Schedule Drill</Button>
-                    </Link>
-                </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-blue-50 p-2">
-                                <CalendarClock className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.scheduled_drills}</div>
-                                <div className="text-xs text-slate-500">Scheduled Drills</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-green-50 p-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.completed_6mo}</div>
-                                <div className="text-xs text-slate-500">Completed (6 months)</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-red-50 p-2">
-                                <AlertTriangle className="h-5 w-5 text-red-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.sites_overdue}</div>
-                                <div className="text-xs text-slate-500">Sites Overdue</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-amber-50 p-2">
-                                <Timer className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.avg_evacuation_time}</div>
-                                <div className="text-xs text-slate-500">Avg Evacuation Time</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Emergency Drills"
+                    description="Schedule, run, and track emergency evacuation drills"
+                    icon={<CalendarClock className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Scheduled', value: stats.scheduled_drills },
+                        { label: 'Completed (6mo)', value: stats.completed_6mo },
+                        { label: 'Sites Overdue', value: stats.sites_overdue },
+                        { label: 'Avg Evac Time', value: stats.avg_evacuation_time },
+                    ]}
+                    actions={
+                        <Link href="/health-safety/drills/create">
+                            <Button size="sm">Schedule Drill</Button>
+                        </Link>
+                    }
+                />
 
                 {/* Site Compliance Cards */}
                 {site_compliance.length > 0 && (
