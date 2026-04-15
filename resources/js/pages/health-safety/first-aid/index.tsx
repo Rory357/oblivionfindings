@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -89,23 +90,26 @@ export default function FirstAidIndex({ records, stats, staff, sites }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'First Aid', href: '/health-safety/first-aid' }]}>
             <Head title="First Aid Records" />
 
-            <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <Heart className="h-5 w-5 text-red-500" />
-                            <h1 className="text-lg font-semibold">First Aid Records</h1>
-                        </div>
-                        <div className="mt-1 text-sm text-slate-500">Record and track first aid treatments</div>
-                    </div>
-                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Record First Aid
-                            </Button>
-                        </DialogTrigger>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="First Aid Records"
+                    description="Record and track first aid treatments"
+                    icon={<Heart className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Records (30d)', value: stats.records_30d },
+                        { label: 'Ambulance Calls', value: stats.ambulance_calls_30d },
+                        { label: 'Linked to Incidents', value: stats.linked_to_incidents },
+                    ]}
+                    actions={
+                        <Button size="sm" onClick={() => setDialogOpen(true)}>
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Record First Aid
+                        </Button>
+                    }
+                />
+
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Record First Aid Treatment</DialogTitle>
@@ -228,41 +232,6 @@ export default function FirstAidIndex({ records, stats, staff, sites }: Props) {
                             </form>
                         </DialogContent>
                     </Dialog>
-                </div>
-
-                {/* Stats */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Records (30d)</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.records_30d}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Ambulance Calls (30d)</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <Siren className="h-5 w-5 text-red-500" />
-                                <div className="text-2xl font-bold">{stats.ambulance_calls_30d}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Linked to Incidents</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <Link2 className="h-5 w-5 text-blue-500" />
-                                <div className="text-2xl font-bold">{stats.linked_to_incidents}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
 
                 {/* Table */}
                 <Card>
