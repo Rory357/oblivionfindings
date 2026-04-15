@@ -1,7 +1,6 @@
 import DrugInteractionManager from '@/components/medications/DrugInteractionManager';
 import MedicationVersionHistory from '@/components/medications/MedicationVersionHistory';
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +31,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, Ban, Clock, FileUp, Pencil, Plus } from 'lucide-react';
+import { AlertTriangle, Ban, Clock, FileUp, Pencil, Pill, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -1073,12 +1072,14 @@ export default function Medications({
     return (
         <AppLayout>
             <Head title="eMAR - Medications" />
-            <PageHeader
-                title="Medications Database"
-                description="Central medication directory with search, filtering, and status tracking."
-                backHref="/emar"
-            />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="Medications Database"
+                    description="Central medication directory with search, filtering, and status tracking"
+                    icon={<Pill className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                />
                 {/* Filters */}
                 <div className="mb-6 flex flex-wrap items-center gap-3">
                     <Input
@@ -1571,7 +1572,7 @@ export default function Medications({
                         </table>
                     </CardContent>
                 </Card>
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
