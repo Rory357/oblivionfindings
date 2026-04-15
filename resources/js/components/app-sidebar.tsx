@@ -1049,7 +1049,7 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: Shield,
         });
     if (can?.risks?.viewAny || can?.risks?.viewAssigned)
-        compliance.push({ title: 'Risks', href: '/risks', icon: Target });
+        compliance.push({ title: 'Risks', href: '/health-safety/risk-assessments', icon: Target });
     if (can?.privacy?.viewRequests)
         compliance.push({
             title: 'Privacy & GDPR',
