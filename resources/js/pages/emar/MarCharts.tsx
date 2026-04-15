@@ -4,8 +4,7 @@ import AdministrationEvidenceDialog from '@/components/medications/Administratio
 import RecordAdministrationDialog from '@/components/medications/RecordAdministrationDialog';
 import RefusalFollowUpDialog from '@/components/medications/RefusalFollowUpDialog';
 import { type SafetyCheck } from '@/components/medications/SafetyCheckPanel';
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -580,12 +579,14 @@ export default function MarCharts({
     return (
         <AppLayout>
             <Head title="eMAR - MAR Charts" />
-            <PageHeader
-                title="MAR Charts"
-                description="Medication Administration Record charts by client and date."
-                backHref="/emar"
-            />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="MAR Charts"
+                    description="Medication Administration Record charts by client and date"
+                    icon={<Pill className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                />
                 {/* Filters */}
                 <div className="mb-6 flex flex-wrap items-center gap-4">
                     <div className="w-72">
@@ -1830,7 +1831,7 @@ export default function MarCharts({
                         )}
                     </>
                 )}
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
