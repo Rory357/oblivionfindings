@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -53,94 +54,33 @@ export default function MedicationsIndex({ date, clients }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Medications', href: '/medications' }]}>
             <Head title="Medications" />
 
-            <div className="space-y-6">
-                {/* Header with Quick Actions */}
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <h1 className="text-xl font-semibold">Medications</h1>
-                        <p className="text-sm text-slate-500">Centralised "run-the-day" view • {date}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {canViewDashboard && (
-                            <Button variant="outline" asChild>
-                                <Link href="/medications/dashboard">
-                                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                                    Dashboard
-                                </Link>
-                            </Button>
-                        )}
-                        {canViewReports && (
-                            <Button variant="outline" asChild>
-                                <Link href="/reports/medications">
-                                    <BarChart3 className="mr-2 h-4 w-4" />
-                                    Reports
-                                </Link>
-                            </Button>
-                        )}
-                        {canViewAudit && (
-                            <Button variant="outline" asChild>
-                                <Link href="/medications/audit">
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    Audit
-                                </Link>
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Quick Stats Summary */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                    <Card className="border-blue-200 bg-blue-50">
-                        <CardContent className="py-4">
-                            <div className="flex items-center gap-2">
-                                <ClipboardList className="h-5 w-5 text-blue-600" />
-                                <div>
-                                    <div className="text-xs text-blue-600">Total Clients</div>
-                                    <div className="text-lg font-bold text-blue-800">{clients.length}</div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-amber-200 bg-amber-50">
-                        <CardContent className="py-4">
-                            <div className="flex items-center gap-2">
-                                <Pill className="h-5 w-5 text-amber-600" />
-                                <div>
-                                    <div className="text-xs text-amber-600">Due Today</div>
-                                    <div className="text-lg font-bold text-amber-800">
-                                        {clients.reduce((sum, c) => sum + c.counts.due, 0)}
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-orange-200 bg-orange-50">
-                        <CardContent className="py-4">
-                            <div className="flex items-center gap-2">
-                                <TrendingUp className="h-5 w-5 text-orange-600" />
-                                <div>
-                                    <div className="text-xs text-orange-600">Late</div>
-                                    <div className="text-lg font-bold text-orange-800">
-                                        {clients.reduce((sum, c) => sum + c.counts.late, 0)}
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-red-200 bg-red-50">
-                        <CardContent className="py-4">
-                            <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-5 w-5 text-red-600" />
-                                <div>
-                                    <div className="text-xs text-red-600">Missed</div>
-                                    <div className="text-lg font-bold text-red-800">
-                                        {clients.reduce((sum, c) => sum + c.counts.missed, 0)}
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Medications"
+                    description={`Centralised "run-the-day" view • ${date}`}
+                    icon={<Pill className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Clients', value: clients.length },
+                        { label: 'Due Today', value: clients.reduce((sum, c) => sum + c.counts.due, 0) },
+                        { label: 'Late', value: clients.reduce((sum, c) => sum + c.counts.late, 0) },
+                        { label: 'Missed', value: clients.reduce((sum, c) => sum + c.counts.missed, 0) },
+                    ]}
+                    actions={
+                        <div className="flex flex-wrap gap-2">
+                            {canViewDashboard && (
+                                <Button variant="outline" asChild>
+                                    <Link href="/medications/dashboard">Dashboard</Link>
+                                </Button>
+                            )}
+                            {canViewReports && (
+                                <Button variant="outline" asChild>
+                                    <Link href="/reports/medications">Reports</Link>
+                                </Button>
+                            )}
+                        </div>
+                    }
+                />
 
                 {/* Client Cards Grid */}
                 <div>
