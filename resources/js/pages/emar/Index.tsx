@@ -224,8 +224,8 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     stats={[
                         { label: 'Admin Rate', value: `${stats.adminRate}%` },
                         { label: 'Active Clients', value: stats.activeClients },
-                        { label: 'Controlled Drugs', value: stats.controlledDrugs },
-                        { label: 'Active Alerts', value: stats.activeAlerts },
+                        { label: 'Controlled Drugs', value: stats.controlledCount },
+                        { label: 'Rounds Today', value: stats.roundsToday },
                     ]}
                 />
                 {/* ── KPI Cards ─────────────────────────────────────── */}
