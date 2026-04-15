@@ -216,18 +216,18 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
     return (
         <AppLayout>
             <Head title="eMAR Dashboard" />
-            <FleetHero
-                title="eMAR Dashboard"
-                description="Electronic Medication Administration — real-time overview"
-                icon={<Pill className="h-7 w-7 text-white" />}
-                stats={[
-                    { label: 'Admin Rate', value: `${stats.adminRate}%` },
-                    { label: 'Active Clients', value: stats.activeClients },
-                    { label: 'Controlled Drugs', value: stats.controlledDrugs },
-                    { label: 'Active Alerts', value: stats.activeAlerts },
-                ]}
-            />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="eMAR Dashboard"
+                    description="Electronic Medication Administration — real-time overview"
+                    icon={<Pill className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Admin Rate', value: `${stats.adminRate}%` },
+                        { label: 'Active Clients', value: stats.activeClients },
+                        { label: 'Controlled Drugs', value: stats.controlledDrugs },
+                        { label: 'Active Alerts', value: stats.activeAlerts },
+                    ]}
+                />
                 {/* ── KPI Cards ─────────────────────────────────────── */}
                 <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <OpsStatCard
@@ -699,7 +699,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                         </div>
                     </CardContent>
                 </Card>
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
