@@ -1,7 +1,6 @@
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import ScheduledStockCounts from '@/components/medications/ScheduledStockCounts';
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -378,12 +377,14 @@ export default function StockManagement({
     return (
         <AppLayout>
             <Head title="eMAR - Stock Management" />
-            <PageHeader
-                title="Stock Management"
-                description="Medication stock levels, reorder alerts, and pharmacy orders."
-                backHref="/emar"
-            />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="Stock Management"
+                    description="Medication stock levels, reorder alerts, and pharmacy orders"
+                    icon={<Package className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                />
                 {/* Alert Summary Cards */}
                 <div className="mb-6 grid gap-4 sm:grid-cols-4">
                     <Card>
@@ -1610,7 +1611,7 @@ export default function StockManagement({
                         </Card>
                     </TabsContent>
                 </Tabs>
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
