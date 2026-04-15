@@ -1,13 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import RespiteSubnav from '@/components/respite-subnav';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { CalendarDays, Plus } from 'lucide-react';
+import { CalendarDays, Plus, Search, X, Inbox, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 
 type Props = {
     referrals: any;
@@ -23,6 +23,35 @@ type Props = {
     };
 };
 
+/* ------------------------------------------------------------------ */
+/*  Stat Card                                                          */
+/* ------------------------------------------------------------------ */
+
+const STAT_COLORS = {
+    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', icon: 'text-blue-600 dark:text-blue-400', ring: 'ring-blue-100 dark:ring-blue-500/20' },
+    amber: { bg: 'bg-amber-50 dark:bg-amber-500/10', icon: 'text-amber-600 dark:text-amber-400', ring: 'ring-amber-100 dark:ring-amber-500/20' },
+    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', icon: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-100 dark:ring-emerald-500/20' },
+};
+
+function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {
+    const c = STAT_COLORS[color];
+    return (
+        <div className={`relative flex items-center gap-4 rounded-xl p-4 ring-1 ${c.bg} ${c.ring} transition-shadow hover:shadow-md`}>
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${c.bg} ${c.icon}`}>
+                <Icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+                <p className="text-2xl font-bold tracking-tight">{value}</p>
+                <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
+
 export default function RespiteIndex({ referrals, filters, stats }: Props) {
     const { auth, labels } = usePage().props as any;
     const can = auth?.can?.respite ?? {};
@@ -33,17 +62,25 @@ export default function RespiteIndex({ referrals, filters, stats }: Props) {
         router.get('/respite', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
     };
 
+    function clearFilters() {
+        router.get('/respite', {}, { preserveState: true, replace: true });
+    }
+
+    const hasFilters = !!(filters.q || filters.status || filters.urgency);
+    const data = referrals?.data ?? [];
+
     return (
         <AppLayout breadcrumbs={[{ title: label, href: '/respite' }]}>
             <Head title={label} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-6 p-6">
+                {/* Header */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold">{label} Referrals</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <h1 className="text-2xl font-bold tracking-tight">{label} Referrals</h1>
+                        <p className="text-sm text-muted-foreground">
                             Referrals start the intake. Booking requests are reviewed and approved before creating bookings.
-                        </div>
+                        </p>
                     </div>
                     {can.create && (
                         <Link href="/respite/referrals/create">
@@ -57,128 +94,109 @@ export default function RespiteIndex({ referrals, filters, stats }: Props) {
 
                 <RespiteSubnav />
 
+                {/* Stats */}
                 {stats && (
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Received</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.received}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Triaged</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.triaged}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Accepted</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.accepted}</div>
-                            </CardContent>
-                        </Card>
+                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                        <StatCard label="Received" value={stats.received} icon={Inbox} color="blue" />
+                        <StatCard label="Triaged" value={stats.triaged} icon={Clock} color="amber" />
+                        <StatCard label="Accepted" value={stats.accepted} icon={CheckCircle2} color="emerald" />
                     </div>
                 )}
 
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            placeholder="Search referrer or reason..."
+                            className="w-64 pl-9"
+                            defaultValue={filters.q ?? ''}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') onFilter({ q: (e.target as HTMLInputElement).value });
+                            }}
+                        />
+                    </div>
+
+                    <Select value={filters.status ?? ANY} onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}>
+                        <SelectTrigger className="w-36">
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ANY}>All Status</SelectItem>
+                            {['received', 'triaged', 'accepted', 'declined'].map((s) => (
+                                <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={filters.urgency ?? ANY} onValueChange={(v) => onFilter({ urgency: v === ANY ? null : v })}>
+                        <SelectTrigger className="w-36">
+                            <SelectValue placeholder="Urgency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ANY}>All Urgency</SelectItem>
+                            {['planned', 'urgent', 'crisis'].map((s) => (
+                                <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {hasFilters && (
+                        <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
+                            <X className="h-3.5 w-3.5" />
+                            Clear
+                        </Button>
+                    )}
+                </div>
+
+                {/* Referral list */}
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Filters</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
-                            <Input
-                                placeholder="Search referrer or reason"
-                                value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
-                            <Select
-                                value={filters.status ?? ANY}
-                                onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
-                            >
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ANY}>Any</SelectItem>
-                                    {['received', 'triaged', 'accepted', 'declined'].map((s) => (
-                                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label className="text-xs text-slate-500">Urgency</Label>
-                            <Select
-                                value={filters.urgency ?? ANY}
-                                onValueChange={(v) => onFilter({ urgency: v === ANY ? null : v })}
-                            >
-                                <SelectTrigger><SelectValue placeholder="Urgency" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ANY}>Any</SelectItem>
-                                    {['planned', 'urgent', 'crisis'].map((s) => (
-                                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                    <CardContent className="p-0">
+                        <div className="divide-y">
+                            {data.map((ref: any) => (
+                                <div
+                                    key={ref.id}
+                                    className="group cursor-pointer px-4 py-3 transition-colors hover:bg-muted/40"
+                                    onClick={() => router.visit(`/respite/referrals/${ref.id}`)}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-500/10">
+                                                <CalendarDays className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                            </div>
+                                            <div>
+                                                <div className="font-semibold group-hover:text-primary">
+                                                    {ref.client?.first_name} {ref.client?.last_name}
+                                                </div>
+                                                <div className="mt-1 flex flex-wrap gap-2">
+                                                    <Badge variant="outline" className="text-[11px] capitalize">{ref.status}</Badge>
+                                                    <Badge variant="outline" className="text-[11px] capitalize">{ref.urgency}</Badge>
+                                                </div>
+                                                <div className="mt-1.5 text-xs text-muted-foreground">
+                                                    Referrer: {ref.referrer_name}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {!data.length && (
+                                <div className="px-4 py-16 text-center">
+                                    <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                                    <p className="font-medium text-muted-foreground">No respite referrals found</p>
+                                    <p className="mt-1 text-sm text-muted-foreground/70">
+                                        {hasFilters ? 'Try adjusting your filters' : 'Create a referral to get started'}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
 
-                <div className="space-y-2">
-                    {referrals.data.map((ref: any) => (
-                        <Card key={ref.id}>
-                            <CardHeader>
-                                <CardTitle className="text-base">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 font-semibold">
-                                                <CalendarDays className="h-4 w-4 text-slate-500" />
-                                                {ref.client?.first_name} {ref.client?.last_name}
-                                            </div>
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge variant="outline">{ref.status}</Badge>
-                                                <Badge variant="outline">{ref.urgency}</Badge>
-                                            </div>
-                                            <div className="mt-2 text-xs text-slate-500">
-                                                Referrer: {ref.referrer_name}
-                                            </div>
-                                        </div>
-                                        <Link href={`/respite/referrals/${ref.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                                            View
-                                        </Link>
-                                    </div>
-                                </CardTitle>
-                            </CardHeader>
-                        </Card>
-                    ))}
-                    {!referrals.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
-                            No respite referrals found.
-                        </div>
-                    )}
-                </div>
-
-                {referrals?.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {referrals.links.map((l: any) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
-                ) : null}
+                {/* Pagination */}
+                {referrals?.last_page > 1 && (
+                    <LaravelPagination links={referrals.links} />
+                )}
             </div>
         </AppLayout>
     );

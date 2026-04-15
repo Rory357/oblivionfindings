@@ -7,9 +7,9 @@ import {
     Activity,
     AlertTriangle,
     ClipboardList,
+    Clock,
     Eye,
     HeartPulse,
-    TrendingUp,
 } from 'lucide-react';
 
 type ObservationStats = {
@@ -65,11 +65,43 @@ type Props = {
 };
 
 const severityColor: Record<string, string> = {
-    low: 'bg-blue-100 text-blue-800',
-    medium: 'bg-amber-100 text-amber-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
+    low: 'bg-blue-100 text-blue-800 dark:bg-blue-500/10 dark:text-blue-300',
+    medium: 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300',
+    high: 'bg-orange-100 text-orange-800 dark:bg-orange-500/10 dark:text-orange-300',
+    critical: 'bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-300',
 };
+
+/* ------------------------------------------------------------------ */
+/*  Stat Card                                                          */
+/* ------------------------------------------------------------------ */
+
+const STAT_COLORS = {
+    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', icon: 'text-blue-600 dark:text-blue-400', ring: 'ring-blue-100 dark:ring-blue-500/20' },
+    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', icon: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-100 dark:ring-emerald-500/20' },
+    amber: { bg: 'bg-amber-50 dark:bg-amber-500/10', icon: 'text-amber-600 dark:text-amber-400', ring: 'ring-amber-100 dark:ring-amber-500/20' },
+    red: { bg: 'bg-red-50 dark:bg-red-500/10', icon: 'text-red-600 dark:text-red-400', ring: 'ring-red-100 dark:ring-red-500/20' },
+    purple: { bg: 'bg-purple-50 dark:bg-purple-500/10', icon: 'text-purple-600 dark:text-purple-400', ring: 'ring-purple-100 dark:ring-purple-500/20' },
+};
+
+function StatCard({ label, value, subtitle, icon: Icon, color }: { label: string; value: number | string; subtitle?: string; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {
+    const c = STAT_COLORS[color];
+    return (
+        <div className={`relative flex items-center gap-4 rounded-xl p-4 ring-1 ${c.bg} ${c.ring} transition-shadow hover:shadow-md`}>
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${c.bg} ${c.icon}`}>
+                <Icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+                <p className="text-2xl font-bold tracking-tight">{value}</p>
+                <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+                {subtitle && <p className="truncate text-[10px] text-muted-foreground/70">{subtitle}</p>}
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
 
 export default function Dashboard({
     observation_stats,
@@ -81,88 +113,18 @@ export default function Dashboard({
     event_types,
 }: Props) {
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={[{ title: 'Health & Clinical', href: '/health-clinical' }, { title: 'Dashboard', href: '/health-clinical' }]}>
             <Head title="Health & Clinical" />
-            <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between">
+
+            <div className="flex flex-col gap-6 p-6">
+                {/* Header */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            Health & Clinical
-                        </h1>
-                        <p className="mt-1 text-sm text-gray-500">
-                            Clinical observations, events, and protocol oversight
+                        <h1 className="text-2xl font-bold tracking-tight">Health & Clinical</h1>
+                        <p className="text-sm text-muted-foreground">
+                            Clinical observation compliance and event oversight
                         </p>
                     </div>
-                </div>
-
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Observations (30d)
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {observation_stats.total_observations}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                {observation_stats.observations_today} today
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Clinical Events (30d)
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {event_stats.total_events}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                {event_stats.events_today} today
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Active Protocols
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {protocol_stats.active_protocols}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className={protocol_stats.overdue_protocols > 0 ? 'border-amber-300 bg-amber-50/30' : ''}>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Overdue Protocols
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className={`text-2xl font-bold ${protocol_stats.overdue_protocols > 0 ? 'text-amber-700' : ''}`}>
-                                {protocol_stats.overdue_protocols}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className={event_stats.pending_follow_ups > 0 ? 'border-red-300 bg-red-50/30' : ''}>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                Pending Follow-ups
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className={`text-2xl font-bold ${event_stats.pending_follow_ups > 0 ? 'text-red-700' : ''}`}>
-                                {event_stats.pending_follow_ups}
-                            </div>
-                        </CardContent>
-                    </Card>
                 </div>
 
                 {/* Quick Nav */}
@@ -182,6 +144,15 @@ export default function Dashboard({
                             <ClipboardList className="h-4 w-4" /> Protocols
                         </Button>
                     </Link>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                    <StatCard label="Observations (30d)" value={observation_stats.total_observations} subtitle={`${observation_stats.observations_today} today`} icon={Eye} color="blue" />
+                    <StatCard label="Clinical Events (30d)" value={event_stats.total_events} subtitle={`${event_stats.events_today} today`} icon={Activity} color="purple" />
+                    <StatCard label="Active Protocols" value={protocol_stats.active_protocols} icon={ClipboardList} color="emerald" />
+                    <StatCard label="Overdue Protocols" value={protocol_stats.overdue_protocols} icon={Clock} color="amber" />
+                    <StatCard label="Pending Follow-ups" value={event_stats.pending_follow_ups} icon={AlertTriangle} color="red" />
                 </div>
 
                 {/* Recent Activity */}
