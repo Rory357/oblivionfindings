@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -67,53 +68,32 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
         ]}>
             <Head title="Legal Holds" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Legal Holds</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Manage data preservation orders for litigation and investigations
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/privacy/dashboard" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Privacy Dashboard
-                        </Link>
-                        {can.manageLegalHolds && (
-                            <Link href="/privacy/legal-holds/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Hold
-                                </Button>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Legal Holds"
+                    description="Manage data preservation orders for litigation and investigations"
+                    icon={<Scale className="h-7 w-7 text-white" />}
+                    stats={stats ? [
+                        { label: 'Total Holds', value: stats.total },
+                        { label: 'Active', value: stats.active },
+                    ] : undefined}
+                    actions={
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link href="/privacy/dashboard">
+                                <Button variant="outline" size="sm">Privacy Dashboard</Button>
                             </Link>
-                        )}
-                    </div>
-                </div>
-
-                {stats && (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Total Holds</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.total}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Active Holds</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-2">
-                                    <Lock className="h-5 w-5 text-red-500" />
-                                    <div className="text-2xl font-bold text-red-600">{stats.active}</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
+                            {can.manageLegalHolds && (
+                                <Link href="/privacy/legal-holds/create">
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Hold
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    }
+                />
 
                 <Card>
                     <CardHeader>
