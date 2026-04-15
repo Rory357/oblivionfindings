@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Head, router } from '@inertiajs/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -59,20 +60,17 @@ export default function RiskAssessmentsIndex({ assessments, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Risk Assessments" />
-            <div className="mx-auto max-w-[1400px] space-y-6">
+            <div className="flex flex-col gap-6 p-6">
 
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
-                            <Shield className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Risk Assessments</h1>
-                            <p className="text-sm text-muted-foreground">{assessments.total} assessment{assessments.total !== 1 ? 's' : ''}</p>
-                        </div>
-                    </div>
-                </div>
+                {/* Hero Header */}
+                <FleetHero
+                    title="Risk Assessments"
+                    description={`${assessments.total} assessment${assessments.total !== 1 ? 's' : ''} registered`}
+                    icon={<Shield className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total', value: assessments.total },
+                    ]}
+                />
 
                 {/* Filters */}
                 <Card>
