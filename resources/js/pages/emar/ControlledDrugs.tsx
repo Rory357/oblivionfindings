@@ -1,8 +1,7 @@
 import SupportingEvidenceDialog, {
     type SupportingEvidenceAttachment,
 } from '@/components/medications/SupportingEvidenceDialog';
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -503,34 +502,27 @@ export default function ControlledDrugs({
     return (
         <AppLayout>
             <Head title="eMAR - Controlled Drugs" />
-            <PageHeader
-                title="Controlled Drug Register"
-                description="Controlled substance registers, balance tracking, and discrepancy management."
-                backHref="/emar"
-                actions={
-                    <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={() => setEntryOpen(true)}>
-                            <Plus className="mr-1 h-4 w-4" /> Record Entry
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setBalanceOpen(true)}
-                        >
-                            <ClipboardCheck className="mr-1 h-4 w-4" /> Balance
-                            Check
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => setLossOpen(true)}
-                        >
-                            <FileWarning className="mr-1 h-4 w-4" /> Report Loss
-                        </Button>
-                    </div>
-                }
-            />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="Controlled Drug Register"
+                    description="Controlled substance registers, balance tracking, and discrepancy management"
+                    icon={<Shield className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <Button size="sm" onClick={() => setEntryOpen(true)}>
+                                <Plus className="mr-1 h-4 w-4" /> Record Entry
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setBalanceOpen(true)}>
+                                <ClipboardCheck className="mr-1 h-4 w-4" /> Balance Check
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => setLossOpen(true)}>
+                                <FileWarning className="mr-1 h-4 w-4" /> Report Loss
+                            </Button>
+                        </div>
+                    }
+                />
                 {/* Record CD Entry Dialog */}
                 <Dialog open={entryOpen} onOpenChange={setEntryOpen}>
                     <DialogContent className="max-w-lg">
@@ -2178,7 +2170,7 @@ export default function ControlledDrugs({
                         );
                     }}
                 />
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
