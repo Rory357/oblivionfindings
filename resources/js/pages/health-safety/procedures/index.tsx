@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,57 +76,26 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Safe Work Procedures', href: '/health-safety/procedures' }]}>
             <Head title="Safe Work Procedures" />
 
-            <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-blue-600" />
-                            <h1 className="text-lg font-semibold">Safe Work Procedures</h1>
-                        </div>
-                        <div className="mt-1 text-sm text-slate-500">Manage safe work procedures and safety documentation</div>
-                    </div>
-                    <Link href="/health-safety/procedures/create">
-                        <Button size="sm">
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            New Procedure
-                        </Button>
-                    </Link>
-                </div>
-
-                {/* Stats */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Total Procedures</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.total}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Approved</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <ClipboardCheck className="h-5 w-5 text-green-500" />
-                                <div className="text-2xl font-bold">{stats.approved}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Due for Review</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <AlertCircle className="h-5 w-5 text-amber-500" />
-                                <div className="text-2xl font-bold">{stats.due_for_review}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Safe Work Procedures"
+                    description="Manage safe work procedures and safety documentation"
+                    icon={<FileText className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total', value: stats.total },
+                        { label: 'Approved', value: stats.approved },
+                        { label: 'Due for Review', value: stats.due_for_review },
+                    ]}
+                    actions={
+                        <Link href="/health-safety/procedures/create">
+                            <Button size="sm">
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New Procedure
+                            </Button>
+                        </Link>
+                    }
+                />
 
                 {/* Filters */}
                 <Card>
