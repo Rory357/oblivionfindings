@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -77,72 +78,34 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
         ]}>
             <Head title="Data Protection Impact Assessments" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Data Protection Impact Assessments</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            GDPR Article 35 - Assess risks of data processing activities
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/privacy/dashboard" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Privacy Dashboard
-                        </Link>
-                        {can.conductDPIA && (
-                            <Link href="/privacy/dpia/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Assessment
-                                </Button>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Data Protection Impact Assessments"
+                    description="GDPR Article 35 — Assess risks of data processing activities"
+                    icon={<Activity className="h-7 w-7 text-white" />}
+                    stats={stats ? [
+                        { label: 'Total', value: stats.total },
+                        { label: 'Pending Review', value: stats.pending_review },
+                        { label: 'High Risk', value: stats.high_risk },
+                        { label: 'Approved', value: stats.approved },
+                    ] : undefined}
+                    actions={
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link href="/privacy/dashboard">
+                                <Button variant="outline" size="sm">Privacy Dashboard</Button>
                             </Link>
-                        )}
-                    </div>
-                </div>
-
-                {stats && (
-                    <div className="grid gap-4 sm:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Total Assessments</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.total}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Pending Review</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-yellow-600">{stats.pending_review}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">High Risk</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-red-500" />
-                                    <div className="text-2xl font-bold text-red-600">{stats.high_risk}</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Approved</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle className="h-5 w-5 text-green-500" />
-                                    <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
+                            {can.conductDPIA && (
+                                <Link href="/privacy/dpia/create">
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Assessment
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    }
+                />
 
                 <Card>
                     <CardHeader>
