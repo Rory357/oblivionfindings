@@ -1,5 +1,4 @@
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type Assessment = {
@@ -144,8 +143,14 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
     return (
         <AppLayout>
             <Head title="eMAR - Self-Administration Assessments" />
-            <PageHeader title="Self-Administration Assessments" description="Assess client capacity for self-medication per NZ MOH medication support categories." backHref="/emar" />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="Self-Administration Assessments"
+                    description="Assess client capacity for self-medication per NZ MOH medication support categories"
+                    icon={<ClipboardCheck className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                />
                 {/* Due Reassessments */}
                 {dueReassessments.length > 0 && (
                     <Card className="mb-6 border-amber-200 dark:border-amber-800">
@@ -331,7 +336,7 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
                         </table>
                     </CardContent>
                 </Card>
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
