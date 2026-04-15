@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -78,72 +79,37 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
         ]}>
             <Head title="Data Subject Requests" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Data Subject Requests</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            GDPR Article 15-22 compliance - 30-day response deadline
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/privacy/dashboard" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Privacy Dashboard
-                        </Link>
-                        <Link href="/privacy/breaches" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Data Breaches
-                        </Link>
-                        {can.processRequests && (
-                            <Link href="/privacy/requests/create">
-                                <Button size="sm">
-                                    <FileText className="mr-1.5 h-4 w-4" />
-                                    New Request
-                                </Button>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Data Subject Requests"
+                    description="GDPR Article 15-22 compliance — 30-day response deadline"
+                    icon={<FileText className="h-7 w-7 text-white" />}
+                    stats={stats ? [
+                        { label: 'Open', value: stats.open },
+                        { label: 'Overdue', value: stats.overdue },
+                        { label: 'Completed (30d)', value: stats.completed_30_days },
+                        { label: 'Pending', value: stats.pending_verification },
+                    ] : undefined}
+                    actions={
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link href="/privacy/dashboard">
+                                <Button variant="outline" size="sm">Privacy Dashboard</Button>
                             </Link>
-                        )}
-                    </div>
-                </div>
-
-                {stats && (
-                    <div className="grid gap-4 sm:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Open Requests</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.open}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Overdue</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-red-500" />
-                                    <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Completed (30d)</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.completed_30_days}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Pending Verification</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.pending_verification}</div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
+                            <Link href="/privacy/breaches">
+                                <Button variant="outline" size="sm">Data Breaches</Button>
+                            </Link>
+                            {can.processRequests && (
+                                <Link href="/privacy/requests/create">
+                                    <Button size="sm">
+                                        <FileText className="mr-1.5 h-4 w-4" />
+                                        New Request
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    }
+                />
 
                 <Card>
                     <CardHeader>
