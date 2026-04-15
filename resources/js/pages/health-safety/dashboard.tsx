@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -418,36 +419,36 @@ export default function HealthSafetyDashboard({
         <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Dashboard', href: '/health-safety/dashboard' }]}>
             <Head title="Health & Safety Dashboard" />
 
-            <div className="mx-auto max-w-[1600px] space-y-8 p-1">
+            <div className="flex flex-col gap-6 p-6">
 
-                {/* ------------------------------------------------ */}
-                {/*  Page Header                                     */}
-                {/* ------------------------------------------------ */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
-                            <Shield className="h-5 w-5" />
+                {/* Hero Header */}
+                <FleetHero
+                    title="Health & Safety Dashboard"
+                    description="Real-time overview of workplace safety performance"
+                    icon={<Shield className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Incidents (30d)', value: kpis.incidents_30d ?? 0 },
+                        { label: 'Open Hazards', value: kpis.open_hazards ?? 0 },
+                        { label: 'Overdue Actions', value: kpis.overdue_actions ?? 0 },
+                        { label: 'Drill Compliance', value: `${kpis.drill_compliance_pct ?? 0}%` },
+                    ]}
+                    actions={
+                        <div className="flex flex-wrap gap-2">
+                            <Link href="/incidents/create">
+                                <Button size="sm" variant="destructive" className="gap-1.5">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    Report Incident
+                                </Button>
+                            </Link>
+                            <Link href="/compliance/hazards">
+                                <Button size="sm" variant="outline" className="gap-1.5">
+                                    <Flame className="h-4 w-4" />
+                                    Report Hazard
+                                </Button>
+                            </Link>
                         </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Health & Safety Dashboard</h1>
-                            <p className="text-sm text-muted-foreground">Real-time overview of workplace safety performance</p>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Link href="/incidents/create">
-                            <Button size="sm" variant="destructive" className="gap-1.5">
-                                <AlertTriangle className="h-4 w-4" />
-                                Report Incident
-                            </Button>
-                        </Link>
-                        <Link href="/compliance/hazards">
-                            <Button size="sm" variant="outline" className="gap-1.5">
-                                <Flame className="h-4 w-4" />
-                                Report Hazard
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
+                    }
+                />
 
                 {/* ------------------------------------------------ */}
                 {/*  KPI Grid                                        */}
