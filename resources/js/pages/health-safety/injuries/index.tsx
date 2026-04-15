@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -92,66 +93,24 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
         >
             <Head title="Injuries & Return to Work" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Injuries & Return to Work</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Track workplace injuries, RTW plans, and capacity assessments
-                        </div>
-                    </div>
-                    <Link href="/health-safety/injuries/create">
-                        <Button size="sm">Record Injury</Button>
-                    </Link>
-                </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-amber-50 p-2">
-                                <HeartPulse className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.active_injuries}</div>
-                                <div className="text-xs text-slate-500">Active Injuries</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-blue-50 p-2">
-                                <ClipboardList className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.active_rtw_plans}</div>
-                                <div className="text-xs text-slate-500">Active RTW Plans</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-red-50 p-2">
-                                <CalendarX className="h-5 w-5 text-red-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.lost_days_30d}</div>
-                                <div className="text-xs text-slate-500">Lost Days (30d)</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-purple-50 p-2">
-                                <Clock className="h-5 w-5 text-purple-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.pending_assessments}</div>
-                                <div className="text-xs text-slate-500">Pending Assessments</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Injuries & Return to Work"
+                    description="Track workplace injuries, RTW plans, and capacity assessments"
+                    icon={<HeartPulse className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Active Injuries', value: stats.active_injuries },
+                        { label: 'RTW Plans', value: stats.active_rtw_plans },
+                        { label: 'Lost Days (30d)', value: stats.lost_days_30d },
+                        { label: 'Pending', value: stats.pending_assessments },
+                    ]}
+                    actions={
+                        <Link href="/health-safety/injuries/create">
+                            <Button size="sm">Record Injury</Button>
+                        </Link>
+                    }
+                />
 
                 {/* Filters */}
                 <Card>
