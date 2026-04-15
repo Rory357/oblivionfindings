@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -65,72 +66,34 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
         ]}>
             <Head title="Data Breaches" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Data Breach Management</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            GDPR Article 33 - 72 hour ICO notification requirement
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/privacy/dashboard" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Privacy Dashboard
-                        </Link>
-                        {can.reportBreaches && (
-                            <Link href="/privacy/breaches/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Report Breach
-                                </Button>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Data Breach Management"
+                    description="GDPR Article 33 — 72 hour ICO notification requirement"
+                    icon={<Shield className="h-7 w-7 text-white" />}
+                    stats={stats ? [
+                        { label: 'Total', value: stats.total },
+                        { label: 'Open', value: stats.open },
+                        { label: 'ICO Required', value: stats.requiring_notification },
+                        { label: 'Resolved (30d)', value: stats.resolved_30_days },
+                    ] : undefined}
+                    actions={
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link href="/privacy/dashboard">
+                                <Button variant="outline" size="sm">Privacy Dashboard</Button>
                             </Link>
-                        )}
-                    </div>
-                </div>
-
-                {stats && (
-                    <div className="grid gap-4 sm:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Total Breaches</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.total}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Open</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-orange-500" />
-                                    <div className="text-2xl font-bold text-orange-600">{stats.open}</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Requiring ICO Notification</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5 text-red-500" />
-                                    <div className="text-2xl font-bold text-red-600">{stats.requiring_notification}</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Resolved (30d)</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.resolved_30_days}</div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
+                            {can.reportBreaches && (
+                                <Link href="/privacy/breaches/create">
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Report Breach
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    }
+                />
 
                 <Card>
                     <CardHeader>
