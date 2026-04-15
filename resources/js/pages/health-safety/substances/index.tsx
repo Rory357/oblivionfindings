@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,66 +89,24 @@ export default function SubstancesIndex({ filters, stats, substances }: Props) {
         >
             <Head title="Chemical Register" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Chemical Register</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Manage hazardous substances, SDS documents, and storage locations
-                        </div>
-                    </div>
-                    <Link href="/health-safety/substances/create">
-                        <Button size="sm">Add Substance</Button>
-                    </Link>
-                </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-blue-50 p-2">
-                                <FlaskConical className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.total_substances}</div>
-                                <div className="text-xs text-slate-500">Total Substances</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-red-50 p-2">
-                                <ShieldAlert className="h-5 w-5 text-red-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.controlled_substances}</div>
-                                <div className="text-xs text-slate-500">Controlled Substances</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-green-50 p-2">
-                                <FileText className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.active_sds}</div>
-                                <div className="text-xs text-slate-500">Active SDS</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-amber-50 p-2">
-                                <Warehouse className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.storage_locations}</div>
-                                <div className="text-xs text-slate-500">Storage Locations</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Chemical Register"
+                    description="Manage hazardous substances, SDS documents, and storage locations"
+                    icon={<FlaskConical className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total', value: stats.total_substances },
+                        { label: 'Controlled', value: stats.controlled_substances },
+                        { label: 'Active SDS', value: stats.active_sds },
+                        { label: 'Locations', value: stats.storage_locations },
+                    ]}
+                    actions={
+                        <Link href="/health-safety/substances/create">
+                            <Button size="sm">Add Substance</Button>
+                        </Link>
+                    }
+                />
 
                 {/* Filters */}
                 <Card>
