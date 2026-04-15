@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,12 +75,18 @@ export default function HealthSafetyAnalytics({
         <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Analytics', href: '/health-safety/analytics' }]}>
             <Head title="H&S Analytics" />
 
-            <div className="space-y-6">
-                {/* Page Title */}
-                <div className="flex items-center gap-2">
-                    <BarChart3 className="h-6 w-6 text-blue-600" />
-                    <h1 className="text-xl font-semibold">Health & Safety Analytics</h1>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Health & Safety Analytics"
+                    description="Incident trends, root cause analysis, and site comparisons"
+                    icon={<BarChart3 className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total Incidents', value: totalIncidents },
+                        { label: 'Near Misses', value: nearMissCount },
+                        { label: 'Ratio', value: ratio },
+                    ]}
+                />
 
                 {/* Date Range Filter */}
                 <Card>
