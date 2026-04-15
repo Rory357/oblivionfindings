@@ -1,4 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
+import { ShieldAlert } from 'lucide-react';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,15 +99,15 @@ export default function EmergencyAccessPage({ query, results, activeAccesses }: 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Emergency Access" />
 
-            <div className="space-y-4">
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="Emergency Access"
+                    description="Urgent medication access for clients you are not assigned to. A reason is required and access is time-limited."
+                    icon={<ShieldAlert className="h-7 w-7 text-white" />}
+                />
+
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Emergency Access</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="text-sm text-slate-600">
-                            Use this only when you need urgent medication access for a client you are not assigned to. A reason is required and access is time-limited.
-                        </div>
+                    <CardContent className="space-y-3 pt-6">
 
                         <div className="flex gap-2">
                             <Input
