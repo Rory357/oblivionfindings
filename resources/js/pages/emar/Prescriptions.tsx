@@ -1,5 +1,4 @@
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -436,8 +435,14 @@ export default function Prescriptions({ orders, pendingCountersigns, covertAutho
     return (
         <AppLayout>
             <Head title="eMAR - Prescriptions" />
-            <PageHeader title="Prescriptions & Orders" description="Prescriber orders, verbal/telephone orders, countersignatures, and covert administration authorisations." backHref="/emar" />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="Prescriptions & Orders"
+                    description="Prescriber orders, verbal/telephone orders, countersignatures, and covert administration authorisations"
+                    icon={<FileText className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                />
                 {/* Alerts */}
                 {pendingCountersigns > 0 && (
                     <Card className="mb-6 border-amber-200 dark:border-amber-800">
@@ -588,7 +593,7 @@ export default function Prescriptions({ orders, pendingCountersigns, covertAutho
                         </Card>
                     </TabsContent>
                 </Tabs>
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
