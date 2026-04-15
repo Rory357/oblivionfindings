@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Head, Link } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ import {
     AreaChart,
     Area,
 } from 'recharts';
-import { AlertTriangle, Bell, TrendingUp, ArrowRight } from 'lucide-react';
+import { AlertTriangle, Bell, TrendingUp, ArrowRight, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface ControlRoomAlert {
@@ -121,29 +122,32 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Compliance', href: '/compliance' }]}>
             <Head title="Compliance" />
 
-            <div className="space-y-6">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                        <div className="text-xl font-semibold">
-                            Compliance Dashboard
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Compliance Dashboard"
+                    description="Exceptions, registers due, and audit evidence at a glance"
+                    icon={<Shield className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Incidents', value: kpis.openIncidents },
+                        { label: 'Discrepancies', value: kpis.openCdDiscrepancies },
+                        { label: 'MAR Exceptions', value: kpis.marExceptionsToday },
+                        { label: 'Audit Events', value: kpis.auditEventsLast30d },
+                    ]}
+                    actions={
+                        <div className="flex gap-2 flex-wrap">
+                            <Button asChild variant="outline">
+                                <Link href="/reports">Reports</Link>
+                            </Button>
+                            <Button asChild variant="outline">
+                                <Link href="/audit-logs">Audit Logs</Link>
+                            </Button>
+                            <Button asChild>
+                                <Link href="/incidents">Incidents</Link>
+                            </Button>
                         </div>
-                        <div className="text-sm text-slate-600">
-                            Exceptions, registers due, and audit evidence at a glance.
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2 flex-wrap">
-                        <Button asChild variant="outline">
-                            <Link href="/reports">Reports</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                            <Link href="/audit-logs">Audit Logs</Link>
-                        </Button>
-                        <Button asChild>
-                            <Link href="/incidents">Incidents</Link>
-                        </Button>
-                    </div>
-                </div>
+                    }
+                />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                     <KpiCard
