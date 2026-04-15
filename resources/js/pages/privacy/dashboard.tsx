@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Head, Link } from '@inertiajs/react';
 import { Shield, AlertTriangle, Clock, FileText, Lock, Scale, Activity } from 'lucide-react';
@@ -57,15 +58,19 @@ export default function PrivacyDashboard({
         <AppLayout breadcrumbs={[{ title: 'Privacy & GDPR', href: '/privacy/dashboard' }]}>
             <Head title="Privacy & GDPR Dashboard" />
 
-            <div className="space-y-6">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Privacy & GDPR Dashboard</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Data protection compliance overview and management
-                        </div>
-                    </div>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Privacy & GDPR Dashboard"
+                    description="Data protection compliance overview and management"
+                    icon={<Shield className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Pending DSRs', value: dsrStats.pending },
+                        { label: 'Open Breaches', value: breachStats.open },
+                        { label: 'Active Holds', value: activeHolds },
+                        { label: 'Pending DPIAs', value: dpiaStats.pending_review },
+                    ]}
+                />
 
                 {/* Quick Links */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
