@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -122,33 +123,28 @@ export default function SafeguardingIndex({ filters, concerns, stats }: Props) {
             <Head title="Safeguarding Concerns" />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Safeguarding Concerns</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage safeguarding concerns, investigations, and external referrals
-                        </p>
-                    </div>
-                    {can.create && (
-                        <Link href="/safeguarding/create">
-                            <Button size="sm">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Concern
-                            </Button>
-                        </Link>
-                    )}
-                </div>
-
-                {/* Stats */}
-                {stats && (
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                        <StatCard label="Open Concerns" value={stats.open} icon={Shield} color="blue" />
-                        <StatCard label="Critical" value={stats.critical} icon={AlertCircle} color="red" />
-                        <StatCard label="Requiring Referral" value={stats.requiring_referral} icon={ExternalLink} color="amber" />
-                        <StatCard label="Assigned to Me" value={stats.assigned_to_me} icon={UserCheck} color="emerald" />
-                    </div>
-                )}
+                {/* Hero Header */}
+                <FleetHero
+                    title="Safeguarding Concerns"
+                    description="Manage safeguarding concerns, investigations, and external referrals"
+                    icon={<Shield className="h-7 w-7 text-white" />}
+                    stats={stats ? [
+                        { label: 'Open', value: stats.open },
+                        { label: 'Critical', value: stats.critical },
+                        { label: 'Referral', value: stats.requiring_referral },
+                        { label: 'Assigned to Me', value: stats.assigned_to_me },
+                    ] : undefined}
+                    actions={
+                        can.create ? (
+                            <Link href="/safeguarding/create">
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Concern
+                                </Button>
+                            </Link>
+                        ) : undefined
+                    }
+                />
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">

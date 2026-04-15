@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Head, Link, usePage, router } from '@inertiajs/react';
 import { Building2, Home, MapPin, Warehouse, AlertTriangle, AlertCircle, CheckCircle2, Plus, Search, X, Eye, Pencil, Calendar, ShieldAlert, ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -175,31 +176,28 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
             <Head title={sitePlural} />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{sitePlural}</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage locations and facilities &mdash; {sites.length} {sites.length === 1 ? siteSingular.toLowerCase() : sitePlural.toLowerCase()} total
-                        </p>
-                    </div>
-                    {can?.sites?.create && (
-                        <Button size="sm" asChild>
-                            <Link href="/sites/create">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Add {siteSingular}
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <StatCard label={`Total ${sitePlural}`} value={sites.length} icon={Building2} color="blue" />
-                    <StatCard label="Active" value={activeSites} icon={CheckCircle2} color="emerald" />
-                    <StatCard label="High Risk" value={highRiskSites} icon={AlertTriangle} color="red" />
-                    <StatCard label="Inactive" value={sites.length - activeSites} icon={Building2} color="amber" />
-                </div>
+                {/* Hero Header */}
+                <FleetHero
+                    title={sitePlural}
+                    description={`Manage locations and facilities — ${sites.length} ${sites.length === 1 ? siteSingular.toLowerCase() : sitePlural.toLowerCase()} total`}
+                    icon={<Building2 className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total', value: sites.length },
+                        { label: 'Active', value: activeSites },
+                        { label: 'High Risk', value: highRiskSites },
+                        { label: 'Inactive', value: sites.length - activeSites },
+                    ]}
+                    actions={
+                        can?.sites?.create ? (
+                            <Button size="sm" asChild>
+                                <Link href="/sites/create">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add {siteSingular}
+                                </Link>
+                            </Button>
+                        ) : undefined
+                    }
+                />
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">

@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ShieldAlert,
@@ -57,31 +58,18 @@ export default function ReportsIndex() {
             <Head title="Reports" />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Overview of key metrics and exportable reports across all modules
-                    </p>
-                </div>
-
-                {/* KPI Cards */}
-                {kpis && (
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                        <StatCard label="Open Incidents" value={kpis.openIncidents} subtitle="Submitted / reviewed" icon={ShieldAlert} color="red" />
-                        <StatCard label="Medication Exceptions" value={kpis.missedMeds7d} subtitle="Last 7 days" icon={Pill} color="amber" />
-                        <StatCard label="Completed Shifts" value={kpis.completedShifts7d} subtitle="Last 7 days" icon={CalendarCheck} color="emerald" />
-                        <StatCard label="Open Safeguarding" value={kpis.openSafeguarding} subtitle="Not closed" icon={Shield} color="purple" />
-                    </div>
-                )}
-
-                {kpis && (
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-                        <StatCard label="Open Discrepancies" value={kpis.openDiscrepancies} subtitle="Controlled drugs" icon={AlertCircle} color="slate" />
-                        <StatCard label="Overdue Asset Checks" value={kpis.overdueAssetChecks} subtitle="Inspection + maintenance" icon={ClipboardCheck} color="amber" />
-                        <StatCard label="Audit Events" value={kpis.auditEvents7d} subtitle="Last 7 days" icon={FileText} color="blue" />
-                    </div>
-                )}
+                {/* Hero Header */}
+                <FleetHero
+                    title="Reports"
+                    description="Overview of key metrics and exportable reports across all modules"
+                    icon={<BarChart3 className="h-7 w-7 text-white" />}
+                    stats={kpis ? [
+                        { label: 'Incidents', value: kpis.openIncidents },
+                        { label: 'Med Exceptions', value: kpis.missedMeds7d },
+                        { label: 'Shifts (7d)', value: kpis.completedShifts7d },
+                        { label: 'Safeguarding', value: kpis.openSafeguarding },
+                    ] : undefined}
+                />
 
                 {/* Combined Reports */}
                 <Card>

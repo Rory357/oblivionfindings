@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useInitials } from '@/hooks/use-initials';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -85,30 +86,27 @@ export default function StaffIndex({ users, filters }: Props) {
             <Head title="Staff" />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Staff</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage staff profiles, assignments, availability and access
-                        </p>
-                    </div>
-                    {can?.staff?.create && (
-                        <Link href="/system/users/create?type=staff">
-                            <Button size="sm">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Add staff
-                            </Button>
-                        </Link>
-                    )}
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-                    <StatCard label="Total Staff" value={data.length} icon={Users} color="blue" />
-                    <StatCard label="Active" value={activeCount} icon={UserCheck} color="emerald" />
-                    <StatCard label="With Assignments" value={withClients} icon={Briefcase} color="amber" />
-                </div>
+                {/* Hero Header */}
+                <FleetHero
+                    title="Staff"
+                    description="Manage staff profiles, assignments, availability and access"
+                    icon={<Users className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total', value: data.length },
+                        { label: 'Active', value: activeCount },
+                        { label: 'With Assignments', value: withClients },
+                    ]}
+                    actions={
+                        can?.staff?.create ? (
+                            <Link href="/system/users/create?type=staff">
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add staff
+                                </Button>
+                            </Link>
+                        ) : undefined
+                    }
+                />
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">

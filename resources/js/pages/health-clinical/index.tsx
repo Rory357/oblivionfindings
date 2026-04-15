@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
@@ -135,25 +136,26 @@ export default function HealthClinicalDashboard({
             <Head title="Health & Clinical" />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">
-                        Health &amp; Clinical
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Clinical observation compliance and event oversight.
-                    </p>
-                </div>
-
-                {/* Quick Nav */}
-                <div>
-                    <Link href="/health-clinical/observations">
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                            <ClipboardList className="h-4 w-4" />
-                            Observation Register
-                        </Button>
-                    </Link>
-                </div>
+                {/* Hero Header */}
+                <FleetHero
+                    title="Health & Clinical"
+                    description="Clinical observation compliance and event oversight"
+                    icon={<Heart className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Observations (7d)', value: kpis.observations_7d },
+                        { label: 'Compliance', value: `${kpis.compliance_rate_30d}%` },
+                        { label: 'Overdue', value: kpis.schedules_overdue },
+                        { label: 'Events (30d)', value: kpis.events_30d },
+                    ]}
+                    actions={
+                        <Link href="/health-clinical/observations">
+                            <Button size="sm" className="gap-1.5">
+                                <ClipboardList className="h-4 w-4" />
+                                Observation Register
+                            </Button>
+                        </Link>
+                    }
+                />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

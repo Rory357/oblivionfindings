@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -74,34 +75,29 @@ export default function RespiteIndex({ referrals, filters, stats }: Props) {
             <Head title={label} />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{label} Referrals</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Referrals start the intake. Booking requests are reviewed and approved before creating bookings.
-                        </p>
-                    </div>
-                    {can.create && (
-                        <Link href="/respite/referrals/create">
-                            <Button size="sm">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Referral
-                            </Button>
-                        </Link>
-                    )}
-                </div>
+                {/* Hero Header */}
+                <FleetHero
+                    title={`${label} Referrals`}
+                    description="Referrals start the intake. Booking requests are reviewed and approved before creating bookings."
+                    icon={<CalendarDays className="h-7 w-7 text-white" />}
+                    stats={stats ? [
+                        { label: 'Received', value: stats.received },
+                        { label: 'Triaged', value: stats.triaged },
+                        { label: 'Accepted', value: stats.accepted },
+                    ] : undefined}
+                    actions={
+                        can.create ? (
+                            <Link href="/respite/referrals/create">
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Referral
+                                </Button>
+                            </Link>
+                        ) : undefined
+                    }
+                />
 
                 <RespiteSubnav />
-
-                {/* Stats */}
-                {stats && (
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-                        <StatCard label="Received" value={stats.received} icon={Inbox} color="blue" />
-                        <StatCard label="Triaged" value={stats.triaged} icon={Clock} color="amber" />
-                        <StatCard label="Accepted" value={stats.accepted} icon={CheckCircle2} color="emerald" />
-                    </div>
-                )}
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">

@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -164,49 +165,38 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
             <Head title="Incidents" />
 
             <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            {filters.type === 'near_miss' ? 'Near Misses' : 'Incidents'}
-                            {filters.type && filters.type !== 'near_miss' && (
-                                <span className="ml-2 text-sm font-normal text-muted-foreground capitalize">({filters.type.replace(/_/g, ' ')})</span>
+                {/* Hero Header */}
+                <FleetHero
+                    title={filters.type === 'near_miss' ? 'Near Misses' : 'Incidents'}
+                    description={filters.type
+                        ? `Filtered by type: ${filters.type.replace(/_/g, ' ')}`
+                        : `Manage and review incidents — ${total} total`
+                    }
+                    icon={<ShieldAlert className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total', value: total },
+                        { label: 'Drafts', value: draftCount },
+                        { label: 'High Severity', value: highCount },
+                        { label: 'Awaiting Review', value: awaitingReview },
+                    ]}
+                    actions={
+                        <div className="flex items-center gap-2">
+                            {can.templatesManage && (
+                                <Link href="/incidents/templates">
+                                    <Button variant="outline" size="sm">Templates</Button>
+                                </Link>
                             )}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {filters.type
-                                ? <span>Filtered by type &middot; <button className="text-primary underline" onClick={() => onFilter({ type: null })}>Clear filter</button></span>
-                                : `Manage and review incidents — ${total} total`
-                            }
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        {can.templatesManage && (
-                            <Link href="/incidents/templates">
-                                <Button variant="outline" size="sm">
-                                    Templates
-                                </Button>
-                            </Link>
-                        )}
-                        {can.create && (
-                            <Link href="/incidents/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New incident
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <StatCard label="Total Incidents" value={total} icon={ShieldAlert} color="blue" />
-                    <StatCard label="Drafts on Page" value={draftCount} icon={FileWarning} color="amber" />
-                    <StatCard label="High Severity" value={highCount} icon={AlertCircle} color="red" />
-                    <StatCard label="Awaiting Review" value={awaitingReview} icon={Clock} color="emerald" />
-                </div>
+                            {can.create && (
+                                <Link href="/incidents/create">
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New incident
+                                    </Button>
+                                </Link>
+                            )}
+                        </div>
+                    }
+                />
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
