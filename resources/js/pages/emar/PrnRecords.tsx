@@ -1,5 +1,4 @@
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,8 +83,14 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
     return (
         <AppLayout>
             <Head title="eMAR - PRN Records" />
-            <PageHeader title="PRN Records" description="As-needed medication administration records and effectiveness tracking." backHref="/emar" />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="PRN Records"
+                    description="As-needed medication administration records and effectiveness tracking"
+                    icon={<ClipboardCheck className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                />
                 {/* Stats */}
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">
                     <Card>
@@ -281,7 +286,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                         </div>
                     </CardContent>
                 </Card>
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
