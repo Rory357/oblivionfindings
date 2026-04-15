@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -208,49 +209,31 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
         <AppLayout breadcrumbs={[{ title: 'Compliance', href: '#' }, { title: 'Hazards', href: '/compliance/hazards' }]}>
             <Head title="Homes and Sites Hazards" />
 
-            <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
-                            <ShieldAlert className="h-5 w-5 text-orange-600" />
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Homes and Sites Hazards"
+                    description="Cross-site hazard register and management"
+                    icon={<ShieldAlert className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total', value: filteredHazards.length },
+                        { label: 'Critical Open', value: criticalOpen.length },
+                        { label: 'Overdue', value: overdueHazards.length },
+                        { label: 'Closed', value: closedHazards.length },
+                    ]}
+                    actions={
+                        <div className="flex gap-2">
+                            <Button onClick={handleExportCSV} variant="outline" size="sm" className="gap-2">
+                                <Download className="h-4 w-4" />
+                                Export CSV
+                            </Button>
+                            <Button onClick={() => setLogHazardOpen(true)} size="sm" className="gap-2">
+                                <Plus className="h-4 w-4" />
+                                Log Hazard
+                            </Button>
                         </div>
-                        <div>
-                            <h1 className="text-lg font-semibold">Homes and Sites Hazards</h1>
-                            <div className="text-sm text-slate-500">Cross-site hazard register and management</div>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button onClick={handleExportCSV} variant="outline" size="sm" className="gap-2">
-                            <Download className="h-4 w-4" />
-                            Export CSV
-                        </Button>
-                        <Button onClick={() => setLogHazardOpen(true)} size="sm" className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            Log Hazard
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-lg border bg-white p-3">
-                        <div className="text-2xl font-bold">{filteredHazards.length}</div>
-                        <div className="text-xs text-slate-500">Total hazards</div>
-                    </div>
-                    <div className="rounded-lg border bg-white p-3">
-                        <div className={`text-2xl font-bold ${criticalOpen.length > 0 ? 'text-red-600' : 'text-slate-600'}`}>{criticalOpen.length}</div>
-                        <div className="text-xs text-slate-500">Critical / Extreme open</div>
-                    </div>
-                    <div className="rounded-lg border bg-white p-3">
-                        <div className={`text-2xl font-bold ${overdueHazards.length > 0 ? 'text-red-600' : 'text-slate-600'}`}>{overdueHazards.length}</div>
-                        <div className="text-xs text-slate-500">Overdue</div>
-                    </div>
-                    <div className="rounded-lg border bg-white p-3">
-                        <div className="text-2xl font-bold text-emerald-600">{closedHazards.length}</div>
-                        <div className="text-xs text-slate-500">Closed</div>
-                    </div>
-                </div>
+                    }
+                />
 
                 {/* Filters */}
                 <Card>
