@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -757,21 +758,14 @@ export default function WorkerParticipationIndex({
         >
             <Head title="Worker Participation" />
 
-            <div className="space-y-6">
-                {/* ---- Header ---- */}
-                <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100">
-                        <Users className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Worker Participation</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Under the Health and Safety at Work Act 2015, PCBUs must engage with workers and their
-                            representatives on health and safety matters. Manage your H&S reps, committee meetings,
-                            and worker consultations here.
-                        </p>
-                    </div>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Worker Participation"
+                    description="Manage H&S representatives, committee meetings, and worker consultations under HSWA 2015"
+                    icon={<Users className="h-7 w-7 text-white" />}
+                    stats={statCards.map((s) => ({ label: s.label, value: s.value }))}
+                />
 
                 {/* ---- Stats Row ---- */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
