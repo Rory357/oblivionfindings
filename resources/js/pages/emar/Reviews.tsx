@@ -1,5 +1,4 @@
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -295,8 +294,14 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
     return (
         <AppLayout>
             <Head title="eMAR - Medication Reviews" />
-            <PageHeader title="Medication Reviews" description="Schedule and track medication reviews — routine, triggered, and comprehensive." backHref="/emar" />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="Medication Reviews"
+                    description="Schedule and track medication reviews — routine, triggered, and comprehensive"
+                    icon={<Calendar className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                />
                 {/* Stats */}
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">
                     <Card>
@@ -421,7 +426,7 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
                         </table>
                     </CardContent>
                 </Card>
-            </PageShell>
+            </div>
 
             {editingReview && (
                 <EditReviewDialog
