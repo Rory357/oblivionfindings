@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -160,51 +161,18 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
         <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Restraints', href: '/health-safety/restraints' }]}>
             <Head title="Restraints & Behaviour Support" />
 
-            <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <ShieldAlert className="h-5 w-5 text-orange-500" />
-                            <h1 className="text-lg font-semibold">Restraints & Behaviour Support</h1>
-                        </div>
-                        <div className="mt-1 text-sm text-slate-500">Record restraint events and manage behaviour support plans</div>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Events (30d)</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.events_30d}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Active Plans</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <ClipboardList className="h-5 w-5 text-blue-500" />
-                                <div className="text-2xl font-bold">{stats.active_plans}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Reviews Due</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <AlertCircle className="h-5 w-5 text-amber-500" />
-                                <div className="text-2xl font-bold">{stats.reviews_due}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Restraints & Behaviour Support"
+                    description="Record restraint events and manage behaviour support plans"
+                    icon={<ShieldAlert className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Events (30d)', value: stats.events_30d },
+                        { label: 'Active Plans', value: stats.active_plans },
+                        { label: 'Reviews Due', value: stats.reviews_due },
+                    ]}
+                />
 
                 {/* Tabs */}
                 <Tabs defaultValue="events">
