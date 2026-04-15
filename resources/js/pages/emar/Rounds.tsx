@@ -1,5 +1,4 @@
-import PageHeader from '@/components/page-header';
-import PageShell from '@/components/page-shell';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -211,8 +210,14 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
     return (
         <AppLayout>
             <Head title="eMAR - Medication Rounds" />
-            <PageHeader title="Medication Rounds" description="Manage daily medication administration rounds, assignments, and completion tracking." backHref="/emar" />
-            <PageShell>
+            <div className="flex flex-col gap-6 p-6">
+                <FleetHero
+                    title="Medication Rounds"
+                    description="Manage daily medication administration rounds, assignments, and completion tracking"
+                    icon={<Clock className="h-7 w-7 text-white" />}
+                    backHref="/emar"
+                    backLabel="Back"
+                />
                 {/* Date Navigation & Actions */}
                 <div className="mb-6 flex flex-wrap items-center gap-3">
                     <Button variant="outline" size="icon" onClick={() => navigateDate(-1)}><ChevronLeft className="h-4 w-4" /></Button>
@@ -444,7 +449,7 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
                         </table>
                     </CardContent>
                 </Card>
-            </PageShell>
+            </div>
 
             {editingTemplate && (
                 <EditTemplateDialog
