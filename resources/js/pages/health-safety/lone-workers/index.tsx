@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -248,68 +249,25 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
         >
             <Head title="Lone Worker Safety" />
 
-            <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Lone Worker Safety</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Monitor active lone worker sessions, check-ins, and emergency alerts
-                        </div>
-                    </div>
-                    <Button size="sm" onClick={() => setStartOpen(true)}>
-                        <Radio className="mr-1.5 h-4 w-4" />
-                        Start Session
-                    </Button>
-                </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-blue-50 p-2">
-                                <UserCheck className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.active_sessions}</div>
-                                <div className="text-xs text-slate-500">Active Sessions</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-amber-50 p-2">
-                                <Clock className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-amber-700">{stats.overdue_check_ins}</div>
-                                <div className="text-xs text-slate-500">Overdue Check-ins</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-orange-50 p-2">
-                                <AlertTriangle className="h-5 w-5 text-orange-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-orange-700">{stats.alerts_today}</div>
-                                <div className="text-xs text-slate-500">Alerts Today</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-red-50 p-2">
-                                <Siren className="h-5 w-5 text-red-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-red-700">{stats.emergency_alerts}</div>
-                                <div className="text-xs text-slate-500">Emergency Alerts</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="Lone Worker Safety"
+                    description="Monitor active lone worker sessions, check-ins, and emergency alerts"
+                    icon={<Radio className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Active Sessions', value: stats.active_sessions },
+                        { label: 'Overdue Check-ins', value: stats.overdue_check_ins },
+                        { label: 'Alerts Today', value: stats.alerts_today },
+                        { label: 'Emergency', value: stats.emergency_alerts },
+                    ]}
+                    actions={
+                        <Button size="sm" onClick={() => setStartOpen(true)}>
+                            <Radio className="mr-1.5 h-4 w-4" />
+                            Start Session
+                        </Button>
+                    }
+                />
 
                 {/* Active Sessions Table */}
                 <Card>
