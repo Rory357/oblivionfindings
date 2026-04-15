@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -292,64 +293,19 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
         >
             <Head title="PPE Management" />
 
-            <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">PPE Management</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Manage personal protective equipment inventory, allocations, and inspections
-                        </div>
-                    </div>
-                </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-blue-50 p-2">
-                                <Package className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.total_items}</div>
-                                <div className="text-xs text-slate-500">Total Items</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-green-50 p-2">
-                                <HardHat className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold">{stats.allocated}</div>
-                                <div className="text-xs text-slate-500">Allocated</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-amber-50 p-2">
-                                <ClipboardCheck className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-amber-700">{stats.inspections_due}</div>
-                                <div className="text-xs text-slate-500">Inspections Due</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-red-50 p-2">
-                                <Ban className="h-5 w-5 text-red-600" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-red-700">{stats.condemned}</div>
-                                <div className="text-xs text-slate-500">Condemned</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="flex flex-col gap-6 p-6">
+                {/* Hero Header */}
+                <FleetHero
+                    title="PPE Management"
+                    description="Manage personal protective equipment inventory, allocations, and inspections"
+                    icon={<Package className="h-7 w-7 text-white" />}
+                    stats={[
+                        { label: 'Total Items', value: stats.total_items },
+                        { label: 'Allocated', value: stats.allocated },
+                        { label: 'Inspections Due', value: stats.inspections_due },
+                        { label: 'Condemned', value: stats.condemned },
+                    ]}
+                />
 
                 {/* Tabs */}
                 <Tabs defaultValue="inventory">
