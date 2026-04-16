@@ -212,3 +212,28 @@
 .group\/item:hover .icon-gradient-bg svg {
     color: white;
 }
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Frontline / staff shell support
+ *
+ * Provides iOS safe-area handling for the persistent mobile bottom nav and
+ * a helper class for any custom frontline surface that needs to clear it.
+ * ────────────────────────────────────────────────────────────────────────── */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .safe-area-pb {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+.staff-shell-content {
+    /* Height of StaffBottomNav (~56px) + inset padding (~8px) + safe-area */
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 1024px) {
+    .staff-shell-content {
+        padding-bottom: 1.5rem;
+    }
+}
+
