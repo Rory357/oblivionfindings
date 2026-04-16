@@ -23,12 +23,13 @@ test('my calendar page loads', function () {
     });
 });
 
-test('my tasks page loads', function () {
+test('my day page loads (legacy /my-tasks still redirects)', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/my-tasks')
-            ->waitForText('Task', 10)
-            ->assertSee('Task');
+            ->visit('/my-tasks') // legacy alias → redirects to /my-day
+            ->waitForText('Open items', 10)
+            ->assertPathIs('/my-day')
+            ->assertSee('Shifts today');
     });
 });

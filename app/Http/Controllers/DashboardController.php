@@ -42,6 +42,17 @@ class DashboardController extends Controller
             return redirect()->route('portal.index');
         }
 
+        // Frontline/staff users → `/my-day` is the single canonical home.
+        // Managers (`shifts.manageAny` / `timesheets.manageAny`) and HR admins
+        // (`hr.analytics.view`) keep the existing dashboard. This mirrors the
+        // `$mode` resolution further down so the redirect never fires for a
+        // non-staff user — no redirect loops possible.
+        $isManager = $user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny');
+        $isHrAdmin = $user->canDo('hr.analytics.view') && ! $user->canDo('shifts.manageAny');
+        if (! $isManager && ! $isHrAdmin) {
+            return redirect()->route('my-day');
+        }
+
         $today = now()->startOfDay();
         $tomorrow = (clone $today)->addDay();
         $weekEnd = (clone $today)->addDays(config('dashboard.short_range_days', 7));

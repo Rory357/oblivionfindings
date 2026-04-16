@@ -48,17 +48,20 @@ type StaffBottomNavProps = {
 };
 
 const DEFAULT_ITEMS: ReadonlyArray<Omit<StaffBottomNavItem, 'onClick'>> = [
-    { key: 'home', label: 'Home', icon: Home, href: '/my-tasks' },
+    // PR 3 — Home points at the canonical frontline route `/my-day`.
+    { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
     { key: 'meds', label: 'Meds', icon: Pill, href: '/emar' },
-    { key: 'clock', label: 'Clock', icon: Clock, href: '/my-tasks#clock' },
+    // Clock slot keeps its deep-link hash on the home page. Future PRs wire the
+    // actual clock workflow; this PR only canonicalises the URL.
+    { key: 'clock', label: 'Clock', icon: Clock, href: '/my-day#clock' },
     { key: 'report', label: 'Report', icon: ClipboardList, href: '/incidents' },
     { key: 'more', label: 'More', icon: Menu, href: '/' },
 ];
 
 function isHrefActive(currentUrl: string, href: string): boolean {
     if (!href || href === '/') return currentUrl === '/';
-    // Strip hash for comparison — a bottom nav target like /my-tasks#clock
-    // should still be treated as active on /my-tasks.
+    // Strip hash for comparison — a bottom nav target like /my-day#clock
+    // should still be treated as active on /my-day.
     const [pathname] = href.split('#');
     if (!pathname) return false;
     if (currentUrl === pathname) return true;

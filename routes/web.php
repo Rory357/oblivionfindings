@@ -95,16 +95,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/quality/checklist', QualityChecklistController::class)->name('quality.checklist');
 });
 
-Route::get('/my-tasks', \App\Http\Controllers\MyTasksController::class)
+// Canonical frontline home.
+// `/my-day` is the single staff/frontline entry point. Legacy `/my-tasks`
+// links (including existing POST action endpoints) keep working via the
+// redirect below and the unchanged action routes.
+Route::get('/my-day', \App\Http\Controllers\MyTasksController::class)
+    ->middleware(['auth'])
+    ->name('my-day');
+
+// Legacy alias — any inbound `/my-tasks` link (email, bookmarks) lands on
+// the canonical home. Kept as a simple redirect to avoid a second home surface.
+Route::redirect('/my-tasks', '/my-day')
     ->middleware(['auth'])
     ->name('my-tasks');
 
-// My Day quick actions
+// My Day quick actions — URL paths intentionally unchanged to avoid churning
+// every POST call-site; names are aliased under `my-day.*` for future use.
 Route::middleware(['auth'])->group(function () {
-    Route::post('/my-tasks/clock-in/{shift}', [\App\Http\Controllers\MyDayActionsController::class, 'clockIn'])->name('my-tasks.clock-in');
-    Route::post('/my-tasks/clock-out/{shift}', [\App\Http\Controllers\MyDayActionsController::class, 'clockOut'])->name('my-tasks.clock-out');
-    Route::post('/my-tasks/shift-task/{task}/complete', [\App\Http\Controllers\MyDayActionsController::class, 'completeShiftTask'])->name('my-tasks.shift-task.complete');
-    Route::post('/my-tasks/timesheet/{timesheet}/submit', [\App\Http\Controllers\MyDayActionsController::class, 'submitTimesheet'])->name('my-tasks.timesheet.submit');
+    Route::post('/my-tasks/clock-in/{shift}', [\App\Http\Controllers\MyDayActionsController::class, 'clockIn'])->name('my-day.clock-in');
+    Route::post('/my-tasks/clock-out/{shift}', [\App\Http\Controllers\MyDayActionsController::class, 'clockOut'])->name('my-day.clock-out');
+    Route::post('/my-tasks/shift-task/{task}/complete', [\App\Http\Controllers\MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
+    Route::post('/my-tasks/timesheet/{timesheet}/submit', [\App\Http\Controllers\MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');
 });
 
 Route::get('/my-calendar', [\App\Http\Controllers\MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');

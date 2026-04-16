@@ -76,7 +76,7 @@ class MyTasksController extends Controller
         // 10. Manager data
         $managerData = $isManager ? $this->getManagerData($user, $today, $tomorrowEnd) : null;
 
-        return Inertia::render('my-tasks', [
+        return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
             'shifts' => $shifts->values()->all(),
             'medications_due' => $medicationsDue,
