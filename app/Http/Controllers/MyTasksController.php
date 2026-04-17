@@ -11,9 +11,11 @@ use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
 use App\Models\MedicationRound;
 use App\Models\Shift;
+use App\Models\ShiftHandover;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\GuidedRoundService;
+use App\Services\ShiftHandoverService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -151,6 +153,11 @@ class MyTasksController extends Controller
                 : null,
         ];
 
+        $activeShiftCard = $activeShift ? $shiftToCard($activeShift) : null;
+        if ($activeShiftCard && $activeShift) {
+            $activeShiftCard['incoming_handover'] = $this->findIncomingHandover($user, $activeShift);
+        }
+
         return [
             'can_clock' => $canClock,
             'open_session' => $openSession ? [
@@ -163,11 +170,91 @@ class MyTasksController extends Controller
                 'shift_starts_at' => optional($openSession->shift?->starts_at)->toIso8601String(),
                 'shift_ends_at' => optional($openSession->shift?->ends_at)->toIso8601String(),
                 'location' => $openSession->shift?->location ?? $openSession->location,
+                'handover_submitted' => $openSession->shift_id
+                    ? $this->hasSubmittedHandoverForShift((int) $openSession->shift_id)
+                    : false,
             ] : null,
-            'active_shift' => $activeShift ? $shiftToCard($activeShift) : null,
+            'active_shift' => $activeShiftCard,
             'eligible_shifts' => $eligibleShifts->map($shiftToCard)->values()->all(),
             'eligible_shift_count' => $eligibleShifts->count(),
         ];
+    }
+
+    /**
+     * Find the most recent submitted handover that the arriving worker should
+     * read before starting this shift. Looks for a submitted handover either
+     * explicitly targeted at this incoming shift, or — if nothing matches
+     * directly — the most recent submitted handover for the same client from
+     * the last 24 hours. Never returns acknowledged handovers (they've been
+     * read) so this prompt only appears once.
+     */
+    private function findIncomingHandover(User $user, Shift $activeShift): ?array
+    {
+        try {
+            $handover = ShiftHandover::query()
+                ->where('status', ShiftHandoverService::STATUS_SUBMITTED)
+                ->where(function ($q) use ($activeShift, $user) {
+                    $q->where('incoming_shift_id', $activeShift->id)
+                        ->orWhere(function ($nested) use ($activeShift, $user) {
+                            $nested->whereNull('incoming_shift_id')
+                                ->where(function ($inner) use ($activeShift, $user) {
+                                    $inner->where('incoming_staff_id', $user->id)
+                                        ->orWhereNull('incoming_staff_id');
+                                })
+                                ->when($activeShift->client_id, fn ($c) => $c->where('client_id', $activeShift->client_id))
+                                ->where('created_at', '>=', now()->subHours(24));
+                        });
+                })
+                ->with([
+                    'outgoingStaff:id,name',
+                    'client:id,first_name,last_name',
+                    'outgoingShift:id,ends_at',
+                ])
+                ->latest('submitted_at')
+                ->latest('id')
+                ->first();
+
+            if (! $handover) {
+                return null;
+            }
+
+            return [
+                'id' => $handover->id,
+                'handover_notes' => $handover->handover_notes,
+                'client_mood' => $handover->client_mood,
+                'medications_due' => $handover->medications_due ?? [],
+                'incidents_to_note' => $handover->incidents_to_note ?? [],
+                'follow_up_items' => $handover->follow_up_items ?? [],
+                'submitted_at' => optional($handover->submitted_at)->toIso8601String(),
+                'outgoing_staff_name' => $handover->outgoingStaff?->name,
+                'outgoing_shift_ends_at' => optional($handover->outgoingShift?->ends_at)->toIso8601String(),
+                'client_name' => $handover->client
+                    ? trim($handover->client->first_name . ' ' . $handover->client->last_name)
+                    : null,
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Whether the worker has already submitted a handover for the shift tied
+     * to their open attendance session. Used to suppress the clock-out write
+     * prompt once a handover has been captured.
+     */
+    private function hasSubmittedHandoverForShift(int $shiftId): bool
+    {
+        try {
+            return ShiftHandover::query()
+                ->where('outgoing_shift_id', $shiftId)
+                ->whereIn('status', [
+                    ShiftHandoverService::STATUS_SUBMITTED,
+                    ShiftHandoverService::STATUS_ACKNOWLEDGED,
+                ])
+                ->exists();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function getShifts(int $userId, Carbon $today, Carbon $tomorrowEnd, Carbon $now): \Illuminate\Support\Collection

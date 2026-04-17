@@ -13,6 +13,10 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import HandoverWriteForm, {
+    emptyHandoverWriteValue,
+    type HandoverWriteValue,
+} from '@/components/handover-write-form';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -45,6 +49,7 @@ type OpenSession = {
     shift_starts_at: string | null;
     shift_ends_at: string | null;
     location: string | null;
+    handover_submitted?: boolean;
 };
 
 type ActiveShift = {
@@ -106,6 +111,9 @@ export default function ClockInCard({
     const [customBreak, setCustomBreak] = useState('');
     const [now, setNow] = useState<number>(() => Date.now());
     const [pickedShiftId, setPickedShiftId] = useState<number | null>(null);
+    const [handoverValue, setHandoverValue] = useState<HandoverWriteValue>(
+        emptyHandoverWriteValue,
+    );
 
     // Tick every second while clocked in so the elapsed counter updates live.
     useEffect(() => {
@@ -148,9 +156,11 @@ export default function ClockInCard({
         );
     };
 
-    const handleClockOutConfirm = () => {
+    const handoverEligible =
+        !!openSession?.shift_id && !openSession?.handover_submitted;
+
+    const performClockOut = () => {
         if (!openSession) return;
-        setSubmitting(true);
         router.post(
             '/attendance/clock-out',
             {
@@ -165,6 +175,39 @@ export default function ClockInCard({
                 },
             },
         );
+    };
+
+    const handleClockOutConfirm = () => {
+        if (!openSession) return;
+        setSubmitting(true);
+
+        // Save the short handover first so the outgoing shift's carry-over
+        // is captured *before* the attendance session closes. If the worker
+        // hasn't answered the shift-rating yet, that's fine — the backend
+        // accepts a null rating. A backend failure surfaces via Inertia
+        // errors and we don't proceed to clock-out so nothing is lost.
+        if (handoverEligible && openSession.shift_id) {
+            router.post(
+                '/attendance/handover',
+                {
+                    shift_id: openSession.shift_id,
+                    meds_completed: handoverValue.meds_completed,
+                    shift_rating: handoverValue.shift_rating,
+                    handover_notes: handoverValue.handover_notes,
+                    follow_up_needed: handoverValue.follow_up_needed,
+                },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => performClockOut(),
+                    onError: () => {
+                        setSubmitting(false);
+                    },
+                },
+            );
+            return;
+        }
+
+        performClockOut();
     };
 
     /* ---------------------------------- */
@@ -234,6 +277,7 @@ export default function ClockInCard({
                                 onClick={() => {
                                     setBreakPreset(0);
                                     setCustomBreak('');
+                                    setHandoverValue(emptyHandoverWriteValue);
                                     setConfirmOpen(true);
                                 }}
                                 disabled={submitting}
@@ -251,7 +295,7 @@ export default function ClockInCard({
                         if (!submitting) setConfirmOpen(o);
                     }}
                 >
-                    <AlertDialogContent>
+                    <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
                         <AlertDialogHeader>
                             <AlertDialogTitle>End this shift?</AlertDialogTitle>
                             <AlertDialogDescription>
@@ -261,7 +305,7 @@ export default function ClockInCard({
                             </AlertDialogDescription>
                         </AlertDialogHeader>
 
-                        <div className="space-y-3 py-2">
+                        <div className="space-y-4 py-2">
                             <div className="text-sm font-medium">Break (minutes)</div>
                             <div className="flex flex-wrap gap-2">
                                 {BREAK_CHIPS.map((chip) => {
@@ -314,6 +358,17 @@ export default function ClockInCard({
                                     />
                                 </div>
                             )}
+
+                            {openSession.shift_id ? (
+                                <div className="border-t pt-4">
+                                    <HandoverWriteForm
+                                        value={handoverValue}
+                                        onChange={setHandoverValue}
+                                        disabled={submitting}
+                                        alreadySubmitted={!!openSession.handover_submitted}
+                                    />
+                                </div>
+                            ) : null}
                         </div>
 
                         <AlertDialogFooter>
@@ -328,7 +383,11 @@ export default function ClockInCard({
                                 disabled={submitting}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                                {submitting ? 'Ending…' : `Clock out (${breakMinutes}m break)`}
+                                {submitting
+                                    ? 'Ending…'
+                                    : handoverEligible
+                                      ? `Finish and clock out (${breakMinutes}m break)`
+                                      : `Clock out (${breakMinutes}m break)`}
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>

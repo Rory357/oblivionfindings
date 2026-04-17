@@ -25,6 +25,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import ClockInCard from '@/components/clock-in-card';
+import HandoverReadCard, {
+    type HandoverReadPayload,
+} from '@/components/handover-read-card';
 import RefreshPill from '@/components/refresh-pill';
 import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import useLiveRefresh from '@/hooks/use-live-refresh';
@@ -152,6 +155,7 @@ interface ClockOpenSession {
     shift_starts_at: string | null;
     shift_ends_at: string | null;
     location: string | null;
+    handover_submitted?: boolean;
 }
 
 interface ClockActiveShift {
@@ -161,6 +165,7 @@ interface ClockActiveShift {
     status: string;
     location: string | null;
     client_name: string | null;
+    incoming_handover?: HandoverReadPayload | null;
 }
 
 interface ClockState {
@@ -526,6 +531,13 @@ export default function MyDay({
             <Head title="My Day" />
 
             <div className="mx-auto w-full max-w-5xl space-y-5">
+                {/* ── Handover read prompt (PR 11) ───────────────────────── */}
+                {clock?.active_shift?.incoming_handover && !clock.open_session && (
+                    <HandoverReadCard
+                        handover={clock.active_shift.incoming_handover}
+                    />
+                )}
+
                 {/* ── Frontline clock (PR 4) ─────────────────────────────── */}
                 {clock && (
                     <ClockInCard

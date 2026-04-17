@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Shift;
+use App\Models\ShiftHandover;
 use App\Models\User;
+use App\Services\ShiftHandoverService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,6 +15,7 @@ class AttendanceController extends Controller
 {
     public function __construct(
         protected AttendanceService $attendanceService,
+        protected ShiftHandoverService $handoverService,
     ) {}
 
     public function index(Request $request)
@@ -163,5 +166,114 @@ class AttendanceController extends Controller
             || $auth->canDo('shifts.update')
             || $auth->canDo('shifts.manageAny')
         );
+    }
+
+    /**
+     * PR 11 — Handover write on clock-out.
+     *
+     * Small structured handover captured at shift end from the frontline
+     * clock card. Persisted as a submitted `ShiftHandover` so the next
+     * worker sees it in the clock-in read prompt, and so it joins the
+     * existing handover timeline/audit pipeline (no parallel storage).
+     */
+    public function submitHandover(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($this->canClock($auth), 403);
+
+        $data = $request->validate([
+            'shift_id' => ['required', 'integer', 'exists:shifts,id'],
+            'meds_completed' => ['required', 'boolean'],
+            'shift_rating' => ['nullable', 'string', 'in:calm,mixed,challenging'],
+            'handover_notes' => ['nullable', 'string', 'max:2000'],
+            'follow_up_needed' => ['required', 'boolean'],
+        ]);
+
+        $shift = Shift::query()->findOrFail((int) $data['shift_id']);
+
+        // Only the worker who worked the shift — or a manager — may leave a
+        // handover for it. Avoids strangers writing on someone else's shift.
+        if (
+            ! $auth->canDo('shifts.manageAny')
+            && (int) $shift->user_id !== (int) $auth->id
+        ) {
+            abort(403);
+        }
+
+        $notes = trim((string) ($data['handover_notes'] ?? ''));
+        if ($notes === '') {
+            $notes = $data['meds_completed']
+                ? 'No specific items to flag for the next shift.'
+                : 'Medications were not fully completed — please review on arrival.';
+        }
+
+        $payload = [
+            'handover_notes' => $notes,
+            'client_mood' => $data['shift_rating'] ?? null,
+            'medications_due' => $data['meds_completed']
+                ? null
+                : [[
+                    'label' => 'Review outstanding medications from previous shift',
+                    'severity' => 'high',
+                ]],
+            'follow_up_items' => $data['follow_up_needed']
+                ? [[
+                    'label' => 'Follow-up flagged by outgoing worker',
+                    'priority' => 'medium',
+                ]]
+                : null,
+            'submit' => true,
+        ];
+
+        try {
+            $this->handoverService->save($shift, $auth, $payload);
+        } catch (\Throwable $exception) {
+            return redirect()->back()->withErrors([
+                'handover' => $exception->getMessage(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Handover saved for the next shift.');
+    }
+
+    /**
+     * PR 11 — Acknowledge the handover read prompt shown at clock-in.
+     *
+     * Thin wrapper over `ShiftHandoverService::acknowledge` that reuses the
+     * existing permission/invariant logic but is reachable from the frontline
+     * `/my-day` handover-read card without depending on the operations-module
+     * route.
+     */
+    public function acknowledgeHandover(Request $request, ShiftHandover $handover)
+    {
+        $auth = $request->user();
+        abort_unless($this->canClock($auth), 403);
+
+        $relatedToUser = (int) $handover->incoming_staff_id === (int) $auth->id
+            || (int) $handover->incomingShift?->user_id === (int) $auth->id
+            || ($handover->incoming_staff_id === null && $handover->incoming_shift_id === null);
+
+        abort_unless(
+            $relatedToUser || $auth->canDo('shifts.manageAny') || $auth->canDo('handovers.viewAny'),
+            403,
+        );
+
+        try {
+            // `acknowledge` requires an assigned incoming shift. If the
+            // read surface found the handover via client match without a
+            // linked incoming shift, attach the arriving worker so the
+            // acknowledgement can settle.
+            if (! $handover->incoming_staff_id) {
+                $handover->forceFill(['incoming_staff_id' => $auth->id])->save();
+            }
+
+            $this->handoverService->acknowledge($handover, $auth);
+        } catch (\Throwable $exception) {
+            return redirect()->back()->withErrors([
+                'handover' => $exception->getMessage(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Handover marked as read.');
     }
 }
