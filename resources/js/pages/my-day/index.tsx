@@ -14,12 +14,11 @@ import {
     Menu,
     OctagonAlert,
     Pill,
-    RefreshCw,
     Shield,
     User,
     Users,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,7 +31,9 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import ClockInCard from '@/components/clock-in-card';
+import RefreshPill from '@/components/refresh-pill';
 import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
+import useLiveRefresh from '@/hooks/use-live-refresh';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import StaffStatus from '@/components/staff-status';
 import {
@@ -307,24 +308,14 @@ export default function MyDay({
     manager_data,
     clock,
 }: Props) {
-    const [isRefreshing, setIsRefreshing] = useState(false);
     const [openItemFilter, setOpenItemFilter] = useState<OpenItemFilter>('all');
 
-    // Auto-refresh every 60s — same cadence as the old page.
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (!document.hidden) router.reload({ preserveScroll: true });
-        }, 60000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const handleRefresh = () => {
-        setIsRefreshing(true);
-        router.reload({
-            preserveScroll: true,
-            onFinish: () => setIsRefreshing(false),
-        });
-    };
+    // PR 6 — replace silent `setInterval(router.reload, 60s)` with a guarded,
+    // visible refresh. `useLiveRefresh` suppresses the tick while an input is
+    // focused, a modal is open, or the tab is hidden, so content never shifts
+    // under an actively-interacting worker. The `RefreshPill` surfaces
+    // freshness in the header and lets the worker refresh on demand.
+    const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh();
 
     const handleTimesheetSubmit = (tsId: number) => {
         // Action endpoint URL is unchanged (see routes/web.php comment).
@@ -493,17 +484,11 @@ export default function MyDay({
 
     const headerAction = (
         <div className="flex items-center gap-1.5">
-            <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                aria-label="Refresh my day"
-            >
-                <RefreshCw
-                    className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
-                />
-            </Button>
+            <RefreshPill
+                lastUpdatedAt={lastUpdatedAt}
+                isRefreshing={isRefreshing}
+                onRefresh={refreshNow}
+            />
             <Button
                 variant="ghost"
                 size="sm"
