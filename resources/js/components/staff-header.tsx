@@ -35,7 +35,11 @@ export function StaffHeader({
     return (
         <header
             className={cn(
-                'sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b border-border/50 bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80',
+                'sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b border-border/50 bg-background/95 px-4 pb-2 backdrop-blur supports-[backdrop-filter]:bg-background/80',
+                // Honour the top safe-area inset so the title clears the
+                // status bar when the app is launched in standalone/PWA
+                // mode. Resolves to pt-2 in a normal browser tab.
+                'pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]',
                 className,
             )}
         >

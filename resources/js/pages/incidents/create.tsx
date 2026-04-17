@@ -259,7 +259,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
     return (
         <AppLayout breadcrumbs={[{ title: 'Incidents', href: '/incidents' }, { title: 'New', href: '/incidents/create' }]}>
             <Head title="Report incident" />
-            <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-28 pt-4 sm:pb-8">
+            <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-4 sm:pb-8">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-xl font-semibold tracking-tight">Report an incident</h1>
@@ -303,7 +303,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                 )}
 
                 {step < 2 ? (
-                    <div className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t bg-background/95 p-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0">
+                    <div className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0">
                         {step > 0 && (
                             <Button variant="outline" size="lg" onClick={goBack} className="flex-1 sm:flex-none">
                                 <ArrowLeft className="mr-1.5 h-4 w-4" />
@@ -335,7 +335,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                         </Button>
                     </div>
                 ) : (
-                    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 border-t bg-background/95 p-3 backdrop-blur sm:static sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0">
+                    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-col gap-2 border-t bg-background/95 px-3 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)] backdrop-blur sm:static sm:flex-row sm:items-center sm:justify-between sm:border-0 sm:bg-transparent sm:p-0">
                         <Button
                             variant="outline"
                             size="lg"

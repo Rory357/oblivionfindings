@@ -3,7 +3,19 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    {{-- viewport-fit=cover lets env(safe-area-inset-*) resolve on iOS so the
+         frontline shell, bottom nav, and sticky action bars respect the
+         home-indicator and notch insets. --}}
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    {{-- Theme colour matches the app background so the mobile browser chrome
+         (and iOS status bar in standalone mode) blends into the shell. --}}
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+    {{-- Tighten standalone/home-screen presentation on iOS. No full PWA work
+         in this PR — these are just light, low-risk shell hints. --}}
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
 

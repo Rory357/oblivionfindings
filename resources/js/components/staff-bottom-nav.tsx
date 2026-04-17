@@ -94,7 +94,10 @@ export function StaffBottomNav({ onMore, items, className }: StaffBottomNavProps
             aria-label="Frontline navigation"
             className={cn(
                 'fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden',
-                'pb-[env(safe-area-inset-bottom)]',
+                // Honour the device home-indicator inset, with a small
+                // fallback so Android / no-inset devices still get breathing
+                // room below the icon row.
+                'pb-[max(env(safe-area-inset-bottom,0px),0.25rem)]',
                 className,
             )}
         >

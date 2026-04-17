@@ -234,7 +234,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
             </header>
 
             {/* ── Content ─────────────────────────────────────────────── */}
-            <main className="mx-auto w-full max-w-2xl px-4 pb-32 pt-4 sm:pt-6">
+            <main className="mx-auto w-full max-w-2xl px-4 pb-[calc(8rem+env(safe-area-inset-bottom,0px))] pt-4 sm:pt-6">
                 {items.length === 0 ? (
                     <EmptyRound roundName={headerTitle} />
                 ) : isRoundFinished ? (
@@ -312,7 +312,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
 
             {/* ── Action bar (sticky, mobile-first) ───────────────────── */}
             {current && !isRoundFinished && (
-                <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pb-[env(safe-area-inset-bottom)] pt-3 shadow-[0_-4px_12px_rgb(0_0_0_/_4%)] backdrop-blur">
+                <div className="frontline-sticky-footer fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 pt-3 shadow-[0_-4px_12px_rgb(0_0_0_/_4%)] backdrop-blur">
                     <div className="mx-auto grid max-w-2xl grid-cols-3 gap-2">
                         <Button
                             size="lg"

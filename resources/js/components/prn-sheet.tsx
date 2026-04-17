@@ -237,7 +237,7 @@ export default function PrnSheet({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                className="flex max-h-[92dvh] flex-col gap-0 rounded-t-2xl p-0 pb-[env(safe-area-inset-bottom)] sm:max-w-xl sm:mx-auto"
+                className="flex max-h-[92dvh] flex-col gap-0 rounded-t-2xl p-0 sm:max-w-xl sm:mx-auto"
             >
                 <SheetHeader className="border-b px-4 pt-5 pb-3 text-left">
                     <div className="flex items-center gap-2">

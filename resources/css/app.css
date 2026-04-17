@@ -215,19 +215,39 @@
 
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Frontline / staff shell support
+ * Frontline / staff shell support (PR 24)
  *
- * Provides iOS safe-area handling for the persistent mobile bottom nav and
- * a helper class for any custom frontline surface that needs to clear it.
+ * Shared safe-area primitives used by StaffPageShell, StaffBottomNav, and any
+ * sticky/fixed footer action bar on a frontline route. Centralising these
+ * keeps bottom edges, home indicators, and notches handled consistently —
+ * future frontline surfaces should prefer these helpers over ad-hoc
+ * `pb-[env(safe-area-inset-bottom)]` sprinkles.
+ *
+ *   .safe-area-pb            — raw safe-area bottom padding (legacy helper).
+ *   .safe-area-pt            — raw safe-area top padding, for any surface
+ *                              that becomes flush with the notch in
+ *                              standalone/PWA presentation.
+ *   .staff-shell-content     — main-content bottom padding that clears the
+ *                              mobile bottom nav AND the home indicator.
+ *   .frontline-sticky-footer — the canonical pattern for sticky/fixed
+ *                              action bars on a frontline route. Guarantees
+ *                              a comfortable minimum of 0.75rem while
+ *                              honouring the device inset on phones with a
+ *                              home indicator.
+ *   .frontline-header-inset  — top padding for sticky headers so the title
+ *                              does not collide with the status bar when
+ *                              the app is added to home screen / standalone.
  * ────────────────────────────────────────────────────────────────────────── */
-@supports (padding: env(safe-area-inset-bottom)) {
-    .safe-area-pb {
-        padding-bottom: env(safe-area-inset-bottom);
-    }
+.safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-pt {
+    padding-top: env(safe-area-inset-top, 0px);
 }
 
 .staff-shell-content {
-    /* Height of StaffBottomNav (~56px) + inset padding (~8px) + safe-area */
+    /* Height of StaffBottomNav (~56px) + breathing room (~8px) + safe-area */
     padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
 }
 
@@ -235,6 +255,20 @@
     .staff-shell-content {
         padding-bottom: 1.5rem;
     }
+}
+
+.frontline-sticky-footer {
+    /* Comfortable minimum on phones without a home indicator; grows to clear
+     * the indicator when the device exposes a bottom inset. Pair with the
+     * usual px-4 pt-3 on the footer element itself. */
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
+}
+
+.frontline-header-inset {
+    /* Keeps the sticky header title clear of the iOS status bar / notch when
+     * the app is launched in standalone mode. No-op in a normal browser tab
+     * because env(safe-area-inset-top) resolves to 0. */
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

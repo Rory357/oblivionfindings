@@ -65,7 +65,7 @@ export default function StaffPageShell({
     className,
 }: StaffPageShellProps) {
     return (
-        <div className="min-h-svh w-full">
+        <div className="min-h-svh w-full overflow-x-hidden">
             <a
                 href="#main-content"
                 className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-primary focus:px-4 focus:py-2 focus:rounded-md focus:text-primary-foreground"
@@ -99,11 +99,7 @@ export default function StaffPageShell({
 
                 <div
                     className={cn(
-                        'flex-1 px-4 py-4 md:px-6 md:py-6',
-                        // Reserve space for the mobile bottom nav (approx 64px
-                        // content + safe-area inset). Cleared on lg+ where the
-                        // bottom nav is hidden.
-                        'pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6',
+                        'staff-shell-content flex-1 px-4 pt-4 md:px-6 md:pt-6',
                     )}
                 >
                     {children}
