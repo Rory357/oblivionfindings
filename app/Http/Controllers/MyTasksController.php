@@ -592,8 +592,15 @@ class MyTasksController extends Controller
     private function getAlertTasks(int $userId): array
     {
         try {
+            $now = now();
+
             return ControlRoomAlert::where('assigned_to_user_id', $userId)
                 ->unresolved()
+                // PR 17 — hide snoozed alerts from /my-day until the window
+                // elapses. The alert row remains fully live on the CR side.
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('snoozed_until')->orWhere('snoozed_until', '<=', $now);
+                })
                 ->with(['asset:id,name', 'client:id,first_name,last_name', 'sla'])
                 ->get()
                 ->map(function (ControlRoomAlert $alert) {
@@ -612,6 +619,12 @@ class MyTasksController extends Controller
                         }
                     }
 
+                    $severity = strtolower((string) ($alert->severity ?? 'medium'));
+                    $canAck = in_array($alert->status, [
+                        ControlRoomAlert::STATUS_OPEN,
+                    ], true);
+                    $canSnooze = ! $alert->isTerminal() && $severity !== 'critical';
+
                     return [
                         'id' => 'alert-' . $alert->id,
                         'type' => 'alert',
@@ -626,6 +639,9 @@ class MyTasksController extends Controller
                             'client_name' => $clientName,
                             'sla_status' => $slaStatus,
                             'asset_name' => $alert->asset?->name,
+                            'alert_id' => $alert->id,
+                            'can_ack' => $canAck,
+                            'can_snooze' => $canSnooze,
                         ],
                     ];
                 })

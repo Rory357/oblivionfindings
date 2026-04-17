@@ -120,6 +120,12 @@ Route::redirect('/my-tasks', '/my-day')
 Route::middleware(['auth'])->group(function () {
     Route::post('/my-tasks/shift-task/{task}/complete', [\App\Http\Controllers\MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
     Route::post('/my-tasks/timesheet/{timesheet}/submit', [\App\Http\Controllers\MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');
+
+    // PR 17 — frontline alert quick actions. Scoped to the alert's assignee so
+    // a frontline worker can acknowledge or snooze an alert from /my-day
+    // without reaching into the Control Room operator surface.
+    Route::post('/my-day/alerts/{alert}/ack', [\App\Http\Controllers\MyDayActionsController::class, 'acknowledgeAlert'])->name('my-day.alert.ack');
+    Route::post('/my-day/alerts/{alert}/snooze', [\App\Http\Controllers\MyDayActionsController::class, 'snoozeAlert'])->name('my-day.alert.snooze');
 });
 
 Route::get('/my-calendar', [\App\Http\Controllers\MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');

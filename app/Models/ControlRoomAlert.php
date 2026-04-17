@@ -73,6 +73,8 @@ class ControlRoomAlert extends Model
         'resolution_code',
         'time_spent_minutes',
         'watchers_count',
+        'snoozed_until',
+        'snoozed_by_user_id',
     ];
 
     protected $casts = [
@@ -85,6 +87,7 @@ class ControlRoomAlert extends Model
         'context' => 'array',
         'escalation_level' => 'integer',
         'due_at' => 'datetime',
+        'snoozed_until' => 'datetime',
     ];
 
     public function client(): BelongsTo

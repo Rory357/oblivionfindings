@@ -8,14 +8,12 @@ import {
     ChevronRight,
     Clock,
     ClipboardList,
-    FileText,
     Home,
     ListTodo,
     Menu,
     OctagonAlert,
     Pill,
     Shield,
-    User,
     Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -24,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import AlertRow, { type AlertRowItem } from '@/components/alert-row';
 import ClockInCard from '@/components/clock-in-card';
 import HandoverReadCard, {
     type HandoverReadPayload,
@@ -144,6 +143,9 @@ interface Task {
         client_name?: string;
         sla_status?: string;
         asset_name?: string;
+        alert_id?: number;
+        can_ack?: boolean;
+        can_snooze?: boolean;
     };
 }
 
@@ -241,20 +243,6 @@ function formatTime(iso: string): string {
     });
 }
 
-function formatRelative(iso: string): string {
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const mins = Math.floor(diffMs / 60000);
-    const hrs = Math.floor(mins / 60);
-    const days = Math.floor(hrs / 24);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    if (hrs < 24) return `${hrs}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
-}
-
 // Map the controller's `MedDue.status` into the worker-facing `med` vocabulary
 // via `status-vocab.ts`. Anything not-yet-given from the backend is "Due"; the
 // overdue distinction is surfaced separately as a header badge.
@@ -346,17 +334,14 @@ export default function MyDay({
         stats.meds_overdue;
 
     // Build the unified Open Items list — reused from the old page, trimmed.
-    const openItems: Array<{
-        id: string;
-        type: 'shift' | 'alert' | 'followup' | 'note_followup' | 'incident';
-        title: string;
-        priority: string;
-        client_name?: string;
-        url: string;
-        time: string;
+    // PR 17 — every row is now rendered by <AlertRow>, so we carry enough
+    // metadata (due_at, sla_status, alert_id, can_ack/can_snooze) to let the
+    // row render its urgency badge and the right inline actions.
+    type OpenItem = AlertRowItem & {
         shift_status?: string;
         incident_status?: string;
-    }> = [];
+    };
+    const openItems: OpenItem[] = [];
 
     shifts.forEach((s) => {
         openItems.push({
@@ -380,6 +365,11 @@ export default function MyDay({
             client_name: t.meta.client_name,
             url: t.source_url,
             time: t.created_at,
+            due_at: t.due_at,
+            sla_status: t.meta.sla_status,
+            alert_id: t.meta.alert_id ?? null,
+            can_ack: t.meta.can_ack ?? false,
+            can_snooze: t.meta.can_snooze ?? false,
         });
     });
 
@@ -818,74 +808,42 @@ export default function MyDay({
                         ) : (
                             <ul className="space-y-2">
                                 {sortedOpenItems.map((item) => {
-                                    const TypeIcon =
-                                        item.type === 'shift'
-                                            ? Calendar
-                                            : item.type === 'incident'
-                                                ? AlertTriangle
-                                                : item.type === 'followup' ||
-                                                    item.type === 'note_followup'
-                                                    ? ClipboardList
-                                                    : item.type === 'alert'
-                                                        ? Bell
-                                                        : FileText;
-
+                                    // PR 17 — let <AlertRow> own layout + actions.
+                                    // For shifts/incidents we still pass the
+                                    // existing worker-vocab status chip as a
+                                    // drop-in `statusChip`, so prior PRs' status
+                                    // clarity is preserved.
+                                    let statusChip: React.ReactNode = null;
+                                    if (item.type === 'shift' && item.shift_status) {
+                                        const s = mapShiftStatus(item.shift_status);
+                                        if (s) {
+                                            statusChip = (
+                                                <StaffStatus
+                                                    kind="shift"
+                                                    state={s}
+                                                    size="sm"
+                                                />
+                                            );
+                                        }
+                                    } else if (item.type === 'incident') {
+                                        const s = mapIncidentStatus(
+                                            item.incident_status ?? 'submitted',
+                                        );
+                                        if (s) {
+                                            statusChip = (
+                                                <StaffStatus
+                                                    kind="incident"
+                                                    state={s}
+                                                    size="sm"
+                                                />
+                                            );
+                                        }
+                                    }
                                     return (
-                                        <li key={item.id}>
-                                            <Link
-                                                href={item.url}
-                                                className="group flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-all hover:border-primary/30 hover:shadow-sm"
-                                            >
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                                                    <TypeIcon className="h-4 w-4" />
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="truncate text-sm font-medium group-hover:text-primary">
-                                                            {item.title}
-                                                        </span>
-                                                        {item.type === 'shift' &&
-                                                            item.shift_status && (() => {
-                                                                const s = mapShiftStatus(
-                                                                    item.shift_status,
-                                                                );
-                                                                return s ? (
-                                                                    <StaffStatus
-                                                                        kind="shift"
-                                                                        state={s}
-                                                                        size="sm"
-                                                                    />
-                                                                ) : null;
-                                                            })()}
-                                                        {item.type === 'incident' && (() => {
-                                                            const s = mapIncidentStatus(
-                                                                item.incident_status ?? 'submitted',
-                                                            );
-                                                            return s ? (
-                                                                <StaffStatus
-                                                                    kind="incident"
-                                                                    state={s}
-                                                                    size="sm"
-                                                                />
-                                                            ) : null;
-                                                        })()}
-                                                    </div>
-                                                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                                                        {item.client_name && (
-                                                            <span className="flex items-center gap-1">
-                                                                <User className="h-3 w-3" />
-                                                                {item.client_name}
-                                                            </span>
-                                                        )}
-                                                        <span className="flex items-center gap-1">
-                                                            <Clock className="h-3 w-3" />
-                                                            {formatRelative(item.time)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
-                                            </Link>
-                                        </li>
+                                        <AlertRow
+                                            key={item.id}
+                                            item={{ ...item, statusChip }}
+                                        />
                                     );
                                 })}
                             </ul>
