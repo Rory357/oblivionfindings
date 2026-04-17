@@ -73,7 +73,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Dashboard & Activity
     // -------------------------------------------------------------------------
 
-    Route::get('/', DashboardController::class)->name('operations.dashboard');
+    // PR 18 — the operations dashboard is scheduler/admin-first. Frontline
+    // staff without any management capability are redirected to `/my-day`
+    // (their canonical home). Managers / admins still see the same dashboard.
+    Route::get('/', DashboardController::class)
+        ->middleware('role_scope:my-day')
+        ->name('operations.dashboard');
     Route::get('/activity', [ActivityFeedController::class, 'index'])->name('operations.activity.index');
 
     // Timeline
@@ -421,8 +426,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Shifts (migrated from /shifts)
     // -------------------------------------------------------------------------
 
+    // PR 18 — the shifts index is the scheduler's table. Frontline staff see
+    // their own shifts on `/my-day` and should not land on the scheduler list.
+    // Individual shift detail (`/shifts/{shift}`) remains accessible because
+    // workers legitimately click through to their own assigned shift.
     Route::get('/shifts', [ShiftController::class, 'index'])
-        ->middleware('permission:shifts.viewAny|shifts.viewAssigned')
+        ->middleware(['permission:shifts.viewAny|shifts.viewAssigned', 'role_scope:my-day'])
         ->name('operations.shifts.index');
 
     Route::get('/shifts/{shift}', [ShiftController::class, 'show'])
@@ -441,12 +450,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:shifts.create|shifts.update')
         ->name('operations.shifts.eligibility_preview');
 
-    // Recurring shifts (weekly series)
+    // Recurring shifts (weekly series) — manager/scheduler surface.
+    // PR 18: belt-and-braces role_scope ensures a frontline worker never lands
+    // here via a stale link even if `shifts.viewAny` is inadvertently granted.
     Route::get('/shifts/series', [ShiftSeriesController::class, 'index'])
-        ->middleware('permission:rostering.viewAny|shifts.viewAny|shifts.manageAny')
+        ->middleware(['role_scope:my-day', 'permission:rostering.viewAny|shifts.viewAny|shifts.manageAny'])
         ->name('operations.shifts.series.index');
     Route::get('/shifts/series/{series}', [ShiftSeriesController::class, 'show'])
-        ->middleware('permission:rostering.viewAny|shifts.viewAny|shifts.manageAny')
+        ->middleware(['role_scope:my-day', 'permission:rostering.viewAny|shifts.viewAny|shifts.manageAny'])
         ->name('operations.shifts.series.show');
     Route::post('/shifts/series', [ShiftSeriesController::class, 'store'])
         ->middleware('permission:shifts.create')
@@ -529,7 +540,11 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Rostering (migrated from /rostering)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:rostering.viewAny')->group(function () {
+    // PR 18 — rostering is the scheduler surface. `rostering.viewAny` already
+    // excludes support workers, but `role_scope` layers a friendly redirect
+    // to `/my-day` on top of the 403 so any staff user who lands here via an
+    // old bookmark gets routed home instead of hitting an error page.
+    Route::middleware(['role_scope:my-day', 'permission:rostering.viewAny'])->group(function () {
         Route::get('/rostering', [RosteringController::class, 'index'])->name('operations.rostering.index');
         Route::get('/rostering/conflicts', [RosteringController::class, 'conflicts'])->name('operations.rostering.conflicts');
     });
@@ -564,8 +579,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Availability (NEW)
     // -------------------------------------------------------------------------
 
+    // PR 18 — availability planner is scheduler-first. Permission already
+    // filters support workers; role_scope adds the soft redirect home.
     Route::get('/availability', [AvailabilityController::class, 'index'])
-        ->middleware('permission:rostering.viewAny')
+        ->middleware(['role_scope:my-day', 'permission:rostering.viewAny'])
         ->name('operations.availability.index');
 
     // -------------------------------------------------------------------------
@@ -577,7 +594,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->name('operations.timesheets.index');
 
     // Manager/Admin approval queue
-    Route::middleware('permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam')->group(function () {
+    // PR 18 — role_scope redirects frontline staff to `/my-day` (their own
+    // timesheet list stays on `operations.timesheets.index`, which is not
+    // gated here because workers legitimately review their own sheets).
+    Route::middleware(['role_scope:my-day', 'permission:timesheets.approve|timesheets.manageAny|hr.time.manage|hr.time.approveTeam'])->group(function () {
         Route::get('/timesheets/approvals', [TimesheetController::class, 'approvals'])->name('operations.timesheets.approvals');
         Route::get('/timesheets/payroll-adjustments', [TimesheetController::class, 'payrollAdjustmentsPending'])->name('operations.timesheets.payrollAdjustments');
         Route::post('/timesheets/amendments/{amendment}/mark-processed', [TimesheetController::class, 'markPayrollAdjustmentProcessed'])->name('operations.timesheets.markPayrollProcessed');

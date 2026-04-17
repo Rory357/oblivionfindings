@@ -621,9 +621,28 @@ function buildOperationsSubPanelGroups({
 }): SubPanelGroup[] {
     const groups: SubPanelGroup[] = [];
 
-    // Overview
-    const overview: NavItem[] = [
-        { title: 'Dashboard', href: '/operations', icon: LayoutGrid },
+    // PR 18 — role separation for operations nav. Frontline staff (no
+    // scheduler/approval capabilities) should not see manager-oriented
+    // entries: the operations Dashboard, the scheduler Shifts table, the
+    // Rostering planner or the timesheet approvals queue. Their home is
+    // `/my-day`, so these links are hidden rather than surfaced and then
+    // redirected.
+    const isManager =
+        !!can?.shifts?.manageAny ||
+        !!can?.timesheets?.manageAny ||
+        !!can?.timesheets?.approve ||
+        !!can?.rostering?.viewAny ||
+        !!can?.hr?.analytics?.view ||
+        !!can?.hr?.time?.manage ||
+        !!can?.hr?.time?.approveTeam;
+
+    // Overview — Dashboard is a scheduler/admin landing surface; staff start
+    // on `/my-day` and don't need it here.
+    const overview: NavItem[] = [];
+    if (isManager) {
+        overview.push({ title: 'Dashboard', href: '/operations', icon: LayoutGrid });
+    }
+    overview.push(
         {
             title: 'Activity Feed',
             href: '/operations/activity',
@@ -631,7 +650,7 @@ function buildOperationsSubPanelGroups({
         },
         { title: 'Timeline', href: '/operations/timeline', icon: Clock },
         { title: 'Summaries', href: '/operations/summaries', icon: FileText },
-    ];
+    );
     groups.push({ label: 'Overview', items: overview });
 
     // Client Management
@@ -682,8 +701,11 @@ function buildOperationsSubPanelGroups({
         groups.push({ label: `${clientLabel} Management`, items: clientMgmt });
 
     // Scheduling
+    // PR 18 — the `/operations/shifts` table is the scheduler view of the
+    // roster. Frontline workers see their own shifts on `/my-day`, so hide
+    // this entry for them. Managers with `shifts.viewAny` still see it.
     const scheduling: NavItem[] = [];
-    if (can?.shifts?.viewAny || role === 'support_worker')
+    if (can?.shifts?.viewAny)
         scheduling.push({
             title: 'Shifts',
             href: '/operations/shifts',
