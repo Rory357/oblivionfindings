@@ -255,26 +255,26 @@ function SnoozeMenu({
             <button
                 type="button"
                 onClick={() => snooze('15m')}
-                className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-muted"
+                className="frontline-focus flex w-full min-h-11 items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-muted"
             >
                 Snooze 15m
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <Clock aria-hidden className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
             <button
                 type="button"
                 onClick={() => snooze('1h')}
-                className="flex w-full items-center justify-between border-t px-3 py-2.5 text-left text-sm hover:bg-muted"
+                className="frontline-focus flex w-full min-h-11 items-center justify-between border-t px-3 py-2.5 text-left text-sm hover:bg-muted"
             >
                 Snooze 1h
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <Clock aria-hidden className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
             <button
                 type="button"
                 onClick={() => snooze('shift')}
-                className="flex w-full items-center justify-between border-t px-3 py-2.5 text-left text-sm hover:bg-muted"
+                className="frontline-focus flex w-full min-h-11 items-center justify-between border-t px-3 py-2.5 text-left text-sm hover:bg-muted"
             >
                 Until end of shift
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <Clock aria-hidden className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
         </div>
     );
@@ -316,7 +316,8 @@ export default function AlertRow({ item }: { item: AlertRowItem }) {
                 The whole top row is one big tap target that opens the item. */}
             <Link
                 href={item.url}
-                className="group flex items-start gap-3 px-3 pb-2 pt-3"
+                aria-label={`Open ${typeLabel.toLowerCase()}: ${item.title}`}
+                className="frontline-focus group flex items-start gap-3 px-3 pb-2 pt-3"
             >
                 <div
                     className={cn(
@@ -375,11 +376,12 @@ export default function AlertRow({ item }: { item: AlertRowItem }) {
                             onClick={() => setSnoozeOpen((v) => !v)}
                             aria-expanded={snoozeOpen}
                             aria-haspopup="menu"
-                            className="h-8 gap-1 px-2.5 text-xs"
+                            aria-label="Snooze this alert"
+                            className="min-h-11 gap-1 px-3 text-sm"
                         >
-                            <Clock className="h-3.5 w-3.5" />
+                            <Clock aria-hidden className="h-4 w-4" />
                             Snooze
-                            <MoreHorizontal className="h-3 w-3 opacity-60" />
+                            <MoreHorizontal aria-hidden className="h-3.5 w-3.5 opacity-60" />
                         </Button>
                         {snoozeOpen ? (
                             <SnoozeMenu
@@ -395,7 +397,8 @@ export default function AlertRow({ item }: { item: AlertRowItem }) {
                         size="sm"
                         variant="ghost"
                         onClick={ack}
-                        className="h-8 px-2.5 text-xs"
+                        aria-label={`Acknowledge ${item.title}`}
+                        className="min-h-11 px-3 text-sm"
                     >
                         Acknowledge
                     </Button>
@@ -405,9 +408,11 @@ export default function AlertRow({ item }: { item: AlertRowItem }) {
                     asChild
                     size="sm"
                     variant={hasQuickActions ? 'default' : 'outline'}
-                    className="h-8 px-3 text-xs"
+                    className="min-h-11 px-4 text-sm"
                 >
-                    <Link href={item.url}>Open</Link>
+                    <Link href={item.url} aria-label={`Open ${item.title}`}>
+                        Open
+                    </Link>
                 </Button>
             </div>
         </li>

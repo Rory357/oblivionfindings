@@ -60,7 +60,7 @@ export function RefreshPill({
             disabled={isRefreshing}
             aria-label={`${label}. Tap to refresh now.`}
             className={cn(
-                'inline-flex h-8 items-center gap-1.5 rounded-full border border-border/70 bg-muted/60 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-wait disabled:opacity-70',
+                'frontline-focus inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border/70 bg-muted/60 px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-wait disabled:opacity-70',
                 className,
             )}
         >

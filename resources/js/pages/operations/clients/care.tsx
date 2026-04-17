@@ -246,7 +246,8 @@ export default function ClientCare({
                     type="button"
                     onClick={() => setPrnOpen(true)}
                     disabled={prnDisabled}
-                    className="group flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800/60 dark:bg-amber-950/20"
+                    aria-label={`Give as-needed med to ${fullName}`}
+                    className="frontline-focus group flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800/60 dark:bg-amber-950/20"
                 >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
                         <Zap className="h-5 w-5" />
@@ -435,8 +436,10 @@ export default function ClientCare({
                                     {c.phone && (
                                         <a
                                             href={`tel:${c.phone.replace(/\s+/g, '')}`}
-                                            className="shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent"
+                                            aria-label={`Call ${c.name}${c.relationship ? ` (${c.relationship})` : ''} at ${c.phone}`}
+                                            className="frontline-focus inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
                                         >
+                                            <Phone aria-hidden className="h-4 w-4" />
                                             {c.phone}
                                         </a>
                                     )}

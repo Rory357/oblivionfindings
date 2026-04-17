@@ -237,3 +237,34 @@
     }
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Frontline accessibility helpers (PR 22)
+ *
+ * Two small primitives so worker-facing controls share a consistent feel:
+ *
+ *   .frontline-focus  — clearer, higher-contrast focus ring than the browser
+ *                       default for custom buttons/links/chips that don't go
+ *                       through the shadcn <Button>. Safe to combine with
+ *                       `outline-none` on the host element.
+ *
+ *   .frontline-tap    — enforces a ≥44×44 px hit area without mandating a
+ *                       rigid height, so compact chips/icon buttons meet the
+ *                       WCAG 2.5.5 (enhanced) target size when applied.
+ *
+ * Nothing here redefines layout or colour beyond the ring; pages opt in by
+ * adding the utility class where an audit showed a real issue.
+ * ────────────────────────────────────────────────────────────────────────── */
+.frontline-focus {
+    outline: none;
+}
+.frontline-focus:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: inherit;
+}
+
+.frontline-tap {
+    min-height: 2.75rem; /* 44px */
+    min-width: 2.75rem;
+}
+
