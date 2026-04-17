@@ -87,9 +87,25 @@ class IncidentController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Wizard continuation: if an incident id was passed back after Step 2 create,
+        // hydrate the draft so Step 3 (optional detail) can pick up without re-creating.
+        $resumeIncident = null;
+        if ($request->filled('incident')) {
+            $incident = ClientIncident::query()->find((int) $request->query('incident'));
+            if ($incident && $request->user()?->can('update', $incident) && $incident->status === 'draft') {
+                $resumeIncident = $incident->only([
+                    'id', 'client_id', 'type', 'severity', 'occurred_at', 'description',
+                    'immediate_action_taken', 'witnesses', 'injured_person_name',
+                    'injured_person_role', 'injury_body_part', 'injury_nature',
+                    'medical_treatment_type',
+                ]);
+            }
+        }
+
         return inertia('incidents/create', [
             'clients' => $clients,
             'templates' => $templates,
+            'resumeIncident' => $resumeIncident,
         ]);
     }
 
@@ -196,6 +212,12 @@ class IncidentController extends Controller
                     'include_assigned_workers' => false,
                 ]
             );
+        }
+
+        if ($request->boolean('continue_wizard')) {
+            return redirect()
+                ->route('incidents.create', ['incident' => $incident->id])
+                ->with('success', 'Incident saved. Add any extra detail below.');
         }
 
         return redirect()->route('incidents.show', $incident)->with('success', 'Incident draft created.');
