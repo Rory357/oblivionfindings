@@ -147,7 +147,52 @@ export default function ShiftsIndex({ shifts, filters, clients, staff, statuses,
 
                 {shifts.data.length > 0 ? (
                     <>
-                        <div className="overflow-x-auto rounded-xl border">
+                        {/* Mobile: stacked cards */}
+                        <ul className="space-y-2 md:hidden">
+                            {shifts.data.map((s) => {
+                                const startLabel = new Date(s.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                const endLabel = new Date(s.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                const dateLabel = new Date(s.starts_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' });
+                                return (
+                                    <li key={s.id} className="rounded-xl border bg-card p-3 text-sm">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="font-medium">
+                                                    <Link className="hover:underline" href={`/operations/clients/${s.client.id}`}>
+                                                        {s.client.first_name} {s.client.last_name}
+                                                    </Link>
+                                                </div>
+                                                <div className="mt-0.5 text-xs text-muted-foreground">
+                                                    {dateLabel} · {startLabel} – {endLabel} · {hoursBetween(s.starts_at, s.ends_at)}
+                                                </div>
+                                                {s.location ? (
+                                                    <div className="mt-0.5 text-xs text-muted-foreground">{s.location}</div>
+                                                ) : null}
+                                            </div>
+                                            <ShiftStatusBadge status={s.status} />
+                                        </div>
+                                        <div className="mt-3 flex items-center justify-between gap-2">
+                                            <span className="truncate text-xs text-muted-foreground">
+                                                {s.staff?.name ?? <span className="italic">Unassigned</span>}
+                                            </span>
+                                            <div className="flex shrink-0 gap-1">
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link href={`/operations/shifts/${s.id}`}>View</Link>
+                                                </Button>
+                                                {canEdit ? (
+                                                    <Button asChild variant="ghost" size="sm">
+                                                        <Link href={`/operations/shifts/${s.id}/edit`}>Edit</Link>
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+
+                        {/* Desktop: table */}
+                        <div className="hidden rounded-xl border md:block">
                             <table className="w-full text-sm">
                                 <thead className="bg-muted/40">
                                     <tr>

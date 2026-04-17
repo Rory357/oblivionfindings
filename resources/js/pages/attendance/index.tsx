@@ -244,13 +244,59 @@ export default function AttendanceIndex({
                     </Card>
                 ) : null}
 
-                {/* Sessions table */}
+                {/* Sessions list — mobile cards, desktop table */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Recent Sessions</CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
+                        {/* Mobile: stacked cards (no horizontal scroll) */}
+                        <ul className="divide-y md:hidden">
+                            {sessions.data.length === 0 ? (
+                                <li className="px-4 py-8 text-center text-sm text-muted-foreground">
+                                    No attendance sessions found.
+                                </li>
+                            ) : (
+                                sessions.data.map((session) => (
+                                    <li key={session.id} className="space-y-2 px-4 py-3 text-sm">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="font-medium">
+                                                    {toLocal(session.clock_in_at)}
+                                                </div>
+                                                <div className="mt-0.5 text-xs text-muted-foreground">
+                                                    {session.clock_out_at
+                                                        ? `Out ${toLocal(session.clock_out_at)}`
+                                                        : 'Still clocked in'}
+                                                </div>
+                                            </div>
+                                            <span className="shrink-0 rounded-full border bg-muted/60 px-2 py-0.5 text-xs font-medium tabular-nums">
+                                                {session.worked_hours.toFixed(2)}h
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                            <span>Break {session.break_minutes}m</span>
+                                            {session.timesheet_id ? (
+                                                <Link
+                                                    href={`/timesheets/${session.timesheet_id}/edit`}
+                                                    className="inline-flex items-center gap-1.5"
+                                                >
+                                                    <span className="underline">Timesheet #{session.timesheet_id}</span>
+                                                    {session.timesheet_status ? (
+                                                        <TimesheetStatusBadge status={session.timesheet_status} className="text-[10px]" />
+                                                    ) : null}
+                                                </Link>
+                                            ) : (
+                                                <span>Not synced to timesheet</span>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))
+                            )}
+                        </ul>
+
+                        {/* Desktop: keep the dense table */}
+                        <div className="hidden md:block">
                             <table className="w-full text-sm">
                                 <thead className="border-b bg-muted/40">
                                     <tr>

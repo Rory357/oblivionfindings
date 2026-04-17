@@ -215,10 +215,109 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                     </Button>
                 </div>
 
-                {/* Table */}
+                {/* List — mobile cards, desktop table */}
                 {timesheets.data.length > 0 ? (
                     <>
-                        <div className="overflow-x-auto rounded-xl border">
+                        {/* Mobile: stacked cards */}
+                        <ul className="space-y-2 md:hidden">
+                            {timesheets.data.map((t) => {
+                                const showReturnBanner = !isApprovalMode && t.status === 'returned';
+                                const dateLabel = new Date(t.work_date).toLocaleDateString('en-NZ', {
+                                    day: 'numeric', month: 'short', year: 'numeric',
+                                });
+                                const startLabel = new Date(t.starts_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+                                const endLabel = new Date(t.ends_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+                                const tagBadges = (
+                                    <>
+                                        {t.sleepover ? <Badge variant="outline" className="text-[10px]">Sleepover</Badge> : null}
+                                        {t.on_call ? <Badge variant="outline" className="text-[10px]">On-call</Badge> : null}
+                                        {t.public_holiday ? <Badge variant="outline" className="text-[10px]">Public holiday</Badge> : null}
+                                        {(t.mileage_km ?? 0) > 0 ? <Badge variant="outline" className="text-[10px]">{t.mileage_km}km</Badge> : null}
+                                    </>
+                                );
+                                return (
+                                    <li key={t.id} className="rounded-xl border bg-card p-3 text-sm">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex min-w-0 items-start gap-3">
+                                                {isApprovalMode ? (
+                                                    <input
+                                                        type="checkbox"
+                                                        className="mt-1 shrink-0"
+                                                        checked={!!selected[t.id]}
+                                                        onChange={(e) => setSelected((prev) => ({ ...prev, [t.id]: e.target.checked }))}
+                                                        aria-label={`Select timesheet for ${t.client.first_name} ${t.client.last_name} on ${dateLabel}`}
+                                                    />
+                                                ) : null}
+                                                <div className="min-w-0">
+                                                    <div className="font-medium">{dateLabel}</div>
+                                                    <div className="mt-0.5 text-xs text-muted-foreground">
+                                                        {startLabel} – {endLabel}
+                                                        {t.break_minutes ? ` · ${t.break_minutes}m break` : ''}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="shrink-0">
+                                                {isApprovalMode ? (
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        {t.submitted_at ? new Date(t.submitted_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '—'}
+                                                    </span>
+                                                ) : (
+                                                    <TimesheetStatusBadge status={t.status} />
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                                            <dt className="text-muted-foreground">Client</dt>
+                                            <dd className="min-w-0 truncate">
+                                                <Link className="underline" href={`/operations/clients/${t.client.id}`}>
+                                                    {t.client.first_name} {t.client.last_name}
+                                                </Link>
+                                            </dd>
+                                            <dt className="text-muted-foreground">Staff</dt>
+                                            <dd className="min-w-0 truncate">{t.staff?.name ?? '—'}</dd>
+                                            {t.shift ? (
+                                                <>
+                                                    <dt className="text-muted-foreground">Shift</dt>
+                                                    <dd className="min-w-0 truncate">
+                                                        {String(t.shift.shift_type ?? 'standard').replace('_', ' ')}
+                                                        {t.shift.location ? ` · ${t.shift.location}` : ''}
+                                                    </dd>
+                                                </>
+                                            ) : null}
+                                        </dl>
+
+                                        {!isApprovalMode && (t.sleepover || t.on_call || t.public_holiday || (t.mileage_km ?? 0) > 0) ? (
+                                            <div className="mt-2 flex flex-wrap gap-1">{tagBadges}</div>
+                                        ) : null}
+
+                                        {showReturnBanner ? (
+                                            <div className="mt-2">
+                                                <TimesheetReturnBanner
+                                                    timesheetId={t.id}
+                                                    returnNote={t.returned_notes}
+                                                    editHref={`/operations/timesheets/${t.id}/edit`}
+                                                />
+                                            </div>
+                                        ) : null}
+
+                                        <div className="mt-3 flex items-center justify-between gap-2">
+                                            {canApprove && t.status === 'submitted' ? (
+                                                <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 bg-yellow-500/10 text-[10px]">
+                                                    Needs approval
+                                                </Badge>
+                                            ) : <span />}
+                                            <Button asChild size="sm" variant="outline">
+                                                <Link href={`/operations/timesheets/${t.id}/edit`}>View</Link>
+                                            </Button>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+
+                        {/* Desktop: table */}
+                        <div className="hidden rounded-xl border md:block">
                             <table className="w-full text-sm">
                                 <thead className="bg-muted/40">
                                     <tr>
