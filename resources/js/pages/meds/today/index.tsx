@@ -165,7 +165,12 @@ function MedRow({ med }: { med: MedDue }) {
         <li className="flex items-center justify-between gap-3 py-2.5">
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">{med.client_name}</span>
+                    <Link
+                        href={`/operations/clients/${med.client_id}/care`}
+                        className="truncate text-sm font-medium hover:underline"
+                    >
+                        {med.client_name}
+                    </Link>
                     {med.is_controlled && (
                         <Badge
                             variant="outline"

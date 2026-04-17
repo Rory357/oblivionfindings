@@ -123,6 +123,17 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/clients/{client}/consents', [ClientConsentController::class, 'index'])
             ->whereNumber('client')
             ->name('operations.clients.consents.index');
+
+        // PR 14 — Consolidated frontline client care page
+        // Worker-facing landing for a single client. Uses StaffPageShell,
+        // ClientSafetyRibbon and the shared PRN sheet; admin show/medical/
+        // risks remain at their existing routes for manager flows.
+        Route::get('/clients/{client}/care', [\App\Http\Controllers\Operations\ClientCareController::class, 'show'])
+            ->whereNumber('client')
+            ->name('operations.clients.care');
+        Route::post('/clients/{client}/care/prn', [\App\Http\Controllers\Operations\ClientCareController::class, 'recordPrn'])
+            ->whereNumber('client')
+            ->name('operations.clients.care.prn');
     });
 
     // Client creation

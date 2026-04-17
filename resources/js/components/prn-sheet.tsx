@@ -3,6 +3,7 @@ import {
     AlertTriangle,
     CheckCircle2,
     ChevronLeft,
+    Info,
     Pill,
     Search,
     Shield,
@@ -64,6 +65,32 @@ interface PrnSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     medications: PrnMedication[];
+    /**
+     * When launched from a client-scoped surface (e.g. the consolidated client
+     * care page), we already know the client and can skip the client/med
+     * picker grouping. The sheet still reuses the same record step and the
+     * same backend path, but the header and empty-state copy shift to reflect
+     * the narrower context. Optional — /meds/today continues to pass a
+     * cross-client list and no preselectedClient.
+     */
+    preselectedClient?: {
+        id: number;
+        name: string;
+        /**
+         * True when this worker does not currently have an active (clocked-in)
+         * shift for this client. The PRN still records — we just surface the
+         * context explicitly so the worker knows the administration will not
+         * be linked to a shift, and future reporting can filter it.
+         */
+        hasActiveShift?: boolean;
+    };
+    /**
+     * Optional submit endpoint override. Defaults to `/meds/today/prn` so
+     * existing callers on the worker home keep working. The client-care
+     * launch points at a client-scoped endpoint so null-shift context can be
+     * handled server-side without guessing.
+     */
+    submitUrl?: string;
 }
 
 type Step = 'pick' | 'record';
@@ -82,9 +109,23 @@ function reasonChipsFor(med: PrnMedication): string[] {
         .slice(0, 6);
 }
 
-export default function PrnSheet({ open, onOpenChange, medications }: PrnSheetProps) {
-    const [step, setStep] = useState<Step>('pick');
-    const [selected, setSelected] = useState<PrnMedication | null>(null);
+export default function PrnSheet({
+    open,
+    onOpenChange,
+    medications,
+    preselectedClient,
+    submitUrl,
+}: PrnSheetProps) {
+    // When the sheet is launched from a single-client surface and there is
+    // only one PRN available, jump straight to the record step. Otherwise
+    // the worker still picks from the (possibly client-scoped) list.
+    const initialStep: Step =
+        preselectedClient && medications.length === 1 ? 'record' : 'pick';
+
+    const [step, setStep] = useState<Step>(initialStep);
+    const [selected, setSelected] = useState<PrnMedication | null>(
+        preselectedClient && medications.length === 1 ? medications[0] : null,
+    );
     const [search, setSearch] = useState('');
     const [reasonChoice, setReasonChoice] = useState<string | null>(null);
     const [reasonText, setReasonText] = useState('');
@@ -95,17 +136,28 @@ export default function PrnSheet({ open, onOpenChange, medications }: PrnSheetPr
         dose_given: string;
         notes: string;
     }>({
-        client_medication_id: null,
+        client_medication_id:
+            preselectedClient && medications.length === 1 ? medications[0].id : null,
         reason: '',
-        dose_given: '',
+        dose_given:
+            preselectedClient && medications.length === 1
+                ? medications[0].dose ?? ''
+                : '',
         notes: '',
     });
 
-    // Reset everything on close so the next open is a clean sheet.
+    // Reset everything on close so the next open is a clean sheet. Respect
+    // the preselected client launch — if we opened straight into the record
+    // step because there was only one PRN for this client, reset back to the
+    // same starting state on next open rather than jumping to the picker.
     useEffect(() => {
         if (!open) {
-            setStep('pick');
-            setSelected(null);
+            setStep(initialStep);
+            setSelected(
+                preselectedClient && medications.length === 1
+                    ? medications[0]
+                    : null,
+            );
             setSearch('');
             setReasonChoice(null);
             setReasonText('');
@@ -169,7 +221,7 @@ export default function PrnSheet({ open, onOpenChange, medications }: PrnSheetPr
             reason: effectiveReason,
         }));
 
-        form.post('/meds/today/prn', {
+        form.post(submitUrl ?? '/meds/today/prn', {
             preserveScroll: true,
             onSuccess: () => {
                 // flash-toaster renders the success toast on the next prop
@@ -208,7 +260,9 @@ export default function PrnSheet({ open, onOpenChange, medications }: PrnSheetPr
                             <SheetTitle className="text-base">Give as-needed med</SheetTitle>
                             <SheetDescription className="text-xs">
                                 {step === 'pick'
-                                    ? 'Pick the client and the PRN med you\u2019re giving now.'
+                                    ? preselectedClient
+                                        ? `Pick the PRN med you\u2019re giving to ${preselectedClient.name}.`
+                                        : 'Pick the client and the PRN med you\u2019re giving now.'
                                     : `${selected?.client_name} \u00b7 ${selected?.name}`}
                             </SheetDescription>
                         </div>
@@ -222,6 +276,7 @@ export default function PrnSheet({ open, onOpenChange, medications }: PrnSheetPr
                         search={search}
                         onSearchChange={setSearch}
                         onPick={pickMed}
+                        preselectedClient={preselectedClient}
                     />
                 )}
 
@@ -241,6 +296,9 @@ export default function PrnSheet({ open, onOpenChange, medications }: PrnSheetPr
                         submitting={form.processing}
                         canSubmit={canSubmit}
                         error={form.errors.reason || form.errors.client_medication_id}
+                        nullShiftNotice={
+                            preselectedClient && preselectedClient.hasActiveShift === false
+                        }
                     />
                 )}
             </SheetContent>
@@ -258,12 +316,14 @@ function PickStep({
     search,
     onSearchChange,
     onPick,
+    preselectedClient,
 }: {
     medications: PrnMedication[];
     groupedByClient: [string, PrnMedication[]][];
     search: string;
     onSearchChange: (s: string) => void;
     onPick: (m: PrnMedication) => void;
+    preselectedClient?: { id: number; name: string };
 }) {
     if (medications.length === 0) {
         return (
@@ -271,8 +331,9 @@ function PickStep({
                 <Pill className="h-8 w-8 text-muted-foreground/60" />
                 <p className="text-sm font-medium">No PRN meds set up</p>
                 <p className="max-w-xs text-xs text-muted-foreground">
-                    You can give as-needed meds from here once your clients have PRN
-                    medications configured on their profile.
+                    {preselectedClient
+                        ? `${preselectedClient.name} doesn\u2019t have any as-needed meds configured on their profile yet.`
+                        : 'You can give as-needed meds from here once your clients have PRN medications configured on their profile.'}
                 </p>
             </div>
         );
@@ -280,19 +341,21 @@ function PickStep({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b px-4 py-3">
-                <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        type="search"
-                        placeholder="Search client or med"
-                        value={search}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        className="h-11 pl-9"
-                        autoFocus={false}
-                    />
+            {!preselectedClient && (
+                <div className="border-b px-4 py-3">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            placeholder="Search client or med"
+                            value={search}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                            className="h-11 pl-9"
+                            autoFocus={false}
+                        />
+                    </div>
                 </div>
-            </div>
+            )}
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 {groupedByClient.length === 0 ? (
@@ -303,9 +366,11 @@ function PickStep({
                     <ul className="divide-y">
                         {groupedByClient.map(([clientName, meds]) => (
                             <li key={clientName} className="py-1">
-                                <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                    {clientName}
-                                </p>
+                                {!preselectedClient && (
+                                    <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                        {clientName}
+                                    </p>
+                                )}
                                 <ul>
                                     {meds.map((med) => (
                                         <li key={med.id}>
@@ -399,6 +464,7 @@ function RecordStep({
     submitting,
     canSubmit,
     error,
+    nullShiftNotice,
 }: {
     med: PrnMedication;
     reasonChips: string[];
@@ -414,6 +480,7 @@ function RecordStep({
     submitting: boolean;
     canSubmit: boolean;
     error?: string;
+    nullShiftNotice?: boolean;
 }) {
     const freeTextShown = reasonChips.length === 0 || reasonChoice === '__other__';
 
@@ -454,6 +521,25 @@ function RecordStep({
                             </p>
                             <p className="mt-0.5 text-xs text-red-700 dark:text-red-200">
                                 Don&rsquo;t give another dose without checking with your supervisor.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Null-shift notice — explicit, not silent. The admin path
+                    still saves the record without a shift_id; we just tell the
+                    worker that, so the reporting context isn't ambiguous. */}
+                {nullShiftNotice && (
+                    <div className="flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-sm dark:border-sky-900 dark:bg-sky-950/20">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" />
+                        <div className="min-w-0">
+                            <p className="font-medium text-sky-900 dark:text-sky-100">
+                                Not on shift for this client
+                            </p>
+                            <p className="mt-0.5 text-xs text-sky-800 dark:text-sky-200">
+                                The dose will still record, but it won&rsquo;t be linked to a
+                                shift. Add a note below if anything about the context
+                                matters.
                             </p>
                         </div>
                     </div>

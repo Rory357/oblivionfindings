@@ -215,11 +215,30 @@ export default function ClientsIndex({ clients }) {
                             </div>
 
                             <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/operations/clients/${client.id}`}>
-                                        View
-                                    </Link>
-                                </Button>
+                                {/* Care view is the consolidated frontline
+                                    page — the default target for support
+                                    workers. Managers still get "View" for the
+                                    admin show page. */}
+                                {role === 'support_worker' ? (
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link href={`/operations/clients/${client.id}/care`}>
+                                            Open
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <Button variant="outline" size="sm" asChild>
+                                            <Link href={`/operations/clients/${client.id}`}>
+                                                View
+                                            </Link>
+                                        </Button>
+                                        <Button variant="ghost" size="sm" asChild>
+                                            <Link href={`/operations/clients/${client.id}/care`}>
+                                                Care view
+                                            </Link>
+                                        </Button>
+                                    </>
+                                )}
 
                                 {canManage && (
                                     <>
