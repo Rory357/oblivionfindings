@@ -19,6 +19,14 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
+import {
+    categorizeTimelineType,
+    getEventDetailLabel,
+    getTimelineCategoryEntry,
+    TIMELINE_CATEGORY_ORDER,
+    TIMELINE_CATEGORY_VOCAB,
+    type TimelineCategory,
+} from '@/lib/timeline-vocab';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, Filter, Home, Search } from 'lucide-react';
 import { useState } from 'react';
@@ -60,169 +68,15 @@ type Props = {
     filters?: { type?: string; from?: string | null; to?: string | null };
 };
 
-const EVENT_TYPE_STYLES: Record<
-    string,
-    { dot: string; bg: string; label: string }
-> = {
-    shift: {
-        dot: 'bg-blue-500',
-        bg: 'bg-blue-50 border-l-blue-400',
-        label: 'Shift',
-    },
-    shift_started: {
-        dot: 'bg-emerald-500',
-        bg: 'bg-emerald-50 border-l-emerald-400',
-        label: 'Shift Started',
-    },
-    shift_completed: {
-        dot: 'bg-teal-500',
-        bg: 'bg-teal-50 border-l-teal-400',
-        label: 'Shift Completed',
-    },
-    shift_cancelled: {
-        dot: 'bg-amber-500',
-        bg: 'bg-amber-50 border-l-amber-400',
-        label: 'Shift Cancelled',
-    },
-    shift_replacement_requested: {
-        dot: 'bg-orange-500',
-        bg: 'bg-orange-50 border-l-orange-400',
-        label: 'Replacement Requested',
-    },
-    shift_replacement_claimed: {
-        dot: 'bg-sky-500',
-        bg: 'bg-sky-50 border-l-sky-400',
-        label: 'Replacement Claimed',
-    },
-    shift_replacement_approved: {
-        dot: 'bg-emerald-500',
-        bg: 'bg-emerald-50 border-l-emerald-400',
-        label: 'Replacement Approved',
-    },
-    shift_replacement_cancelled: {
-        dot: 'bg-stone-500',
-        bg: 'bg-stone-50 border-l-stone-400',
-        label: 'Replacement Cancelled',
-    },
-    note: {
-        dot: 'bg-violet-500',
-        bg: 'bg-violet-50 border-l-violet-400',
-        label: 'Note',
-    },
-    shift_note: {
-        dot: 'bg-violet-500',
-        bg: 'bg-violet-50 border-l-violet-400',
-        label: 'Shift Note',
-    },
-    progress_note: {
-        dot: 'bg-violet-500',
-        bg: 'bg-violet-50 border-l-violet-400',
-        label: 'Progress Note',
-    },
-    handover: {
-        dot: 'bg-cyan-500',
-        bg: 'bg-cyan-50 border-l-cyan-400',
-        label: 'Handover',
-    },
-    incident: {
-        dot: 'bg-red-500',
-        bg: 'bg-red-50 border-l-red-400',
-        label: 'Incident',
-    },
-    medication_given: {
-        dot: 'bg-emerald-500',
-        bg: 'bg-emerald-50 border-l-emerald-400',
-        label: 'Medication Given',
-    },
-    medication_refused: {
-        dot: 'bg-orange-500',
-        bg: 'bg-orange-50 border-l-orange-400',
-        label: 'Medication Refused',
-    },
-    medication_missed: {
-        dot: 'bg-amber-500',
-        bg: 'bg-amber-50 border-l-amber-400',
-        label: 'Medication Missed',
-    },
-    medication_prescribed: {
-        dot: 'bg-teal-500',
-        bg: 'bg-teal-50 border-l-teal-400',
-        label: 'Medication Added',
-    },
-    medication_correction: {
-        dot: 'bg-pink-500',
-        bg: 'bg-pink-50 border-l-pink-400',
-        label: 'Correction',
-    },
-    document_uploaded: {
-        dot: 'bg-indigo-500',
-        bg: 'bg-indigo-50 border-l-indigo-400',
-        label: 'Document',
-    },
-    condition_added: {
-        dot: 'bg-rose-500',
-        bg: 'bg-rose-50 border-l-rose-400',
-        label: 'Condition',
-    },
-    care_plan_created: {
-        dot: 'bg-purple-500',
-        bg: 'bg-purple-50 border-l-purple-400',
-        label: 'Care Plan',
-    },
-    appointment_scheduled: {
-        dot: 'bg-amber-500',
-        bg: 'bg-amber-50 border-l-amber-400',
-        label: 'Appointment',
-    },
-    visit_requested: {
-        dot: 'bg-green-500',
-        bg: 'bg-green-50 border-l-green-400',
-        label: 'Visit Request',
-    },
-    visit_approved: {
-        dot: 'bg-green-500',
-        bg: 'bg-green-50 border-l-green-400',
-        label: 'Visit Approved',
-    },
-    visit_cancelled: {
-        dot: 'bg-gray-500',
-        bg: 'bg-gray-50 border-l-gray-400',
-        label: 'Visit Cancelled',
-    },
-    photo_uploaded: {
-        dot: 'bg-sky-500',
-        bg: 'bg-sky-50 border-l-sky-400',
-        label: 'Photo',
-    },
-    family_note_created: {
-        dot: 'bg-purple-500',
-        bg: 'bg-purple-50 border-l-purple-400',
-        label: 'Family Note',
-    },
-    family_note_completed: {
-        dot: 'bg-emerald-500',
-        bg: 'bg-emerald-50 border-l-emerald-400',
-        label: 'Family Note Done',
-    },
-};
-
-const TYPE_FILTER_OPTIONS = [
-    { value: 'all', label: 'All Types' },
-    { value: 'shift', label: 'Shifts' },
-    { value: 'shift_started', label: 'Shift Arrivals' },
-    { value: 'shift_completed', label: 'Shift Completions' },
-    { value: 'shift_cancelled', label: 'Shift Cancellations' },
-    { value: 'shift_replacement_requested', label: 'Replacement Requests' },
-    { value: 'shift_replacement_approved', label: 'Replacement Approvals' },
-    { value: 'note', label: 'Notes' },
-    { value: 'progress_note', label: 'Progress Notes' },
-    { value: 'handover', label: 'Handovers' },
-    { value: 'incident', label: 'Incidents' },
-    { value: 'medication_given', label: 'Medications' },
-    { value: 'document_uploaded', label: 'Documents' },
-    { value: 'appointment_scheduled', label: 'Appointments' },
-    { value: 'family_note_created', label: 'Family Notes' },
-    { value: 'visit_requested', label: 'Visit Requests' },
+// Worker-facing category filter options. Raw backend types are still
+// preserved on each event and shown as secondary detail; the primary
+// row label uses the collapsed category set from `timeline-vocab`.
+const CATEGORY_FILTER_OPTIONS: { value: TimelineCategory | 'all'; label: string }[] = [
+    { value: 'all', label: 'All activity' },
+    ...TIMELINE_CATEGORY_ORDER.map((c) => ({
+        value: c,
+        label: TIMELINE_CATEGORY_VOCAB[c].label,
+    })),
 ];
 
 function groupByDate(events: EventDto[]): Record<string, EventDto[]> {
@@ -249,6 +103,7 @@ export default function TimelineIndex(props: Props) {
     const name = c ? `${c.first_name} ${c.last_name}`.trim() : props.scope.name;
 
     const [search, setSearch] = useState('');
+    const [category, setCategory] = useState<TimelineCategory | 'all'>('all');
     const [showAddNote, setShowAddNote] = useState(false);
 
     const noteForm = useForm<{ body: string }>({ body: '' });
@@ -275,16 +130,20 @@ export default function TimelineIndex(props: Props) {
         });
     };
 
-    // Filter by search text client-side
-    const filteredEvents = search
-        ? props.events.filter((e) => {
-              const searchable = [e.subject, e.body, e.type, e.actor?.name]
-                  .filter(Boolean)
-                  .join(' ')
-                  .toLowerCase();
-              return searchable.includes(search.toLowerCase());
-          })
-        : props.events;
+    // Filter by category + free text client-side. Backend date-range filter
+    // still controls which events arrive; category is a presentation-layer
+    // filter and doesn't need a round-trip.
+    const filteredEvents = props.events.filter((e) => {
+        if (category !== 'all' && categorizeTimelineType(e.type) !== category) {
+            return false;
+        }
+        if (!search) return true;
+        const searchable = [e.subject, e.body, e.type, e.actor?.name]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        return searchable.includes(search.toLowerCase());
+    });
 
     const grouped = groupByDate(filteredEvents);
 
@@ -401,14 +260,16 @@ export default function TimelineIndex(props: Props) {
                             />
                         </div>
                         <Select
-                            value={props.filters?.type ?? 'all'}
-                            onValueChange={(v) => updateFilter('type', v)}
+                            value={category}
+                            onValueChange={(v) =>
+                                setCategory(v as TimelineCategory | 'all')
+                            }
                         >
                             <SelectTrigger className="h-9 w-[160px] text-xs">
-                                <SelectValue placeholder="All Types" />
+                                <SelectValue placeholder="All activity" />
                             </SelectTrigger>
                             <SelectContent>
-                                {TYPE_FILTER_OPTIONS.map((o) => (
+                                {CATEGORY_FILTER_OPTIONS.map((o) => (
                                     <SelectItem key={o.value} value={o.value}>
                                         {o.label}
                                     </SelectItem>
@@ -502,13 +363,28 @@ export default function TimelineIndex(props: Props) {
                                 </div>
                                 <div className="ml-[3px] space-y-2 border-l-2 border-border pl-4">
                                     {events.map((e) => {
-                                        const style = EVENT_TYPE_STYLES[
-                                            e.type
-                                        ] ?? {
-                                            dot: 'bg-gray-400',
-                                            bg: 'bg-card border-l-gray-300',
-                                            label: e.type,
-                                        };
+                                        const cat = categorizeTimelineType(
+                                            e.type,
+                                        );
+                                        const style = getTimelineCategoryEntry(
+                                            cat,
+                                        );
+                                        const detailLabel = getEventDetailLabel(
+                                            e.type,
+                                        );
+                                        // If there's no subject, fall back to
+                                        // the specific event-type label so the
+                                        // row still says *what* happened.
+                                        const title = e.subject ?? detailLabel;
+                                        // Only show the secondary detail chip
+                                        // when it adds information beyond the
+                                        // category + title combination.
+                                        const showDetailChip =
+                                            !!detailLabel &&
+                                            detailLabel.toLowerCase() !==
+                                                style.label.toLowerCase() &&
+                                            detailLabel.toLowerCase() !==
+                                                (title ?? '').toLowerCase();
                                         return (
                                             <div
                                                 key={e.id}
@@ -521,20 +397,24 @@ export default function TimelineIndex(props: Props) {
                                                                 className={`h-2 w-2 rounded-full ${style.dot}`}
                                                             />
                                                             <span className="text-sm font-semibold">
-                                                                {e.subject ??
-                                                                    e.type}
+                                                                {title}
                                                             </span>
                                                             <Badge
                                                                 variant="outline"
-                                                                className="text-[9px] capitalize"
+                                                                className={`text-[9px] ${style.pill}`}
                                                             >
                                                                 {style.label}
                                                             </Badge>
+                                                            {showDetailChip && (
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    {detailLabel}
+                                                                </span>
+                                                            )}
                                                             {e.visibility ===
                                                                 'portal' && (
-                                                                <Badge className="border-0 bg-blue-100 text-[9px] text-blue-700">
+                                                                <Badge className="border-0 bg-blue-100 text-[9px] text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
                                                                     Family
-                                                                    Visible
+                                                                    visible
                                                                 </Badge>
                                                             )}
                                                         </div>
