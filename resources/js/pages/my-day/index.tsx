@@ -311,7 +311,6 @@ export default function MyDay({
     incidents,
     tasks,
     stats,
-    leave,
     is_manager,
     manager_data,
     clock,
@@ -881,49 +880,6 @@ export default function MyDay({
                         )}
                     </CardContent>
                 </Card>
-
-                {/* ── Leave balances (kept for parity with the old page) ── */}
-                {leave && leave.balances.length > 0 && (
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">Leave balances</CardTitle>
-                                {leave.pending_requests > 0 && (
-                                    <Badge variant="secondary">
-                                        {leave.pending_requests} pending
-                                    </Badge>
-                                )}
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3 pt-0">
-                            {leave.balances.map((bal) => {
-                                const pct =
-                                    bal.total_hours > 0
-                                        ? Math.round(
-                                            (bal.remaining_hours / bal.total_hours) * 100,
-                                        )
-                                        : 0;
-                                return (
-                                    <div key={bal.type} className="space-y-1">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="font-medium">{bal.type}</span>
-                                            <span className="text-muted-foreground">
-                                                {bal.remaining_hours}h / {bal.total_hours}h
-                                            </span>
-                                        </div>
-                                        <Progress value={pct} className="h-2" />
-                                    </div>
-                                );
-                            })}
-                            <Button variant="outline" size="sm" asChild className="mt-2">
-                                <Link href="/hr/leave">
-                                    Request leave
-                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                </Link>
-                            </Button>
-                        </CardContent>
-                    </Card>
-                )}
 
                 {/* ── Footer quick links ─────────────────────────────────── */}
                 <div className="flex flex-wrap gap-2 pt-1">

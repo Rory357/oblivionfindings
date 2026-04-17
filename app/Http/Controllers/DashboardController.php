@@ -319,9 +319,21 @@ class DashboardController extends Controller
             ->take(200)
             ->values();
 
-        // HR quick stats for dashboard
+        // Determine dashboard mode
+        $mode = 'staff';
+        if ($user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny')) {
+            $mode = 'manager';
+        }
+        // HR Admin override - if user primarily has HR permissions
+        if ($user->canDo('hr.analytics.view') && !$user->canDo('shifts.manageAny')) {
+            $mode = 'hr_admin';
+        }
+
+        // HR quick stats for dashboard — only for manager/HR-admin surfaces.
+        // PR 10 removed these from the staff-facing dashboard so the frontline
+        // home stays operational; staff see their HR items on `/hr/my` instead.
         $hrWidgets = null;
-        if ($user->canDo('hr.leave.viewAny') || $user->canDo('hr.performance.view') || $user->canDo('hr.compliance.view')) {
+        if ($mode !== 'staff' && ($user->canDo('hr.leave.viewAny') || $user->canDo('hr.performance.view') || $user->canDo('hr.compliance.view'))) {
             $hrWidgets = [
                 'pending_leave' => \App\Domain\Hr\Models\HrLeaveRequest::where('status', 'pending')->count(),
                 'expiring_compliance' => \App\Domain\Hr\Models\HrStaffComplianceStatus::where('status', 'expiring_soon')->count(),
@@ -331,16 +343,6 @@ class DashboardController extends Controller
                     ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
                     ->count(),
             ];
-        }
-
-        // Determine dashboard mode
-        $mode = 'staff';
-        if ($user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny')) {
-            $mode = 'manager';
-        }
-        // HR Admin override - if user primarily has HR permissions
-        if ($user->canDo('hr.analytics.view') && !$user->canDo('shifts.manageAny')) {
-            $mode = 'hr_admin';
         }
 
         // HR Admin dashboard data
@@ -429,31 +431,19 @@ class DashboardController extends Controller
             ];
         }
 
-        // Staff-specific KPIs
+        // Staff-specific KPIs — operational only.
+        // PR 10 removed the `leaveBalance` and `compliancePercent` values that
+        // previously surfaced on the staff dashboard. Staff now see those on
+        // `/hr/my`, and in practice they are redirected to `/my-day` before
+        // ever reaching the dashboard fallback.
         $staffKpis = null;
         if ($mode === 'staff') {
             $myShiftsToday = Shift::where('user_id', $user->id)
                 ->whereBetween('starts_at', [$today, $tomorrow])
                 ->count();
 
-            // Leave balance from HrLeaveBalance if available
-            $leaveBalance = null;
-            $hrLeaveBalance = \App\Domain\Hr\Models\HrLeaveBalance::where('user_id', $user->id)->first();
-            if ($hrLeaveBalance) {
-                $leaveBalance = (float) ($hrLeaveBalance->balance_hours ?? $hrLeaveBalance->balance ?? 0);
-            }
-
-            // Compliance percentage for this user
-            $userCompTotal = HrStaffComplianceStatus::where('user_id', $user->id)->count();
-            $userCompCompliant = HrStaffComplianceStatus::where('user_id', $user->id)->where('status', 'compliant')->count();
-            $compliancePercent = $userCompTotal > 0
-                ? (int) round(($userCompCompliant / $userCompTotal) * 100)
-                : null;
-
             $staffKpis = [
                 'myShiftsToday' => $myShiftsToday,
-                'leaveBalance' => $leaveBalance,
-                'compliancePercent' => $compliancePercent,
                 'pendingTasks' => $myDayItems->count(),
             ];
         }

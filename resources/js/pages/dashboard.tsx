@@ -37,10 +37,8 @@ import {
     Clock,
     ShieldAlert,
     CalendarDays,
-    Timer,
     CheckCircle2,
     ListTodo,
-    Building2,
     Briefcase,
     FileWarning,
     Activity,
@@ -169,11 +167,9 @@ type Props = {
         recentFeedPosts?: HrFeedPostLite[];
         expiringCompliance?: ExpiringComplianceItem[];
     } | null;
-    /* Staff-specific */
+    /* Staff-specific — operational KPIs only (PR 10). */
     staffKpis?: {
         myShiftsToday: number;
-        leaveBalance: number;
-        compliancePercent: number;
         pendingTasks: number;
     } | null;
     /* eMAR */
@@ -565,15 +561,19 @@ function StaffDashboard({ props }: { props: Props }) {
         ...(props.upcomingShifts ?? []),
     ];
 
+    // PR 10 — This fallback component is only reached if a staff user somehow
+    // lands on `/dashboard` directly (the controller redirects them to
+    // `/my-day`). It now shows a calm, operational view only — no HR or
+    // compliance widgets. The canonical frontline home is `/my-day`.
     return (
         <div className="space-y-8">
-            {/* Section: Today's Summary */}
+            {/* Section: Today's Summary — operational only */}
             <div>
                 <div className="mb-4">
                     <h2 className="text-lg font-semibold">Today's Summary</h2>
                     <div className="mt-2 h-0.5 w-12 bg-gradient-to-r from-primary to-transparent rounded-full"></div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                     <KpiCard
                         label="My Shifts Today"
                         value={kpis?.myShiftsToday ?? props.todayShifts?.length ?? 0}
@@ -581,77 +581,18 @@ function StaffDashboard({ props }: { props: Props }) {
                         href="/shifts"
                     />
                     <KpiCard
-                        label="Leave Balance"
-                        value={kpis?.leaveBalance != null ? `${kpis.leaveBalance}h` : '--'}
-                        icon={CalendarDays}
-                        href="/hr/leave"
-                    />
-                    <KpiCard
-                        label="Compliance"
-                        value={kpis?.compliancePercent != null ? `${kpis.compliancePercent}%` : '--'}
-                        icon={CheckCircle2}
-                        trend={
-                            kpis?.compliancePercent != null
-                                ? {
-                                      value: kpis.compliancePercent,
-                                      label: 'complete',
-                                      direction:
-                                          kpis.compliancePercent >= 90
-                                              ? 'up'
-                                              : kpis.compliancePercent >= 70
-                                                ? 'neutral'
-                                                : 'down',
-                                  }
-                                : undefined
-                        }
-                    />
-                    <KpiCard
                         label="Pending Tasks"
                         value={kpis?.pendingTasks ?? props.myDayItems?.length ?? 0}
                         icon={ListTodo}
+                        href="/my-day"
                     />
                 </div>
             </div>
 
-            {/* HR widgets if available */}
-            {props.hrWidgets && (
-                <div>
-                    <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-muted-foreground">Human Resources</h3>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <KpiCard
-                            label="Pending Leave"
-                            value={props.hrWidgets.pending_leave}
-                            icon={CalendarDays}
-                            href="/hr/leave"
-                        />
-                        <KpiCard
-                            label="Expiring Compliance"
-                            value={props.hrWidgets.expiring_compliance}
-                            icon={FileWarning}
-                            href="/hr/compliance"
-                        />
-                        <KpiCard
-                            label="Pending Signatures"
-                            value={props.hrWidgets.pending_signatures}
-                            icon={ClipboardList}
-                            href="/hr/signatures/pending"
-                        />
-                        <KpiCard
-                            label="Due Attestations"
-                            value={props.hrWidgets.due_attestations}
-                            icon={CheckCircle2}
-                            href="/hr/my/policies"
-                        />
-                    </div>
-                </div>
-            )}
-
-            {/* Row 2: Schedule + Check-in */}
+            {/* Row 2: Schedule + canonical home prompt */}
             <div>
                 <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Schedule & Wellness</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground">Schedule</h3>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-3">
                     <div className="lg:col-span-2">
@@ -666,48 +607,25 @@ function StaffDashboard({ props }: { props: Props }) {
                     <div className="lg:col-span-1">
                         <Card className="border-primary/10 bg-gradient-to-br from-card via-card to-primary/5 shadow-sm">
                             <CardHeader>
-                                <CardTitle className="text-sm">Daily Check-in</CardTitle>
+                                <CardTitle className="text-sm">Go to My Day</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="text-sm text-muted-foreground">
-                                    How are you feeling today?
-                                </div>
-                                <div className="flex gap-2">
-                                    {['Great', 'Good', 'Okay', 'Tired'].map((mood) => (
-                                        <Button
-                                            key={mood}
-                                            size="sm"
-                                            variant="outline"
-                                            className="flex-1 transition-all hover:bg-primary/10 hover:border-primary/30"
-                                        >
-                                            {mood}
-                                        </Button>
-                                    ))}
-                                </div>
-
-                                <div className="border-t pt-4">
-                                    <div className="text-xs font-medium text-muted-foreground">
-                                        Quick Actions
-                                    </div>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        <Button asChild size="sm" variant="outline" className="transition-all hover:bg-primary/10">
-                                            <Link href="/hr/leave/create">Submit Leave</Link>
-                                        </Button>
-                                        <Button asChild size="sm" variant="outline" className="transition-all hover:bg-primary/10">
-                                            <Link href="/timesheets">View Timesheets</Link>
-                                        </Button>
-                                    </div>
-                                </div>
+                            <CardContent className="space-y-3">
+                                <p className="text-sm text-muted-foreground">
+                                    Your shifts, meds, and action items live on My Day.
+                                </p>
+                                <Button asChild size="sm" className="w-full">
+                                    <Link href="/my-day">Open My Day</Link>
+                                </Button>
                             </CardContent>
                         </Card>
                     </div>
                 </div>
             </div>
 
-            {/* Row 3: Tasks + Quick Actions */}
+            {/* Row 3: Tasks list */}
             <div>
                 <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Tasks & Actions</h3>
+                    <h3 className="text-sm font-semibold text-muted-foreground">Tasks</h3>
                 </div>
                 <div className="grid gap-4 lg:grid-cols-3">
                     <div className="lg:col-span-2">
@@ -718,41 +636,7 @@ function StaffDashboard({ props }: { props: Props }) {
                         />
                     </div>
 
-                    <div className="lg:col-span-1 space-y-4">
-                        <Card className="border-emerald/10 bg-gradient-to-br from-card via-card to-emerald/5 shadow-sm">
-                            <CardHeader>
-                                <CardTitle className="text-sm">Quick Actions</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button asChild size="sm" variant="outline" className="justify-start transition-all hover:bg-emerald/10 hover:border-emerald/30">
-                                        <Link href="/hr/leave/create">
-                                            <CalendarDays className="mr-2 h-4 w-4" />
-                                            Submit Leave
-                                        </Link>
-                                    </Button>
-                                    <Button asChild size="sm" variant="outline" className="justify-start transition-all hover:bg-emerald/10 hover:border-emerald/30">
-                                        <Link href="/timesheets">
-                                            <Timer className="mr-2 h-4 w-4" />
-                                            View Timesheets
-                                        </Link>
-                                    </Button>
-                                    <Button asChild size="sm" variant="outline" className="justify-start transition-all hover:bg-emerald/10 hover:border-emerald/30">
-                                        <Link href="/hr/my/training">
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            My Training
-                                        </Link>
-                                    </Button>
-                                    <Button asChild size="sm" variant="outline" className="justify-start transition-all hover:bg-emerald/10 hover:border-emerald/30">
-                                        <Link href="/hr/my/policies">
-                                            <ClipboardList className="mr-2 h-4 w-4" />
-                                            My Policies
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-
+                    <div className="lg:col-span-1">
                         <ActivityTimeline
                             title="Activity"
                             events={props.upcomingEvents ?? []}

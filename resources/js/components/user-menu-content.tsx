@@ -10,7 +10,7 @@ const logout = () => '/logout';
 const edit = () => '/profile';
 import { type User } from '@/types';
 import { Link, router } from '@inertiajs/react';
-import { LogOut, Settings } from 'lucide-react';
+import { Briefcase, LogOut, Settings } from 'lucide-react';
 
 interface UserMenuContentProps {
     user: User;
@@ -33,6 +33,18 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+                <DropdownMenuItem asChild>
+                    <Link
+                        className="block w-full"
+                        href="/hr/my"
+                        as="button"
+                        prefetch
+                        onClick={cleanup}
+                    >
+                        <Briefcase className="mr-2" />
+                        My HR
+                    </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                     <Link
                         className="block w-full"
