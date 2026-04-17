@@ -20,6 +20,7 @@ import HandoverWriteForm, {
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
+import { useUndoableAction } from '@/hooks/use-undoable-action';
 import { formatTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
@@ -105,6 +106,7 @@ export default function ClockInCard({
 
     const [submitting, setSubmitting] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const { run: runUndoable } = useUndoableAction();
     const [breakPreset, setBreakPreset] = useState<number | 'custom'>(0);
     const [customBreak, setCustomBreak] = useState('');
     const [now, setNow] = useState<number>(() => Date.now());
@@ -198,15 +200,16 @@ export default function ClockInCard({
         );
     };
 
-    const handleClockOutConfirm = () => {
+    // PR 21 — after the worker confirms in the dialog, we hold the real
+    // POST for a short undo window. Nothing is written to the backend
+    // during that window, so Undo genuinely prevents the clock-out rather
+    // than faking a reversal after the fact. The confirm dialog closes
+    // immediately so the worker sees the undo toast clearly on the home.
+    const commitClockOutNow = () => {
         if (!openSession) return;
-        setSubmitting(true);
 
-        // Save the short handover first so the outgoing shift's carry-over
-        // is captured *before* the attendance session closes. If the worker
-        // hasn't answered the shift-rating yet, that's fine — the backend
-        // accepts a null rating. A backend failure surfaces via Inertia
-        // errors and we don't proceed to clock-out so nothing is lost.
+        const finishClockOut = () => performClockOut();
+
         if (handoverEligible && openSession.shift_id) {
             router.post(
                 '/attendance/handover',
@@ -221,7 +224,7 @@ export default function ClockInCard({
                     preserveScroll: true,
                     onSuccess: () => {
                         clearHandoverDraft();
-                        performClockOut();
+                        finishClockOut();
                     },
                     onError: () => {
                         setSubmitting(false);
@@ -231,7 +234,25 @@ export default function ClockInCard({
             return;
         }
 
-        performClockOut();
+        finishClockOut();
+    };
+
+    const handleClockOutConfirm = () => {
+        if (!openSession) return;
+        setSubmitting(true);
+        setConfirmOpen(false);
+
+        runUndoable({
+            message: 'Clocking out…',
+            durationMs: 5000,
+            onCommit: commitClockOutNow,
+            onUndo: () => {
+                // Shift stays open; re-enable the Clock out button so the
+                // worker can try again. The handover draft is untouched.
+                setSubmitting(false);
+            },
+            undoneMessage: 'Clock-out cancelled — still on shift.',
+        });
     };
 
     /* ---------------------------------- */
@@ -436,7 +457,7 @@ export default function ClockInCard({
                                     handleClockOutConfirm();
                                 }}
                                 disabled={submitting}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                className="bg-destructive text-white hover:bg-destructive/90"
                             >
                                 {submitting
                                     ? 'Ending…'

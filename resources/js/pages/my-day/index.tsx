@@ -30,6 +30,7 @@ import HandoverReadCard, {
 import RefreshPill from '@/components/refresh-pill';
 import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import useLiveRefresh from '@/hooks/use-live-refresh';
+import { useUndoableAction } from '@/hooks/use-undoable-action';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import StaffStatus from '@/components/staff-status';
 import TimesheetReturnBanner from '@/components/timesheet-return-banner';
@@ -311,9 +312,47 @@ export default function MyDay({
     // freshness in the header and lets the worker refresh on demand.
     const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh();
 
+    // PR 21 — wrap "Send" in a 5 s undo window so an accidental tap on a
+    // draft timesheet row doesn't immediately commit it for approval. We
+    // delay the POST rather than reverse after the fact, so auditability
+    // is unchanged: nothing is submitted unless the timer elapses.
+    const { run: runUndoable } = useUndoableAction();
+    const [pendingTimesheetIds, setPendingTimesheetIds] = useState<
+        Record<number, true>
+    >({});
+
     const handleTimesheetSubmit = (tsId: number) => {
-        // Action endpoint URL is unchanged (see routes/web.php comment).
-        router.post(`/my-tasks/timesheet/${tsId}/submit`, {}, { preserveScroll: true });
+        if (pendingTimesheetIds[tsId]) return;
+        setPendingTimesheetIds((prev) => ({ ...prev, [tsId]: true }));
+        runUndoable({
+            message: 'Timesheet sending…',
+            durationMs: 5000,
+            onCommit: () => {
+                // Action endpoint URL is unchanged (see routes/web.php comment).
+                router.post(
+                    `/my-tasks/timesheet/${tsId}/submit`,
+                    {},
+                    {
+                        preserveScroll: true,
+                        onFinish: () => {
+                            setPendingTimesheetIds((prev) => {
+                                const next = { ...prev };
+                                delete next[tsId];
+                                return next;
+                            });
+                        },
+                    },
+                );
+            },
+            onUndo: () => {
+                setPendingTimesheetIds((prev) => {
+                    const next = { ...prev };
+                    delete next[tsId];
+                    return next;
+                });
+            },
+            undoneMessage: 'Timesheet still in draft.',
+        });
     };
 
     // "Action needed" = CR alerts + open incidents + follow-ups + overdue meds.
@@ -725,11 +764,16 @@ export default function MyDay({
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
+                                                            disabled={
+                                                                !!pendingTimesheetIds[ts.id]
+                                                            }
                                                             onClick={() =>
                                                                 handleTimesheetSubmit(ts.id)
                                                             }
                                                         >
-                                                            Send
+                                                            {pendingTimesheetIds[ts.id]
+                                                                ? 'Sending…'
+                                                                : 'Send'}
                                                         </Button>
                                                     )}
                                                 </div>

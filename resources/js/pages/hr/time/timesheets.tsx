@@ -35,6 +35,7 @@ import { Label } from '@/components/ui/label';
 import { FileText, CheckCircle2, XCircle, Send, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { useUndoableAction } from '@/hooks/use-undoable-action';
 
 interface Timesheet {
     id: number;
@@ -109,11 +110,26 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
         router.get('/hr/time/timesheets', newFilters, { preserveState: true, replace: true });
     }
 
+    const { run: runUndoable } = useUndoableAction();
+
     function handleSubmit(id: number) {
+        // PR 21 — delayed commit so an accidental tap on "Submit" in a
+        // dense table gets a 5 s grace window. The POST only fires once
+        // the timer elapses.
         setProcessing(id);
-        router.post(`/hr/time/timesheets/${id}/submit`, {}, {
-            preserveScroll: true,
-            onFinish: () => setProcessing(null),
+        runUndoable({
+            message: 'Timesheet sending…',
+            durationMs: 5000,
+            onCommit: () => {
+                router.post(`/hr/time/timesheets/${id}/submit`, {}, {
+                    preserveScroll: true,
+                    onFinish: () => setProcessing(null),
+                });
+            },
+            onUndo: () => {
+                setProcessing(null);
+            },
+            undoneMessage: 'Timesheet still in draft.',
         });
     }
 
