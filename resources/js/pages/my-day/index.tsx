@@ -24,18 +24,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
 import ClockInCard from '@/components/clock-in-card';
 import RefreshPill from '@/components/refresh-pill';
 import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import useLiveRefresh from '@/hooks/use-live-refresh';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import StaffStatus from '@/components/staff-status';
+import TimesheetReturnBanner from '@/components/timesheet-return-banner';
 import {
     mapIncidentStatus,
     mapMedStatus,
@@ -656,67 +651,55 @@ export default function MyDay({
                             <ul className="divide-y">
                                 {timesheets.map((ts) => {
                                     const tState = mapTimesheetStatus(ts.status);
+                                    const needsChanges = tState === 'needs_changes';
                                     return (
                                         <li
                                             key={ts.id}
-                                            className="flex items-center justify-between gap-3 py-2.5 text-sm"
+                                            className="space-y-2 py-2.5 text-sm"
                                         >
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium">
-                                                        {ts.work_date}
-                                                    </span>
-                                                    {ts.client_name && (
-                                                        <span className="truncate text-muted-foreground">
-                                                            · {ts.client_name}
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">
+                                                            {ts.work_date}
                                                         </span>
-                                                    )}
+                                                        {ts.client_name && (
+                                                            <span className="truncate text-muted-foreground">
+                                                                · {ts.client_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-0.5 text-xs text-muted-foreground">
+                                                        {ts.hours}h
+                                                    </div>
                                                 </div>
-                                                <div className="mt-0.5 text-xs text-muted-foreground">
-                                                    {ts.hours}h
-                                                </div>
-                                            </div>
-                                            <div className="flex shrink-0 items-center gap-2">
-                                                {tState ? (
-                                                    ts.return_notes ? (
-                                                        <TooltipProvider>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <span>
-                                                                        <StaffStatus
-                                                                            kind="timesheet"
-                                                                            state={tState}
-                                                                            size="sm"
-                                                                        />
-                                                                    </span>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p className="max-w-xs text-xs">
-                                                                        {ts.return_notes}
-                                                                    </p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </TooltipProvider>
-                                                    ) : (
+                                                <div className="flex shrink-0 items-center gap-2">
+                                                    {tState && !needsChanges ? (
                                                         <StaffStatus
                                                             kind="timesheet"
                                                             state={tState}
                                                             size="sm"
                                                         />
-                                                    )
-                                                ) : null}
-                                                {ts.status === 'draft' && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            handleTimesheetSubmit(ts.id)
-                                                        }
-                                                    >
-                                                        Submit
-                                                    </Button>
-                                                )}
+                                                    ) : null}
+                                                    {ts.status === 'draft' && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                handleTimesheetSubmit(ts.id)
+                                                            }
+                                                        >
+                                                            Submit
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
+                                            {needsChanges ? (
+                                                <TimesheetReturnBanner
+                                                    timesheetId={ts.id}
+                                                    returnNote={ts.return_notes}
+                                                />
+                                            ) : null}
                                         </li>
                                     );
                                 })}

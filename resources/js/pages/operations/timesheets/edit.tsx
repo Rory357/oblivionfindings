@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
 import FleetHero from '@/components/fleet-hero';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
+import TimesheetReturnBanner from '@/components/timesheet-return-banner';
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,14 +93,12 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
                 />
 
                 {/* Status-specific banners */}
-                {status === 'returned' && timesheet.returned_notes ? (
-                    <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                        <div>
-                            <div className="text-xs font-medium text-amber-700 dark:text-amber-400">Returned — changes requested</div>
-                            <div className="mt-1 text-sm text-amber-800 dark:text-amber-300 whitespace-pre-wrap">{timesheet.returned_notes}</div>
-                        </div>
-                    </div>
+                {status === 'returned' ? (
+                    <TimesheetReturnBanner
+                        timesheetId={timesheet.id}
+                        returnNote={timesheet.returned_notes}
+                        hideAction
+                    />
                 ) : null}
 
                 {(status === 'approved' || status === 'rejected') && timesheet.decision_notes ? (

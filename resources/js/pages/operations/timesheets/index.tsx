@@ -1,6 +1,7 @@
 import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
+import TimesheetReturnBanner from '@/components/timesheet-return-banner';
 import { OpsStatCard } from '@/components/ops-stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { EmptyList } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FileText, Clock, CheckCircle2, AlertCircle, Send } from 'lucide-react';
 
 type Timesheet = {
@@ -25,6 +26,7 @@ type Timesheet = {
     on_call?: boolean;
     public_holiday?: boolean;
     status: string;
+    returned_notes?: string | null;
     submitted_at?: string | null;
     client: { id: number; first_name: string; last_name: string };
     staff: { id: number; name: string };
@@ -233,8 +235,13 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {timesheets.data.map((t) => (
-                                        <tr key={t.id} className="border-t transition-colors hover:bg-muted/20">
+                                    {timesheets.data.map((t) => {
+                                        const showReturnBanner =
+                                            !isApprovalMode && t.status === 'returned';
+                                        const rowColspan = isApprovalMode ? 6 : 5;
+                                        return (
+                                        <React.Fragment key={t.id}>
+                                        <tr className="border-t transition-colors hover:bg-muted/20">
                                             {isApprovalMode ? (
                                                 <td className="p-3">
                                                     <input type="checkbox" checked={!!selected[t.id]} onChange={(e) => setSelected((prev) => ({ ...prev, [t.id]: e.target.checked }))} />
@@ -290,7 +297,20 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                        {showReturnBanner ? (
+                                            <tr className="border-t bg-amber-50/40 dark:bg-amber-500/5">
+                                                <td colSpan={rowColspan} className="p-3">
+                                                    <TimesheetReturnBanner
+                                                        timesheetId={t.id}
+                                                        returnNote={t.returned_notes}
+                                                        editHref={`/operations/timesheets/${t.id}/edit`}
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ) : null}
+                                        </React.Fragment>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
