@@ -16,6 +16,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import VoiceInputButton from '@/components/voice-input-button';
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
@@ -224,7 +225,15 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                                     </Select>
                                 </div>
                             </div>
-                            <Textarea className="mt-3 min-h-[80px] text-sm" placeholder="Write your progress note..." value={noteData.content} onChange={(e) => setNoteData({ ...noteData, content: e.target.value })} />
+                            <div className="mt-3 flex items-center justify-between">
+                                <Label className="text-xs">Note</Label>
+                                <VoiceInputButton
+                                    value={noteData.content}
+                                    onChange={(next) => setNoteData({ ...noteData, content: next })}
+                                    fieldLabel="Progress note"
+                                />
+                            </div>
+                            <Textarea className="mt-1 min-h-[80px] text-sm" placeholder="Write your progress note..." value={noteData.content} onChange={(e) => setNoteData({ ...noteData, content: e.target.value })} />
                             <div className="mt-3 flex items-center justify-between">
                                 <Button size="sm" variant="ghost" className="text-xs" onClick={() => setShowAddForm(false)}>Cancel</Button>
                                 <Button size="sm" className="bg-violet-600 hover:bg-violet-700" onClick={submitNote} disabled={!noteData.client_id || !noteData.content.trim()}>Save Note</Button>

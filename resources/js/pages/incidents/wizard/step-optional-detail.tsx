@@ -2,6 +2,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import VoiceInputButton from '@/components/voice-input-button';
 
 export type StepThreeData = {
     immediate_action_taken: string;
@@ -56,7 +57,14 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
             </div>
 
             <div className="space-y-2">
-                <Label className="text-sm font-medium">What you did straight away</Label>
+                <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">What you did straight away</Label>
+                    <VoiceInputButton
+                        value={data.immediate_action_taken}
+                        onChange={(next) => onChange({ immediate_action_taken: next })}
+                        fieldLabel="What you did straight away"
+                    />
+                </div>
                 <Textarea
                     value={data.immediate_action_taken}
                     onChange={(e) => onChange({ immediate_action_taken: e.target.value })}
@@ -67,7 +75,14 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
             </div>
 
             <div className="space-y-2">
-                <Label className="text-sm font-medium">Who else was there</Label>
+                <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Who else was there</Label>
+                    <VoiceInputButton
+                        value={data.witnesses}
+                        onChange={(next) => onChange({ witnesses: next })}
+                        fieldLabel="Who else was there"
+                    />
+                </div>
                 <Textarea
                     value={data.witnesses}
                     onChange={(e) => onChange({ witnesses: e.target.value })}

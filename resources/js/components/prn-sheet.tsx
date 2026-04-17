@@ -22,6 +22,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import VoiceInputButton from '@/components/voice-input-button';
 
 /* -------------------------------------------------------------------------- */
 /*  PR 13 — PRN (as-needed meds) quick flow                                   */
@@ -639,9 +640,16 @@ function RecordStep({
 
                 {/* Note */}
                 <div>
-                    <label htmlFor="prn-note" className="text-sm font-medium">
-                        Add a note <span className="text-xs text-muted-foreground">(optional)</span>
-                    </label>
+                    <div className="flex items-center justify-between">
+                        <label htmlFor="prn-note" className="text-sm font-medium">
+                            Add a note <span className="text-xs text-muted-foreground">(optional)</span>
+                        </label>
+                        <VoiceInputButton
+                            value={notes}
+                            onChange={onNotesChange}
+                            fieldLabel="PRN note"
+                        />
+                    </div>
                     <Textarea
                         id="prn-note"
                         value={notes}

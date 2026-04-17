@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import VoiceInputButton from '@/components/voice-input-button';
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
@@ -263,7 +264,14 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <Label>Activities</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Activities</Label>
+                                    <VoiceInputButton
+                                        value={data.activities}
+                                        onChange={(next) => setData('activities', next)}
+                                        fieldLabel="Activities"
+                                    />
+                                </div>
                                 <Textarea
                                     value={data.activities}
                                     onChange={(e) => setData('activities', e.target.value)}
@@ -272,7 +280,14 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
                                 {errors.activities && <div className="mt-1 text-xs text-red-500">{errors.activities}</div>}
                             </div>
                             <div>
-                                <Label>Observations</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Observations</Label>
+                                    <VoiceInputButton
+                                        value={data.observations}
+                                        onChange={(next) => setData('observations', next)}
+                                        fieldLabel="Observations"
+                                    />
+                                </div>
                                 <Textarea
                                     value={data.observations}
                                     onChange={(e) => setData('observations', e.target.value)}
@@ -281,7 +296,14 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
                                 {errors.observations && <div className="mt-1 text-xs text-red-500">{errors.observations}</div>}
                             </div>
                             <div>
-                                <Label>Concerns</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Concerns</Label>
+                                    <VoiceInputButton
+                                        value={data.concerns}
+                                        onChange={(next) => setData('concerns', next)}
+                                        fieldLabel="Concerns"
+                                    />
+                                </div>
                                 <Textarea
                                     value={data.concerns}
                                     onChange={(e) => setData('concerns', e.target.value)}
@@ -290,7 +312,14 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
                                 {errors.concerns && <div className="mt-1 text-xs text-red-500">{errors.concerns}</div>}
                             </div>
                             <div>
-                                <Label>Goals Progress</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Goals Progress</Label>
+                                    <VoiceInputButton
+                                        value={data.goals_progress}
+                                        onChange={(next) => setData('goals_progress', next)}
+                                        fieldLabel="Goals progress"
+                                    />
+                                </div>
                                 <Textarea
                                     value={data.goals_progress}
                                     onChange={(e) => setData('goals_progress', e.target.value)}

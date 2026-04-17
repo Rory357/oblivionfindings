@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import VoiceInputButton from '@/components/voice-input-button';
 
 /* -------------------------------------------------------------------------- */
 /*  Handover write form — shown at clock-out                                  */
@@ -161,15 +162,23 @@ export default function HandoverWriteForm({
 
             {/* Notes */}
             <div className="space-y-1.5">
-                <label
-                    htmlFor="handover-notes"
-                    className="block text-sm font-medium"
-                >
-                    What should the next shift know?{' '}
-                    <span className="font-normal text-muted-foreground">
-                        (optional)
-                    </span>
-                </label>
+                <div className="flex items-center justify-between gap-2">
+                    <label
+                        htmlFor="handover-notes"
+                        className="block text-sm font-medium"
+                    >
+                        What should the next shift know?{' '}
+                        <span className="font-normal text-muted-foreground">
+                            (optional)
+                        </span>
+                    </label>
+                    <VoiceInputButton
+                        value={value.handover_notes}
+                        onChange={(next) => set('handover_notes', next)}
+                        fieldLabel="Handover notes"
+                        disabled={disabled}
+                    />
+                </div>
                 <textarea
                     id="handover-notes"
                     rows={3}
