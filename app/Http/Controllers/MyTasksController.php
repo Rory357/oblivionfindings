@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Services\AttendanceService;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
@@ -9,6 +11,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
 use App\Models\Shift;
 use App\Models\Timesheet;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -76,6 +79,9 @@ class MyTasksController extends Controller
         // 10. Manager data
         $managerData = $isManager ? $this->getManagerData($user, $today, $tomorrowEnd) : null;
 
+        // 11. Frontline clock state (PR 4)
+        $clock = $this->getClockState($user, $now);
+
         return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
             'shifts' => $shifts->values()->all(),
@@ -87,7 +93,74 @@ class MyTasksController extends Controller
             'leave' => $leave,
             'is_manager' => $isManager,
             'manager_data' => $managerData,
+            'clock' => $clock,
         ]);
+    }
+
+    /**
+     * Build the clock-in/out payload for the frontline home card.
+     *
+     * Reuses the existing AttendanceService / HrAttendanceSession pipeline so
+     * that starting a shift from `/my-day` behaves identically to starting it
+     * from the full Attendance page (a real session row is created, and
+     * clock-out drafts a timesheet).
+     */
+    private function getClockState(User $user, Carbon $now): array
+    {
+        $canClock = $user->canDo('timesheets.create')
+            || $user->canDo('shifts.viewAssigned')
+            || $user->canDo('shifts.update')
+            || $user->canDo('shifts.manageAny');
+
+        $openSession = null;
+        $eligibleShifts = collect();
+        $activeShift = null;
+
+        try {
+            $openSession = HrAttendanceSession::query()
+                ->with(['shift.client:id,first_name,last_name'])
+                ->where('user_id', $user->id)
+                ->open()
+                ->latest('clock_in_at')
+                ->first();
+
+            $eligibleShifts = app(AttendanceService::class)
+                ->eligibleShiftsForUser($user, $now)
+                ->load('client:id,first_name,last_name');
+
+            $activeShift = $eligibleShifts->count() === 1 ? $eligibleShifts->first() : null;
+        } catch (\Throwable) {
+            // Fail soft — home should still render without the clock card.
+        }
+
+        $shiftToCard = fn ($shift) => [
+            'id' => $shift->id,
+            'starts_at' => optional($shift->starts_at)->toIso8601String(),
+            'ends_at' => optional($shift->ends_at)->toIso8601String(),
+            'status' => $shift->status,
+            'location' => $shift->location,
+            'client_name' => $shift->client
+                ? trim($shift->client->first_name . ' ' . $shift->client->last_name)
+                : null,
+        ];
+
+        return [
+            'can_clock' => $canClock,
+            'open_session' => $openSession ? [
+                'id' => $openSession->id,
+                'clock_in_at' => optional($openSession->clock_in_at)->toIso8601String(),
+                'shift_id' => $openSession->shift_id,
+                'client_name' => $openSession->shift?->client
+                    ? trim($openSession->shift->client->first_name . ' ' . $openSession->shift->client->last_name)
+                    : null,
+                'shift_starts_at' => optional($openSession->shift?->starts_at)->toIso8601String(),
+                'shift_ends_at' => optional($openSession->shift?->ends_at)->toIso8601String(),
+                'location' => $openSession->shift?->location ?? $openSession->location,
+            ] : null,
+            'active_shift' => $activeShift ? $shiftToCard($activeShift) : null,
+            'eligible_shifts' => $eligibleShifts->map($shiftToCard)->values()->all(),
+            'eligible_shift_count' => $eligibleShifts->count(),
+        ];
     }
 
     private function getShifts(int $userId, Carbon $today, Carbon $tomorrowEnd, Carbon $now): \Illuminate\Support\Collection

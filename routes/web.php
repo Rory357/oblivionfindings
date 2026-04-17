@@ -111,9 +111,13 @@ Route::redirect('/my-tasks', '/my-day')
 
 // My Day quick actions — URL paths intentionally unchanged to avoid churning
 // every POST call-site; names are aliased under `my-day.*` for future use.
+//
+// PR 4.5 removed the `/my-tasks/clock-in/{shift}` and `/my-tasks/clock-out/{shift}`
+// shortcuts so the frontline clock flow funnels exclusively through
+// `POST /attendance/clock-in` + `POST /attendance/clock-out` (AttendanceController),
+// which goes through AttendanceService and writes a real HrAttendanceSession and
+// draft Timesheet. Do not re-add quick-clock endpoints here.
 Route::middleware(['auth'])->group(function () {
-    Route::post('/my-tasks/clock-in/{shift}', [\App\Http\Controllers\MyDayActionsController::class, 'clockIn'])->name('my-day.clock-in');
-    Route::post('/my-tasks/clock-out/{shift}', [\App\Http\Controllers\MyDayActionsController::class, 'clockOut'])->name('my-day.clock-out');
     Route::post('/my-tasks/shift-task/{task}/complete', [\App\Http\Controllers\MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
     Route::post('/my-tasks/timesheet/{timesheet}/submit', [\App\Http\Controllers\MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');
 });

@@ -9,7 +9,9 @@ import {
     Clock,
     ClipboardList,
     FileText,
+    Home,
     ListTodo,
+    Menu,
     OctagonAlert,
     Pill,
     RefreshCw,
@@ -17,7 +19,7 @@ import {
     User,
     Users,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +31,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import ClockInCard from '@/components/clock-in-card';
+import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import StaffStatus from '@/components/staff-status';
 import {
@@ -144,6 +148,33 @@ interface Task {
     };
 }
 
+interface ClockOpenSession {
+    id: number;
+    clock_in_at: string | null;
+    shift_id: number | null;
+    client_name: string | null;
+    shift_starts_at: string | null;
+    shift_ends_at: string | null;
+    location: string | null;
+}
+
+interface ClockActiveShift {
+    id: number;
+    starts_at: string | null;
+    ends_at: string | null;
+    status: string;
+    location: string | null;
+    client_name: string | null;
+}
+
+interface ClockState {
+    can_clock: boolean;
+    open_session: ClockOpenSession | null;
+    active_shift: ClockActiveShift | null;
+    eligible_shifts?: ClockActiveShift[];
+    eligible_shift_count: number;
+}
+
 interface Props {
     today: string;
     shifts: MyShift[];
@@ -172,6 +203,7 @@ interface Props {
         timesheets_pending_approval: number;
         staff_on_today: number;
     };
+    clock?: ClockState;
 }
 
 // ---------------------------------------------------------------------------
@@ -273,6 +305,7 @@ export default function MyDay({
     leave,
     is_manager,
     manager_data,
+    clock,
 }: Props) {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [openItemFilter, setOpenItemFilter] = useState<OpenItemFilter>('all');
@@ -406,6 +439,58 @@ export default function MyDay({
         return 'Good evening';
     })();
 
+    // Bottom nav Clock item reflects the real attendance state:
+    //   - clocked in  → "On shift" + pulsing dot, deep-links to clock card
+    //   - one eligible shift → "Clock" deep-links to clock card (ready to go)
+    //   - multi eligible     → "Pick shift" deep-links to the inline picker
+    //   - no context         → "Clock" falls back to /attendance (history + fix)
+    // The deep-link hash scroll is smoothed by `scroll-mt` on the card itself.
+    const isClockedIn = !!clock?.open_session;
+    const hasSingleShift = !!clock?.active_shift;
+    const eligibleCount = clock?.eligible_shift_count ?? 0;
+    const isAmbiguous = !isClockedIn && !hasSingleShift && eligibleCount > 1;
+    const hasClockContext = isClockedIn || hasSingleShift || isAmbiguous;
+
+    const clockLabel = isClockedIn
+        ? 'On shift'
+        : isAmbiguous
+            ? 'Pick shift'
+            : 'Clock';
+
+    const clockBadge = isClockedIn ? (
+        <span
+            aria-hidden
+            className="block h-2 w-2 rounded-full bg-emerald-500"
+        />
+    ) : isAmbiguous ? (
+        <span
+            aria-hidden
+            className="block h-2 w-2 rounded-full bg-amber-500"
+        />
+    ) : undefined;
+
+    const bottomNavItems = useMemo<StaffBottomNavItem[]>(
+        () => [
+            { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
+            { key: 'meds', label: 'Meds', icon: Pill, href: '/emar' },
+            {
+                key: 'clock',
+                label: clockLabel,
+                icon: Clock,
+                href: hasClockContext ? '/my-day#clock' : '/attendance',
+                badge: clockBadge,
+            },
+            {
+                key: 'report',
+                label: 'Report',
+                icon: ClipboardList,
+                href: '/incidents',
+            },
+            { key: 'more', label: 'More', icon: Menu, href: '/' },
+        ],
+        [clockLabel, clockBadge, hasClockContext],
+    );
+
     const headerAction = (
         <div className="flex items-center gap-1.5">
             <Button
@@ -443,10 +528,22 @@ export default function MyDay({
             title={greeting}
             subtitle={today}
             headerAction={headerAction}
+            bottomNavItems={bottomNavItems}
         >
             <Head title="My Day" />
 
             <div className="mx-auto w-full max-w-5xl space-y-5">
+                {/* ── Frontline clock (PR 4) ─────────────────────────────── */}
+                {clock && (
+                    <ClockInCard
+                        canClock={clock.can_clock}
+                        openSession={clock.open_session}
+                        activeShift={clock.active_shift}
+                        eligibleShifts={clock.eligible_shifts}
+                        eligibleShiftCount={clock.eligible_shift_count}
+                    />
+                )}
+
                 {/* ── Trimmed KPI strip (3 items only) ───────────────────── */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
                     <HomeKpi
