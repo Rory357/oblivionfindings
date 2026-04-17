@@ -267,7 +267,8 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                     </div>
                     <Link
                         href="/incidents"
-                        className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted"
+                        aria-label="Exit incident report and return to incidents list"
+                        className="frontline-focus inline-flex min-h-11 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
                     >
                         Exit
                     </Link>

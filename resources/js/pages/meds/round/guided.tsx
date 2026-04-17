@@ -202,9 +202,14 @@ export default function GuidedRound({ round, items, progress }: Props) {
             {/* ── Top bar ─────────────────────────────────────────────── */}
             <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
                 <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-                    <Button variant="ghost" size="icon" asChild aria-label="Back to My Day">
-                        <Link href="/my-day">
-                            <ArrowLeft className="h-5 w-5" />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        className="h-11 w-11"
+                    >
+                        <Link href="/my-day" aria-label="Back to My Day">
+                            <ArrowLeft aria-hidden className="h-5 w-5" />
                         </Link>
                     </Button>
                     <div className="min-w-0 flex-1">
@@ -283,8 +288,10 @@ export default function GuidedRound({ round, items, progress }: Props) {
                                 size="sm"
                                 onClick={() => goTo(currentIndex - 1)}
                                 disabled={currentIndex === 0}
+                                aria-label="Previous dose"
+                                className="min-h-11 px-3"
                             >
-                                <ChevronLeft className="mr-1 h-4 w-4" />
+                                <ChevronLeft aria-hidden className="mr-1 h-4 w-4" />
                                 Previous
                             </Button>
                             <Button
@@ -292,9 +299,11 @@ export default function GuidedRound({ round, items, progress }: Props) {
                                 size="sm"
                                 onClick={() => goTo(currentIndex + 1)}
                                 disabled={currentIndex >= items.length - 1}
+                                aria-label="Next dose"
+                                className="min-h-11 px-3"
                             >
                                 Next
-                                <ChevronRight className="ml-1 h-4 w-4" />
+                                <ChevronRight aria-hidden className="ml-1 h-4 w-4" />
                             </Button>
                         </div>
                     </>

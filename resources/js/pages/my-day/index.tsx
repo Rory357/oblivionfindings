@@ -526,15 +526,24 @@ export default function MyDay({
             />
             <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 asChild
-                className="relative"
-                aria-label={`Notifications (${stats.notifications_unread} unread)`}
+                className="relative h-11 w-11"
             >
-                <Link href="/notifications">
-                    <Bell className="h-4 w-4" />
+                <Link
+                    href="/notifications"
+                    aria-label={
+                        stats.notifications_unread > 0
+                            ? `Notifications, ${stats.notifications_unread} unread`
+                            : 'Notifications'
+                    }
+                >
+                    <Bell aria-hidden className="h-5 w-5" />
                     {stats.notifications_unread > 0 && (
-                        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                        <span
+                            aria-hidden
+                            className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+                        >
                             {stats.notifications_unread}
                         </span>
                     )}
@@ -637,7 +646,8 @@ export default function MyDay({
                 {active_round && (
                     <Link
                         href={active_round.url}
-                        className="group block rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 transition-shadow hover:shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/20"
+                        aria-label={`${active_round.status === 'in_progress' ? 'Resume' : 'Start'} ${active_round.name}`}
+                        className="frontline-focus group block rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 transition-shadow hover:shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/20"
                     >
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
@@ -802,7 +812,11 @@ export default function MyDay({
                     </CardHeader>
                     <CardContent className="space-y-3 pt-0">
                         {/* Filter tabs */}
-                        <div className="-mx-1 flex gap-1 overflow-x-auto rounded-lg border bg-muted/50 p-1">
+                        <div
+                            role="tablist"
+                            aria-label="Filter open items"
+                            className="-mx-1 flex gap-1 overflow-x-auto rounded-lg border bg-muted/50 p-1"
+                        >
                             {(
                                 [
                                     { key: 'all', label: 'All' },
@@ -814,8 +828,11 @@ export default function MyDay({
                             ).map((tab) => (
                                 <button
                                     key={tab.key}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={openItemFilter === tab.key}
                                     onClick={() => setOpenItemFilter(tab.key)}
-                                    className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                                    className={`frontline-focus flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                                         openItemFilter === tab.key
                                             ? 'bg-background text-foreground shadow-sm'
                                             : 'text-muted-foreground hover:text-foreground'

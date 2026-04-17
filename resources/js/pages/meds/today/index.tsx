@@ -280,7 +280,12 @@ export default function MedsToday({
                     type="button"
                     onClick={() => setPrnOpen(true)}
                     disabled={prn_medications.length === 0}
-                    className="group flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800/60 dark:bg-amber-950/20"
+                    aria-label={
+                        prn_medications.length === 0
+                            ? 'Give as-needed med — none set up'
+                            : `Give as-needed med (${prn_medications.length} available)`
+                    }
+                    className="frontline-focus group flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800/60 dark:bg-amber-950/20"
                 >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
                         <Zap className="h-5 w-5" />
@@ -300,7 +305,8 @@ export default function MedsToday({
                 {active_round && (
                     <Link
                         href={active_round.url}
-                        className="group block rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 transition-shadow hover:shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/20"
+                        aria-label={`${active_round.status === 'in_progress' ? 'Resume' : 'Start'} ${active_round.name}`}
+                        className="frontline-focus group block rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 transition-shadow hover:shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/20"
                     >
                         <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
@@ -374,7 +380,8 @@ export default function MedsToday({
                                         <li key={round.id}>
                                             <Link
                                                 href={round.url}
-                                                className="group flex items-center gap-3 py-2.5"
+                                                aria-label={`${isActive ? 'Resume' : 'Start'} ${round.name}: ${round.completed} of ${round.total} done`}
+                                                className="frontline-focus group flex min-h-14 items-center gap-3 py-2.5"
                                             >
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">

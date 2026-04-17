@@ -248,9 +248,9 @@ export default function PrnSheet({
                                 size="icon"
                                 onClick={backToPick}
                                 aria-label="Back to medication list"
-                                className="-ml-2 h-8 w-8"
+                                className="-ml-2 h-11 w-11"
                             >
-                                <ChevronLeft className="h-5 w-5" />
+                                <ChevronLeft aria-hidden className="h-5 w-5" />
                             </Button>
                         )}
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-200">
@@ -377,7 +377,8 @@ function PickStep({
                                             <button
                                                 type="button"
                                                 onClick={() => onPick(med)}
-                                                className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-accent active:bg-accent/70"
+                                                aria-label={`Record as-needed dose of ${med.name} for ${med.client_name}`}
+                                                className="frontline-focus flex w-full min-h-14 items-center gap-3 px-4 py-3 text-left transition hover:bg-accent active:bg-accent/70"
                                             >
                                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
                                                     <Pill className="h-4 w-4 text-muted-foreground" />
@@ -564,16 +565,22 @@ function RecordStep({
                 <div>
                     <label className="text-sm font-medium">Why is it needed?</label>
                     {reasonChips.length > 0 ? (
-                        <div className="mt-2 flex flex-wrap gap-2">
+                        <div
+                            role="radiogroup"
+                            aria-label="Reason for as-needed dose"
+                            className="mt-2 flex flex-wrap gap-2"
+                        >
                             {reasonChips.map((chip) => {
                                 const active = reasonChoice === chip;
                                 return (
                                     <button
                                         key={chip}
                                         type="button"
+                                        role="radio"
+                                        aria-checked={active}
                                         onClick={() => onReasonChoice(chip)}
                                         className={
-                                            'rounded-full border px-3 py-1.5 text-sm transition ' +
+                                            'frontline-focus min-h-11 rounded-full border px-4 py-2 text-sm transition ' +
                                             (active
                                                 ? 'border-primary bg-primary text-primary-foreground'
                                                 : 'border-input bg-background hover:bg-accent')
@@ -585,9 +592,11 @@ function RecordStep({
                             })}
                             <button
                                 type="button"
+                                role="radio"
+                                aria-checked={reasonChoice === '__other__'}
                                 onClick={() => onReasonChoice('__other__')}
                                 className={
-                                    'rounded-full border px-3 py-1.5 text-sm transition ' +
+                                    'frontline-focus min-h-11 rounded-full border px-4 py-2 text-sm transition ' +
                                     (reasonChoice === '__other__'
                                         ? 'border-primary bg-primary text-primary-foreground'
                                         : 'border-input bg-background hover:bg-accent')
