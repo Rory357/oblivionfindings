@@ -36,6 +36,12 @@ Route::middleware([
 ])->group(function () {
     Route::get('/meds/today', [WorkerMedsController::class, 'today'])
         ->name('meds.today');
+
+    // PR 13 — PRN (as-needed) quick-entry flow. Delegates to the same
+    // EnhancedMarService used everywhere else so audit/safety logic runs
+    // untouched; this is just a fast, frontline-shaped surface for it.
+    Route::post('/meds/today/prn', [WorkerMedsController::class, 'recordPrn'])
+        ->name('meds.today.prn');
 });
 
 Route::middleware(['auth'])->prefix('emar')->group(function () {

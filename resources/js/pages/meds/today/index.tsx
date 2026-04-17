@@ -9,11 +9,11 @@ import {
     Home,
     Menu,
     Pill,
-    Shield,
     Zap,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
+import PrnSheet, { type PrnMedication } from '@/components/prn-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,6 +90,7 @@ interface Props {
     upcoming_rounds: UpcomingRound[];
     due_now: MedDue[];
     due_later: MedDue[];
+    prn_medications: PrnMedication[];
     has_shift_context: boolean;
 }
 
@@ -211,8 +212,10 @@ export default function MedsToday({
     upcoming_rounds,
     due_now,
     due_later,
+    prn_medications,
     has_shift_context,
 }: Props) {
+    const [prnOpen, setPrnOpen] = useState(false);
     const bottomNavItems = useMemo<StaffBottomNavItem[]>(
         () => [
             { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
@@ -269,6 +272,31 @@ export default function MedsToday({
                         icon={Pill}
                     />
                 </div>
+
+                {/* ── PRN quick action (PR 13) ─────────────────────────── */}
+                {/* Lives above the active round because a PRN is usually
+                    given in response to a symptom right now, and shouldn't
+                    be buried behind the rounds walk. Disabled only when
+                    no PRN meds are configured for today's assigned clients. */}
+                <button
+                    type="button"
+                    onClick={() => setPrnOpen(true)}
+                    disabled={prn_medications.length === 0}
+                    className="group flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800/60 dark:bg-amber-950/20"
+                >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
+                        <Zap className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-tight">Give as-needed med</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            {prn_medications.length === 0
+                                ? 'No PRN meds configured for your clients today'
+                                : `${prn_medications.length} PRN med${prn_medications.length === 1 ? '' : 's'} available \u00b7 quick record`}
+                        </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
+                </button>
 
                 {/* ── Active round banner (resume / start) ─────────────── */}
                 {active_round && (
@@ -452,6 +480,8 @@ export default function MedsToday({
                 )}
 
                 {/* ── Footer links ────────────────────────────────────── */}
+                {/* The worker PRN surface is the sheet above; we don't send
+                    frontline staff back into the admin /emar/prn register. */}
                 <div className="flex flex-wrap gap-2 pt-1">
                     <Button variant="outline" size="sm" asChild>
                         <Link href="/my-day">
@@ -459,14 +489,14 @@ export default function MedsToday({
                             Back to My Day
                         </Link>
                     </Button>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href="/emar/prn">
-                            <Shield className="mr-2 h-4 w-4" />
-                            PRN
-                        </Link>
-                    </Button>
                 </div>
             </div>
+
+            <PrnSheet
+                open={prnOpen}
+                onOpenChange={setPrnOpen}
+                medications={prn_medications}
+            />
         </StaffPageShell>
     );
 }

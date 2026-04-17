@@ -7,9 +7,11 @@ use App\Models\ClientMedication;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -35,6 +37,7 @@ class WorkerMedsController extends Controller
 {
     public function __construct(
         protected GuidedRoundService $guidedRoundService,
+        protected EnhancedMarService $marService,
     ) {
     }
 
@@ -52,6 +55,7 @@ class WorkerMedsController extends Controller
         $medsDue = $this->medicationsDue($assignedClientIds, $now);
         $activeRound = $this->activeRound($user, $now);
         $upcomingRounds = $this->upcomingRounds($user, $now);
+        $prnMedications = $this->prnMedications($assignedClientIds);
 
         $dueNow = array_values(array_filter(
             $medsDue,
@@ -79,8 +83,79 @@ class WorkerMedsController extends Controller
             'upcoming_rounds' => $upcomingRounds,
             'due_now' => $dueNow,
             'due_later' => $dueLater,
+            'prn_medications' => $prnMedications,
             'has_shift_context' => ! empty($assignedClientIds),
         ]);
+    }
+
+    /**
+     * Record a PRN (as-needed) dose from the frontline quick-entry sheet.
+     *
+     * Delegates to the same EnhancedMarService the rest of the medication
+     * module uses, so safety checks, controlled-drug witness rules, audit and
+     * PRN over-limit incident handling all run exactly as they do from the
+     * admin recording path. This avoids creating a second administration path
+     * for as-needed doses.
+     */
+    public function recordPrn(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        abort_unless(
+            $user->canDo('medications.administer.record') || $user->canDo('clients.update'),
+            403,
+            'You do not have permission to record medication administrations.'
+        );
+
+        $data = $request->validate([
+            'client_medication_id' => ['required', 'integer', 'exists:client_medications,id'],
+            'reason' => ['required', 'string', 'max:500'],
+            'dose_given' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
+
+        abort_unless($medication->is_prn, 422, 'This medication is not configured as an as-needed (PRN) med.');
+        abort_unless($medication->active, 422, 'This medication is not currently active.');
+        abort_unless($medication->client, 404);
+
+        // Best-effort shift linkage: an active shift for this worker with this
+        // client. Falls back to null if the worker is outside a shift (e.g. a
+        // medication lead helping out) so the administration still records.
+        $shiftId = Shift::query()
+            ->where('user_id', $user->id)
+            ->where('client_id', $medication->client_id)
+            ->whereNotNull('actual_starts_at')
+            ->whereNull('actual_ends_at')
+            ->latest('actual_starts_at')
+            ->value('id');
+
+        $result = $this->marService->recordAdministration(
+            $medication->client,
+            $medication,
+            [
+                'status' => 'given',
+                'reason' => trim($data['reason']),
+                'dose_given' => $data['dose_given'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'administered_at' => now()->toIso8601String(),
+            ],
+            $user->id,
+            $shiftId,
+        );
+
+        if (! ($result['success'] ?? false)) {
+            return back()->withErrors([
+                'reason' => $result['error'] ?? 'Could not record this PRN dose.',
+            ]);
+        }
+
+        return back()->with(
+            'success',
+            'Saved — ' . $medication->name . ' recorded for ' . trim(($medication->client->first_name ?? '') . ' ' . ($medication->client->last_name ?? '')),
+        );
     }
 
     /**
@@ -198,6 +273,67 @@ class WorkerMedsController extends Controller
 
                 return strcmp($a['scheduled_for'], $b['scheduled_for']);
             });
+
+            return $result;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * PRN (as-needed) medications available for quick recording from the
+     * /meds/today sheet. Scoped to the same assigned-client set the rest of
+     * the page uses, so a worker only ever sees PRN meds for people they're
+     * actively supporting.
+     *
+     * Keeps the payload small: just the fields the quick sheet needs to show
+     * client, med, default dose and PRN pressure (near/over daily limit).
+     */
+    private function prnMedications(array $clientIds): array
+    {
+        if (empty($clientIds)) {
+            return [];
+        }
+
+        try {
+            $medications = ClientMedication::whereIn('client_id', $clientIds)
+                ->active()
+                ->prn()
+                ->with('client:id,first_name,last_name')
+                ->orderBy('client_id')
+                ->orderBy('name')
+                ->get();
+
+            $result = [];
+
+            foreach ($medications as $med) {
+                if (! $med->client) {
+                    continue;
+                }
+
+                $maxPerDay = $med->max_per_day ? (int) $med->max_per_day : null;
+                $givenLast24h = $med->prnCountLast24Hours;
+                $remaining = $maxPerDay !== null ? max(0, $maxPerDay - $givenLast24h) : null;
+
+                $result[] = [
+                    'id' => $med->id,
+                    'client_id' => $med->client_id,
+                    'client_name' => trim($med->client->first_name . ' ' . $med->client->last_name),
+                    'name' => $med->name,
+                    'dose' => $med->dosage,
+                    'route' => $med->route,
+                    'form' => $med->form,
+                    'instructions' => $med->instructions,
+                    'prn_reason' => $med->prn_reason,
+                    'max_per_day' => $maxPerDay,
+                    'given_last_24h' => $givenLast24h,
+                    'remaining_today' => $remaining,
+                    'near_limit' => $med->isPrnNearLimit(),
+                    'over_limit' => $med->isPrnOverLimit(),
+                    'is_controlled' => (bool) ($med->controlled_drug ?? false),
+                    'requires_witness' => (bool) ($med->witness_required ?? false) || (bool) ($med->controlled_drug ?? false),
+                ];
+            }
 
             return $result;
         } catch (\Throwable) {
