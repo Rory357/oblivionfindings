@@ -5,7 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, useForm } from '@inertiajs/react';
+import DraftSavedIndicator from '@/components/draft-saved-indicator';
+import DraftResumePrompt from '@/components/draft-resume-prompt';
+import { useFormAutosave } from '@/hooks/use-form-autosave';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 
 type Props = {
     stays: any[];
@@ -16,10 +20,42 @@ type Props = {
     mobilityLevels: string[];
 };
 
+type DailyNoteDraft = {
+    stay_id: string;
+    note_date: string;
+    shift_period: string;
+    mood: string;
+    appetite: string;
+    sleep_quality: string;
+    engagement: string;
+    mobility: string;
+    activities: string;
+    observations: string;
+    concerns: string;
+    goals_progress: string;
+    incident_occurred: boolean;
+    sensitive_flag: boolean;
+};
+
+const hasDraftContent = (d: DailyNoteDraft): boolean =>
+    !!(
+        d.activities?.trim() ||
+        d.observations?.trim() ||
+        d.concerns?.trim() ||
+        d.goals_progress?.trim() ||
+        d.mood ||
+        d.appetite ||
+        d.sleep_quality ||
+        d.engagement ||
+        d.mobility
+    );
+
 export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeingLevels, mobilityLevels }: Props) {
     const wellbeingOptions = Array.isArray(wellbeingLevels) ? wellbeingLevels : Object.keys(wellbeingLevels || {});
+    const page = usePage().props as { auth?: { user?: { id?: number } } };
+    const userId = page.auth?.user?.id ?? 0;
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors } = useForm<DailyNoteDraft>({
         stay_id: stayId || '',
         note_date: '',
         shift_period: '',
@@ -36,6 +72,41 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
         sensitive_flag: false,
     });
 
+    const draftKey = `oblivion:respite-daily-note:v1:u${userId}`;
+    const [bootstrapped, setBootstrapped] = useState(false);
+    const [resumePayload, setResumePayload] = useState<{ data: DailyNoteDraft; savedAt: number } | null>(null);
+
+    const { savedAt, load, clear } = useFormAutosave<DailyNoteDraft>(
+        data,
+        { stayId: data.stay_id },
+        { key: draftKey, enabled: bootstrapped },
+    );
+
+    useEffect(() => {
+        const existing = load();
+        if (existing && hasDraftContent(existing.data as DailyNoteDraft)) {
+            setResumePayload({ data: existing.data as DailyNoteDraft, savedAt: existing.savedAt });
+        } else {
+            setBootstrapped(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const resumeDraft = () => {
+        if (!resumePayload) return;
+        (Object.keys(resumePayload.data) as Array<keyof DailyNoteDraft>).forEach((k) => {
+            setData(k, resumePayload.data[k] as never);
+        });
+        setResumePayload(null);
+        setBootstrapped(true);
+    };
+
+    const discardDraft = () => {
+        clear();
+        setResumePayload(null);
+        setBootstrapped(true);
+    };
+
     return (
         <AppLayout breadcrumbs={[
             { title: 'Respite', href: '/respite' },
@@ -45,17 +116,31 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
             <Head title="New Daily Note" />
 
             <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">New Daily Note</h1>
-                    <div className="mt-1 text-sm text-slate-500">
-                        Record wellbeing observations and activities for a shift.
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                        <h1 className="text-lg font-semibold">New Daily Note</h1>
+                        <div className="mt-1 text-sm text-slate-500">
+                            Record wellbeing observations and activities for a shift.
+                        </div>
                     </div>
+                    <DraftSavedIndicator savedAt={savedAt} />
                 </div>
+
+                {resumePayload && (
+                    <DraftResumePrompt
+                        savedAt={resumePayload.savedAt}
+                        onResume={resumeDraft}
+                        onDiscard={discardDraft}
+                        description="We kept what you were writing for this daily note."
+                    />
+                )}
 
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
-                        post('/respite/daily-notes');
+                        post('/respite/daily-notes', {
+                            onSuccess: () => clear(),
+                        });
                     }}
                     className="space-y-4"
                 >
@@ -242,10 +327,13 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
                         </CardContent>
                     </Card>
 
-                    <div className="flex justify-end">
-                        <Button type="submit" disabled={processing}>
-                            Save Daily Note
-                        </Button>
+                    <div className="flex items-center justify-between gap-2">
+                        <DraftSavedIndicator savedAt={savedAt} className="sm:hidden" />
+                        <div className="ml-auto">
+                            <Button type="submit" disabled={processing}>
+                                Save Daily Note
+                            </Button>
+                        </div>
                     </div>
                 </form>
             </div>

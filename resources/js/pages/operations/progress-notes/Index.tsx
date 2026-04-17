@@ -16,8 +16,11 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import DraftSavedIndicator from '@/components/draft-saved-indicator';
+import DraftResumePrompt from '@/components/draft-resume-prompt';
+import { useFormAutosave } from '@/hooks/use-form-autosave';
 import { BookOpen, Flag, MessageSquareText, Plus, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const ANY = '__ANY__';
 
@@ -84,10 +87,43 @@ function formatRelativeTime(iso: string): string {
 }
 
 export default function ProgressNotesIndex({ notes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any, clients = [] }: Props) {
-    const { labels } = usePage().props as any;
+    const page = usePage().props as { labels?: Record<string, string>; auth?: { user?: { id?: number } } };
+    const labels = page.labels;
+    const userId = page.auth?.user?.id ?? 0;
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
     const [showAddForm, setShowAddForm] = useState(false);
     const [noteData, setNoteData] = useState({ client_id: '', content: '', note_type: 'general', mood_rating: '', visibility: 'staff_only' });
+
+    const draftKey = `oblivion:progress-note:v1:u${userId}`;
+    const { savedAt, load, clear } = useFormAutosave(
+        noteData,
+        {},
+        { key: draftKey, enabled: showAddForm },
+    );
+    const [resumePayload, setResumePayload] = useState<{ data: typeof noteData; savedAt: number } | null>(null);
+    const [bootstrapped, setBootstrapped] = useState(false);
+
+    useEffect(() => {
+        if (bootstrapped) return;
+        const existing = load();
+        if (existing && (existing.data as typeof noteData)?.content?.trim()) {
+            setResumePayload({ data: existing.data as typeof noteData, savedAt: existing.savedAt });
+            setShowAddForm(true);
+        }
+        setBootstrapped(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const resumeDraft = () => {
+        if (!resumePayload) return;
+        setNoteData(resumePayload.data);
+        setResumePayload(null);
+    };
+
+    const discardDraft = () => {
+        clear();
+        setResumePayload(null);
+    };
 
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/progress-notes', { ...filters, [key]: value }, { preserveState: true, replace: true });
@@ -100,7 +136,11 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
             mood_rating: noteData.mood_rating ? Number(noteData.mood_rating) : null,
         }, {
             preserveScroll: true,
-            onSuccess: () => { setNoteData({ ...noteData, content: '', mood_rating: '' }); setShowAddForm(false); },
+            onSuccess: () => {
+                clear();
+                setNoteData({ client_id: '', content: '', note_type: 'general', mood_rating: '', visibility: 'staff_only' });
+                setShowAddForm(false);
+            },
         });
     };
 
@@ -130,10 +170,21 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                 {/* Add Note Form */}
                 {showAddForm && (
                     <Card className="overflow-hidden border-violet-200">
-                        <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
+                        <div className="flex items-center justify-between bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
                             <h3 className="text-sm font-semibold text-white">New Progress Note</h3>
+                            <DraftSavedIndicator savedAt={savedAt} className="text-white/90 [&_svg]:text-white" />
                         </div>
                         <CardContent className="p-4">
+                            {resumePayload && (
+                                <div className="mb-3">
+                                    <DraftResumePrompt
+                                        savedAt={resumePayload.savedAt}
+                                        onResume={resumeDraft}
+                                        onDiscard={discardDraft}
+                                        description="We kept what you started writing for a progress note."
+                                    />
+                                </div>
+                            )}
                             <div className="grid gap-3 sm:grid-cols-4">
                                 <div className="space-y-1">
                                     <Label className="text-xs">Client *</Label>

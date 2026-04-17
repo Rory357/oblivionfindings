@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { Clock, LogIn, LogOut, MapPin, User } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -17,6 +17,9 @@ import HandoverWriteForm, {
     emptyHandoverWriteValue,
     type HandoverWriteValue,
 } from '@/components/handover-write-form';
+import DraftSavedIndicator from '@/components/draft-saved-indicator';
+import DraftResumePrompt from '@/components/draft-resume-prompt';
+import { useFormAutosave } from '@/hooks/use-form-autosave';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -105,6 +108,9 @@ export default function ClockInCard({
     eligibleShifts,
     eligibleShiftCount,
 }: ClockInCardProps) {
+    const page = usePage().props as { auth?: { user?: { id?: number } } };
+    const userId = page.auth?.user?.id ?? 0;
+
     const [submitting, setSubmitting] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [breakPreset, setBreakPreset] = useState<number | 'custom'>(0);
@@ -113,6 +119,26 @@ export default function ClockInCard({
     const [pickedShiftId, setPickedShiftId] = useState<number | null>(null);
     const [handoverValue, setHandoverValue] = useState<HandoverWriteValue>(
         emptyHandoverWriteValue,
+    );
+    const [resumeAvailable, setResumeAvailable] = useState<{ savedAt: number } | null>(null);
+
+    // Per-shift draft key so two parallel shifts never collide on the same device.
+    const handoverDraftKey = openSession?.shift_id
+        ? `oblivion:clockout-handover:v1:u${userId}:s${openSession.shift_id}`
+        : null;
+
+    const handoverEligibleForSave =
+        !!openSession?.shift_id && !openSession?.handover_submitted && confirmOpen;
+
+    const { savedAt: handoverSavedAt, load: loadHandoverDraft, clear: clearHandoverDraft } = useFormAutosave<
+        Record<string, unknown>
+    >(
+        handoverValue as unknown as Record<string, unknown>,
+        {},
+        {
+            key: handoverDraftKey ?? 'oblivion:clockout-handover:v1:disabled',
+            enabled: !!handoverDraftKey && handoverEligibleForSave,
+        },
     );
 
     // Tick every second while clocked in so the elapsed counter updates live.
@@ -169,6 +195,9 @@ export default function ClockInCard({
             },
             {
                 preserveScroll: true,
+                onSuccess: () => {
+                    clearHandoverDraft();
+                },
                 onFinish: () => {
                     setSubmitting(false);
                     setConfirmOpen(false);
@@ -198,7 +227,10 @@ export default function ClockInCard({
                 },
                 {
                     preserveScroll: true,
-                    onSuccess: () => performClockOut(),
+                    onSuccess: () => {
+                        clearHandoverDraft();
+                        performClockOut();
+                    },
                     onError: () => {
                         setSubmitting(false);
                     },
@@ -277,7 +309,22 @@ export default function ClockInCard({
                                 onClick={() => {
                                     setBreakPreset(0);
                                     setCustomBreak('');
-                                    setHandoverValue(emptyHandoverWriteValue);
+                                    // Look for a saved draft for this shift; if present, offer resume.
+                                    const existing = handoverDraftKey ? loadHandoverDraft() : null;
+                                    const draftData = existing?.data as HandoverWriteValue | undefined;
+                                    const hasDraft =
+                                        !!draftData &&
+                                        (!!draftData.handover_notes?.trim() ||
+                                            draftData.shift_rating !== null ||
+                                            draftData.follow_up_needed === true ||
+                                            draftData.meds_completed === false);
+                                    if (hasDraft && draftData) {
+                                        setHandoverValue(draftData);
+                                        setResumeAvailable({ savedAt: existing!.savedAt });
+                                    } else {
+                                        setHandoverValue(emptyHandoverWriteValue);
+                                        setResumeAvailable(null);
+                                    }
                                     setConfirmOpen(true);
                                 }}
                                 disabled={submitting}
@@ -360,13 +407,29 @@ export default function ClockInCard({
                             )}
 
                             {openSession.shift_id ? (
-                                <div className="border-t pt-4">
+                                <div className="space-y-3 border-t pt-4">
+                                    {resumeAvailable && !openSession.handover_submitted && (
+                                        <DraftResumePrompt
+                                            savedAt={resumeAvailable.savedAt}
+                                            onResume={() => setResumeAvailable(null)}
+                                            onDiscard={() => {
+                                                clearHandoverDraft();
+                                                setHandoverValue(emptyHandoverWriteValue);
+                                                setResumeAvailable(null);
+                                            }}
+                                            title="Resume your unfinished handover?"
+                                            description="We kept your handover answers from earlier on this device."
+                                        />
+                                    )}
                                     <HandoverWriteForm
                                         value={handoverValue}
                                         onChange={setHandoverValue}
                                         disabled={submitting}
                                         alreadySubmitted={!!openSession.handover_submitted}
                                     />
+                                    {!openSession.handover_submitted && (
+                                        <DraftSavedIndicator savedAt={handoverSavedAt} />
+                                    )}
                                 </div>
                             ) : null}
                         </div>
