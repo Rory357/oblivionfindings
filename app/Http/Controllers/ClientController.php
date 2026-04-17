@@ -49,6 +49,7 @@ use App\Models\FleetIncident;
 use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\ShiftCoverageService;
+use App\Support\ClientSafetyPayload;
 use Illuminate\Support\Facades\Schema;
 
 class ClientController extends Controller
@@ -64,7 +65,12 @@ class ClientController extends Controller
                 $user->hasRole('support_worker') && !$user->hasRole('admin', 'manager', 'coordinator'),
                 fn($q) => $q->whereHas('supportWorkers', fn($q) => $q->whereKey($user->id))
             )
-            ->with(['site:id,name,is_active', 'onboardingOverrides:id,client_id,key,value'])
+            ->with([
+                'site:id,name,is_active',
+                'onboardingOverrides:id,client_id,key,value',
+                'medicalProfile:id,client_id,allergies,disabilities',
+                'risks:id,client_id,label,severity,active',
+            ])
             ->withCount([
                 'portalUsers',
                 'medications',
@@ -91,6 +97,8 @@ class ClientController extends Controller
                 'city',
                 'postcode',
                 'profile_photo_path',
+                'risk_level',
+                'safeguarding_flag',
             ]);
 
         $clients = $clients->map(function (Client $c) {
@@ -107,6 +115,7 @@ class ClientController extends Controller
                 'site' => $c->site ? ['id' => $c->site->id, 'name' => $c->site->name] : null,
                 'onboarding' => $summary,
                 'has_respite' => $hasRespite,
+                'safety' => ClientSafetyPayload::summaryForClient($c),
             ];
         })->values();
 
@@ -174,6 +183,7 @@ class ClientController extends Controller
             'assessments',
             'onboardingOverrides',
             'onboardingWorkflow.steps',
+            'risks',
         ]);
 
         // For modal / async detail views, return JSON.
@@ -765,6 +775,7 @@ class ClientController extends Controller
             'missingMandatoryConsents' => $missingMandatory->pluck('name')->values(),
             'transport' => \Inertia\Inertia::optional(fn () => $this->buildTransportData($client)),
             'hs_summary' => \Inertia\Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
+            'safety' => ClientSafetyPayload::forClient($client),
         ]);
     }
 

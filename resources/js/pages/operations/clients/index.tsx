@@ -1,5 +1,6 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
+import { ClientSafetyBadges } from '@/components/client-safety-ribbon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -185,6 +186,10 @@ export default function ClientsIndex({ clients }) {
                                             </div>
                                         ) : null}
                                     </div>
+                                    <ClientSafetyBadges
+                                        summary={client.safety}
+                                        className="mt-1"
+                                    />
                                     <div className="mt-1 text-xs text-slate-500">
                                         {siteSingular}:{' '}
                                         {client.site ? (

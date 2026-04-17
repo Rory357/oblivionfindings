@@ -1,6 +1,9 @@
 import ClientLocationTab, {
     type ClientLocationData,
 } from '@/components/client-location-tab';
+import ClientSafetyRibbon, {
+    type ClientSafety,
+} from '@/components/client-safety-ribbon';
 import HealthSummaryCard, {
     type HealthSummary,
 } from '@/components/clinical/health-summary-card';
@@ -462,6 +465,7 @@ export default function ClientShow({
 }: Props) {
     const pageProps = usePage().props as any;
     const { auth, labels } = pageProps;
+    const safety = pageProps.safety as ClientSafety | null | undefined;
     const nextShiftSummary = shifts_summary?.next ?? null;
     const recurringShiftSeries = shifts_summary?.recurring ?? [];
     const siteCoverageSummary = site_coverage ?? null;
@@ -975,6 +979,8 @@ export default function ClientShow({
                         </form>
                     )}
                 </div>
+
+                <ClientSafetyRibbon safety={safety} className="mt-4" />
 
                 <div className="-mx-4 mt-4 overflow-x-auto border-b px-4">
                     <div className="flex w-max items-center gap-1 pb-0">

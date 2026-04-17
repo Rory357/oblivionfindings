@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientRisk;
+use App\Support\ClientSafetyPayload;
 use Illuminate\Http\Request;
 
 class ClientRiskController extends Controller
@@ -19,9 +20,13 @@ class ClientRiskController extends Controller
             ->orderBy('label')
             ->get();
 
+        $client->load('medicalProfile');
+        $client->setRelation('risks', $risks);
+
         return inertia('operations/clients/risks', [
             'client' => $client->only(['id', 'first_name', 'last_name', 'status']),
             'risks' => $risks,
+            'safety' => ClientSafetyPayload::forClient($client),
             'can' => [
                 'update' => $request->user()?->canDo('risks.update') ?? false,
                 'create' => $request->user()?->canDo('risks.create') ?? false,

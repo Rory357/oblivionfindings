@@ -1,4 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
+import ClientSafetyRibbon, {
+    type ClientSafety,
+} from '@/components/client-safety-ribbon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,10 +15,11 @@ import { useState } from 'react';
 type Props = {
     client: { id: number; first_name: string; last_name: string; status: string };
     risks: Array<any>;
+    safety?: ClientSafety | null;
     can: { create: boolean; update: boolean };
 };
 
-export default function ClientRisks({ client, risks, can }: Props) {
+export default function ClientRisks({ client, risks, safety, can }: Props) {
     const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [editingId, setEditingId] = useState<number | null>(null);
@@ -47,6 +51,8 @@ export default function ClientRisks({ client, risks, can }: Props) {
             <Head title={`Risks • ${name}`} />
 
             <div className="space-y-4">
+                <ClientSafetyRibbon safety={safety} />
+
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Risk register</h1>

@@ -24,6 +24,9 @@ import {
 import { cn } from '@/lib/utils';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
+import ClientSafetyRibbon, {
+    type ClientSafety,
+} from '@/components/client-safety-ribbon';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -215,6 +218,10 @@ export default function ClientMedical({
             <Head title={`Medical - ${name}`} />
 
             <div className="space-y-6">
+                <ClientSafetyRibbon
+                    safety={(usePage().props as any).safety as ClientSafety | null | undefined}
+                />
+
                 {/* ── Hero Header ──────────────────────────────── */}
                 <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600/90 via-rose-500 to-pink-500/80 p-6 text-white md:p-8">
                     <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />

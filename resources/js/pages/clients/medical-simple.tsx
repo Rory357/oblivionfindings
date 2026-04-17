@@ -1,16 +1,21 @@
 import AppLayout from '@/layouts/app-layout';
+import ClientSafetyRibbon, {
+    type ClientSafety,
+} from '@/components/client-safety-ribbon';
 import { Head, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
 
 export default function MedicalSimple() {
-    const { client, medications, conditions, emergency_contacts, profile } = usePage<any>().props;
+    const { client, medications, conditions, emergency_contacts, profile, safety } = usePage<any>().props;
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Clients', href: '/clients' }, { title: `${client?.first_name} ${client?.last_name}`, href: `/clients/${client?.id}` }, { title: 'Medical', href: `/clients/${client?.id}/medical` }]}>
             <Head title={`Medical - ${client?.first_name} ${client?.last_name}`} />
 
             <div className="space-y-6 p-6">
+                <ClientSafetyRibbon safety={safety as ClientSafety | null | undefined} />
+
                 <div>
                     <h1 className="text-2xl font-semibold tracking-tight">Medical Profile (Debug)</h1>
                     <p className="text-sm text-muted-foreground">{client?.first_name} {client?.last_name}</p>
