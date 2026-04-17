@@ -20,6 +20,7 @@ import VoiceInputButton from '@/components/voice-input-button';
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
+import { submitOffline } from '@/lib/offline-queue';
 import { BookOpen, Flag, MessageSquareText, Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -132,16 +133,38 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
 
     const submitNote = () => {
         if (!noteData.client_id || !noteData.content.trim()) return;
-        router.post('/operations/progress-notes', {
+
+        const payload = {
             ...noteData,
             mood_rating: noteData.mood_rating ? Number(noteData.mood_rating) : null,
-        }, {
+        };
+
+        const resetForm = () => {
+            clear();
+            setNoteData({ client_id: '', content: '', note_type: 'general', mood_rating: '', visibility: 'staff_only' });
+            setShowAddForm(false);
+        };
+
+        // PR 26 — offline path. Queue the note locally and close the form
+        // with a calm "saved on this device" toast. The server dedupes on
+        // `client_request_uuid` when the queued item replays on reconnect.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            void submitOffline({
+                action: 'progress_note',
+                url: '/operations/progress-notes',
+                payload,
+                queuedMessage:
+                    'Note saved on this device — we\u2019ll send it when you\u2019re back online.',
+            }).then(() => {
+                resetForm();
+                router.reload({ only: ['notes', 'stats'], preserveScroll: true });
+            });
+            return;
+        }
+
+        router.post('/operations/progress-notes', payload, {
             preserveScroll: true,
-            onSuccess: () => {
-                clear();
-                setNoteData({ client_id: '', content: '', note_type: 'general', mood_rating: '', visibility: 'staff_only' });
-                setShowAddForm(false);
-            },
+            onSuccess: resetForm,
         });
     };
 

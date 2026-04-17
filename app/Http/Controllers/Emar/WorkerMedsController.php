@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Emar;
 
+use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
 use App\Models\ClientMedication;
 use App\Models\MedicationRound;
@@ -35,6 +36,8 @@ use Inertia\Response;
  */
 class WorkerMedsController extends Controller
 {
+    use HandlesOfflineSubmission;
+
     public function __construct(
         protected GuidedRoundService $guidedRoundService,
         protected EnhancedMarService $marService,
@@ -113,49 +116,53 @@ class WorkerMedsController extends Controller
             'reason' => ['required', 'string', 'max:500'],
             'dose_given' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            ...$this->offlineSubmissionRules(),
         ]);
 
-        $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
+        return $this->runOfflineSubmissionOnce('prn', $data, function () use ($user, $data) {
+            $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
 
-        abort_unless($medication->is_prn, 422, 'This medication is not configured as an as-needed (PRN) med.');
-        abort_unless($medication->active, 422, 'This medication is not currently active.');
-        abort_unless($medication->client, 404);
+            abort_unless($medication->is_prn, 422, 'This medication is not configured as an as-needed (PRN) med.');
+            abort_unless($medication->active, 422, 'This medication is not currently active.');
+            abort_unless($medication->client, 404);
 
-        // Best-effort shift linkage: an active shift for this worker with this
-        // client. Falls back to null if the worker is outside a shift (e.g. a
-        // medication lead helping out) so the administration still records.
-        $shiftId = Shift::query()
-            ->where('user_id', $user->id)
-            ->where('client_id', $medication->client_id)
-            ->whereNotNull('actual_starts_at')
-            ->whereNull('actual_ends_at')
-            ->latest('actual_starts_at')
-            ->value('id');
+            // Best-effort shift linkage: an active shift for this worker with this
+            // client. Falls back to null if the worker is outside a shift (e.g. a
+            // medication lead helping out) so the administration still records.
+            $shiftId = Shift::query()
+                ->where('user_id', $user->id)
+                ->where('client_id', $medication->client_id)
+                ->whereNotNull('actual_starts_at')
+                ->whereNull('actual_ends_at')
+                ->latest('actual_starts_at')
+                ->value('id');
 
-        $result = $this->marService->recordAdministration(
-            $medication->client,
-            $medication,
-            [
-                'status' => 'given',
-                'reason' => trim($data['reason']),
-                'dose_given' => $data['dose_given'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'administered_at' => now()->toIso8601String(),
-            ],
-            $user->id,
-            $shiftId,
-        );
+            $result = $this->marService->recordAdministration(
+                $medication->client,
+                $medication,
+                [
+                    'status' => 'given',
+                    'reason' => trim($data['reason']),
+                    'dose_given' => $data['dose_given'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                    'administered_at' => $data['captured_offline_at']
+                        ?? now()->toIso8601String(),
+                ],
+                $user->id,
+                $shiftId,
+            );
 
-        if (! ($result['success'] ?? false)) {
-            return back()->withErrors([
-                'reason' => $result['error'] ?? 'Could not record this PRN dose.',
-            ]);
-        }
+            if (! ($result['success'] ?? false)) {
+                return back()->withErrors([
+                    'reason' => $result['error'] ?? 'Could not record this PRN dose.',
+                ]);
+            }
 
-        return back()->with(
-            'success',
-            'Saved — ' . $medication->name . ' recorded for ' . trim(($medication->client->first_name ?? '') . ' ' . ($medication->client->last_name ?? '')),
-        );
+            return back()->with(
+                'success',
+                'Saved — ' . $medication->name . ' recorded for ' . trim(($medication->client->first_name ?? '') . ' ' . ($medication->client->last_name ?? '')),
+            );
+        });
     }
 
     /**

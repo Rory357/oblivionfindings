@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Operations;
 
+use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ProgressNote;
@@ -11,6 +12,8 @@ use Illuminate\Http\Request;
 
 class ProgressNoteController extends Controller
 {
+    use HandlesOfflineSubmission;
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -90,8 +93,16 @@ class ProgressNoteController extends Controller
             'visibility' => ['nullable', 'string', 'in:staff_only,include_family,private'],
             'is_flagged' => ['nullable', 'boolean'],
             'flagged_reason' => ['nullable', 'string', 'max:500'],
+            ...$this->offlineSubmissionRules(),
         ]);
 
+        return $this->runOfflineSubmissionOnce('progress_note', $data, function () use ($auth, $data) {
+            return $this->createProgressNote($auth, $data);
+        });
+    }
+
+    private function createProgressNote(User $auth, array $data)
+    {
         $note = ProgressNote::create([
             'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
@@ -117,7 +128,7 @@ class ProgressNoteController extends Controller
         TimelineEvent::create([
             'source_type' => ProgressNote::class,
             'source_id' => $note->id,
-            'occurred_at' => now(),
+            'occurred_at' => $data['captured_offline_at'] ?? now(),
             'type' => 'progress_note',
             'actor_user_id' => $auth->id,
             'client_id' => $data['client_id'],

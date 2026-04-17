@@ -6,8 +6,10 @@ import { createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import FlashToaster from './components/flash-toaster';
+import OfflineStatusBanner from './components/offline-status-banner';
 import { initializeTheme } from './hooks/use-appearance';
 import { bootEmarOffline } from './lib/emar-offline';
+import { bootOfflineQueue } from './lib/offline-queue';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -37,6 +39,7 @@ createInertiaApp({
         ),
     setup({ el, App, props }) {
         bootEmarOffline();
+        bootOfflineQueue();
         const root = createRoot(el);
 
         root.render(
@@ -44,6 +47,7 @@ createInertiaApp({
                 <App {...props}>
                     {({ Component, props: pageProps, key }) => (
                         <>
+                            <OfflineStatusBanner />
                             {renderInertiaPage(Component, pageProps, key)}
                             <FlashToaster />
                             <Toaster richColors position="top-right" />

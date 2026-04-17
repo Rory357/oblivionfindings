@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import VoiceInputButton from '@/components/voice-input-button';
+import { submitOffline } from '@/lib/offline-queue';
 
 /* -------------------------------------------------------------------------- */
 /*  PR 13 — PRN (as-needed meds) quick flow                                   */
@@ -217,12 +218,41 @@ export default function PrnSheet({
         if (!selected) return;
         if (effectiveReason.length === 0) return;
 
+        const url = submitUrl ?? '/meds/today/prn';
+        const basePayload = {
+            client_medication_id: form.data.client_medication_id,
+            reason: effectiveReason,
+            dose_given: form.data.dose_given,
+            notes: form.data.notes,
+        };
+
+        // PR 26 — when the device is offline, queue the PRN locally and
+        // close the sheet with a calm "saved on this device" toast instead
+        // of letting Inertia fail the request. The queue replays through
+        // this same endpoint on reconnect, and the server dedupes on
+        // `client_request_uuid` so a lost ACK doesn't double-record.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            void submitOffline({
+                action: 'prn',
+                url,
+                payload: basePayload,
+                queuedMessage:
+                    'PRN saved on this device — we\u2019ll send it when you\u2019re back online.',
+            }).then(() => {
+                // Refresh the page props so `given_last_24h` etc. stay accurate
+                // once the queued record lands. This is a no-op while offline.
+                router.reload({ only: ['prnMedications'], preserveScroll: true });
+                onOpenChange(false);
+            });
+            return;
+        }
+
         form.transform((data) => ({
             ...data,
             reason: effectiveReason,
         }));
 
-        form.post(submitUrl ?? '/meds/today/prn', {
+        form.post(url, {
             preserveScroll: true,
             onSuccess: () => {
                 // flash-toaster renders the success toast on the next prop
