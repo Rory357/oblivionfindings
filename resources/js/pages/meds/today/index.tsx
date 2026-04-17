@@ -296,8 +296,8 @@ export default function MedsToday({
                         <p className="text-sm font-semibold leading-tight">Give as-needed med</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                             {prn_medications.length === 0
-                                ? 'No PRN meds configured for your clients today'
-                                : `${prn_medications.length} PRN med${prn_medications.length === 1 ? '' : 's'} available \u00b7 quick record`}
+                                ? 'No as-needed meds set up for your clients today'
+                                : `${prn_medications.length} as-needed med${prn_medications.length === 1 ? '' : 's'} ready \u00b7 quick record`}
                         </p>
                     </div>
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
@@ -455,8 +455,8 @@ export default function MedsToday({
                             <p className="text-sm font-medium">Nothing due right now</p>
                             <p className="max-w-sm text-xs text-muted-foreground">
                                 {has_shift_context
-                                    ? 'No scheduled doses fall in the next few hours for the clients on your shift.'
-                                    : 'You don\u2019t have a shift today. When you clock in, due medications for that client will show here.'}
+                                    ? 'No doses due in the next few hours for the clients on your shift.'
+                                    : 'You don\u2019t have a shift today. Once you clock in, meds due for that client will show here.'}
                             </p>
                             <Button variant="outline" size="sm" asChild className="mt-2">
                                 <Link href="/my-day">
@@ -477,8 +477,8 @@ export default function MedsToday({
                                 {stats.meds_overdue} dose{stats.meds_overdue === 1 ? '' : 's'} past due
                             </p>
                             <p className="mt-0.5 text-xs text-red-700 dark:text-red-200">
-                                Give now if safe, or tell your supervisor. Don&rsquo;t skip a dose without
-                                recording why.
+                                Give now if safe, or tell your supervisor. Don&rsquo;t skip a dose
+                                without writing down why.
                             </p>
                         </div>
                     </div>

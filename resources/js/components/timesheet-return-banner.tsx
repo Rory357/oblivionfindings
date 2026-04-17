@@ -81,8 +81,8 @@ export function TimesheetReturnBanner({
                     </p>
                 ) : (
                     <p className="text-sm leading-snug text-amber-900/80 dark:text-amber-100/80">
-                        Your manager asked for a change. Open the timesheet,
-                        update it, then resend for approval.
+                        Your manager asked for a change. Open it, make the fix,
+                        then resend for approval.
                     </p>
                 )}
             </div>

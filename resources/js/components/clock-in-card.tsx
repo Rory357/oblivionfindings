@@ -347,7 +347,7 @@ export default function ClockInCard({
                             <AlertDialogTitle>End this shift?</AlertDialogTitle>
                             <AlertDialogDescription>
                                 {clientLabel}
-                                {elapsed ? ` · ${elapsed} worked` : ''}. Select any
+                                {elapsed ? ` · ${elapsed} worked` : ''}. Add any
                                 unpaid break you took during the shift.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -471,13 +471,13 @@ export default function ClockInCard({
                 className="scroll-mt-20 rounded-xl border border-primary/30 bg-primary/5 p-4 shadow-sm"
             >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-base font-semibold">Choose a shift to start</h2>
+                    <h2 className="text-base font-semibold">Pick a shift to start</h2>
                     <span className="text-xs text-muted-foreground">
-                        {eligibleShiftCount} eligible
+                        {eligibleShiftCount} ready
                     </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                    Pick the shift you're starting — we'll clock you in.
+                    Pick the shift you're starting and we'll clock you in.
                 </p>
 
                 <ul

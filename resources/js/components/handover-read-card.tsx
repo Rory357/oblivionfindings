@@ -130,7 +130,7 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <h2 className="text-base font-semibold text-sky-900 dark:text-sky-100">
-                        What you need to know before starting
+                        Read handover from last shift
                     </h2>
                     <p className="mt-0.5 text-xs text-sky-900/80 dark:text-sky-100/80">
                         Handover
@@ -180,7 +180,7 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                             </ul>
                         ) : (
                             <p className="mt-1 text-sm text-muted-foreground">
-                                All scheduled medication completed on the last shift.
+                                All scheduled meds given on the last shift.
                             </p>
                         )}
                     </div>

@@ -356,7 +356,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>
-                            {pendingAction === 'given' && 'Confirm dose given'}
+                            {pendingAction === 'given' && 'Give this dose now?'}
                             {pendingAction === 'refused' && 'Why was this refused?'}
                             {pendingAction === 'held' && 'Why is this being held?'}
                         </DialogTitle>
@@ -397,8 +397,8 @@ export default function GuidedRound({ round, items, progress }: Props) {
 
                     {pendingAction === 'given' && current?.requires_witness && (
                         <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                            This medication usually needs a witness. If you don't have
-                            one with you, hold it and speak to your supervisor.
+                            This med usually needs a witness. If no one is with you,
+                            hold it and tell your supervisor.
                         </p>
                     )}
 
@@ -528,7 +528,7 @@ function RoundCompleteView({
 
             {flaggedItems.length > 0 && (
                 <div className="rounded-2xl border bg-card p-4">
-                    <p className="text-sm font-semibold">Doses that need a follow-up</p>
+                    <p className="text-sm font-semibold">Doses that need follow-up</p>
                     <ul className="mt-2 divide-y">
                         {flaggedItems.map((it) => (
                             <li

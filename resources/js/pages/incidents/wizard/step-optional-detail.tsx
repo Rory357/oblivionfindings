@@ -51,7 +51,7 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
             <div className="space-y-1">
                 <h2 className="text-lg font-semibold">Anything else we should know?</h2>
                 <p className="text-sm text-muted-foreground">
-                    All optional. The incident is already saved — add what you can and skip the rest.
+                    All optional — the incident is already saved. Add what you know, skip the rest.
                 </p>
             </div>
 
@@ -71,7 +71,7 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
                 <Textarea
                     value={data.witnesses}
                     onChange={(e) => onChange({ witnesses: e.target.value })}
-                    placeholder="Names of any witnesses and how to reach them."
+                    placeholder="Names of anyone who saw it, and how to reach them."
                     rows={2}
                     className="text-base"
                 />
@@ -79,7 +79,7 @@ export default function StepOptionalDetail({ data, onChange, showInjuryFields }:
 
             {showInjuryFields && (
                 <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
-                    <p className="text-sm font-medium">Injury detail</p>
+                    <p className="text-sm font-medium">Injury details</p>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">

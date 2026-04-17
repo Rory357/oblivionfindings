@@ -46,7 +46,7 @@ const SEVERITY_OPTIONS: Array<{
     dot: string;
 }> = [
     { value: 'low', label: 'Low', hint: 'Minor, no lasting impact', ring: 'ring-emerald-500 bg-emerald-50 text-emerald-800', dot: 'bg-emerald-500' },
-    { value: 'medium', label: 'Medium', hint: 'Needs follow-up', ring: 'ring-amber-500 bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
+    { value: 'medium', label: 'Medium', hint: 'Needs a follow-up', ring: 'ring-amber-500 bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
     { value: 'high', label: 'High', hint: 'Serious — tell a manager now', ring: 'ring-red-500 bg-red-50 text-red-800', dot: 'bg-red-500' },
 ];
 
@@ -61,7 +61,7 @@ export default function StepWhoWhat({ data, onChange, clients, clientLabel, erro
         <div className="space-y-6">
             <div className="space-y-1">
                 <h2 className="text-lg font-semibold">Who and what</h2>
-                <p className="text-sm text-muted-foreground">Quick basics so we can log this fast.</p>
+                <p className="text-sm text-muted-foreground">The quick basics — so we can log this fast.</p>
             </div>
 
             <div className="space-y-2">
@@ -152,7 +152,7 @@ export default function StepWhoWhat({ data, onChange, clients, clientLabel, erro
                     value={data.occurred_at}
                     onChange={(e) => onChange({ occurred_at: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">Leave blank to use the current time.</p>
+                <p className="text-xs text-muted-foreground">Leave blank to use right now.</p>
             </div>
         </div>
     );

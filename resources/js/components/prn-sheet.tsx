@@ -261,8 +261,8 @@ export default function PrnSheet({
                             <SheetDescription className="text-xs">
                                 {step === 'pick'
                                     ? preselectedClient
-                                        ? `Pick the PRN med you\u2019re giving to ${preselectedClient.name}.`
-                                        : 'Pick the client and the PRN med you\u2019re giving now.'
+                                        ? `Pick the as-needed med you\u2019re giving to ${preselectedClient.name}.`
+                                        : 'Pick the client and the as-needed med you\u2019re giving now.'
                                     : `${selected?.client_name} \u00b7 ${selected?.name}`}
                             </SheetDescription>
                         </div>
@@ -329,11 +329,11 @@ function PickStep({
         return (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-12 text-center">
                 <Pill className="h-8 w-8 text-muted-foreground/60" />
-                <p className="text-sm font-medium">No PRN meds set up</p>
+                <p className="text-sm font-medium">No as-needed meds set up</p>
                 <p className="max-w-xs text-xs text-muted-foreground">
                     {preselectedClient
-                        ? `${preselectedClient.name} doesn\u2019t have any as-needed meds configured on their profile yet.`
-                        : 'You can give as-needed meds from here once your clients have PRN medications configured on their profile.'}
+                        ? `${preselectedClient.name} doesn\u2019t have any as-needed meds on their profile yet.`
+                        : 'You can give as-needed meds from here once your clients have them set up on their profile.'}
                 </p>
             </div>
         );
@@ -520,7 +520,7 @@ function RecordStep({
                                 Already given {med.given_last_24h} of {med.max_per_day} in the last 24 hours
                             </p>
                             <p className="mt-0.5 text-xs text-red-700 dark:text-red-200">
-                                Don&rsquo;t give another dose without checking with your supervisor.
+                                Don&rsquo;t give another dose without checking with your supervisor first.
                             </p>
                         </div>
                     </div>
@@ -551,10 +551,10 @@ function RecordStep({
                         <Shield className="mt-0.5 h-4 w-4 shrink-0 text-purple-700 dark:text-purple-300" />
                         <div className="min-w-0">
                             <p className="font-medium text-purple-900 dark:text-purple-100">
-                                Witness needed for this med
+                                Needs a witness
                             </p>
                             <p className="mt-0.5 text-xs text-purple-800 dark:text-purple-200">
-                                Use the full MAR to record a witnessed dose so the register stays correct.
+                                Record this dose on the full MAR with a witness, so the register stays correct.
                             </p>
                         </div>
                     </div>
@@ -631,7 +631,7 @@ function RecordStep({
                 {/* Note */}
                 <div>
                     <label htmlFor="prn-note" className="text-sm font-medium">
-                        Add note <span className="text-xs text-muted-foreground">(optional)</span>
+                        Add a note <span className="text-xs text-muted-foreground">(optional)</span>
                     </label>
                     <Textarea
                         id="prn-note"
@@ -664,7 +664,7 @@ function RecordStep({
                     ) : (
                         <>
                             <CheckCircle2 className="mr-2 h-5 w-5" />
-                            Record PRN
+                            Save dose
                         </>
                     )}
                 </Button>

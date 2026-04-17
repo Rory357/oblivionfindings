@@ -261,8 +261,8 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
             <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-28 pt-4 sm:pb-8">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Report incident</h1>
-                        <p className="text-sm text-muted-foreground">Quick three-step capture. You can add detail later.</p>
+                        <h1 className="text-xl font-semibold tracking-tight">Report an incident</h1>
+                        <p className="text-sm text-muted-foreground">Three quick steps. You can add more detail later.</p>
                     </div>
                     <Link
                         href="/incidents"
@@ -341,7 +341,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                             disabled={processing}
                             className="w-full sm:w-auto"
                         >
-                            Skip — I’m done
+                            Skip extra detail
                         </Button>
                         <Button
                             size="lg"
@@ -357,7 +357,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                             ) : (
                                 <>
                                     <Check className="mr-1.5 h-4 w-4" />
-                                    Save detail
+                                    Save and finish
                                 </>
                             )}
                         </Button>

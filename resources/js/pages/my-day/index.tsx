@@ -639,7 +639,7 @@ export default function MyDay({
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Pill className="h-4 w-4" />
-                                Medications due
+                                Meds due
                                 {stats.meds_overdue > 0 && (
                                     <Badge variant="destructive" className="ml-1">
                                         {stats.meds_overdue} overdue
@@ -736,7 +736,7 @@ export default function MyDay({
                                                                 handleTimesheetSubmit(ts.id)
                                                             }
                                                         >
-                                                            Submit
+                                                            Send
                                                         </Button>
                                                     )}
                                                 </div>
@@ -802,7 +802,7 @@ export default function MyDay({
                             <div className="flex flex-col items-center py-8 text-center">
                                 <CheckCircle2 className="h-8 w-8 text-green-500" />
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                    Nothing open here right now.
+                                    Nothing to action right now.
                                 </p>
                             </div>
                         ) : (

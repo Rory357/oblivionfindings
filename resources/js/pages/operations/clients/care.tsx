@@ -257,10 +257,10 @@ export default function ClientCare({
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                             {prnCount === 0
-                                ? 'No PRN meds on their profile yet'
+                                ? 'No as-needed meds on their profile yet'
                                 : !can.record_prn
-                                    ? 'You don\u2019t have permission to record medications'
-                                    : `${prnCount} PRN med${prnCount === 1 ? '' : 's'} available \u00b7 quick record`}
+                                    ? 'You can\u2019t record meds on this profile'
+                                    : `${prnCount} as-needed med${prnCount === 1 ? '' : 's'} ready \u00b7 quick record`}
                         </p>
                     </div>
                 </button>
@@ -277,8 +277,8 @@ export default function ClientCare({
                                 You&rsquo;re not on shift for this client right now
                             </p>
                             <p className="mt-0.5 text-xs text-sky-800 dark:text-sky-200">
-                                You can still record a PRN from here. It will save without a
-                                shift link, with a note so the record is clear.
+                                You can still give an as-needed med from here. It will save
+                                without a shift link, so note why if the context matters.
                             </p>
                         </div>
                     </div>
@@ -458,8 +458,8 @@ export default function ClientCare({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0 text-sm text-muted-foreground">
-                        Nothing pending. PRN effect checks and witness follow-ups
-                        will appear here.
+                        Nothing pending. As-needed med effect checks and witness
+                        follow-ups will appear here.
                     </CardContent>
                 </Card>
 

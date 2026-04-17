@@ -86,8 +86,8 @@ export default function StepDescribe({ data, onChange, errors }: Props) {
     return (
         <div className="space-y-6">
             <div className="space-y-1">
-                <h2 className="text-lg font-semibold">Tell us what happened</h2>
-                <p className="text-sm text-muted-foreground">A short plain-language account is fine. You can add more detail later.</p>
+                <h2 className="text-lg font-semibold">What happened</h2>
+                <p className="text-sm text-muted-foreground">In your own words is fine. You can add more detail later.</p>
             </div>
 
             <div className="space-y-2">
@@ -119,7 +119,7 @@ export default function StepDescribe({ data, onChange, errors }: Props) {
                 />
                 {errors?.description && <p className="text-xs text-red-600">{errors.description}</p>}
                 <p className="text-xs text-muted-foreground">
-                    When you tap <span className="font-medium">Save and continue</span>, we create the incident so you don’t lose it.
+                    Tap <span className="font-medium">Save and continue</span> and we&rsquo;ll save the incident so you don&rsquo;t lose it.
                 </p>
             </div>
         </div>

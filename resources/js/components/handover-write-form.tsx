@@ -101,7 +101,7 @@ export default function HandoverWriteForm({
     if (alreadySubmitted) {
         return (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100">
-                Handover already saved for this shift. You're good to clock out.
+                Handover saved for this shift. You're good to clock out.
             </div>
         );
     }
@@ -120,7 +120,7 @@ export default function HandoverWriteForm({
             {/* Meds completed */}
             <div className="space-y-1.5">
                 <div className="text-sm font-medium">
-                    Was all scheduled medication completed?
+                    Were all scheduled meds given?
                 </div>
                 <YesNoToggle
                     value={value.meds_completed}
@@ -165,7 +165,7 @@ export default function HandoverWriteForm({
                     htmlFor="handover-notes"
                     className="block text-sm font-medium"
                 >
-                    Anything the next shift should know?{' '}
+                    What should the next shift know?{' '}
                     <span className="font-normal text-muted-foreground">
                         (optional)
                     </span>
