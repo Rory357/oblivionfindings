@@ -476,7 +476,7 @@ export default function MyDay({
     const bottomNavItems = useMemo<StaffBottomNavItem[]>(
         () => [
             { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
-            { key: 'meds', label: 'Meds', icon: Pill, href: '/emar' },
+            { key: 'meds', label: 'Meds', icon: Pill, href: '/meds/today' },
             {
                 key: 'clock',
                 label: clockLabel,
@@ -908,9 +908,9 @@ export default function MyDay({
                         </Link>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
-                        <Link href="/emar">
+                        <Link href="/meds/today">
                             <Pill className="mr-2 h-4 w-4" />
-                            eMAR
+                            Meds today
                         </Link>
                     </Button>
                 </div>

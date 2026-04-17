@@ -8,6 +8,7 @@ use App\Http\Controllers\Emar\GuidedRoundController;
 use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
+use App\Http\Controllers\Emar\WorkerMedsController;
 use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\EmergencyAccessController;
 use App\Http\Controllers\MedicationAuditController;
@@ -23,6 +24,19 @@ use Illuminate\Support\Facades\Route;
  * Covers medication administration, controlled drugs, prescriber orders,
  * reviews, competency, stock, pharmacy, rounds, and compliance.
  */
+
+// Worker-facing medication home (PR 12). Deliberately lives off-prefix so
+// frontline staff can be routed to `/meds/today` without the admin-heavy
+// `/emar` dashboard ever being their default destination. Gated by the
+// administer/update permissions so support workers can load it, with manager
+// permissions also allowed for oversight roles that want the operational view.
+Route::middleware([
+    'auth',
+    'permission:medications.administer.record|clients.update|medications.orders.manage',
+])->group(function () {
+    Route::get('/meds/today', [WorkerMedsController::class, 'today'])
+        ->name('meds.today');
+});
 
 Route::middleware(['auth'])->prefix('emar')->group(function () {
     // Dashboard

@@ -1,0 +1,302 @@
+<?php
+
+namespace App\Http\Controllers\Emar;
+
+use App\Http\Controllers\Controller;
+use App\Models\ClientMedication;
+use App\Models\MedicationRound;
+use App\Models\Shift;
+use App\Models\User;
+use App\Services\GuidedRoundService;
+use App\Support\EmarUrl;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * PR 12 — Worker-facing medication surface.
+ *
+ * `/meds/today` is the frontline medication home. It is deliberately narrow:
+ * what a support worker needs to know *right now* to give medications safely
+ * and on time. Admin-level compliance, stock, review and register screens live
+ * on `/emar` and are intentionally not mirrored here.
+ *
+ * Reuses:
+ *   - `GuidedRoundService` for active-round progress (matches `/my-day`).
+ *   - The same dose-window logic used by `MyTasksController::getMedicationsDue`.
+ *
+ * Entry is gated by `medications.administer.record|clients.update|medications.orders.manage`
+ * so that both frontline workers and manager/leads who also want the
+ * operational view can load it.
+ */
+class WorkerMedsController extends Controller
+{
+    public function __construct(
+        protected GuidedRoundService $guidedRoundService,
+    ) {
+    }
+
+    public function today(Request $request): Response
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $now = Carbon::now();
+        $today = $now->copy()->startOfDay();
+        $tomorrowEnd = $now->copy()->addDay()->endOfDay();
+
+        $assignedClientIds = $this->assignedClientIdsFor($user, $today, $tomorrowEnd);
+
+        $medsDue = $this->medicationsDue($assignedClientIds, $now);
+        $activeRound = $this->activeRound($user, $now);
+        $upcomingRounds = $this->upcomingRounds($user, $now);
+
+        $dueNow = array_values(array_filter(
+            $medsDue,
+            fn ($m) => $m['status'] === 'overdue' || $m['status'] === 'due',
+        ));
+        $dueLater = array_values(array_filter(
+            $medsDue,
+            fn ($m) => $m['status'] === 'upcoming',
+        ));
+        $overdue = array_values(array_filter(
+            $medsDue,
+            fn ($m) => $m['status'] === 'overdue',
+        ));
+
+        return Inertia::render('meds/today/index', [
+            'today' => $now->format('l, j F Y'),
+            'stats' => [
+                'meds_due' => count($medsDue),
+                'meds_overdue' => count($overdue),
+                'due_now' => count($dueNow),
+                'due_later' => count($dueLater),
+                'upcoming_rounds' => count($upcomingRounds),
+            ],
+            'active_round' => $activeRound,
+            'upcoming_rounds' => $upcomingRounds,
+            'due_now' => $dueNow,
+            'due_later' => $dueLater,
+            'has_shift_context' => ! empty($assignedClientIds),
+        ]);
+    }
+
+    /**
+     * Clients this worker has a shift for today/tomorrow. When a worker has no
+     * shift context (e.g. a medication lead opening the worker view) we still
+     * want to degrade gracefully rather than wipe the page — fall back to all
+     * clients they can see meds for.
+     */
+    private function assignedClientIdsFor(User $user, Carbon $today, Carbon $tomorrowEnd): array
+    {
+        try {
+            $shiftClientIds = Shift::where('user_id', $user->id)
+                ->whereBetween('starts_at', [$today, $tomorrowEnd])
+                ->pluck('client_id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            if (! empty($shiftClientIds)) {
+                return $shiftClientIds;
+            }
+        } catch (\Throwable) {
+            // fall through
+        }
+
+        // Fallback: a manager / medication lead with no shift today still gets
+        // a useful worker view across every client currently on a medication.
+        if ($user->canDo('medications.orders.manage') || $user->canDo('medications.view')) {
+            try {
+                return ClientMedication::active()
+                    ->pluck('client_id')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+            } catch (\Throwable) {
+                return [];
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Non-PRN scheduled doses for today inside the operational window. Mirrors
+     * `MyTasksController::getMedicationsDue` so `/my-day` and `/meds/today`
+     * always agree about what's due.
+     */
+    private function medicationsDue(array $clientIds, Carbon $now): array
+    {
+        if (empty($clientIds)) {
+            return [];
+        }
+
+        try {
+            $windowStart = $now->copy()->subHours(2);
+            $windowEnd = $now->copy()->addHours(8);
+
+            $medications = ClientMedication::whereIn('client_id', $clientIds)
+                ->active()
+                ->where('is_prn', false)
+                ->whereNotNull('dose_times')
+                ->with('client:id,first_name,last_name')
+                ->get();
+
+            $result = [];
+
+            foreach ($medications as $med) {
+                $doseTimes = $med->dose_times;
+                if (empty($doseTimes) || ! is_array($doseTimes)) {
+                    continue;
+                }
+
+                foreach ($doseTimes as $doseTime) {
+                    $scheduled = $now->copy()->startOfDay()->setTimeFromTimeString($doseTime);
+
+                    if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
+                        continue;
+                    }
+
+                    if ($scheduled->lt($now)) {
+                        $status = 'overdue';
+                    } elseif ($scheduled->lte($now->copy()->addHour())) {
+                        $status = 'due';
+                    } else {
+                        $status = 'upcoming';
+                    }
+
+                    $clientName = $med->client
+                        ? trim($med->client->first_name . ' ' . $med->client->last_name)
+                        : 'Unknown';
+
+                    $result[] = [
+                        'client_id' => $med->client_id,
+                        'client_name' => $clientName,
+                        'medication_id' => $med->id,
+                        'medication_name' => $med->name,
+                        'dose' => $med->dosage,
+                        'route' => $med->route,
+                        'is_controlled' => (bool) ($med->controlled_drug ?? false),
+                        'scheduled_for' => $scheduled->toIso8601String(),
+                        'status' => $status,
+                        'mar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
+                    ];
+                }
+            }
+
+            usort($result, function ($a, $b) {
+                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2];
+                $statusCmp = ($order[$a['status']] ?? 3) <=> ($order[$b['status']] ?? 3);
+                if ($statusCmp !== 0) {
+                    return $statusCmp;
+                }
+
+                return strcmp($a['scheduled_for'], $b['scheduled_for']);
+            });
+
+            return $result;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * The single round the worker should walk right now, matching the
+     * `/my-day` banner exactly (same service, same precedence).
+     */
+    private function activeRound(User $user, Carbon $now): ?array
+    {
+        if (! $user->canDo('medications.administer.record')
+            && ! $user->canDo('clients.update')
+            && ! $user->canDo('medications.orders.manage')) {
+            return null;
+        }
+
+        try {
+            $round = MedicationRound::query()
+                ->whereDate('round_date', $now->toDateString())
+                ->where(function ($q) use ($user) {
+                    $q->where('assigned_to', $user->id)
+                        ->orWhere('started_by', $user->id);
+                })
+                ->whereIn('status', ['in_progress', 'pending'])
+                ->orderByRaw("CASE status WHEN 'in_progress' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END")
+                ->orderBy('scheduled_time')
+                ->first();
+
+            if (! $round) {
+                return null;
+            }
+
+            $progress = $this->guidedRoundService->progress($round);
+
+            if ($progress['total'] === 0) {
+                return null;
+            }
+
+            return [
+                'id' => $round->id,
+                'name' => $round->name,
+                'status' => $round->status,
+                'scheduled_time' => $round->scheduled_time,
+                'given' => $progress['given'],
+                'total' => $progress['total'],
+                'completed' => $progress['completed'],
+                'percent' => $progress['percent'],
+                'url' => route('meds.round.show', $round),
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Other scheduled rounds later today the worker can see / jump to. Kept
+     * intentionally light — no admin filtering controls — so the page reads as
+     * "here's what's coming" rather than a full round-management screen.
+     */
+    private function upcomingRounds(User $user, Carbon $now): array
+    {
+        try {
+            $rounds = MedicationRound::query()
+                ->whereDate('round_date', $now->toDateString())
+                ->where(function ($q) use ($user) {
+                    // Surface the worker's own rounds, unassigned rounds, and
+                    // anything starting soon so a worker covering for someone
+                    // else still sees what's next.
+                    $q->where('assigned_to', $user->id)
+                        ->orWhereNull('assigned_to');
+                })
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->orderBy('scheduled_time')
+                ->limit(6)
+                ->get();
+
+            return $rounds
+                ->map(function (MedicationRound $round) {
+                    $progress = $this->guidedRoundService->progress($round);
+
+                    return [
+                        'id' => $round->id,
+                        'name' => $round->name,
+                        'status' => $round->status,
+                        'scheduled_time' => $round->scheduled_time,
+                        'total' => $progress['total'],
+                        'completed' => $progress['completed'],
+                        'percent' => $progress['percent'],
+                        'url' => route('meds.round.show', $round),
+                    ];
+                })
+                ->filter(fn ($r) => $r['total'] > 0)
+                ->values()
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+}

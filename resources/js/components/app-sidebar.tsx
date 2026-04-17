@@ -378,11 +378,35 @@ function buildIconNavItems({
         });
     }
 
-    // eMAR (Electronic Medication Administration)
-    const hasEmar =
-        can?.medications?.view || can?.medications?.administer?.record;
-    if (hasEmar) {
+    // Medications (PR 12 — worker / admin split).
+    //
+    // Frontline workers (administer-record, no orders-manage/audit) get a
+    // single top-level link straight to the operational worker view at
+    // `/meds/today`. They never land on the admin-heavy eMAR dashboard by
+    // default.
+    //
+    // Managers / medication leads (orders-manage, audit, or reports) keep the
+    // full eMAR sub-panel for oversight, now rooted on the worker view so the
+    // first click still matches the frontline experience, with Dashboard kept
+    // one level deeper for compliance / management work.
+    const canAdminEmar =
+        can?.medications?.ordersManage ||
+        can?.medications?.auditView ||
+        can?.medications?.reportsExport ||
+        can?.reports?.viewAny;
+    const canWorkerMeds =
+        can?.medications?.administerRecord ||
+        can?.medications?.view ||
+        can?.clients?.update;
+    if (canAdminEmar) {
         items.push({ id: 'emar', icon: Pill, label: 'eMAR', subPanel: true });
+    } else if (canWorkerMeds) {
+        items.push({
+            id: 'meds-today',
+            icon: Pill,
+            label: 'Meds today',
+            href: '/meds/today',
+        });
     }
 
     // Health & Clinical
@@ -827,6 +851,13 @@ function buildOperationsSubPanelGroups({
 
 function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const groups: SubPanelGroup[] = [];
+
+    // Worker view (PR 12). Top of the panel so even admins can quickly drop
+    // into the operational frontline surface before diving into compliance.
+    const workerItems: NavItem[] = [
+        { title: 'Meds today', href: '/meds/today', icon: Activity },
+    ];
+    groups.push({ label: 'Worker view', items: workerItems });
 
     // Overview
     groups.push({
