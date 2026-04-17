@@ -1,6 +1,7 @@
 import { AlertTriangle, Clock, Pill, ShieldAlert, UserCircle2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { formatTime } from '@/lib/datetime';
 
 /* -------------------------------------------------------------------------- */
 /*  MedRoundCard — the calm "one med at a time" card                          */
@@ -27,18 +28,6 @@ export interface MedRoundCardProps {
     isControlled?: boolean;
     isHighRisk?: boolean;
     requiresWitness?: boolean;
-}
-
-function formatTime(iso: string): string {
-    try {
-        return new Date(iso).toLocaleTimeString('en-NZ', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-        });
-    } catch {
-        return iso;
-    }
 }
 
 export default function MedRoundCard({

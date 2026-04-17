@@ -1,6 +1,7 @@
 import WizardStepper, { type WizardStep } from '@/components/wizard-stepper';
 import { Button } from '@/components/ui/button';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
+import { formatTime } from '@/lib/datetime';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
@@ -296,7 +297,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
 
                 {savedAt && (
                     <p className="text-xs text-muted-foreground">
-                        Draft saved on this device · {new Date(savedAt).toLocaleTimeString()}
+                        Draft saved on this device · {formatTime(savedAt)}
                     </p>
                 )}
 

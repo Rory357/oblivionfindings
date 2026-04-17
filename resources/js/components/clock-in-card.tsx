@@ -20,6 +20,7 @@ import HandoverWriteForm, {
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
+import { formatTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -79,15 +80,6 @@ const BREAK_CHIPS: ReadonlyArray<{ value: number; label: string }> = [
     { value: 45, label: '45' },
     { value: 60, label: '60' },
 ];
-
-function formatTime(iso: string | null): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString('en-NZ', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-    });
-}
 
 function formatElapsed(sinceIso: string, now: number): string {
     const start = new Date(sinceIso).getTime();

@@ -10,6 +10,7 @@ import {
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { formatRelative } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -55,19 +56,6 @@ export type HandoverReadPayload = {
 export type HandoverReadCardProps = {
     handover: HandoverReadPayload | null;
 };
-
-function formatWhen(iso: string | null): string | null {
-    if (!iso) return null;
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const mins = Math.floor(diffMs / 60000);
-    const hrs = Math.floor(mins / 60);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
-    if (hrs < 24) return `${hrs}h ago`;
-    return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
-}
 
 function moodLabel(mood: string | null): string | null {
     if (!mood) return null;
@@ -116,7 +104,9 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
         );
     };
 
-    const submittedWhen = formatWhen(handover.submitted_at);
+    const submittedWhen = handover.submitted_at
+        ? formatRelative(handover.submitted_at)
+        : null;
     const mood = moodLabel(handover.client_mood);
 
     return (

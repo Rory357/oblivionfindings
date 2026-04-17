@@ -33,6 +33,7 @@ import useLiveRefresh from '@/hooks/use-live-refresh';
 import StaffPageShell from '@/layouts/staff-page-shell';
 import StaffStatus from '@/components/staff-status';
 import TimesheetReturnBanner from '@/components/timesheet-return-banner';
+import { formatTime } from '@/lib/datetime';
 import {
     mapIncidentStatus,
     mapMedStatus,
@@ -234,14 +235,6 @@ const priorityOrder: Record<string, number> = {
     medium: 2,
     low: 3,
 };
-
-function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString('en-NZ', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-    });
-}
 
 // Map the controller's `MedDue.status` into the worker-facing `med` vocabulary
 // via `status-vocab.ts`. Anything not-yet-given from the backend is "Due"; the

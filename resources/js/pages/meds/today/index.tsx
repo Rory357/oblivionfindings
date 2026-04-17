@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import type { StaffBottomNavItem } from '@/components/staff-bottom-nav';
 import StaffPageShell from '@/layouts/staff-page-shell';
+import { formatTime } from '@/lib/datetime';
 
 /* -------------------------------------------------------------------------- */
 /*  PR 12 — Worker-facing medication home at `/meds/today`                    */
@@ -92,14 +93,6 @@ interface Props {
     due_later: MedDue[];
     prn_medications: PrnMedication[];
     has_shift_context: boolean;
-}
-
-function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString('en-NZ', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-    });
 }
 
 function formatClock(hhmm?: string | null): string {

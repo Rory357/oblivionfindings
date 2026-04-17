@@ -1,5 +1,6 @@
 import { Check, CloudOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { formatRelative, formatTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -18,12 +19,12 @@ export type DraftSavedIndicatorProps = {
     saving?: boolean;
 };
 
-function formatRelative(savedAt: number, now: number): string {
+function formatSavedLabel(savedAt: number, now: number): string {
     const diff = Math.max(0, Math.floor((now - savedAt) / 1000));
     if (diff < 5) return 'just now';
     if (diff < 60) return `${diff}s ago`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    return new Date(savedAt).toLocaleTimeString();
+    if (diff < 3600) return formatRelative(savedAt, now);
+    return formatTime(savedAt);
 }
 
 export default function DraftSavedIndicator({
@@ -58,7 +59,7 @@ export default function DraftSavedIndicator({
             ) : savedAt ? (
                 <>
                     <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
-                    <span>Draft saved on this device · {formatRelative(savedAt, now)}</span>
+                    <span>Draft saved on this device · {formatSavedLabel(savedAt, now)}</span>
                 </>
             ) : null}
         </div>

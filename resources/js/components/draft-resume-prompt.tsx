@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 /* -------------------------------------------------------------------------- */
@@ -19,16 +20,6 @@ export type DraftResumePromptProps = {
     description?: string;
     className?: string;
 };
-
-function formatSavedAt(savedAt: number): string {
-    const d = new Date(savedAt);
-    return d.toLocaleString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
-}
 
 export default function DraftResumePrompt({
     savedAt,
@@ -56,7 +47,7 @@ export default function DraftResumePrompt({
                     <div className="font-medium text-amber-900 dark:text-amber-100">{title}</div>
                     <p className="mt-0.5 text-xs text-amber-900/80 dark:text-amber-100/80">
                         {description}
-                        {savedAt ? ` Last saved ${formatSavedAt(savedAt)}.` : null}
+                        {savedAt ? ` Last saved ${formatDateTime(savedAt)}.` : null}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                         <Button size="sm" onClick={onResume}>

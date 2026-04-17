@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     DropdownMenu,
