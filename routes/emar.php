@@ -4,6 +4,7 @@ use App\Http\Controllers\Emar\AuditLogController;
 use App\Http\Controllers\Emar\CDLossReportController;
 use App\Http\Controllers\Emar\EmarController;
 use App\Http\Controllers\Emar\EmarPdfController;
+use App\Http\Controllers\Emar\GuidedRoundController;
 use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
@@ -78,6 +79,17 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::get('/rounds', [EmarController::class, 'rounds'])
         ->middleware('permission:medications.view')
         ->name('emar.rounds');
+
+    // Frontline Guided Round flow — worker-facing, gated by administer/record
+    // rather than orders.manage so support workers can walk a round safely.
+    Route::middleware('permission:medications.administer.record|clients.update|medications.orders.manage')->group(function () {
+        Route::get('/rounds/{round}/guided', [GuidedRoundController::class, 'show'])
+            ->name('meds.round.show');
+        Route::post('/rounds/{round}/guided/items/{medication}', [GuidedRoundController::class, 'administer'])
+            ->name('meds.round.administer');
+        Route::post('/rounds/{round}/guided/complete', [GuidedRoundController::class, 'complete'])
+            ->name('meds.round.complete');
+    });
 
     // Self-Administration Assessments
     Route::get('/self-admin', [EmarController::class, 'selfAdmin'])

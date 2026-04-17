@@ -10,8 +10,8 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Clock, Pencil, Play, Plus, Trash2, Users, Zap } from 'lucide-react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Clock, ListChecks, Pencil, Play, Plus, Trash2, Users, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 type MedRound = {
@@ -355,9 +355,17 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
                                     )}
                                     {/* Round Actions */}
                                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+                                        {round.status !== 'completed' && (
+                                            <Button size="sm" asChild>
+                                                <Link href={`/emar/rounds/${round.id}/guided`}>
+                                                    <ListChecks className="mr-1 h-3 w-3" />
+                                                    {round.status === 'in_progress' ? 'Resume round' : 'Start guided round'}
+                                                </Link>
+                                            </Button>
+                                        )}
                                         {round.status === 'pending' && (
                                             <Button size="sm" variant="outline" onClick={() => router.post(`/emar/rounds/${round.id}/start`)}>
-                                                <Play className="mr-1 h-3 w-3" /> Start
+                                                <Play className="mr-1 h-3 w-3" /> Mark started
                                             </Button>
                                         )}
                                         {round.status === 'in_progress' && (

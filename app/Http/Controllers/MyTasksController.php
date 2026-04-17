@@ -9,9 +9,11 @@ use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
+use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\GuidedRoundService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -82,6 +84,10 @@ class MyTasksController extends Controller
         // 11. Frontline clock state (PR 4)
         $clock = $this->getClockState($user, $now);
 
+        // 12. Active guided medication round (PR 9). Surfaces a resume / start
+        //     banner on /my-day for the worker assigned to today's round.
+        $activeRound = $this->getActiveRound($user, $now);
+
         return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
             'shifts' => $shifts->values()->all(),
@@ -94,6 +100,7 @@ class MyTasksController extends Controller
             'is_manager' => $isManager,
             'manager_data' => $managerData,
             'clock' => $clock,
+            'active_round' => $activeRound,
         ]);
     }
 
@@ -271,6 +278,64 @@ class MyTasksController extends Controller
             return $result;
         } catch (\Throwable) {
             return [];
+        }
+    }
+
+    /**
+     * Return the guided-round summary for whatever round the worker should
+     * focus on right now, or null if nothing relevant is assigned.
+     *
+     * Priority:
+     *   1. Rounds still in_progress for today that this user started or was
+     *      assigned to (so resuming always wins).
+     *   2. Pending rounds assigned to this user whose window overlaps "now".
+     *
+     * Progress numbers come from GuidedRoundService — the same source used by
+     * the guided page itself — so the banner never disagrees with what the
+     * worker sees when they tap it.
+     */
+    private function getActiveRound(User $user, Carbon $now): ?array
+    {
+        if (! $user->canDo('medications.administer.record') && ! $user->canDo('clients.update')) {
+            return null;
+        }
+
+        try {
+            $round = MedicationRound::query()
+                ->whereDate('round_date', $now->toDateString())
+                ->where(function ($q) use ($user) {
+                    $q->where('assigned_to', $user->id)
+                        ->orWhere('started_by', $user->id);
+                })
+                ->whereIn('status', ['in_progress', 'pending'])
+                ->orderByRaw("CASE status WHEN 'in_progress' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END")
+                ->orderBy('scheduled_time')
+                ->first();
+
+            if (! $round) {
+                return null;
+            }
+
+            $service = app(GuidedRoundService::class);
+            $progress = $service->progress($round);
+
+            if ($progress['total'] === 0) {
+                return null;
+            }
+
+            return [
+                'id' => $round->id,
+                'name' => $round->name,
+                'status' => $round->status,
+                'scheduled_time' => $round->scheduled_time,
+                'given' => $progress['given'],
+                'total' => $progress['total'],
+                'completed' => $progress['completed'],
+                'percent' => $progress['percent'],
+                'url' => route('meds.round.show', $round),
+            ];
+        } catch (\Throwable) {
+            return null;
         }
     }
 

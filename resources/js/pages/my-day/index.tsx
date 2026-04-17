@@ -171,6 +171,18 @@ interface ClockState {
     eligible_shift_count: number;
 }
 
+interface ActiveRound {
+    id: number;
+    name: string;
+    status: 'pending' | 'in_progress' | string;
+    scheduled_time: string;
+    given: number;
+    total: number;
+    completed: number;
+    percent: number;
+    url: string;
+}
+
 interface Props {
     today: string;
     shifts: MyShift[];
@@ -200,6 +212,7 @@ interface Props {
         staff_on_today: number;
     };
     clock?: ClockState;
+    active_round?: ActiveRound | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,6 +315,7 @@ export default function MyDay({
     is_manager,
     manager_data,
     clock,
+    active_round,
 }: Props) {
     const [openItemFilter, setOpenItemFilter] = useState<OpenItemFilter>('all');
 
@@ -584,6 +598,38 @@ export default function MyDay({
                             </Button>
                         </CardContent>
                     </Card>
+                )}
+
+                {/* ── Active guided round (PR 9) ─────────────────────────── */}
+                {active_round && (
+                    <Link
+                        href={active_round.url}
+                        className="group block rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 transition-shadow hover:shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/20"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+                                <Pill className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold leading-tight">
+                                    {active_round.status === 'in_progress'
+                                        ? `Resume ${active_round.name}`
+                                        : `Start ${active_round.name}`}
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {active_round.completed} of {active_round.total} done
+                                    {active_round.scheduled_time
+                                        ? ` · ${active_round.scheduled_time.slice(0, 5)}`
+                                        : ''}
+                                </p>
+                                <Progress
+                                    value={active_round.percent}
+                                    className="mt-2 h-1.5"
+                                />
+                            </div>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
+                        </div>
+                    </Link>
                 )}
 
                 {/* ── Medications Due ────────────────────────────────────── */}
