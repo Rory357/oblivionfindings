@@ -396,6 +396,7 @@ class RbacSeeder extends Seeder
             ['key' => 'consents.record', 'description' => 'Record client consent', 'group' => 'consents', 'module' => 'Compliance'],
             ['key' => 'consents.withdraw', 'description' => 'Process consent withdrawal', 'group' => 'consents', 'module' => 'Compliance'],
             ['key' => 'consents.export', 'description' => 'Export consent reports', 'group' => 'consents', 'module' => 'Compliance'],
+            ['key' => 'consents.request', 'description' => 'Request consent via family portal', 'group' => 'consents', 'module' => 'Compliance'],
 
             // Data Privacy & GDPR
             ['key' => 'privacy.viewRequests', 'description' => 'View data subject requests', 'group' => 'privacy', 'module' => 'Compliance'],
@@ -528,7 +529,7 @@ class RbacSeeder extends Seeder
             'assets.alerts.view', 'assets.alerts.manage', 'assets.scan.record', 'assets.geofences.manage',
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update',
             'safeguarding.investigate', 'safeguarding.report.external', 'safeguarding.viewSensitive',
-            'consents.viewAny', 'consents.manage', 'consents.record', 'consents.withdraw', 'consents.export',
+            'consents.viewAny', 'consents.manage', 'consents.record', 'consents.withdraw', 'consents.export', 'consents.request',
             'staff.vetting.view', 'staff.vetting.manage', 'staff.training.viewAny', 'staff.training.manage',
             'staff.competency.assess', 'staff.induction.manage',
             'privacy.viewRequests', 'privacy.processRequests', 'privacy.manageRetention',
@@ -581,7 +582,7 @@ class RbacSeeder extends Seeder
             'assets.trackers.manage', 'assets.telemetry.ingest', 'assets.telemetry.view',
             'assets.alerts.view', 'assets.alerts.manage', 'assets.scan.record', 'assets.geofences.manage',
             'safeguarding.viewAny', 'safeguarding.create', 'safeguarding.update', 'safeguarding.investigate',
-            'consents.viewAny', 'consents.record', 'consents.withdraw',
+            'consents.viewAny', 'consents.record', 'consents.withdraw', 'consents.request',
             'siteHardware.view', 'controlRoom.alerts.view',
             'hr.employees.viewAny', 'hr.compliance.view', 'hr.training.view',
             'hr.vetting.view', 'hr.leave.viewAny', 'hr.leave.approve',

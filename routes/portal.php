@@ -29,6 +29,7 @@ use App\Http\Controllers\ClientVisitRequestController;
 use App\Http\Controllers\Portal\PortalPreferenceController;
 use App\Http\Controllers\Portal\PortalLocationController;
 use App\Http\Controllers\Portal\PortalTimelineInteractionController;
+use App\Http\Controllers\Portal\ConsentRequestPortalController;
 
 /**
  * Portal & Shared Features Routes
@@ -64,6 +65,14 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.visit-requests.store');
     Route::post('/portal/clients/{client}/visit-requests/{visit}/cancel', [FamilyDashboardController::class, 'cancelVisitRequest'])
         ->name('portal.clients.visit-requests.cancel');
+
+    // Consent Requests (portal-side respond flow)
+    Route::get('/portal/clients/{client}/consent-requests/{consentRequest}', [ConsentRequestPortalController::class, 'show'])
+        ->name('portal.clients.consent-requests.show');
+    Route::post('/portal/clients/{client}/consent-requests/{consentRequest}/approve', [ConsentRequestPortalController::class, 'approve'])
+        ->name('portal.clients.consent-requests.approve');
+    Route::post('/portal/clients/{client}/consent-requests/{consentRequest}/decline', [ConsentRequestPortalController::class, 'decline'])
+        ->name('portal.clients.consent-requests.decline');
 
     // Portal Calendar
     Route::get('/portal/clients/{client}/calendar', [PortalCalendarController::class, 'index'])

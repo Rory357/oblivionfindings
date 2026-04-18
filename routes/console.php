@@ -58,6 +58,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->hourly();
 
+// Expire stale consent requests past expires_at (14-day default window).
+app(Schedule::class)
+    ->command('consent-requests:expire-stale')
+    ->timezone('Pacific/Auckland')
+    ->hourly();
+
 // Escalation engine: re-notify pending items based on admin-configured rules
 app(Schedule::class)
     ->command('notifications:escalate')

@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Models\ClientConsent;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
@@ -36,6 +37,13 @@ class DeviceAssignmentController extends Controller
         ]);
 
         try {
+            $this->enforceConsentForClientTracker(
+                $device,
+                $validated['assignable_type'],
+                (int) $validated['assignable_id'],
+                isset($validated['consent_id']) ? (int) $validated['consent_id'] : null,
+            );
+
             $this->service->assign(
                 device: $device,
                 assignableType: $validated['assignable_type'],
@@ -51,6 +59,54 @@ class DeviceAssignmentController extends Controller
         }
 
         return back()->with('success', "Device assigned successfully.");
+    }
+
+    /**
+     * Reject client-tracker assignments that lack a valid ClientConsent.
+     *
+     * Applies when: assignable is a client AND the device is a tracking device
+     * (domain='tracking'). A valid consent is one that belongs to this client,
+     * status='given', and either has no expiry or hasn't expired yet.
+     *
+     * Enforced at controller level (not in the model) to avoid breaking unit
+     * tests that build fixtures via DeviceAssignment::create() directly.
+     */
+    private function enforceConsentForClientTracker(
+        Device $device,
+        string $assignableType,
+        int $assignableId,
+        ?int $consentId,
+    ): void {
+        if ($assignableType !== DeviceAssignment::TARGET_CLIENT) {
+            return;
+        }
+
+        if ($device->domain !== 'tracking') {
+            return;
+        }
+
+        if (!$consentId) {
+            throw new \InvalidArgumentException(
+                'Assigning a tracking device to a client requires a valid consent. '
+                . 'Request consent via the family portal or record it in person before assigning.'
+            );
+        }
+
+        $consent = ClientConsent::query()
+            ->where('id', $consentId)
+            ->where('client_id', $assignableId)
+            ->where('status', 'given')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->first();
+
+        if (!$consent) {
+            throw new \InvalidArgumentException(
+                'The chosen consent is not valid for this client (missing, not given, expired, '
+                . 'or belongs to a different client).'
+            );
+        }
     }
 
     /**

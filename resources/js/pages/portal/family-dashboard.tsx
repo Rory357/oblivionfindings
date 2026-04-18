@@ -155,11 +155,21 @@ type Props = {
     recentEvents: EventItem[];
     recentIncidents: IncidentItem[];
     visitRequests: VisitRequest[];
+    pendingConsentRequests?: Array<{
+        id: number;
+        consent_type: { id: number; name: string; category: string } | null;
+        requested_by: { id: number; name: string } | null;
+        purpose: string;
+        sent_at: string | null;
+        expires_at: string | null;
+        action_url: string;
+    }>;
     stats: {
         shiftsToday: number;
         shiftsThisWeek: number;
         shiftsThisMonth: number;
         pendingVisitRequests: number;
+        pendingConsentRequests?: number;
         incidentsLast30Days: number;
     };
     relation?: string | null;
@@ -330,6 +340,7 @@ export default function FamilyDashboard({
     recentEvents,
     recentIncidents,
     visitRequests,
+    pendingConsentRequests = [],
     stats,
     relation,
     medicalSummary,
@@ -1260,6 +1271,53 @@ export default function FamilyDashboard({
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Consent Requests */}
+                        {pendingConsentRequests.length > 0 && (
+                            <Card className="border-amber-300 bg-amber-50">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <span>🔏</span>
+                                        Consent reviews waiting for you
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        {pendingConsentRequests.map((cr) => (
+                                            <div
+                                                key={cr.id}
+                                                className="flex items-start justify-between gap-3 rounded-lg border bg-white p-3"
+                                            >
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-sm font-medium">
+                                                        {cr.consent_type?.name ?? 'Consent request'}
+                                                    </div>
+                                                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                                                        {cr.purpose}
+                                                    </p>
+                                                    <div className="mt-1 text-xs text-muted-foreground">
+                                                        From {cr.requested_by?.name ?? 'care team'}
+                                                        {cr.expires_at && (
+                                                            <>
+                                                                {' '}
+                                                                · respond by{' '}
+                                                                {new Date(cr.expires_at).toLocaleDateString(
+                                                                    'en-NZ',
+                                                                    { day: 'numeric', month: 'short' },
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <Button asChild size="sm">
+                                                    <a href={cr.action_url}>Review</a>
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         {/* Visit Requests */}
                         <Card>
