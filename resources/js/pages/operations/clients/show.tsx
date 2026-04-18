@@ -78,6 +78,7 @@ import {
     Pill,
     Plus,
     Search,
+    Send,
     Shield,
     ShieldAlert,
     Stethoscope,
@@ -510,6 +511,8 @@ export default function ClientShow({
     const consents = pageProps.consents ?? [];
     const familyNotesOpenCount = pageProps.family_notes_open_count ?? 0;
     const pendingVisitCount = pageProps.pending_visit_count ?? 0;
+    const pendingConsentRequestsCount =
+        pageProps.pending_consent_requests_count ?? 0;
     const emarSummary = pageProps.emar_summary ?? null;
     const carePlansSummary = pageProps.care_plans_summary ?? {};
     const clientProgressNotes = pageProps.client_progress_notes ?? [];
@@ -521,11 +524,12 @@ export default function ClientShow({
     const removePhotoForm = useForm({});
 
     const tabs: Array<{
-        key: TabKey;
+        key: TabKey | string;
         label: string;
         icon: typeof User;
         show: boolean;
         count?: number;
+        href?: string;
     }> = useMemo(
         () => [
             { key: 'profile', label: 'Overview', icon: User, show: true },
@@ -602,6 +606,14 @@ export default function ClientShow({
                 count: (transport?.stats?.transports_30d ?? 0) + (transport?.stats?.outings_30d ?? 0) || undefined,
             },
             { key: 'consents', label: 'Consents', icon: Shield, show: true },
+            {
+                key: 'consent-requests',
+                label: 'Consent Requests',
+                icon: Send,
+                show: true,
+                count: pendingConsentRequestsCount || undefined,
+                href: `/operations/clients/${client.id}/consent-requests`,
+            },
             { key: 'location', label: 'Location', icon: MapPin, show: true },
             { key: 'portal', label: 'Family Portal', icon: Users, show: true },
             {
@@ -995,16 +1007,13 @@ export default function ClientShow({
                             .map((t) => {
                                 const Icon = t.icon;
                                 const isActive = tab === t.key;
-                                return (
-                                    <button
-                                        key={t.key}
-                                        onClick={() => handleTabChange(t.key)}
-                                        className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                                            isActive
-                                                ? 'border-primary text-primary'
-                                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                                        }`}
-                                    >
+                                const className = `inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                                    isActive
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                }`;
+                                const inner = (
+                                    <>
                                         <Icon className="h-3.5 w-3.5" />
                                         {t.label}
                                         {t.count != null && t.count > 0 && (
@@ -1018,6 +1027,24 @@ export default function ClientShow({
                                                 {t.count}
                                             </span>
                                         )}
+                                    </>
+                                );
+
+                                if (t.href) {
+                                    return (
+                                        <Link key={t.key} href={t.href} className={className}>
+                                            {inner}
+                                        </Link>
+                                    );
+                                }
+
+                                return (
+                                    <button
+                                        key={t.key}
+                                        onClick={() => handleTabChange(t.key)}
+                                        className={className}
+                                    >
+                                        {inner}
                                     </button>
                                 );
                             })}

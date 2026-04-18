@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
 
         // Compliance module seeders
         $this->call(ConsentTypesSeeder::class);
+        $this->call(StandardConsentTypesSeeder::class);
         $this->call(TrainingCoursesSeeder::class);
         $this->call(CompetencyFrameworksSeeder::class);
         $this->call(NzComplianceObligationsSeeder::class);

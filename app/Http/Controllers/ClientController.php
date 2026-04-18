@@ -609,6 +609,7 @@ class ClientController extends Controller
                 'record_event' => $request->user()?->canDo('clinical.events.record') ?? false,
             ],
             'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
+            'pending_consent_requests_count' => \App\Models\ConsentRequest::forClient($client->id)->pending()->count(),
             'family_notes_open_count' => \App\Models\FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
             'family_notes' => \App\Models\FamilyNote::where('client_id', $client->id)
                 ->with([

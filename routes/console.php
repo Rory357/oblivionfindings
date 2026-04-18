@@ -64,6 +64,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->hourly();
 
+// Remind recipients of pending consent requests expiring in 24-72 hours.
+app(Schedule::class)
+    ->command('consent-requests:send-reminders')
+    ->timezone('Pacific/Auckland')
+    ->hourly();
+
 // Escalation engine: re-notify pending items based on admin-configured rules
 app(Schedule::class)
     ->command('notifications:escalate')
