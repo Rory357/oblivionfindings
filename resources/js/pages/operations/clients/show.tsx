@@ -508,6 +508,13 @@ export default function ClientShow({
             : 0;
     const respiteCan = auth?.can?.respite ?? {};
     const consents = pageProps.consents ?? [];
+    const familyNotesOpenCount = pageProps.family_notes_open_count ?? 0;
+    const pendingVisitCount = pageProps.pending_visit_count ?? 0;
+    const emarSummary = pageProps.emar_summary ?? null;
+    const carePlansSummary = pageProps.care_plans_summary ?? {};
+    const clientProgressNotes = pageProps.client_progress_notes ?? [];
+    const clientAgreements = pageProps.client_agreements ?? [];
+    const familyNotes = pageProps.family_notes ?? [];
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
@@ -602,7 +609,7 @@ export default function ClientShow({
                 label: 'Family Notes',
                 icon: ListTodo,
                 show: true,
-                count: (usePage().props as any).family_notes_open_count,
+                count: familyNotesOpenCount,
             },
             {
                 key: 'respite',
@@ -628,6 +635,9 @@ export default function ClientShow({
             photos?.length,
             personal_assets?.length,
             onboarding?.total,
+            familyNotesOpenCount,
+            transport?.stats?.outings_30d,
+            transport?.stats?.transports_30d,
         ],
     );
 
@@ -870,15 +880,11 @@ export default function ClientShow({
                                     >
                                         <Users className="mr-1.5 h-3.5 w-3.5" />
                                         Visits
-                                        {(() => {
-                                            const pc = (usePage().props as any)
-                                                .pending_visit_count;
-                                            return pc > 0 ? (
+                                        {pendingVisitCount > 0 ? (
                                                 <span className="ml-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                                                    {pc}
+                                                    {pendingVisitCount}
                                                 </span>
-                                            ) : null;
-                                        })()}
+                                        ) : null}
                                     </Link>
                                 </Button>
                                 {can.edit && (
@@ -3548,8 +3554,6 @@ export default function ClientShow({
 
                 {tab === 'mar' &&
                     (() => {
-                        const emarSummary = (usePage().props as any)
-                            .emar_summary;
                         const meds = medical?.medications ?? [];
                         const activeMeds = meds.filter(
                             (m: any) => m.active !== false,
@@ -4025,8 +4029,7 @@ export default function ClientShow({
 
                 {tab === 'care_plans' &&
                     (() => {
-                        const pageProps = usePage().props as any;
-                        const summary = pageProps.care_plans_summary ?? {};
+                        const summary = carePlansSummary;
                         const activePlan = summary.active_plan;
                         const recentNotes = summary.recent_notes ?? [];
                         const reviewDue = summary.review_due ?? false;
@@ -4595,8 +4598,7 @@ export default function ClientShow({
 
                 {tab === 'progress_notes' &&
                     (() => {
-                        const pageProps = usePage().props as any;
-                        const notes = pageProps.client_progress_notes ?? [];
+                        const notes = clientProgressNotes;
                         const flaggedCount = notes.filter(
                             (n: any) => n.is_flagged,
                         ).length;
@@ -5265,8 +5267,7 @@ export default function ClientShow({
 
                 {tab === 'service_agreements' &&
                     (() => {
-                        const pageProps = usePage().props as any;
-                        const agreements = pageProps.client_agreements ?? [];
+                        const agreements = clientAgreements;
                         const activeAgs = agreements.filter(
                             (a: any) => a.status === 'active',
                         );
@@ -6414,8 +6415,6 @@ export default function ClientShow({
 
                 {tab === 'family_notes' &&
                     (() => {
-                        const familyNotes =
-                            (usePage().props as any).family_notes ?? [];
                         const openNotes = familyNotes.filter((n: any) =>
                             ['open', 'in_progress'].includes(n.status),
                         );

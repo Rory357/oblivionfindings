@@ -38,31 +38,32 @@ class MyTasksController extends Controller
 
         $user = $request->user();
         $userId = $user->id;
-        $now = Carbon::now();
-        $today = $now->copy()->startOfDay();
-        $tomorrowEnd = $now->copy()->addDay()->endOfDay();
+        $workerNow = Carbon::now($this->workerTimezone());
+        $queryNow = $workerNow->copy()->utc();
+        $today = $workerNow->copy()->startOfDay()->utc();
+        $tomorrowEnd = $workerNow->copy()->addDay()->endOfDay()->utc();
 
         // 1. Today formatted
-        $todayFormatted = $now->format('l, j F Y');
+        $todayFormatted = $workerNow->format('l, j F Y');
 
         // 2. Shifts today + tomorrow
-        $shifts = $this->getShifts($userId, $today, $tomorrowEnd, $now);
+        $shifts = $this->getShifts($userId, $today, $tomorrowEnd, $workerNow);
 
         // 3. Medications due
         $clientIds = $shifts->pluck('client.id')->filter()->unique()->values()->all();
-        $medicationsDue = $this->getMedicationsDue($clientIds, $now);
+        $medicationsDue = $this->getMedicationsDue($clientIds, $workerNow);
 
         // 4. Timesheets
         $timesheets = $this->getTimesheets($userId);
 
         // 5. Incidents
-        $incidents = $this->getIncidents($userId, $now);
+        $incidents = $this->getIncidents($userId, $queryNow);
 
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
         $tasks = $this->getCrTasks($userId);
 
         // 7. Leave
-        $leave = $this->getLeave($userId, $now);
+        $leave = $this->getLeave($userId, $workerNow);
 
         // 8. Stats
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
@@ -84,11 +85,11 @@ class MyTasksController extends Controller
         $managerData = $isManager ? $this->getManagerData($user, $today, $tomorrowEnd) : null;
 
         // 11. Frontline clock state (PR 4)
-        $clock = $this->getClockState($user, $now);
+        $clock = $this->getClockState($user, $queryNow);
 
         // 12. Active guided medication round (PR 9). Surfaces a resume / start
         //     banner on /my-day for the worker assigned to today's round.
-        $activeRound = $this->getActiveRound($user, $now);
+        $activeRound = $this->getActiveRound($user, $workerNow);
 
         return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
@@ -257,7 +258,7 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getShifts(int $userId, Carbon $today, Carbon $tomorrowEnd, Carbon $now): \Illuminate\Support\Collection
+    private function getShifts(int $userId, Carbon $today, Carbon $tomorrowEnd, Carbon $workerNow): \Illuminate\Support\Collection
     {
         try {
             return Shift::where('user_id', $userId)
@@ -265,7 +266,7 @@ class MyTasksController extends Controller
                 ->with(['client:id,first_name,last_name,profile_photo_path', 'serviceContext:id,name', 'tasks'])
                 ->orderBy('starts_at')
                 ->get()
-                ->map(function (Shift $shift) use ($now, $today) {
+                ->map(function (Shift $shift) use ($workerNow) {
                     $totalTasks = $shift->tasks->count();
                     $completedTasks = $shift->tasks->where('is_completed', true)->count();
 
@@ -292,7 +293,10 @@ class MyTasksController extends Controller
                         'task_progress' => $totalTasks > 0
                             ? round(($completedTasks / $totalTasks) * 100)
                             : 100,
-                        'is_today' => $shift->starts_at->isSameDay($today),
+                        'is_today' => $shift->starts_at
+                            ->copy()
+                            ->timezone($workerNow->getTimezone())
+                            ->isSameDay($workerNow),
                     ];
                 });
         } catch (\Throwable) {
@@ -345,6 +349,7 @@ class MyTasksController extends Controller
                         : 'Unknown';
 
                     $result[] = [
+                        'client_id' => $med->client_id,
                         'client_name' => $clientName,
                         'medication_name' => $med->name,
                         'dose' => $med->dosage,
@@ -712,5 +717,10 @@ class MyTasksController extends Controller
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    private function workerTimezone(): string
+    {
+        return (string) config('app.worker_timezone', 'Pacific/Auckland');
     }
 }

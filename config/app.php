@@ -81,6 +81,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Worker-Facing Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Frontline schedules and medication windows are shown in the timezone
+    | staff actually work in. Keeping this separate from the application
+    | timezone lets us keep storage/query timestamps in UTC while still
+    | rendering "today" correctly for worker surfaces.
+    |
+    */
+
+    'worker_timezone' => env('APP_WORKER_TIMEZONE', 'Pacific/Auckland'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

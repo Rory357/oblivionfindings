@@ -103,6 +103,7 @@ interface MyShift {
 }
 
 interface MedDue {
+    client_id: number;
     client_name: string;
     medication_name: string;
     dose: string;
@@ -382,7 +383,7 @@ export default function MyDay({
             title: `${s.client.name} — ${formatTime(s.starts_at)} to ${formatTime(s.ends_at)}`,
             priority: s.status === 'in_progress' ? 'high' : 'medium',
             client_name: s.client.name,
-            url: `/clients/${s.client.id}`,
+            url: `/operations/clients/${s.client.id}/care`,
             time: s.starts_at,
             shift_status: s.status,
         });
@@ -698,7 +699,12 @@ export default function MyDay({
                                     >
                                         <div className="min-w-0">
                                             <div className="truncate text-sm font-medium">
-                                                {med.client_name}
+                                                <Link
+                                                    href={`/operations/clients/${med.client_id}/care`}
+                                                    className="hover:underline"
+                                                >
+                                                    {med.client_name}
+                                                </Link>
                                             </div>
                                             <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                                                 <Link

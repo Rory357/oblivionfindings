@@ -49,9 +49,9 @@ class WorkerMedsController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
-        $now = Carbon::now();
-        $today = $now->copy()->startOfDay();
-        $tomorrowEnd = $now->copy()->addDay()->endOfDay();
+        $now = Carbon::now($this->workerTimezone());
+        $today = $now->copy()->startOfDay()->utc();
+        $tomorrowEnd = $now->copy()->addDay()->endOfDay()->utc();
 
         $assignedClientIds = $this->assignedClientIdsFor($user, $today, $tomorrowEnd);
 
@@ -441,5 +441,10 @@ class WorkerMedsController extends Controller
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    private function workerTimezone(): string
+    {
+        return (string) config('app.worker_timezone', 'Pacific/Auckland');
     }
 }

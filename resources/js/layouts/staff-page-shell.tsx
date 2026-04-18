@@ -1,4 +1,15 @@
-import { type PropsWithChildren, type ReactNode } from 'react';
+import { Link } from '@inertiajs/react';
+import {
+    Bell,
+    CalendarDays,
+    ClipboardList,
+    Clock3,
+    Home,
+    Pill,
+    Settings,
+    type LucideIcon,
+} from 'lucide-react';
+import { useState, type PropsWithChildren, type ReactNode } from 'react';
 
 import FlashToaster from '@/components/flash-toaster';
 import {
@@ -7,6 +18,13 @@ import {
 } from '@/components/staff-bottom-nav';
 import { StaffHeader } from '@/components/staff-header';
 import { AppSidebar } from '@/components/app-sidebar';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
 type StaffPageShellProps = PropsWithChildren<{
@@ -38,6 +56,58 @@ type StaffPageShellProps = PropsWithChildren<{
     className?: string;
 }>;
 
+type MoreLink = {
+    label: string;
+    description: string;
+    href: string;
+    icon: LucideIcon;
+};
+
+const MORE_LINKS: MoreLink[] = [
+    {
+        label: 'My day',
+        description: 'Home, shifts, meds, and action items',
+        href: '/my-day',
+        icon: Home,
+    },
+    {
+        label: 'Meds today',
+        description: 'Due meds, rounds, and PRN quick record',
+        href: '/meds/today',
+        icon: Pill,
+    },
+    {
+        label: 'Attendance',
+        description: 'Clock history and shift matching',
+        href: '/attendance',
+        icon: Clock3,
+    },
+    {
+        label: 'My calendar',
+        description: 'Upcoming shifts and personal schedule',
+        href: '/my-calendar',
+        icon: CalendarDays,
+    },
+    {
+        label: 'Notifications',
+        description: 'Unread updates and acknowledgements',
+        href: '/notifications',
+        icon: Bell,
+    },
+    {
+        label: 'Report incident',
+        description: 'Start a new incident or review recent ones',
+        href: '/incidents',
+        icon: ClipboardList,
+    },
+    {
+        label: 'Settings & profile',
+        description: 'Profile, password, and notification settings',
+        href: '/settings/profile',
+        icon: Settings,
+    },
+];
+
 /**
  * Frontline / staff layout shell.
  *
@@ -64,6 +134,10 @@ export default function StaffPageShell({
     mobileOnly = false,
     className,
 }: StaffPageShellProps) {
+    const [moreOpen, setMoreOpen] = useState(false);
+    const showBuiltInMoreSheet = !onMore;
+    const handleMore = onMore ?? (() => setMoreOpen(true));
+
     return (
         <div className="min-h-svh w-full overflow-x-hidden">
             <a
@@ -106,7 +180,50 @@ export default function StaffPageShell({
                 </div>
             </main>
 
-            <StaffBottomNav items={bottomNavItems} onMore={onMore} />
+            <StaffBottomNav items={bottomNavItems} onMore={handleMore} />
+
+            {showBuiltInMoreSheet ? (
+                <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+                    <SheetContent
+                        side="bottom"
+                        className="rounded-t-3xl pb-[max(env(safe-area-inset-bottom,0px),1rem)]"
+                    >
+                        <SheetHeader className="pr-12">
+                            <SheetTitle>More</SheetTitle>
+                            <SheetDescription>
+                                Quick worker links that keep you inside the
+                                frontline flow.
+                            </SheetDescription>
+                        </SheetHeader>
+                        <div className="grid gap-2 px-4 pb-4">
+                            {MORE_LINKS.map((item) => {
+                                const Icon = item.icon;
+
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        onClick={() => setMoreOpen(false)}
+                                        className="frontline-focus flex items-center gap-3 rounded-2xl border border-border/80 bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
+                                    >
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted text-foreground">
+                                            <Icon className="h-5 w-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-semibold">
+                                                {item.label}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {item.description}
+                                            </div>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            ) : null}
         </div>
     );
 }

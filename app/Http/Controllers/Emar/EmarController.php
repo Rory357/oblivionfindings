@@ -779,7 +779,7 @@ class EmarController extends Controller
         $scheduled = $medications->where('is_prn', false)->values();
         $prn = $medications->where('is_prn', true)->values();
 
-        $scheduledPayload = $scheduled->map(function ($med) use ($date) {
+        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date) {
                 $doseTimes = $med->dose_times ?? [];
 
                 // If no dose_times stored yet, auto-calculate from frequency

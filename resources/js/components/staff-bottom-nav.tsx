@@ -50,7 +50,7 @@ type StaffBottomNavProps = {
 const DEFAULT_ITEMS: ReadonlyArray<Omit<StaffBottomNavItem, 'onClick'>> = [
     // PR 3 — Home points at the canonical frontline route `/my-day`.
     { key: 'home', label: 'Home', icon: Home, href: '/my-day' },
-    { key: 'meds', label: 'Meds', icon: Pill, href: '/emar' },
+    { key: 'meds', label: 'Meds', icon: Pill, href: '/meds/today' },
     // Clock slot keeps its deep-link hash on the home page. Future PRs wire the
     // actual clock workflow; this PR only canonicalises the URL.
     { key: 'clock', label: 'Clock', icon: Clock, href: '/my-day#clock' },

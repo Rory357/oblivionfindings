@@ -127,7 +127,7 @@ class AttendanceService
 
     public function eligibleShiftsForUser(User $user, ?Carbon $clockInAt = null): Collection
     {
-        $clockInAt = $clockInAt ?: now();
+        $clockInAt = ($clockInAt ?: now())->copy()->utc();
 
         return Shift::query()
             ->with('client:id,site_id')
