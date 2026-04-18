@@ -56,4 +56,24 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/consents/reports/export', [ConsentReportController::class, 'export'])
             ->name('consents.reports.export');
     });
+
+    // Consent requests (family portal workflow). Staff creates the ask,
+    // recipient responds in the portal, approval writes a ClientConsent row.
+    Route::prefix('/operations/clients/{client}/consent-requests')->group(function () {
+        Route::middleware('permission:consents.viewAny')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Operations\ConsentRequestController::class, 'index'])
+                ->name('operations.clients.consent-requests.index');
+            Route::get('/{consentRequest}', [\App\Http\Controllers\Operations\ConsentRequestController::class, 'show'])
+                ->name('operations.clients.consent-requests.show');
+        });
+
+        Route::middleware('permission:consents.request')->group(function () {
+            Route::get('/create', [\App\Http\Controllers\Operations\ConsentRequestController::class, 'create'])
+                ->name('operations.clients.consent-requests.create');
+            Route::post('/', [\App\Http\Controllers\Operations\ConsentRequestController::class, 'store'])
+                ->name('operations.clients.consent-requests.store');
+            Route::post('/{consentRequest}/cancel', [\App\Http\Controllers\Operations\ConsentRequestController::class, 'cancel'])
+                ->name('operations.clients.consent-requests.cancel');
+        });
+    });
 });

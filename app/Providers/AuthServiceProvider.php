@@ -73,6 +73,7 @@ use App\Models\Client;
 use App\Models\ClientAssessment;
 use App\Models\ClientCondition;
 use App\Models\ClientConsent;
+use App\Models\ConsentRequest;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
@@ -93,6 +94,7 @@ use App\Policies\CarePlanPolicy;
 use App\Policies\ClientAssessmentPolicy;
 use App\Policies\ClientConditionPolicy;
 use App\Policies\ClientConsentPolicy;
+use App\Policies\ConsentRequestPolicy;
 use App\Policies\ClientControlledDrugEntryPolicy;
 use App\Policies\ClientIncidentPolicy;
 use App\Policies\ClientMedicationPolicy;
@@ -129,6 +131,7 @@ class AuthServiceProvider extends ServiceProvider
         ClientAssessment::class => ClientAssessmentPolicy::class,
         ClientCondition::class => ClientConditionPolicy::class,
         ClientConsent::class => ClientConsentPolicy::class,
+        ConsentRequest::class => ConsentRequestPolicy::class,
         ClientRisk::class => ClientRiskPolicy::class,
         ClientControlledDrugEntry::class => ClientControlledDrugEntryPolicy::class,
         BillingEntry::class => BillingEntryPolicy::class,

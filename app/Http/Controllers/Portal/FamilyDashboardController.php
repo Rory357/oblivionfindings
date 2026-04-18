@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ConsentRequest;
 use App\Models\FamilyPortalSetting;
 use App\Models\FamilyVisitRequest;
 use App\Models\ProgressNote;
@@ -200,6 +201,24 @@ class FamilyDashboardController extends Controller
             ->withCount(['goals', 'goals as goals_completed' => fn ($q) => $q->where('status', 'completed')])
             ->first();
 
+        // Pending consent requests addressed to this portal user
+        $pendingConsentRequests = ConsentRequest::query()
+            ->forClient($client->id)
+            ->forRecipient($user->id)
+            ->active()
+            ->with(['consentType:id,name,category', 'requestedBy:id,name'])
+            ->orderBy('expires_at')
+            ->get()
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'consent_type' => $r->consentType?->only(['id', 'name', 'category']),
+                'requested_by' => $r->requestedBy?->only(['id', 'name']),
+                'purpose' => $r->purpose,
+                'sent_at' => $r->sent_at?->toIso8601String(),
+                'expires_at' => $r->expires_at?->toIso8601String(),
+                'action_url' => route('portal.clients.consent-requests.show', [$client->id, $r->id]),
+            ]);
+
         // Visit requests for this family member
         $visitRequests = FamilyVisitRequest::where('user_id', $user->id)
             ->where('client_id', $client->id)
@@ -227,6 +246,7 @@ class FamilyDashboardController extends Controller
                 ->where('client_id', $client->id)
                 ->where('status', 'pending')
                 ->count(),
+            'pendingConsentRequests' => $pendingConsentRequests->count(),
             'incidentsLast30Days' => ClientIncident::where('client_id', $client->id)
                 ->where('portal_visible', true)
                 ->whereNotNull('reviewed_at')
@@ -342,6 +362,7 @@ class FamilyDashboardController extends Controller
             'recentEvents' => $recentEvents->values(),
             'recentIncidents' => $recentIncidents->values(),
             'visitRequests' => $visitRequests->values(),
+            'pendingConsentRequests' => $pendingConsentRequests->values(),
             'stats' => $stats,
             'relation' => $nokRelation,
             'medicalSummary' => $client->medicalProfile ? [
