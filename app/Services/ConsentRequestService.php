@@ -6,6 +6,7 @@ use App\Models\ClientConsent;
 use App\Models\ConsentRequest;
 use App\Models\User;
 use App\Notifications\Operations\ConsentRequestCreatedNotification;
+use App\Notifications\Operations\ConsentRequestReminderNotification;
 use App\Notifications\Operations\ConsentRequestRespondedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -163,6 +164,21 @@ class ConsentRequestService
             });
 
         return $expired;
+    }
+
+    /**
+     * Send a reminder to the recipient of a pending consent request and
+     * append a `reminder_sent` event to the audit trail. Intended to be
+     * called from the scheduled reminder command — idempotency (one
+     * reminder per request) is enforced by the caller.
+     */
+    public function sendReminder(ConsentRequest $request): void
+    {
+        $request->recipient?->notify(new ConsentRequestReminderNotification($request));
+
+        $request->update([
+            'audit_trail' => $this->appendAudit($request, 'reminder_sent', null),
+        ]);
     }
 
     // ── internals ─────────────────────────────────────────────────
