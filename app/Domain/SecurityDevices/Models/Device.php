@@ -104,6 +104,11 @@ class Device extends Model
         });
     }
 
+    protected static function newFactory(): \Database\Factories\DeviceFactory
+    {
+        return \Database\Factories\DeviceFactory::new();
+    }
+
     public static function generateUid(?string $domain, ?string $category): string
     {
         $prefix = strtoupper(substr($category ?? $domain ?? 'DEV', 0, 3));

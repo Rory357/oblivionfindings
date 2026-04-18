@@ -2,10 +2,12 @@
 
 namespace App\Jobs\Integration;
 
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Integration\IntegrationTenantSecret;
-use App\Models\LocationHardware;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use Illuminate\Bus\Queueable;
@@ -13,6 +15,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class PullIntegrationHealthJob implements ShouldQueue
@@ -106,22 +109,30 @@ class PullIntegrationHealthJob implements ShouldQueue
                             continue;
                         }
 
-                        $hardware = LocationHardware::find($entry['hardware_id'] ?? null);
+                        $device = $this->resolveCanonicalDevice($siteConfig, $entry);
 
-                        if (!$hardware) {
+                        if (!$device) {
                             $errored++;
                             continue;
                         }
 
-                        $hardware->update([
-                            'status' => $entry['status'],
-                            'last_seen_at' => $entry['last_seen_at'] ?? now(),
+                        $status = $this->mapCanonicalStatus($entry['status'] ?? null);
+                        $device->fill([
+                            'status' => $status,
+                            'health_status' => $this->mapHealthStatus($status),
+                            'last_seen_at' => $this->parseTimestamp($entry['last_seen_at'] ?? null)
+                                ?? $device->last_seen_at
+                                ?? now(),
                         ]);
+                        $device->save();
 
                         $updated++;
                     } catch (\Throwable $e) {
-                        Log::warning('PullIntegrationHealthJob: error updating hardware', [
-                            'hardware_id' => $entry['hardware_id'] ?? 'unknown',
+                        Log::warning('PullIntegrationHealthJob: error updating device', [
+                            'provider' => $this->provider,
+                            'hardware_id' => $entry['hardware_id'] ?? null,
+                            'provider_entity_id' => $entry['provider_entity_id'] ?? null,
+                            'device_id' => $entry['device_id'] ?? null,
                             'error' => $e->getMessage(),
                         ]);
                         $errored++;
@@ -151,6 +162,97 @@ class PullIntegrationHealthJob implements ShouldQueue
 
                 $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $e->getMessage());
             }
+        }
+    }
+
+    /**
+     * Resolve the canonical Device for a non-UniFi health entry.
+     *
+     * Resolution order mirrors UnifiOperationalBridgeService::resolveCanonicalDeviceForHealth:
+     *   1. Explicit device_id from the adapter payload.
+     *   2. provider_entity_id via external_ref JSON (how UnifiOperationalBridgeService
+     *      finds canonical rows for UniFi).
+     *   3. legacy_location_hardware_id fallback, for rows that were migrated from
+     *      the legacy location_hardware table but haven't had external_ref backfilled.
+     */
+    private function resolveCanonicalDevice(IntegrationSiteConfig $siteConfig, array $entry): ?Device
+    {
+        $deviceId = $entry['device_id'] ?? null;
+        if ($deviceId) {
+            return Device::query()
+                ->forTenant($siteConfig->tenant_id)
+                ->byProvider($this->provider)
+                ->find($deviceId);
+        }
+
+        $providerEntityId = isset($entry['provider_entity_id']) ? trim((string) $entry['provider_entity_id']) : '';
+        if ($providerEntityId !== '') {
+            $device = Device::query()
+                ->forTenant($siteConfig->tenant_id)
+                ->byProvider($this->provider)
+                ->where('external_ref->provider_entity_id', $providerEntityId)
+                ->latest('id')
+                ->first();
+
+            if ($device) {
+                return $device;
+            }
+        }
+
+        $hardwareId = $entry['hardware_id'] ?? null;
+        if ($hardwareId) {
+            return Device::query()
+                ->forTenant($siteConfig->tenant_id)
+                ->where('legacy_location_hardware_id', $hardwareId)
+                ->latest('id')
+                ->first();
+        }
+
+        return null;
+    }
+
+    private function mapCanonicalStatus(mixed $state): DeviceStatus
+    {
+        if (is_string($state)) {
+            return match (strtolower(trim($state))) {
+                'active', 'online', 'connected', 'up' => DeviceStatus::Active,
+                'offline', 'disconnected', 'down' => DeviceStatus::Offline,
+                'degraded', 'warn', 'warning', 'unknown' => DeviceStatus::Degraded,
+                'maintenance' => DeviceStatus::Maintenance,
+                'decommissioned', 'retired' => DeviceStatus::Decommissioned,
+                'in_stock' => DeviceStatus::InStock,
+                'lost' => DeviceStatus::Lost,
+                default => DeviceStatus::Degraded,
+            };
+        }
+
+        return match ($state) {
+            1 => DeviceStatus::Active,
+            0 => DeviceStatus::Offline,
+            default => DeviceStatus::Degraded,
+        };
+    }
+
+    private function mapHealthStatus(DeviceStatus $status): HealthStatus
+    {
+        return match ($status) {
+            DeviceStatus::Active => HealthStatus::Healthy,
+            DeviceStatus::Degraded, DeviceStatus::Maintenance => HealthStatus::Warning,
+            DeviceStatus::Offline => HealthStatus::Critical,
+            default => HealthStatus::Unknown,
+        };
+    }
+
+    private function parseTimestamp(mixed $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
         }
     }
 }

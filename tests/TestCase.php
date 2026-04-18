@@ -40,6 +40,13 @@ abstract class TestCase extends BaseTestCase
         return $app;
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     protected function clearTestingMaintenanceMode(): void
     {
         if (($this->environmentValue('APP_ENV') ?? 'testing') !== 'testing') {
