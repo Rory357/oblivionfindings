@@ -5,8 +5,14 @@ use App\Domain\SecurityDevices\Http\Controllers\CategoryPageController;
 use App\Domain\SecurityDevices\Http\Controllers\DashboardController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceAssignmentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceController;
+use App\Domain\SecurityDevices\Http\Controllers\DeviceDocumentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceGroupController;
+use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
+use App\Domain\SecurityDevices\Http\Controllers\Integrations\MilesightController;
+use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkController;
+use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
+use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -47,6 +53,12 @@ Route::middleware([
         ->middleware('permission:securityDevices.devices.delete')
         ->name('security-devices.devices.destroy');
 
+    // Narrow in-place patch for Overview-tab inline edits (notes, asset_tag,
+    // location_description). Full-record updates still go through PUT above.
+    Route::patch('/devices/{device}/fields', [DeviceController::class, 'patchFields'])
+        ->middleware('permission:securityDevices.devices.update')
+        ->name('security-devices.devices.patch-fields');
+
     // ── Device Assignments ────────────────────────────────────────
 
     Route::post('/devices/{device}/assign', [DeviceAssignmentController::class, 'assign'])
@@ -60,6 +72,41 @@ Route::middleware([
     Route::get('/devices/{device}/assignments', [DeviceAssignmentController::class, 'history'])
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.devices.assignments');
+
+    // ── Device <-> Asset links ───────────────────────────────────
+    // Polymorphic: a device can be a primary asset, installed inside an
+    // asset (e.g., tracker in a vehicle), or an accessory.
+    Route::post('/devices/{device}/asset-links', [DeviceController::class, 'linkAsset'])
+        ->middleware('permission:securityDevices.devices.update')
+        ->name('security-devices.devices.asset-links.store');
+
+    Route::delete('/devices/{device}/asset-links/{link}', [DeviceController::class, 'unlinkAsset'])
+        ->middleware('permission:securityDevices.devices.update')
+        ->name('security-devices.devices.asset-links.destroy');
+
+    // ── Device topology relationships ────────────────────────────
+    // `direction=downstream` makes this device the parent; `upstream` makes
+    // it the child. Preserves the physical / logical wiring model.
+    Route::post('/devices/{device}/relationships', [DeviceController::class, 'linkRelated'])
+        ->middleware('permission:securityDevices.devices.update')
+        ->name('security-devices.devices.relationships.store');
+
+    Route::delete('/devices/{device}/relationships/{relationship}', [DeviceController::class, 'unlinkRelated'])
+        ->middleware('permission:securityDevices.devices.update')
+        ->name('security-devices.devices.relationships.destroy');
+
+    // ── Device documents (uploads) ───────────────────────────────
+    Route::post('/devices/{device}/documents', [DeviceDocumentController::class, 'store'])
+        ->middleware('permission:securityDevices.devices.update')
+        ->name('security-devices.devices.documents.store');
+
+    Route::get('/devices/{device}/documents/{document}', [DeviceDocumentController::class, 'download'])
+        ->middleware('permission:securityDevices.devices.view')
+        ->name('security-devices.devices.documents.download');
+
+    Route::delete('/devices/{device}/documents/{document}', [DeviceDocumentController::class, 'destroy'])
+        ->middleware('permission:securityDevices.devices.update')
+        ->name('security-devices.devices.documents.destroy');
 
     // ── Category pages ────────────────────────────────────────────
 
@@ -124,6 +171,17 @@ Route::middleware([
         ->middleware('permission:securityDevices.groups.manage')
         ->name('security-devices.device-groups.remove-member');
 
+    // ── Auto-rule membership ─────────────────────────────────────
+    // Preview returns JSON so the UI can show a confirm dialog;
+    // sync is a POST redirect-back so it plays nicely with Inertia.
+    Route::get('/device-groups/{group}/auto-rules/preview', [DeviceGroupController::class, 'previewAutoRules'])
+        ->middleware('permission:securityDevices.groups.manage')
+        ->name('security-devices.device-groups.auto-rules.preview');
+
+    Route::post('/device-groups/{group}/auto-rules/sync', [DeviceGroupController::class, 'syncAutoRules'])
+        ->middleware('permission:securityDevices.groups.manage')
+        ->name('security-devices.device-groups.auto-rules.sync');
+
     Route::get('/alerts-events', [AlertsEventsController::class, 'index'])
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.alerts-events');
@@ -144,11 +202,86 @@ Route::middleware([
         ->middleware('permission:securityDevices.maintenance.manage')
         ->name('security-devices.maintenance.complete');
 
-    Route::get('/integrations', fn () => Inertia::render('security-devices/section', ['section' => 'integrations']))
+    Route::get('/integrations', IntegrationsHubController::class)
         ->middleware('permission:securityDevices.integrations.view')
         ->name('security-devices.integrations');
 
-    Route::get('/reports', fn () => Inertia::render('security-devices/section', ['section' => 'reports']))
+    // ── UniFi provider configuration ─────────────────────────────
+    // Was previously at /settings/integrations/unifi; kept behind the
+    // module-scoped permission plus a fallback to the legacy tenant-secrets
+    // permission inside the controller to preserve existing admin access.
+    Route::prefix('/integrations/unifi')
+        ->middleware('permission:securityDevices.integrations.manage')
+        ->group(function () {
+            Route::get('/', [UnifiController::class, 'index'])
+                ->name('security-devices.integrations.unifi');
+            Route::post('/key', [UnifiController::class, 'saveKey'])
+                ->name('security-devices.integrations.unifi.key');
+            Route::post('/test', [UnifiController::class, 'testKey'])
+                ->name('security-devices.integrations.unifi.test');
+            Route::post('/rotate', [UnifiController::class, 'rotateKey'])
+                ->name('security-devices.integrations.unifi.rotate');
+            Route::post('/sync-sites', [UnifiController::class, 'syncSites'])
+                ->name('security-devices.integrations.unifi.sync-sites');
+            Route::post('/map-site', [UnifiController::class, 'mapSite'])
+                ->name('security-devices.integrations.unifi.map-site');
+            Route::delete('/map-site/{siteConfig}', [UnifiController::class, 'removeSiteMapping'])
+                ->name('security-devices.integrations.unifi.remove-mapping');
+            Route::post('/sync-devices', [UnifiController::class, 'syncDevices'])
+                ->name('security-devices.integrations.unifi.sync-devices');
+            Route::put('/hardware/{hardware}/room', [UnifiController::class, 'assignHardwareRoom'])
+                ->name('security-devices.integrations.unifi.assign-room');
+            Route::put('/defaults', [UnifiController::class, 'updateDefaults'])
+                ->name('security-devices.integrations.unifi.defaults');
+        });
+
+    // ── Queclink provider configuration (scaffold) ───────────────
+    // Credentials and connection testing are live; site mapping +
+    // device sync ship in PR C1.
+    Route::prefix('/integrations/queclink')
+        ->middleware('permission:securityDevices.integrations.manage')
+        ->group(function () {
+            Route::get('/', [QueclinkController::class, 'index'])
+                ->name('security-devices.integrations.queclink');
+            Route::post('/key', [QueclinkController::class, 'saveKey'])
+                ->name('security-devices.integrations.queclink.key');
+            Route::post('/test', [QueclinkController::class, 'testKey'])
+                ->name('security-devices.integrations.queclink.test');
+            Route::post('/rotate', [QueclinkController::class, 'rotateKey'])
+                ->name('security-devices.integrations.queclink.rotate');
+            Route::delete('/key', [QueclinkController::class, 'removeKey'])
+                ->name('security-devices.integrations.queclink.remove');
+        });
+
+    // ── Milesight provider configuration (scaffold) ──────────────
+    // LoRaWAN credentials and connection testing are live; gateway /
+    // application mapping + LoRaWAN sensor import ship in PR D1.
+    Route::prefix('/integrations/milesight')
+        ->middleware('permission:securityDevices.integrations.manage')
+        ->group(function () {
+            Route::get('/', [MilesightController::class, 'index'])
+                ->name('security-devices.integrations.milesight');
+            Route::post('/key', [MilesightController::class, 'saveKey'])
+                ->name('security-devices.integrations.milesight.key');
+            Route::post('/test', [MilesightController::class, 'testKey'])
+                ->name('security-devices.integrations.milesight.test');
+            Route::post('/rotate', [MilesightController::class, 'rotateKey'])
+                ->name('security-devices.integrations.milesight.rotate');
+            Route::delete('/key', [MilesightController::class, 'removeKey'])
+                ->name('security-devices.integrations.milesight.remove');
+        });
+
+    // ── Reports ──────────────────────────────────────────────────
+    Route::prefix('/reports')
         ->middleware('permission:securityDevices.reports.view')
-        ->name('security-devices.reports');
+        ->group(function () {
+            Route::get('/', [ReportsController::class, 'index'])
+                ->name('security-devices.reports');
+            Route::get('/devices.csv', [ReportsController::class, 'exportDevices'])
+                ->name('security-devices.reports.devices');
+            Route::get('/events.csv', [ReportsController::class, 'exportEvents'])
+                ->name('security-devices.reports.events');
+            Route::get('/maintenance.csv', [ReportsController::class, 'exportMaintenance'])
+                ->name('security-devices.reports.maintenance');
+        });
 });

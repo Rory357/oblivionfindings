@@ -28,6 +28,8 @@ type GroupDetail = {
     type: string;
     description: string | null;
     created_at: string | null;
+    auto_rules: Record<string, unknown> | null;
+    auto_rule_condition_count: number;
 };
 
 type AvailableDevice = {
@@ -58,6 +60,18 @@ export default function DeviceGroupShow({ group, members, availableDevices }: Pr
     const [addOpen, setAddOpen] = useState(false);
     const [selectedDevice, setSelectedDevice] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [syncingAuto, setSyncingAuto] = useState(false);
+
+    const hasAutoRules = group.auto_rule_condition_count > 0;
+
+    const syncAutoRules = () => {
+        if (!confirm('Apply auto-rules to this group? Devices not matching the rules will be removed; new matches will be added.')) return;
+        setSyncingAuto(true);
+        router.post(`/security-devices/device-groups/${group.id}/auto-rules/sync`, {}, {
+            preserveScroll: true,
+            onFinish: () => setSyncingAuto(false),
+        });
+    };
 
     const submitAdd = () => {
         if (!selectedDevice) return;
@@ -122,12 +136,32 @@ export default function DeviceGroupShow({ group, members, availableDevices }: Pr
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle>Members ({members.meta.total})</CardTitle>
+                                <CardTitle className="flex items-center gap-3">
+                                    Members ({members.meta.total})
+                                    {hasAutoRules && (
+                                        <Badge variant="outline" className="text-xs">
+                                            Auto-rules: {group.auto_rule_condition_count} condition{group.auto_rule_condition_count === 1 ? '' : 's'}
+                                        </Badge>
+                                    )}
+                                </CardTitle>
                                 <CardDescription>Devices in this group</CardDescription>
                             </div>
-                            <Button size="sm" onClick={() => { setSelectedDevice(''); setAddOpen(true); }}>
-                                <Plus className="mr-1 h-3 w-3" /> Add Device
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                {hasAutoRules && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={syncAutoRules}
+                                        disabled={syncingAuto}
+                                        title="Apply auto-rules — devices not matching the rules will be removed; new matches will be added."
+                                    >
+                                        {syncingAuto ? 'Syncing…' : 'Sync auto-rules'}
+                                    </Button>
+                                )}
+                                <Button size="sm" onClick={() => { setSelectedDevice(''); setAddOpen(true); }}>
+                                    <Plus className="mr-1 h-3 w-3" /> Add Device
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>

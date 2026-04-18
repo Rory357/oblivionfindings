@@ -1888,6 +1888,11 @@ function buildSecurityDevicesSubPanelGroups(): SubPanelGroup[] {
                     icon: Wrench,
                 },
                 {
+                    title: 'APIs & Integrations',
+                    href: '/security-devices/integrations',
+                    icon: Link2,
+                },
+                {
                     title: 'Reports',
                     href: '/security-devices/reports',
                     icon: FileText,

@@ -36,6 +36,7 @@ import {
     Shield,
     Trash2,
     Wrench,
+    X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -64,6 +65,7 @@ type DeviceDetail = {
     battery_updated_at: string | null;
     commissioned_at: string | null;
     warranty_expires_at: string | null;
+    next_service_due: string | null;
     expected_lifespan_months: number | null;
     purchase_price: string | null;
     provider: string | null;
@@ -103,7 +105,9 @@ type AssignmentHistoryItem = {
     notes: string | null;
 };
 
-type AssetLink = { id: number; asset_id: number; asset_name: string | null; asset_tag: string | null; link_type: string; linked_at: string };
+type AssetLink = { id: number; asset_id: number; asset_name: string | null; asset_tag: string | null; link_type: string; linked_at: string; notes: string | null };
+type AvailableAsset = { id: number; name: string; asset_tag: string | null };
+type LinkTypeOption = { value: string; label: string };
 type EventItem = { id: number; event_type: string; severity: string; occurred_at: string; source: string | null };
 type MaintenanceItem = { id: number; type: string; status: string; description: string; scheduled_for: string | null; completed_at: string | null };
 type Relationship = { id: number; device_id: number; device_name: string | null; type: string; port: string | null };
@@ -122,6 +126,25 @@ type Props = {
         vehicles: Array<{ id: number; name: string; registration_number: string | null }>;
     };
     assetLinks: AssetLink[];
+    availableAssets: AvailableAsset[];
+    linkTypes: LinkTypeOption[];
+    relationshipTypes: LinkTypeOption[];
+    otherDevices: Array<{ id: number; name: string; device_uid: string; category: string }>;
+    documents: Array<{
+        id: number;
+        title: string;
+        category: string;
+        version: string | null;
+        effective_date: string | null;
+        expiry_date: string | null;
+        original_name: string;
+        mime_type: string;
+        size_bytes: number;
+        notes: string | null;
+        uploaded_at: string | null;
+        download_url: string;
+    }>;
+    documentCategories: LinkTypeOption[];
     recentEvents: EventItem[];
     maintenanceRecords: MaintenanceItem[];
     relationships: { parents: Relationship[]; children: Relationship[] };
@@ -154,8 +177,219 @@ function targetTypeLabel(t: string): string {
 
 // ── Component ─────────────────────────────────────────────────────
 
-export default function DeviceShow({ device, activeAssignment, assignmentHistory, assignmentTargets, assetLinks, recentEvents, maintenanceRecords, relationships, groups, can }: Props) {
+export default function DeviceShow({ device, activeAssignment, assignmentHistory, assignmentTargets, assetLinks, availableAssets, linkTypes, relationshipTypes, otherDevices, documents, documentCategories, recentEvents, maintenanceRecords, relationships, groups, can }: Props) {
     const totalRelationships = relationships.parents.length + relationships.children.length;
+
+    // ── Asset-link dialog state ──────────────────────────────────
+    const [linkOpen, setLinkOpen] = useState(false);
+    const [linkAssetId, setLinkAssetId] = useState<string>('');
+    const [linkType, setLinkType] = useState<string>(linkTypes[0]?.value ?? 'primary');
+    const [linkNotes, setLinkNotes] = useState('');
+    const [linkSubmitting, setLinkSubmitting] = useState(false);
+    const [linkError, setLinkError] = useState('');
+    const [unlinkingId, setUnlinkingId] = useState<number | null>(null);
+
+    // Assets already linked to this device (active) — hide from picker.
+    const linkedAssetIds = useMemo(() => new Set(assetLinks.map((l) => l.asset_id)), [assetLinks]);
+    const pickableAssets = useMemo(
+        () => availableAssets.filter((a) => !linkedAssetIds.has(a.id)),
+        [availableAssets, linkedAssetIds],
+    );
+
+    const submitLink = () => {
+        if (!linkAssetId) {
+            setLinkError('Pick an asset to link.');
+            return;
+        }
+        setLinkSubmitting(true);
+        setLinkError('');
+        router.post(
+            `/security-devices/devices/${device.id}/asset-links`,
+            {
+                asset_id: Number(linkAssetId),
+                link_type: linkType,
+                notes: linkNotes || null,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setLinkOpen(false);
+                    setLinkAssetId('');
+                    setLinkType(linkTypes[0]?.value ?? 'primary');
+                    setLinkNotes('');
+                },
+                onError: (errs) => {
+                    const firstErr = Object.values(errs)[0];
+                    setLinkError(Array.isArray(firstErr) ? firstErr[0] : String(firstErr ?? 'Failed to link asset.'));
+                },
+                onFinish: () => setLinkSubmitting(false),
+            },
+        );
+    };
+
+    const submitUnlink = (linkId: number) => {
+        if (!confirm('Unlink this asset? The link history is preserved.')) return;
+        setUnlinkingId(linkId);
+        router.delete(
+            `/security-devices/devices/${device.id}/asset-links/${linkId}`,
+            {
+                preserveScroll: true,
+                onFinish: () => setUnlinkingId(null),
+            },
+        );
+    };
+
+    // ── Relationship dialog state ────────────────────────────────
+    const [relOpen, setRelOpen] = useState(false);
+    const [relOtherDeviceId, setRelOtherDeviceId] = useState<string>('');
+    const [relType, setRelType] = useState<string>(relationshipTypes[0]?.value ?? 'connected_to');
+    const [relDirection, setRelDirection] = useState<'downstream' | 'upstream'>('downstream');
+    const [relPort, setRelPort] = useState('');
+    const [relNotes, setRelNotes] = useState('');
+    const [relSubmitting, setRelSubmitting] = useState(false);
+    const [relError, setRelError] = useState('');
+    const [unlinkingRelId, setUnlinkingRelId] = useState<number | null>(null);
+
+    const submitRelationship = () => {
+        if (!relOtherDeviceId) {
+            setRelError('Pick a device to link.');
+            return;
+        }
+        setRelSubmitting(true);
+        setRelError('');
+        router.post(
+            `/security-devices/devices/${device.id}/relationships`,
+            {
+                other_device_id: Number(relOtherDeviceId),
+                relationship_type: relType,
+                direction: relDirection,
+                port: relPort || null,
+                notes: relNotes || null,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setRelOpen(false);
+                    setRelOtherDeviceId('');
+                    setRelType(relationshipTypes[0]?.value ?? 'connected_to');
+                    setRelDirection('downstream');
+                    setRelPort('');
+                    setRelNotes('');
+                },
+                onError: (errs) => {
+                    const firstErr = Object.values(errs)[0];
+                    setRelError(Array.isArray(firstErr) ? firstErr[0] : String(firstErr ?? 'Failed to add relationship.'));
+                },
+                onFinish: () => setRelSubmitting(false),
+            },
+        );
+    };
+
+    const submitUnlinkRelationship = (relId: number) => {
+        if (!confirm('Remove this relationship?')) return;
+        setUnlinkingRelId(relId);
+        router.delete(
+            `/security-devices/devices/${device.id}/relationships/${relId}`,
+            {
+                preserveScroll: true,
+                onFinish: () => setUnlinkingRelId(null),
+            },
+        );
+    };
+
+    // ── Document upload state ────────────────────────────────────
+    const [docOpen, setDocOpen] = useState(false);
+    const [docTitle, setDocTitle] = useState('');
+    const [docCategory, setDocCategory] = useState(documentCategories[0]?.value ?? 'other');
+    const [docVersion, setDocVersion] = useState('');
+    const [docEffective, setDocEffective] = useState('');
+    const [docExpiry, setDocExpiry] = useState('');
+    const [docNotes, setDocNotes] = useState('');
+    const [docFile, setDocFile] = useState<File | null>(null);
+    const [docSubmitting, setDocSubmitting] = useState(false);
+    const [docError, setDocError] = useState('');
+    const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
+
+    const submitDocument = () => {
+        if (!docFile) {
+            setDocError('Choose a file.');
+            return;
+        }
+        if (!docTitle.trim()) {
+            setDocError('Title is required.');
+            return;
+        }
+        setDocSubmitting(true);
+        setDocError('');
+        const formData = new FormData();
+        formData.append('file', docFile);
+        formData.append('title', docTitle);
+        formData.append('category', docCategory);
+        if (docVersion) formData.append('version', docVersion);
+        if (docEffective) formData.append('effective_date', docEffective);
+        if (docExpiry) formData.append('expiry_date', docExpiry);
+        if (docNotes) formData.append('notes', docNotes);
+
+        router.post(`/security-devices/devices/${device.id}/documents`, formData, {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                setDocOpen(false);
+                setDocTitle('');
+                setDocCategory(documentCategories[0]?.value ?? 'other');
+                setDocVersion('');
+                setDocEffective('');
+                setDocExpiry('');
+                setDocNotes('');
+                setDocFile(null);
+            },
+            onError: (errs) => {
+                const firstErr = Object.values(errs)[0];
+                setDocError(Array.isArray(firstErr) ? firstErr[0] : String(firstErr ?? 'Upload failed.'));
+            },
+            onFinish: () => setDocSubmitting(false),
+        });
+    };
+
+    const submitDeleteDocument = (docId: number) => {
+        if (!confirm('Delete this document? This cannot be undone.')) return;
+        setDeletingDocId(docId);
+        router.delete(
+            `/security-devices/devices/${device.id}/documents/${docId}`,
+            {
+                preserveScroll: true,
+                onFinish: () => setDeletingDocId(null),
+            },
+        );
+    };
+
+    const formatBytes = (n: number): string => {
+        if (n < 1024) return `${n} B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+        return `${(n / 1024 / 1024).toFixed(1)} MB`;
+    };
+
+    // ── Overview inline-edit state (notes + asset_tag + next_service_due) ──
+    const [editingAssetTag, setEditingAssetTag] = useState(false);
+    const [assetTagDraft, setAssetTagDraft] = useState(device.asset_tag ?? '');
+    const [editingNotes, setEditingNotes] = useState(false);
+    const [notesDraft, setNotesDraft] = useState(device.notes ?? '');
+    const [editingServiceDue, setEditingServiceDue] = useState(false);
+    const [serviceDueDraft, setServiceDueDraft] = useState(device.next_service_due ?? '');
+    const [fieldSaving, setFieldSaving] = useState(false);
+
+    const saveFields = (payload: Record<string, string | null>, onSuccess: () => void) => {
+        setFieldSaving(true);
+        router.patch(
+            `/security-devices/devices/${device.id}/fields`,
+            payload,
+            {
+                preserveScroll: true,
+                onSuccess,
+                onFinish: () => setFieldSaving(false),
+            },
+        );
+    };
 
     // ── Maintenance dialog state ─────────────────────────────────
     const [maintOpen, setMaintOpen] = useState(false);
@@ -304,7 +538,63 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                         <Field label="MAC" value={device.mac_address} />
                                         <Field label="IMEI" value={device.imei} />
                                         <Field label="IP Address" value={device.ip_address} />
-                                        <Field label="Asset Tag" value={device.asset_tag} />
+                                        <Field label="Asset Tag">
+                                            {editingAssetTag ? (
+                                                <div className="flex items-center gap-1">
+                                                    <Input
+                                                        value={assetTagDraft}
+                                                        onChange={(e) => setAssetTagDraft(e.target.value)}
+                                                        className="h-7 text-xs"
+                                                        autoFocus
+                                                    />
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() =>
+                                                            saveFields(
+                                                                { asset_tag: assetTagDraft || null },
+                                                                () => setEditingAssetTag(false),
+                                                            )
+                                                        }
+                                                        disabled={fieldSaving}
+                                                        title="Save"
+                                                    >
+                                                        <Check className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() => {
+                                                            setEditingAssetTag(false);
+                                                            setAssetTagDraft(device.asset_tag ?? '');
+                                                        }}
+                                                        title="Cancel"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <span className="flex items-center gap-2">
+                                                    <span>{device.asset_tag ?? '—'}</span>
+                                                    {can.update && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
+                                                            onClick={() => {
+                                                                setAssetTagDraft(device.asset_tag ?? '');
+                                                                setEditingAssetTag(true);
+                                                            }}
+                                                            title="Edit asset tag"
+                                                        >
+                                                            <Edit className="h-3 w-3" />
+                                                        </Button>
+                                                    )}
+                                                </span>
+                                            )}
+                                        </Field>
                                         <Field label="Firmware" value={device.firmware_version} />
                                     </dl>
                                 </CardContent>
@@ -326,6 +616,72 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                         )}
                                         <Field label="Commissioned" value={formatDate(device.commissioned_at)} />
                                         <Field label="Warranty Expires" value={formatDate(device.warranty_expires_at)} />
+                                        <Field label="Next Service Due">
+                                            {editingServiceDue ? (
+                                                <div className="flex items-center gap-1">
+                                                    <Input
+                                                        type="date"
+                                                        value={serviceDueDraft}
+                                                        onChange={(e) => setServiceDueDraft(e.target.value)}
+                                                        className="h-7 text-xs"
+                                                    />
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() =>
+                                                            saveFields(
+                                                                { next_service_due: serviceDueDraft || null },
+                                                                () => setEditingServiceDue(false),
+                                                            )
+                                                        }
+                                                        disabled={fieldSaving}
+                                                        title="Save"
+                                                    >
+                                                        <Check className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        onClick={() => {
+                                                            setEditingServiceDue(false);
+                                                            setServiceDueDraft(device.next_service_due ?? '');
+                                                        }}
+                                                        title="Cancel"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <span className="flex items-center gap-2">
+                                                    {device.next_service_due ? (
+                                                        <>
+                                                            <span>{formatDate(device.next_service_due)}</span>
+                                                            {new Date(device.next_service_due) < new Date() && (
+                                                                <Badge variant="destructive" className="text-[10px]">Overdue</Badge>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    )}
+                                                    {can.update && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
+                                                            onClick={() => {
+                                                                setServiceDueDraft(device.next_service_due ?? '');
+                                                                setEditingServiceDue(true);
+                                                            }}
+                                                            title="Set next service date"
+                                                        >
+                                                            <Edit className="h-3 w-3" />
+                                                        </Button>
+                                                    )}
+                                                </span>
+                                            )}
+                                        </Field>
                                     </dl>
                                 </CardContent>
                             </Card>
@@ -374,25 +730,99 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
 
                             {/* Linked Assets */}
                             <Card>
-                                <CardHeader><CardTitle className="flex items-center gap-2"><Link2 className="h-4 w-4" /> Linked Assets</CardTitle></CardHeader>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                                    <CardTitle className="flex items-center gap-2"><Link2 className="h-4 w-4" /> Linked Assets</CardTitle>
+                                    {can.update && pickableAssets.length > 0 && (
+                                        <Button size="sm" variant="outline" onClick={() => { setLinkOpen(true); setLinkError(''); }}>
+                                            <Plus className="mr-1 h-3.5 w-3.5" /> Link asset
+                                        </Button>
+                                    )}
+                                </CardHeader>
                                 <CardContent>
                                     {assetLinks.length > 0 ? (
                                         <div className="space-y-2">
                                             {assetLinks.map((link) => (
-                                                <div key={link.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
-                                                    <div>
-                                                        <p className="font-medium">{link.asset_name ?? `Asset #${link.asset_id}`}</p>
-                                                        {link.asset_tag && <p className="text-xs text-muted-foreground font-mono">{link.asset_tag}</p>}
+                                                <div key={link.id} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate font-medium">{link.asset_name ?? `Asset #${link.asset_id}`}</p>
+                                                        {link.asset_tag && <p className="font-mono text-xs text-muted-foreground">{link.asset_tag}</p>}
+                                                        {link.notes && <p className="mt-1 text-xs text-muted-foreground">{link.notes}</p>}
                                                     </div>
-                                                    <Badge variant="outline" className="text-[10px]">{link.link_type.replace(/_/g, ' ')}</Badge>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant="outline" className="text-[10px]">{link.link_type.replace(/_/g, ' ')}</Badge>
+                                                        {can.update && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 px-2 text-red-600 hover:text-red-700"
+                                                                onClick={() => submitUnlink(link.id)}
+                                                                disabled={unlinkingId === link.id}
+                                                                title="Unlink (history preserved)"
+                                                            >
+                                                                <Minus className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-muted-foreground italic">No linked assets</p>
+                                        <p className="text-sm italic text-muted-foreground">No linked assets</p>
+                                    )}
+                                    {can.update && pickableAssets.length === 0 && availableAssets.length > 0 && assetLinks.length > 0 && (
+                                        <p className="mt-3 text-xs text-muted-foreground">All known assets are already linked to this device.</p>
                                     )}
                                 </CardContent>
                             </Card>
+
+                            {/* Link-asset dialog */}
+                            <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle>Link asset</DialogTitle>
+                                        <DialogDescription>
+                                            Connect this device to a tracked asset. Choose the link type based on the physical relationship.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Asset</label>
+                                            <Select value={linkAssetId} onValueChange={setLinkAssetId}>
+                                                <SelectTrigger><SelectValue placeholder="Select an asset" /></SelectTrigger>
+                                                <SelectContent>
+                                                    {pickableAssets.map((a) => (
+                                                        <SelectItem key={a.id} value={String(a.id)}>
+                                                            {a.name}{a.asset_tag ? ` — ${a.asset_tag}` : ''}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Link type</label>
+                                            <Select value={linkType} onValueChange={setLinkType}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {linkTypes.map((t) => (
+                                                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Notes (optional)</label>
+                                            <Input value={linkNotes} onChange={(e) => setLinkNotes(e.target.value)} placeholder="e.g. Installed in dashboard console" />
+                                        </div>
+                                        {linkError && <p className="text-sm text-red-600">{linkError}</p>}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="ghost" onClick={() => setLinkOpen(false)} disabled={linkSubmitting}>Cancel</Button>
+                                        <Button onClick={submitLink} disabled={linkSubmitting || !linkAssetId}>
+                                            {linkSubmitting ? 'Linking…' : 'Link asset'}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
 
                         {device.provider && (
@@ -413,12 +843,65 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                             </Card>
                         )}
 
-                        {device.notes && (
-                            <Card>
-                                <CardHeader><CardTitle>Notes</CardTitle></CardHeader>
-                                <CardContent><p className="text-sm whitespace-pre-wrap">{device.notes}</p></CardContent>
-                            </Card>
-                        )}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                                <CardTitle>Notes</CardTitle>
+                                {can.update && !editingNotes && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => {
+                                            setNotesDraft(device.notes ?? '');
+                                            setEditingNotes(true);
+                                        }}
+                                    >
+                                        <Edit className="mr-1 h-3.5 w-3.5" /> Edit
+                                    </Button>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                {editingNotes ? (
+                                    <div className="space-y-3">
+                                        <textarea
+                                            value={notesDraft}
+                                            onChange={(e) => setNotesDraft(e.target.value)}
+                                            className="min-h-[120px] w-full rounded-md border bg-background px-3 py-2 text-sm"
+                                            placeholder="Free-form notes for this device…"
+                                            maxLength={5000}
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    saveFields({ notes: notesDraft || null }, () =>
+                                                        setEditingNotes(false),
+                                                    )
+                                                }
+                                                disabled={fieldSaving}
+                                            >
+                                                {fieldSaving ? 'Saving…' : 'Save notes'}
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    setEditingNotes(false);
+                                                    setNotesDraft(device.notes ?? '');
+                                                }}
+                                                disabled={fieldSaving}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : device.notes ? (
+                                    <p className="whitespace-pre-wrap text-sm">{device.notes}</p>
+                                ) : (
+                                    <p className="text-sm italic text-muted-foreground">No notes yet.</p>
+                                )}
+                            </CardContent>
+                        </Card>
 
                         <div className="text-xs text-muted-foreground">
                             Created {formatDateTime(device.created_at)}
@@ -589,48 +1072,263 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
 
                     {/* ── Topology tab ──────────────────────────── */}
                     <TabsContent value="relationships">
-                        {totalRelationships > 0 ? (
-                            <Card>
-                                <CardHeader><CardTitle>Device Topology</CardTitle><CardDescription>Physical and logical relationships</CardDescription></CardHeader>
-                                <CardContent>
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                                <div>
+                                    <CardTitle>Device Topology</CardTitle>
+                                    <CardDescription>Physical and logical relationships to other devices.</CardDescription>
+                                </div>
+                                {can.update && otherDevices.length > 0 && (
+                                    <Button size="sm" variant="outline" onClick={() => { setRelOpen(true); setRelError(''); }}>
+                                        <Plus className="mr-1 h-3.5 w-3.5" /> Link device
+                                    </Button>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                {totalRelationships > 0 ? (
                                     <div className="space-y-4">
                                         {relationships.parents.length > 0 && (
                                             <div>
-                                                <p className="text-xs font-medium text-muted-foreground mb-2">Connected to (upstream)</p>
+                                                <p className="mb-2 text-xs font-medium text-muted-foreground">Upstream (this device's parents)</p>
                                                 {relationships.parents.map((r) => (
-                                                    <div key={r.id} className="flex items-center gap-3 rounded-md border p-3 text-sm mb-1">
+                                                    <div key={r.id} className="mb-1 flex items-center gap-3 rounded-md border p-3 text-sm">
                                                         <Network className="h-4 w-4 text-muted-foreground" />
-                                                        <span>{r.type.replace(/_/g, ' ')}</span>
-                                                        <Link href={`/security-devices/devices/${r.device_id}`} className="text-primary hover:underline">{r.device_name ?? `Device #${r.device_id}`}</Link>
+                                                        <span className="text-muted-foreground">{r.type.replace(/_/g, ' ')}</span>
+                                                        <Link href={`/security-devices/devices/${r.device_id}`} className="flex-1 truncate text-primary hover:underline">{r.device_name ?? `Device #${r.device_id}`}</Link>
                                                         {r.port && <Badge variant="outline" className="text-[10px]">{r.port}</Badge>}
+                                                        {can.update && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 px-2 text-red-600 hover:text-red-700"
+                                                                onClick={() => submitUnlinkRelationship(r.id)}
+                                                                disabled={unlinkingRelId === r.id}
+                                                                title="Remove relationship"
+                                                            >
+                                                                <Minus className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
                                         )}
                                         {relationships.children.length > 0 && (
                                             <div>
-                                                <p className="text-xs font-medium text-muted-foreground mb-2">Downstream devices</p>
+                                                <p className="mb-2 text-xs font-medium text-muted-foreground">Downstream (this device's children)</p>
                                                 {relationships.children.map((r) => (
-                                                    <div key={r.id} className="flex items-center gap-3 rounded-md border p-3 text-sm mb-1">
+                                                    <div key={r.id} className="mb-1 flex items-center gap-3 rounded-md border p-3 text-sm">
                                                         <GitBranch className="h-4 w-4 text-muted-foreground" />
-                                                        <span>{r.type.replace(/_/g, ' ')}</span>
-                                                        <Link href={`/security-devices/devices/${r.device_id}`} className="text-primary hover:underline">{r.device_name ?? `Device #${r.device_id}`}</Link>
+                                                        <span className="text-muted-foreground">{r.type.replace(/_/g, ' ')}</span>
+                                                        <Link href={`/security-devices/devices/${r.device_id}`} className="flex-1 truncate text-primary hover:underline">{r.device_name ?? `Device #${r.device_id}`}</Link>
                                                         {r.port && <Badge variant="outline" className="text-[10px]">{r.port}</Badge>}
+                                                        {can.update && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 px-2 text-red-600 hover:text-red-700"
+                                                                onClick={() => submitUnlinkRelationship(r.id)}
+                                                                disabled={unlinkingRelId === r.id}
+                                                                title="Remove relationship"
+                                                            >
+                                                                <Minus className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <EmptyState icon={Network} title="No relationships" description="Device topology relationships will appear here when configured." variant="compact" />
-                        )}
+                                ) : (
+                                    <EmptyState icon={Network} title="No relationships" description={can.update ? 'Click "Link device" to record a physical or logical connection.' : 'Device topology relationships will appear here when configured.'} variant="compact" />
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Link-device dialog */}
+                        <Dialog open={relOpen} onOpenChange={setRelOpen}>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Link to another device</DialogTitle>
+                                    <DialogDescription>
+                                        Record a physical or logical relationship. Pick a direction, a relationship type, and the other device.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">Direction</label>
+                                        <Select value={relDirection} onValueChange={(v) => setRelDirection(v as 'downstream' | 'upstream')}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="downstream">This device → other (downstream)</SelectItem>
+                                                <SelectItem value="upstream">Other → this device (upstream)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">Relationship type</label>
+                                        <Select value={relType} onValueChange={setRelType}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {relationshipTypes.map((t) => (
+                                                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">Other device</label>
+                                        <Select value={relOtherDeviceId} onValueChange={setRelOtherDeviceId}>
+                                            <SelectTrigger><SelectValue placeholder="Select a device" /></SelectTrigger>
+                                            <SelectContent>
+                                                {otherDevices.map((d) => (
+                                                    <SelectItem key={d.id} value={String(d.id)}>
+                                                        {d.name}{d.device_uid ? ` — ${d.device_uid}` : ''}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Port (optional)</label>
+                                            <Input value={relPort} onChange={(e) => setRelPort(e.target.value)} placeholder="e.g. Port 3" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Notes (optional)</label>
+                                            <Input value={relNotes} onChange={(e) => setRelNotes(e.target.value)} placeholder="short note" />
+                                        </div>
+                                    </div>
+                                    {relError && <p className="text-sm text-red-600">{relError}</p>}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="ghost" onClick={() => setRelOpen(false)} disabled={relSubmitting}>Cancel</Button>
+                                    <Button onClick={submitRelationship} disabled={relSubmitting || !relOtherDeviceId}>
+                                        {relSubmitting ? 'Linking…' : 'Add relationship'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </TabsContent>
 
                     {/* ── Documents tab ─────────────────────────── */}
                     <TabsContent value="documents">
-                        <EmptyState icon={FileText} title="No documents" description="Device documents will be managed here in a future update." variant="compact" />
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                                <div>
+                                    <CardTitle>Documents</CardTitle>
+                                    <CardDescription>Manuals, compliance certs, install photos, firmware notes, and other device-specific files.</CardDescription>
+                                </div>
+                                {can.update && (
+                                    <Button size="sm" variant="outline" onClick={() => { setDocOpen(true); setDocError(''); }}>
+                                        <Plus className="mr-1 h-3.5 w-3.5" /> Upload document
+                                    </Button>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                {documents.length === 0 ? (
+                                    <EmptyState
+                                        icon={FileText}
+                                        title="No documents"
+                                        description={can.update ? 'Click "Upload document" to attach a manual, photo, or compliance cert.' : 'No documents have been uploaded for this device.'}
+                                        variant="compact"
+                                    />
+                                ) : (
+                                    <div className="space-y-2">
+                                        {documents.map((doc) => {
+                                            const expired = doc.expiry_date && new Date(doc.expiry_date) < new Date();
+                                            return (
+                                                <div key={doc.id} className="flex items-start gap-3 rounded-md border p-3 text-sm">
+                                                    <FileText className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                                    <div className="min-w-0 flex-1 space-y-1">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <a href={doc.download_url} className="truncate font-medium text-primary hover:underline">{doc.title}</a>
+                                                            <Badge variant="outline" className="text-[10px]">{doc.category.replace(/_/g, ' ')}</Badge>
+                                                            {doc.version && <Badge variant="secondary" className="text-[10px]">v{doc.version}</Badge>}
+                                                            {expired && <Badge variant="destructive" className="text-[10px]">Expired</Badge>}
+                                                        </div>
+                                                        <p className="truncate font-mono text-xs text-muted-foreground">
+                                                            {doc.original_name} · {formatBytes(doc.size_bytes)}
+                                                            {doc.expiry_date && ` · expires ${doc.expiry_date}`}
+                                                        </p>
+                                                        {doc.notes && <p className="text-xs text-muted-foreground">{doc.notes}</p>}
+                                                    </div>
+                                                    {can.update && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-7 px-2 text-red-600 hover:text-red-700"
+                                                            onClick={() => submitDeleteDocument(doc.id)}
+                                                            disabled={deletingDocId === doc.id}
+                                                            title="Delete document"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Upload dialog */}
+                        <Dialog open={docOpen} onOpenChange={setDocOpen}>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Upload document</DialogTitle>
+                                    <DialogDescription>Max 20 MB. Stored encrypted on the local disk. Delete removes both the row and the file.</DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">File</label>
+                                        <Input type="file" onChange={(e) => setDocFile(e.target.files?.[0] ?? null)} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">Title</label>
+                                        <Input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="e.g. UVC-G4 Install Manual" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Category</label>
+                                            <Select value={docCategory} onValueChange={setDocCategory}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {documentCategories.map((c) => (
+                                                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Version (optional)</label>
+                                            <Input value={docVersion} onChange={(e) => setDocVersion(e.target.value)} placeholder="e.g. 1.2.0" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Effective (optional)</label>
+                                            <Input type="date" value={docEffective} onChange={(e) => setDocEffective(e.target.value)} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium">Expires (optional)</label>
+                                            <Input type="date" value={docExpiry} onChange={(e) => setDocExpiry(e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">Notes (optional)</label>
+                                        <Input value={docNotes} onChange={(e) => setDocNotes(e.target.value)} placeholder="short note" />
+                                    </div>
+                                    {docError && <p className="text-sm text-red-600">{docError}</p>}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="ghost" onClick={() => setDocOpen(false)} disabled={docSubmitting}>Cancel</Button>
+                                    <Button onClick={submitDocument} disabled={docSubmitting || !docFile || !docTitle.trim()}>
+                                        {docSubmitting ? 'Uploading…' : 'Upload'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </TabsContent>
                 </Tabs>
 

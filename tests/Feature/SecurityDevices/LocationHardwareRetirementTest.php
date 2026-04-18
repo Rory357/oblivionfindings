@@ -139,7 +139,7 @@ class LocationHardwareRetirementTest extends TestCase
         Device::factory()->create(['provider' => 'unifi', 'name' => 'Canonical UniFi AP']);
 
         $response = $this->actingAs($this->admin)
-            ->get('/settings/integrations/unifi');
+            ->get('/security-devices/integrations/unifi');
 
         $response->assertOk();
         $response->assertInertia(function ($page) {

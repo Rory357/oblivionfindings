@@ -26,8 +26,12 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_unifi_sync_creates_canonical_device_assignment_and_compatibility_shadow(): void
+    public function test_unifi_sync_creates_canonical_device_without_legacy_shadow(): void
     {
+        // PR P Phase 1: UnifiOperationalBridgeService no longer writes to the
+        // legacy `location_hardware` table. The canonical Device + DeviceAssignment
+        // are the sole source of truth after a sync; provenance is carried via
+        // integration_events.canonical_device_id.
         $site = Site::factory()->create(['tenant_id' => 1, 'name' => 'North Hub']);
         $siteConfig = $this->makeSiteConfig($site);
         $tenantSecret = $this->makeTenantSecret();
@@ -57,7 +61,6 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
 
         $device = Device::query()->where('provider', 'unifi')->firstOrFail();
         $assignment = $device->assignments()->active()->first();
-        $shadow = LocationHardware::find($device->legacy_location_hardware_id);
 
         $this->assertSame('Lobby AP', $device->name);
         $this->assertSame('it_infrastructure', $device->domain);
@@ -72,11 +75,9 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $this->assertSame('site', $assignment->assignable_type);
         $this->assertSame($site->id, $assignment->assignable_id);
 
-        $this->assertNotNull($shadow);
-        $this->assertSame($site->id, $shadow->site_id);
-        $this->assertNull($shadow->room_id);
-        $this->assertSame(LocationHardware::CATEGORY_AP, $shadow->category);
-        $this->assertSame('unifi-ap-1', $shadow->external_ref['provider_entity_id']);
+        // Phase 1: no legacy shadow is created and the device is not linked to one.
+        $this->assertNull($device->legacy_location_hardware_id);
+        $this->assertSame(0, LocationHardware::query()->count());
     }
 
     public function test_unifi_sync_preserves_existing_room_assignment_within_same_site(): void
@@ -91,6 +92,8 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $siteConfig = $this->makeSiteConfig($site);
         $tenantSecret = $this->makeTenantSecret();
 
+        // Pre-existing legacy shadow from before PR P Phase 1. After Phase 1 the
+        // sync must NOT write to this row; it is read-only historical data.
         $shadow = LocationHardware::create([
             'tenant_id' => 1,
             'site_id' => $site->id,
@@ -101,6 +104,7 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
             'status' => LocationHardware::STATUS_ONLINE,
             'external_ref' => ['provider_entity_id' => 'switch-1'],
         ]);
+        $originalShadowUpdatedAt = $shadow->updated_at;
 
         $device = Device::factory()->itInfrastructure()->create([
             'tenant_id' => 1,
@@ -147,8 +151,14 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $this->assertNotNull($assignment);
         $this->assertSame('room', $assignment->assignable_type);
         $this->assertSame($room->id, $assignment->assignable_id);
+
+        // Phase 1: the pre-existing shadow must be untouched — its timestamp
+        // should not have moved and its fields should still reflect the
+        // original seeded values.
+        $this->assertEquals($originalShadowUpdatedAt, $shadow->updated_at);
         $this->assertSame($room->id, $shadow->room_id);
         $this->assertSame(LocationHardware::CATEGORY_SWITCH, $shadow->category);
+        $this->assertSame(LocationHardware::STATUS_ONLINE, $shadow->status);
     }
 
     public function test_pull_health_job_updates_canonical_device_first_for_unifi(): void
@@ -167,6 +177,7 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
             'status' => LocationHardware::STATUS_ONLINE,
             'external_ref' => ['provider_entity_id' => 'health-ap-1'],
         ]);
+        $originalShadowUpdatedAt = $shadow->updated_at;
 
         $device = Device::factory()->itInfrastructure()->create([
             'tenant_id' => 1,
@@ -241,8 +252,13 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
 
         $this->assertSame(DeviceStatus::Offline, $device->status);
         $this->assertSame(HealthStatus::Critical, $device->health_status);
-        $this->assertSame(LocationHardware::STATUS_OFFLINE, $shadow->status);
         $this->assertNotNull($device->last_seen_at);
+
+        // Phase 1 (PR P): the legacy shadow must NOT be updated by a UniFi
+        // health sync. Its status and updated_at should still match the seeded
+        // values.
+        $this->assertSame(LocationHardware::STATUS_ONLINE, $shadow->status);
+        $this->assertEquals($originalShadowUpdatedAt, $shadow->updated_at);
     }
 
     private function makeSiteConfig(Site $site): IntegrationSiteConfig

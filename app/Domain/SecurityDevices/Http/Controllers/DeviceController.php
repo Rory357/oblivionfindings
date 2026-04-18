@@ -6,10 +6,16 @@ use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Enums\LinkType;
+use App\Domain\SecurityDevices\Enums\RelationshipType;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Models\DeviceRelationship;
+use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Models\Asset;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +27,7 @@ class DeviceController extends Controller
 
     public function __construct(
         private readonly DeviceRegistryService $registry,
+        private readonly DeviceLinkService $linkService,
     ) {}
 
     public function index(Request $request)
@@ -149,7 +156,63 @@ class DeviceController extends Controller
                 'asset_tag' => $link->asset?->asset_tag,
                 'link_type' => $link->link_type?->value,
                 'linked_at' => $link->linked_at?->toISOString(),
+                'notes' => $link->notes,
             ]),
+            'availableAssets' => Asset::query()
+                ->orderBy('name')
+                ->limit(500)
+                ->get(['id', 'name', 'asset_tag'])
+                ->map(fn (Asset $a) => [
+                    'id' => $a->id,
+                    'name' => $a->name,
+                    'asset_tag' => $a->asset_tag,
+                ]),
+            'linkTypes' => collect(LinkType::cases())->map(fn ($t) => [
+                'value' => $t->value,
+                'label' => $t->label(),
+            ]),
+            'relationshipTypes' => collect(RelationshipType::cases())->map(fn ($t) => [
+                'value' => $t->value,
+                'label' => $t->label(),
+            ]),
+            // Other devices in this tenant, excluding this one. Capped at 500
+            // to keep the page payload small; picker becomes search-driven
+            // past that volume (future PR).
+            'otherDevices' => Device::query()
+                ->where('id', '!=', $device->id)
+                ->when($device->tenant_id, fn ($q) => $q->where('tenant_id', $device->tenant_id))
+                ->orderBy('name')
+                ->limit(500)
+                ->get(['id', 'name', 'device_uid', 'category'])
+                ->map(fn (Device $d) => [
+                    'id' => $d->id,
+                    'name' => $d->name,
+                    'device_uid' => $d->device_uid,
+                    'category' => $d->category,
+                ]),
+            'documents' => $device->documents->map(fn ($doc) => [
+                'id' => $doc->id,
+                'title' => $doc->title,
+                'category' => $doc->category,
+                'version' => $doc->version,
+                'effective_date' => $doc->effective_date?->toDateString(),
+                'expiry_date' => $doc->expiry_date?->toDateString(),
+                'original_name' => $doc->original_name,
+                'mime_type' => $doc->mime_type,
+                'size_bytes' => $doc->size_bytes,
+                'notes' => $doc->notes,
+                'uploaded_at' => $doc->created_at?->toISOString(),
+                'download_url' => "/security-devices/devices/{$device->id}/documents/{$doc->id}",
+            ]),
+            'documentCategories' => [
+                ['value' => 'manual', 'label' => 'Manual'],
+                ['value' => 'install_photo', 'label' => 'Install photo'],
+                ['value' => 'compliance_cert', 'label' => 'Compliance cert'],
+                ['value' => 'firmware_notes', 'label' => 'Firmware notes'],
+                ['value' => 'configuration', 'label' => 'Configuration'],
+                ['value' => 'network_diagram', 'label' => 'Network diagram'],
+                ['value' => 'other', 'label' => 'Other'],
+            ],
             'recentEvents' => $device->events->map(fn ($e) => [
                 'id' => $e->id,
                 'event_type' => $e->event_type,
@@ -188,6 +251,135 @@ class DeviceController extends Controller
                 'assign' => $user->canDo('securityDevices.devices.assign'),
             ],
         ]);
+    }
+
+    /**
+     * Link a device to an asset. POST /security-devices/devices/{device}/asset-links
+     */
+    public function linkAsset(Request $request, Device $device)
+    {
+        $user = $request->user();
+        abort_unless($user->canDo('securityDevices.devices.update'), 403);
+
+        $validated = $request->validate([
+            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            'link_type' => ['required', 'string', 'in:primary,installed_in,accessory'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $asset = Asset::findOrFail($validated['asset_id']);
+
+        try {
+            $this->linkService->link(
+                device: $device,
+                asset: $asset,
+                linkedByUserId: $user->id,
+                linkType: LinkType::from($validated['link_type']),
+                notes: $validated['notes'] ?? null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', "Device linked to asset {$asset->name}.");
+    }
+
+    /**
+     * Link a device to another device (topology relationship).
+     * POST /security-devices/devices/{device}/relationships
+     *
+     * `direction` = 'downstream' → this device is the parent, other is child.
+     * `direction` = 'upstream'   → other device is the parent, this is child.
+     */
+    public function linkRelated(Request $request, Device $device)
+    {
+        $user = $request->user();
+        abort_unless($user->canDo('securityDevices.devices.update'), 403);
+
+        $validated = $request->validate([
+            'other_device_id' => ['required', 'integer', 'different:device', 'exists:devices,id'],
+            'relationship_type' => ['required', 'string', 'in:records_to,powered_by,connected_to,mounted_in,controls,uplinks_to,backs_up_to'],
+            'direction' => ['required', 'string', 'in:upstream,downstream'],
+            'port' => ['nullable', 'string', 'max:64'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $other = Device::findOrFail($validated['other_device_id']);
+
+        // Tenant guard — prevent cross-tenant relationships.
+        if ($device->tenant_id && $other->tenant_id && $device->tenant_id !== $other->tenant_id) {
+            return redirect()->back()->with('error', 'Cannot link devices from different tenants.');
+        }
+
+        $parentId = $validated['direction'] === 'downstream' ? $device->id : $other->id;
+        $childId = $validated['direction'] === 'downstream' ? $other->id : $device->id;
+
+        $exists = DeviceRelationship::query()
+            ->where('parent_device_id', $parentId)
+            ->where('child_device_id', $childId)
+            ->where('relationship_type', $validated['relationship_type'])
+            ->exists();
+
+        if ($exists) {
+            return redirect()->back()->with('error', 'That relationship already exists.');
+        }
+
+        DeviceRelationship::create([
+            'parent_device_id' => $parentId,
+            'child_device_id' => $childId,
+            'relationship_type' => $validated['relationship_type'],
+            'port' => $validated['port'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Relationship added.');
+    }
+
+    /**
+     * Remove a topology relationship.
+     * DELETE /security-devices/devices/{device}/relationships/{relationship}
+     */
+    public function unlinkRelated(Request $request, Device $device, DeviceRelationship $relationship)
+    {
+        $user = $request->user();
+        abort_unless($user->canDo('securityDevices.devices.update'), 403);
+
+        // Relationship must involve this device on at least one side.
+        abort_unless(
+            $relationship->parent_device_id === $device->id
+                || $relationship->child_device_id === $device->id,
+            404,
+            'This relationship does not involve this device.',
+        );
+
+        $relationship->delete();
+
+        return redirect()->back()->with('success', 'Relationship removed.');
+    }
+
+    /**
+     * Unlink a device from an asset. DELETE /security-devices/devices/{device}/asset-links/{link}
+     *
+     * History is preserved (sets `unlinked_at`, does not delete the row).
+     */
+    public function unlinkAsset(Request $request, Device $device, DeviceAssetLink $link)
+    {
+        $user = $request->user();
+        abort_unless($user->canDo('securityDevices.devices.update'), 403);
+
+        abort_unless(
+            $link->device_id === $device->id,
+            404,
+            'This asset link does not belong to this device.',
+        );
+
+        try {
+            $this->linkService->unlink($link);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Asset unlinked.');
     }
 
     public function create(Request $request)
@@ -246,6 +438,30 @@ class DeviceController extends Controller
             'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
             'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
         ]);
+    }
+
+    /**
+     * PATCH a narrow set of OF-editable fields from the Device Detail
+     * Overview tab. Separate from update() because update() enforces the
+     * full taxonomy set as required; this endpoint is for quick inline
+     * edits of notes / asset_tag / location_description that don't belong
+     * in a full edit-page round trip.
+     */
+    public function patchFields(Request $request, Device $device)
+    {
+        $user = $request->user();
+        abort_unless($user->canDo('securityDevices.devices.update'), 403);
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'asset_tag' => ['nullable', 'string', 'max:100'],
+            'location_description' => ['nullable', 'string', 'max:255'],
+            'next_service_due' => ['nullable', 'date'],
+        ]);
+
+        $device->update($validated);
+
+        return redirect()->back()->with('success', 'Device updated.');
     }
 
     public function update(Request $request, Device $device)
@@ -319,6 +535,7 @@ class DeviceController extends Controller
             'battery_updated_at' => $d->battery_updated_at?->toISOString(),
             'commissioned_at' => $d->commissioned_at?->toDateString(),
             'warranty_expires_at' => $d->warranty_expires_at?->toDateString(),
+            'next_service_due' => $d->next_service_due?->toDateString(),
             'expected_lifespan_months' => $d->expected_lifespan_months,
             'purchase_price' => $d->purchase_price,
             'provider' => $d->provider,

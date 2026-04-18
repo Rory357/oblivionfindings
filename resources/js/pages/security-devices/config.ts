@@ -7,6 +7,7 @@ import {
     HeartPulse,
     Key,
     LayoutDashboard,
+    Link2,
     type LucideIcon,
     Server,
     Siren,
@@ -26,6 +27,7 @@ export type SecurityDevicesSectionKey =
     | 'device-groups'
     | 'alerts-events'
     | 'maintenance-health'
+    | 'integrations'
     | 'reports';
 
 export type SecurityDevicesSecondarySectionKey = Exclude<
@@ -207,6 +209,21 @@ export const securityDevicesSections: SecurityDevicesSectionConfig[] = [
             'Track future device health, service status, and maintenance readiness.',
             'Surface battery, connectivity, and lifecycle status across vendor-neutral inventories.',
             'Provide a future place for maintenance APIs and scheduled service integrations.',
+        ],
+    },
+    {
+        key: 'integrations',
+        title: 'APIs & Integrations',
+        href: '/security-devices/integrations',
+        icon: Link2,
+        description:
+            'Provider connections, site mapping, sync controls, and exceptions for hardware integrations.',
+        futureFocus:
+            'This section is the system of record for provider credentials, connection health, site mappings, sync schedules, and imported-device exceptions. Device pages show the result of sync; this page controls it.',
+        capabilities: [
+            'Manage provider connections (UniFi today; Queclink and Milesight planned) without leaking credential UI into site pages.',
+            'Map organisation sites to external provider sites / controllers / gateways and track drift between them.',
+            'Surface unmapped, duplicate, and ignored devices in a dedicated exceptions workbench.',
         ],
     },
     {

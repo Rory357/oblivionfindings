@@ -99,7 +99,6 @@ const navSections: NavSection[] = [
         permission: 'integrations.view',
         items: [
             { icon: Plug, title: 'Integration Hub', href: '/settings/integrations' },
-            { icon: Wifi, title: 'UniFi', href: '/settings/integrations/unifi' },
             { icon: Key, title: 'API & Webhooks', href: '/settings/api' },
         ],
     },

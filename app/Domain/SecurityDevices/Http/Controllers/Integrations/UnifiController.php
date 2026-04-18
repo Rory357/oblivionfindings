@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Settings;
+namespace App\Domain\SecurityDevices\Http\Controllers\Integrations;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Http\Controllers\Controller;
@@ -16,9 +16,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
 
-class UnifiSettingsController extends Controller
+class UnifiController extends Controller
 {
     private const PROVIDER = 'unifi';
+
+    private const PERMISSION_MANAGE = 'securityDevices.integrations.manage';
 
     /**
      * Show the UniFi integration settings page.
@@ -26,7 +28,7 @@ class UnifiSettingsController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
 
         $tenantId = $this->resolveTenantId($user);
 
@@ -163,7 +165,7 @@ class UnifiSettingsController extends Controller
             ->values()
             ->all();
 
-        return Inertia::render('settings/integrations/unifi', [
+        return Inertia::render('security-devices/integrations/unifi', [
             'tenantSecret' => $tenantSecret ? [
                 'status' => $tenantSecret->status,
                 'secret_last4' => $tenantSecret->secret_last4,
@@ -179,9 +181,14 @@ class UnifiSettingsController extends Controller
             'syncedDevices' => $syncedDevices,
             'syncLogs' => $syncLogs,
             'can' => [
-                'manage' => $user->canDo('integrations.manage_tenant_secrets'),
+                'manage' => $this->userCanManage($user),
             ],
         ]);
+    }
+
+    private function userCanManage($user): bool
+    {
+        return $user && $user->canDo(self::PERMISSION_MANAGE);
     }
 
     /**
@@ -190,7 +197,7 @@ class UnifiSettingsController extends Controller
     public function saveKey(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
             'api_key' => ['required', 'string'],
@@ -233,7 +240,7 @@ class UnifiSettingsController extends Controller
     public function testKey(Request $request, IntegrationAdapterRegistry $registry)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
 
         $tenantId = $this->resolveTenantId($user);
 
@@ -300,7 +307,7 @@ class UnifiSettingsController extends Controller
     public function rotateKey(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
             'api_key' => ['required', 'string'],
@@ -330,7 +337,7 @@ class UnifiSettingsController extends Controller
     public function syncSites(Request $request, IntegrationAdapterRegistry $registry)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
 
         $tenantId = $this->resolveTenantId($user);
 
@@ -408,7 +415,7 @@ class UnifiSettingsController extends Controller
     public function mapSite(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
             'site_id' => ['required', 'integer', 'exists:sites,id'],
@@ -445,7 +452,7 @@ class UnifiSettingsController extends Controller
     public function removeSiteMapping(Request $request, IntegrationSiteConfig $siteConfig)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
         $tenantId = $this->resolveTenantId($user);
 
         abort_unless(
@@ -464,7 +471,7 @@ class UnifiSettingsController extends Controller
     public function syncDevices(Request $request, IntegrationAdapterRegistry $registry)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
             'site_config_id' => ['required', 'integer', 'exists:integration_site_configs,id'],
@@ -556,7 +563,7 @@ class UnifiSettingsController extends Controller
     )
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
         $tenantId = $this->resolveTenantId($user);
 
         $device = Device::query()
@@ -596,7 +603,7 @@ class UnifiSettingsController extends Controller
     public function updateDefaults(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($this->userCanManage($user), 403);
 
         $request->validate([
             'config' => ['nullable', 'array'],

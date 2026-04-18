@@ -91,9 +91,9 @@ type Props = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Settings', href: '/settings/profile' },
-    { title: 'Integrations', href: '/settings/integrations' },
-    { title: 'UniFi', href: '/settings/integrations/unifi' },
+    { title: 'Security & Devices', href: '/security-devices' },
+    { title: 'APIs & Integrations', href: '/security-devices/integrations' },
+    { title: 'UniFi', href: '/security-devices/integrations/unifi' },
 ];
 
 const connectionStatusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle }> = {
@@ -208,7 +208,7 @@ export default function UnifiIntegration({
         e.preventDefault();
         setSavingDefaults(true);
         router.put(
-            '/settings/integrations/unifi/defaults',
+            '/security-devices/integrations/unifi/defaults',
             {
                 config: {
                     refresh_interval_minutes: defaultsForm.data.refresh_interval_minutes,
@@ -230,9 +230,9 @@ export default function UnifiIntegration({
             <Head title="UniFi Integration" />
             <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
                 <div>
-                    <Link href="/settings/integrations" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                    <Link href="/security-devices/integrations" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                         <ArrowLeft className="h-4 w-4" />
-                        Back to Integrations
+                        Back to APIs &amp; Integrations
                     </Link>
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted"><Wifi className="h-5 w-5 text-muted-foreground" /></div>
@@ -247,7 +247,7 @@ export default function UnifiIntegration({
                     <CardHeader><CardTitle>API Key</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         {!hasKey ? (
-                            <form onSubmit={(e) => { e.preventDefault(); saveKeyForm.post('/settings/integrations/unifi/key', { preserveScroll: true, onSuccess: () => saveKeyForm.reset('api_key') }); }} className="space-y-4">
+                            <form onSubmit={(e) => { e.preventDefault(); saveKeyForm.post('/security-devices/integrations/unifi/key', { preserveScroll: true, onSuccess: () => saveKeyForm.reset('api_key') }); }} className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="api_key">API Key</Label>
                                     <Input id="api_key" type="password" value={saveKeyForm.data.api_key} onChange={(e) => saveKeyForm.setData('api_key', e.target.value)} placeholder="Enter UniFi API key" />
@@ -265,13 +265,13 @@ export default function UnifiIntegration({
                                     <p>Last sync: {fmt(tenantSecret?.last_synced_at)}</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => { setTestingConnection(true); router.post('/settings/integrations/unifi/test', {}, { preserveScroll: true, onFinish: () => setTestingConnection(false) }); }} disabled={testingConnection}>
+                                    <Button variant="outline" size="sm" onClick={() => { setTestingConnection(true); router.post('/security-devices/integrations/unifi/test', {}, { preserveScroll: true, onFinish: () => setTestingConnection(false) }); }} disabled={testingConnection}>
                                         {testingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Test Connection
                                     </Button>
                                     <Button variant="outline" size="sm" onClick={() => setShowRotateForm((p) => !p)}>Rotate Key</Button>
                                 </div>
                                 {showRotateForm && (
-                                    <form onSubmit={(e) => { e.preventDefault(); rotateKeyForm.post('/settings/integrations/unifi/rotate', { preserveScroll: true, onSuccess: () => { rotateKeyForm.reset('api_key'); setShowRotateForm(false); } }); }} className="space-y-3 rounded-lg border p-4">
+                                    <form onSubmit={(e) => { e.preventDefault(); rotateKeyForm.post('/security-devices/integrations/unifi/rotate', { preserveScroll: true, onSuccess: () => { rotateKeyForm.reset('api_key'); setShowRotateForm(false); } }); }} className="space-y-3 rounded-lg border p-4">
                                         <Label htmlFor="rotate_api_key">New API Key</Label>
                                         <Input id="rotate_api_key" type="password" value={rotateKeyForm.data.api_key} onChange={(e) => rotateKeyForm.setData('api_key', e.target.value)} />
                                         <div className="flex gap-2">
@@ -289,7 +289,7 @@ export default function UnifiIntegration({
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0">
                             <CardTitle>Location Mapping</CardTitle>
-                            <Button variant="outline" size="sm" onClick={() => { setSyncingSites(true); router.post('/settings/integrations/unifi/sync-sites', {}, { preserveScroll: true, onFinish: () => setSyncingSites(false) }); }} disabled={syncingSites}>
+                            <Button variant="outline" size="sm" onClick={() => { setSyncingSites(true); router.post('/security-devices/integrations/unifi/sync-sites', {}, { preserveScroll: true, onFinish: () => setSyncingSites(false) }); }} disabled={syncingSites}>
                                 {syncingSites ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Sync UniFi Locations
                             </Button>
                         </CardHeader>
@@ -304,8 +304,8 @@ export default function UnifiIntegration({
                                                 <TableCell><div className="font-medium">{c.mapped_external_site_name || 'Unknown name'}</div><code className="rounded bg-muted px-1.5 py-0.5 text-xs">{c.mapped_external_site_id || '---'}</code></TableCell>
                                                 <TableCell><Badge variant={c.is_active ? 'default' : 'secondary'}>{c.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
                                                 <TableCell><div className="flex flex-wrap gap-2">
-                                                    <Button size="sm" variant="outline" onClick={() => { setSyncingSiteConfigId(c.id); router.post('/settings/integrations/unifi/sync-devices', { site_config_id: c.id }, { preserveScroll: true, onFinish: () => setSyncingSiteConfigId(null) }); }} disabled={syncingSiteConfigId === c.id}>{syncingSiteConfigId === c.id ? 'Syncing...' : 'Sync Devices'}</Button>
-                                                    <Button size="sm" variant="ghost" onClick={() => router.delete(`/settings/integrations/unifi/map-site/${c.id}`, { preserveScroll: true })}>Remove</Button>
+                                                    <Button size="sm" variant="outline" onClick={() => { setSyncingSiteConfigId(c.id); router.post('/security-devices/integrations/unifi/sync-devices', { site_config_id: c.id }, { preserveScroll: true, onFinish: () => setSyncingSiteConfigId(null) }); }} disabled={syncingSiteConfigId === c.id}>{syncingSiteConfigId === c.id ? 'Syncing...' : 'Sync Devices'}</Button>
+                                                    <Button size="sm" variant="ghost" onClick={() => router.delete(`/security-devices/integrations/unifi/map-site/${c.id}`, { preserveScroll: true })}>Remove</Button>
                                                 </div></TableCell>
                                             </TableRow>
                                         ))}
@@ -316,7 +316,7 @@ export default function UnifiIntegration({
                             {!showMapForm ? (
                                 <Button variant="outline" size="sm" onClick={() => setShowMapForm(true)}><Building2 className="mr-2 h-4 w-4" />Map Location</Button>
                             ) : (
-                                <form onSubmit={(e) => { e.preventDefault(); mapForm.post('/settings/integrations/unifi/map-site', { preserveScroll: true, onSuccess: () => { mapForm.reset(); setShowMapForm(false); } }); }} className="space-y-4 rounded-lg border p-4">
+                                <form onSubmit={(e) => { e.preventDefault(); mapForm.post('/security-devices/integrations/unifi/map-site', { preserveScroll: true, onSuccess: () => { mapForm.reset(); setShowMapForm(false); } }); }} className="space-y-4 rounded-lg border p-4">
                                     <div className="grid gap-4 md:grid-cols-3">
                                         <div className="space-y-2">
                                             <Label>Platform Location</Label>
@@ -397,7 +397,7 @@ export default function UnifiIntegration({
                                                 <TableCell>{d.model || '---'}</TableCell>
                                                 <TableCell><Badge variant="outline" className={badge.className}>{badge.label}</Badge></TableCell>
                                                 <TableCell>{fmt(d.last_seen_at)}</TableCell>
-                                                <TableCell><Button size="sm" variant="outline" onClick={() => { const raw = deviceRoomDraft[d.id]; const roomId = !raw || raw === 'unassigned' ? null : Number(raw); setAssigningDeviceId(d.id); router.put(`/settings/integrations/unifi/hardware/${d.id}/room`, { room_id: roomId }, { preserveScroll: true, onFinish: () => setAssigningDeviceId(null) }); }} disabled={assigningDeviceId === d.id}>{assigningDeviceId === d.id ? 'Saving...' : 'Save Room'}</Button></TableCell>
+                                                <TableCell><Button size="sm" variant="outline" onClick={() => { const raw = deviceRoomDraft[d.id]; const roomId = !raw || raw === 'unassigned' ? null : Number(raw); setAssigningDeviceId(d.id); router.put(`/security-devices/integrations/unifi/hardware/${d.id}/room`, { room_id: roomId }, { preserveScroll: true, onFinish: () => setAssigningDeviceId(null) }); }} disabled={assigningDeviceId === d.id}>{assigningDeviceId === d.id ? 'Saving...' : 'Save Room'}</Button></TableCell>
                                             </TableRow>
                                         )})}
                                         {filteredDevices.length === 0 && <TableRow><TableCell colSpan={8} className="text-sm text-muted-foreground">No synced devices for this filter yet.</TableCell></TableRow>}
