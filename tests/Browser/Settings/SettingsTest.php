@@ -247,9 +247,9 @@ test('integrations unifi settings page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/settings/integrations/unifi')
+            ->visit('/security-devices/integrations/unifi')
             ->waitForText('UniFi', 10)
-            ->assertPathBeginsWith('/settings');
+            ->assertPathBeginsWith('/security-devices');
     });
 });
 

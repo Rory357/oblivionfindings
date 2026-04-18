@@ -5,14 +5,10 @@ namespace App\Http\Controllers\Sites;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Controllers\Controller;
-use App\Models\Integration\IntegrationSiteConfig;
-use App\Models\Integration\IntegrationSiteSecret;
-use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Services\Integration\UnifiOperationalBridgeService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
 
 class SiteHardwareController extends Controller
 {
@@ -27,8 +23,9 @@ class SiteHardwareController extends Controller
         $user = $request->user();
         $tenantId = $user?->tenant_id ?? $user?->organization_id ?? $site->tenant_id ?? 1;
 
-        // ── Canonical device list (from Security & Devices) ───────
-        // Devices assigned to this site or any of its rooms.
+        // Canonical device list (from Security & Devices).
+        // This page is a read-only context view; provider config + device CRUD
+        // live in the Security & Devices module.
         $devices = $this->registry->forSite($tenantId, $site->id)
             ->with(['assignments' => fn ($q) => $q->active()])
             ->orderBy('category')
@@ -61,72 +58,14 @@ class SiteHardwareController extends Controller
                     'firmware_version' => $d->firmware_version,
                     'ip_address' => $d->ip_address,
                     'notes' => $d->notes,
-                    // Assignment context for room display.
                     'assignment_type' => $active?->assignable_type,
                     'assignment_id' => $active?->assignable_id,
                 ];
             });
 
-        // ── Rooms and integrations (unchanged) ────────────────────
-
         $rooms = SiteRoom::where('site_id', $site->id)
             ->orderBy('sort_order')
             ->get();
-
-        $integrations = IntegrationSiteConfig::where('site_id', $site->id)
-            ->where('is_active', true)
-            ->get();
-
-        // ── UniFi integration data (unchanged) ────────────────────
-
-        $unifiSecret = IntegrationTenantSecret::query()
-            ->forTenant($tenantId)
-            ->where('provider', 'unifi')
-            ->first();
-
-        $unifiConfig = IntegrationSiteConfig::query()
-            ->forTenant($tenantId)
-            ->forProvider('unifi')
-            ->where('site_id', $site->id)
-            ->first();
-
-        $accessSecret = IntegrationSiteSecret::query()
-            ->forTenant($tenantId)
-            ->where('site_id', $site->id)
-            ->where('provider', 'unifi')
-            ->where('capability', 'access_api')
-            ->first();
-
-        $accessSecretLast4 = null;
-        if ($accessSecret?->secret_encrypted) {
-            try {
-                $accessSecretLast4 = substr(Crypt::decryptString($accessSecret->secret_encrypted), -4);
-            } catch (\Throwable) {
-                $accessSecretLast4 = null;
-            }
-        }
-
-        $secretConfig = is_array($unifiSecret?->config) ? $unifiSecret->config : [];
-        $discoveredSites = collect($secretConfig['discovered_sites'] ?? [])
-            ->map(fn (array $s) => [
-                'external_id' => (string) ($s['external_id'] ?? ''),
-                'name' => $s['name'] ?? 'Unknown',
-                'meta' => $s['meta'] ?? [],
-            ])
-            ->filter(fn (array $s) => $s['external_id'] !== '')
-            ->values()
-            ->all();
-        $discoveredHosts = collect($secretConfig['discovered_hosts'] ?? [])
-            ->map(fn (array $h) => [
-                'host_id' => (string) ($h['host_id'] ?? ''),
-                'name' => $h['name'] ?? 'Unknown',
-                'model' => $h['model'] ?? null,
-                'role' => $h['role'] ?? null,
-                'controllers' => $h['controllers'] ?? [],
-            ])
-            ->filter(fn (array $h) => $h['host_id'] !== '')
-            ->values()
-            ->all();
 
         return inertia('sites/hardware/index', [
             'site' => [
@@ -136,40 +75,8 @@ class SiteHardwareController extends Controller
             ],
             'devices' => $devices,
             'rooms' => $rooms,
-            'integrations' => $integrations,
-            'unifi' => [
-                'tenantSecret' => $unifiSecret ? [
-                    'status' => $unifiSecret->status,
-                    'secret_last4' => $unifiSecret->secret_last4,
-                    'last_tested_at' => $unifiSecret->last_tested_at?->toDateTimeString(),
-                    'last_synced_at' => $unifiSecret->last_synced_at?->toDateTimeString(),
-                    'sites_synced_at' => $secretConfig['sites_synced_at'] ?? null,
-                    'last_error' => $unifiSecret->last_error,
-                ] : null,
-                'discoveredSites' => $discoveredSites,
-                'discoveredHosts' => $discoveredHosts,
-                'siteConfig' => $unifiConfig ? [
-                    'id' => $unifiConfig->id,
-                    'provider' => $unifiConfig->provider,
-                    'status' => $unifiConfig->status,
-                    'mapped_external_site_id' => $unifiConfig->mapped_external_site_id,
-                    'mapped_external_site_name' => $unifiConfig->mapped_external_site_name,
-                    'is_active' => (bool) $unifiConfig->is_active,
-                    'overrides' => $unifiConfig->overrides ?? [],
-                ] : null,
-                'accessSecret' => $accessSecret ? [
-                    'id' => $accessSecret->id,
-                    'base_url' => $accessSecret->base_url,
-                    'is_enabled' => (bool) $accessSecret->is_enabled,
-                    'secret_last4' => $accessSecretLast4,
-                    'last_tested_at' => $accessSecret->last_tested_at?->toDateTimeString(),
-                    'last_error' => $accessSecret->last_error,
-                ] : null,
-            ],
             'can' => [
                 'manage_hardware' => $user?->canDo('siteHardware.manage') ?? false,
-                'manage_site_integrations' => $user?->canDo('integrations.manage_site_secrets') ?? false,
-                'manage_tenant_integrations' => $user?->canDo('integrations.manage_tenant_secrets') ?? false,
             ],
         ]);
     }

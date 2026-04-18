@@ -38,20 +38,20 @@ class UnifiSettingsRefactorTest extends TestCase
 
     public function test_requires_authentication(): void
     {
-        $this->get('/settings/integrations/unifi')->assertRedirect('/login');
+        $this->get('/security-devices/integrations/unifi')->assertRedirect('/login');
     }
 
     public function test_requires_integration_permission(): void
     {
         $this->actingAs($this->noPerms)
-            ->get('/settings/integrations/unifi')
+            ->get('/security-devices/integrations/unifi')
             ->assertForbidden();
     }
 
     public function test_accessible_with_permission(): void
     {
         $this->actingAs($this->admin)
-            ->get('/settings/integrations/unifi')
+            ->get('/security-devices/integrations/unifi')
             ->assertOk();
     }
 
@@ -67,7 +67,7 @@ class UnifiSettingsRefactorTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get('/settings/integrations/unifi');
+            ->get('/security-devices/integrations/unifi');
 
         $response->assertOk();
         $response->assertInertia(function ($page) {
@@ -94,7 +94,7 @@ class UnifiSettingsRefactorTest extends TestCase
         Device::factory()->create(['provider' => 'manual', 'name' => 'Manual Device']);
 
         $response = $this->actingAs($this->admin)
-            ->get('/settings/integrations/unifi');
+            ->get('/security-devices/integrations/unifi');
 
         $response->assertInertia(function ($page) {
             $devices = $page->toArray()['props']['syncedDevices'];
@@ -118,7 +118,7 @@ class UnifiSettingsRefactorTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get('/settings/integrations/unifi');
+            ->get('/security-devices/integrations/unifi');
 
         $response->assertInertia(function ($page) {
             $d = $page->toArray()['props']['syncedDevices'][0];
@@ -145,7 +145,7 @@ class UnifiSettingsRefactorTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get('/settings/integrations/unifi');
+            ->get('/security-devices/integrations/unifi');
 
         $response->assertInertia(function ($page) use ($room) {
             $d = $page->toArray()['props']['syncedDevices'][0];
@@ -159,7 +159,7 @@ class UnifiSettingsRefactorTest extends TestCase
         Device::factory()->create(['provider' => 'unifi', 'name' => 'Floating AP']);
 
         $response = $this->actingAs($this->admin)
-            ->get('/settings/integrations/unifi');
+            ->get('/security-devices/integrations/unifi');
 
         $response->assertInertia(function ($page) {
             $d = $page->toArray()['props']['syncedDevices'][0];
@@ -203,7 +203,7 @@ class UnifiSettingsRefactorTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/settings/integrations/unifi/hardware/{$device->id}/room", [
+            ->put("/security-devices/integrations/unifi/hardware/{$device->id}/room", [
                 'room_id' => $room->id,
             ])
             ->assertRedirect();
@@ -252,7 +252,7 @@ class UnifiSettingsRefactorTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/settings/integrations/unifi/hardware/{$device->id}/room", [
+            ->put("/security-devices/integrations/unifi/hardware/{$device->id}/room", [
                 'room_id' => null,
             ])
             ->assertRedirect();
@@ -278,7 +278,7 @@ class UnifiSettingsRefactorTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->get('/settings/integrations/unifi');
+            ->get('/security-devices/integrations/unifi');
 
         $response->assertInertia(function ($page) {
             $d = $page->toArray()['props']['syncedDevices'][0];

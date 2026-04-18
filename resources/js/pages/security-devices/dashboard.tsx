@@ -41,6 +41,8 @@ type Props = {
         degraded: number;
         lowBattery: number;
         overdueMaintenance: number;
+        serviceDueOverdue: number;
+        serviceDueIn30d: number;
         criticalEvents24h: number;
         warningEvents24h: number;
     };
@@ -138,6 +140,8 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                     <StatCard label="Active" value={stats.active} icon={Activity} />
                     <StatCard label="Offline / Degraded" value={stats.offline + stats.degraded} icon={MonitorOff} variant={totalAttention > 0 ? 'warning' : 'default'} />
                     <StatCard label="Overdue Maintenance" value={stats.overdueMaintenance} icon={Wrench} variant={stats.overdueMaintenance > 0 ? 'warning' : 'default'} />
+                    <StatCard label="Service Due (overdue)" value={stats.serviceDueOverdue} icon={Wrench} variant={stats.serviceDueOverdue > 0 ? 'warning' : 'default'} />
+                    <StatCard label="Service Due (30d)" value={stats.serviceDueIn30d} icon={Wrench} />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard label="Low Battery" value={stats.lowBattery} icon={BatteryLow} variant={stats.lowBattery > 0 ? 'warning' : 'default'} />

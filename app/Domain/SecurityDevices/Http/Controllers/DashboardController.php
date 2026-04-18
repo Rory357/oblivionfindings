@@ -31,6 +31,12 @@ class DashboardController extends Controller
             'degraded' => Device::where('status', DeviceStatus::Degraded->value)->count(),
             'lowBattery' => Device::lowBattery()->count(),
             'overdueMaintenance' => DeviceMaintenanceRecord::overdue()->count(),
+            'serviceDueOverdue' => Device::whereNotNull('next_service_due')
+                ->where('next_service_due', '<', now()->toDateString())
+                ->count(),
+            'serviceDueIn30d' => Device::whereNotNull('next_service_due')
+                ->whereBetween('next_service_due', [now()->toDateString(), now()->addDays(30)->toDateString()])
+                ->count(),
             'criticalEvents24h' => DeviceEvent::since($last24h)->bySeverity('critical')->count(),
             'warningEvents24h' => DeviceEvent::since($last24h)->bySeverity('warning')->count(),
         ];

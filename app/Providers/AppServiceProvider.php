@@ -62,6 +62,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(IntegrationAdapterRegistry::class, function () {
             $registry = new IntegrationAdapterRegistry();
             $registry->register('unifi', UnifiAdapter::class);
+            $registry->register(
+                \App\Services\Integration\Adapters\QueclinkAdapter::PROVIDER_SLUG,
+                \App\Services\Integration\Adapters\QueclinkAdapter::class,
+            );
+            $registry->register(
+                \App\Services\Integration\Adapters\MilesightAdapter::PROVIDER_SLUG,
+                \App\Services\Integration\Adapters\MilesightAdapter::class,
+            );
 
             return $registry;
         });
@@ -77,6 +85,9 @@ class AppServiceProvider extends ServiceProvider
         Site::observe(SiteObserver::class);
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);
+        \App\Domain\SecurityDevices\Models\DeviceEvent::observe(
+            \App\Observers\DeviceEventObserver::class,
+        );
 
         // H&S → Control Room bridge observers
         ClientIncident::observe(ClientIncidentObserver::class);

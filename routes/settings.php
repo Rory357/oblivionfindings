@@ -13,7 +13,6 @@ use App\Http\Controllers\Settings\NotificationEscalationsController;
 use App\Http\Controllers\Settings\IntegrationHubController;
 use App\Http\Controllers\Settings\NotificationTemplateController;
 use App\Http\Controllers\Settings\SsoGroupController;
-use App\Http\Controllers\Settings\UnifiSettingsController;
 use App\Http\Controllers\System\UsersController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -286,17 +285,9 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:integrations.view')
         ->name('settings.integrations.index');
 
-    // UniFi integration settings
-    Route::prefix('settings/integrations/unifi')->middleware('permission:integrations.manage_tenant_secrets')->group(function () {
-        Route::get('/', [UnifiSettingsController::class, 'index'])->name('settings.integrations.unifi');
-        Route::post('/key', [UnifiSettingsController::class, 'saveKey']);
-        Route::post('/test', [UnifiSettingsController::class, 'testKey']);
-        Route::post('/rotate', [UnifiSettingsController::class, 'rotateKey']);
-        Route::post('/sync-sites', [UnifiSettingsController::class, 'syncSites']);
-        Route::post('/map-site', [UnifiSettingsController::class, 'mapSite']);
-        Route::delete('/map-site/{siteConfig}', [UnifiSettingsController::class, 'removeSiteMapping']);
-        Route::post('/sync-devices', [UnifiSettingsController::class, 'syncDevices']);
-        Route::put('/hardware/{hardware}/room', [UnifiSettingsController::class, 'assignHardwareRoom']);
-        Route::put('/defaults', [UnifiSettingsController::class, 'updateDefaults']);
-    });
+    // UniFi integration configuration now lives in Security & Devices.
+    // Keep a permanent redirect so bookmarks and older links still land
+    // on the right place.
+    Route::redirect('settings/integrations/unifi', '/security-devices/integrations/unifi', 301)
+        ->name('settings.integrations.unifi');
 });

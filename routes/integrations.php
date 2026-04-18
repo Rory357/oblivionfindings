@@ -1,25 +1,21 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\UnifiController;
 use App\Http\Controllers\Api\WebhookReceiverController;
 
 /**
  * Integration Routes
  *
- * Handles third-party integrations like UniFi.
+ * Third-party integration endpoints that live outside the Security & Devices
+ * module (webhook receiver only today). UniFi provider config moved to
+ * /security-devices/integrations/unifi — see routes/security-devices.php.
  */
 
 Route::middleware(['auth'])->group(function () {
-    // UniFi Integration — redirect old URL to new settings location
-    Route::get('/integrations/unifi', fn() => redirect()->route('settings.integrations.unifi'))
+    // UniFi legacy URL — permanent redirect into the module. Preserved so
+    // any external bookmarks from the MVP era keep resolving.
+    Route::redirect('/integrations/unifi', '/security-devices/integrations/unifi', 301)
         ->name('integrations.unifi.index');
-    Route::post('/integrations/unifi/{site}', [UnifiController::class, 'upsert'])
-        ->middleware('permission:unifi.manage')
-        ->name('integrations.unifi.upsert');
-    Route::post('/integrations/unifi/{site}/sync', [UnifiController::class, 'sync'])
-        ->middleware('permission:unifi.manage')
-        ->name('integrations.unifi.sync');
 
     // Workers module (placeholder)
     Route::middleware('permission:workers.viewAny')->group(function () {

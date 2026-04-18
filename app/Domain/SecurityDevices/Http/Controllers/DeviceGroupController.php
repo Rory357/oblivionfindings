@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
+use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
@@ -12,6 +13,10 @@ use Inertia\Inertia;
 class DeviceGroupController extends Controller
 {
     use MapsDevicesForList;
+
+    public function __construct(
+        private readonly DeviceGroupAutoRuleService $autoRules,
+    ) {}
 
     public function index(Request $request)
     {
@@ -77,6 +82,11 @@ class DeviceGroupController extends Controller
             ->limit(200)
             ->get(['id', 'name', 'device_uid', 'domain', 'category']);
 
+        $autoRules = is_array($group->auto_rules) ? $group->auto_rules : null;
+        $autoRuleConditionCount = $autoRules
+            ? count($autoRules['conditions'] ?? [])
+            : 0;
+
         return Inertia::render('security-devices/device-groups/show', [
             'group' => [
                 'id' => $group->id,
@@ -84,6 +94,8 @@ class DeviceGroupController extends Controller
                 'type' => $group->type,
                 'description' => $group->description,
                 'created_at' => $group->created_at?->toISOString(),
+                'auto_rules' => $autoRules,
+                'auto_rule_condition_count' => $autoRuleConditionCount,
             ],
             'members' => [
                 'data' => $members->getCollection()->map(fn (Device $d) => $this->mapDeviceForList($d)),
@@ -121,6 +133,7 @@ class DeviceGroupController extends Controller
             'name' => ['required', 'string', 'max:255', 'unique:device_groups,name'],
             'type' => ['nullable', 'string', 'in:location,functional,vendor,maintenance,custom'],
             'description' => ['nullable', 'string', 'max:2000'],
+            'auto_rules' => ['nullable', 'array'],
         ]);
 
         $validated['tenant_id'] = 1;
@@ -156,12 +169,57 @@ class DeviceGroupController extends Controller
             'name' => ['required', 'string', 'max:255', "unique:device_groups,name,{$group->id}"],
             'type' => ['nullable', 'string', 'in:location,functional,vendor,maintenance,custom'],
             'description' => ['nullable', 'string', 'max:2000'],
+            'auto_rules' => ['nullable', 'array'],
         ]);
 
         $group->update($validated);
 
         return redirect()->route('security-devices.device-groups.show', $group)
             ->with('success', "Group '{$group->name}' updated.");
+    }
+
+    /**
+     * Preview which devices auto_rules would match, without changing membership.
+     * Returns a JSON summary suitable for an "are you sure?" dialog.
+     */
+    public function previewAutoRules(Request $request, DeviceGroup $group)
+    {
+        $user = $request->user();
+        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+
+        $result = $this->autoRules->preview($group);
+
+        return response()->json([
+            'count' => $result['count'],
+            'sample' => $result['sample']->map(fn (Device $d) => [
+                'id' => $d->id,
+                'name' => $d->name,
+                'device_uid' => $d->device_uid,
+                'category' => $d->category,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Apply auto_rules to the group's membership. Adds newly-matching devices,
+     * removes devices that no longer match, keeps ones that still match.
+     */
+    public function syncAutoRules(Request $request, DeviceGroup $group)
+    {
+        $user = $request->user();
+        abort_unless($user->canDo('securityDevices.groups.manage'), 403);
+
+        $rules = is_array($group->auto_rules) ? $group->auto_rules : [];
+        if (empty($rules)) {
+            return redirect()->back()->with('error', 'This group has no auto-rules configured.');
+        }
+
+        $delta = $this->autoRules->applyToGroup($group);
+
+        return redirect()->back()->with(
+            'success',
+            "Auto-rules applied: added {$delta['added']}, removed {$delta['removed']}, kept {$delta['kept']} (total {$delta['total']} matches).",
+        );
     }
 
     public function destroy(Request $request, DeviceGroup $group)

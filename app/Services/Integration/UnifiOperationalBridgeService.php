@@ -12,6 +12,7 @@ use App\Models\LocationHardware;
 use App\Models\SiteRoom;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class UnifiOperationalBridgeService
 {
@@ -85,17 +86,16 @@ class UnifiOperationalBridgeService
         $assignment = $this->ensureInventoryPlacement($device, $siteConfig->site_id);
         $roomId = $assignment->assignable_type === DeviceAssignment::TARGET_ROOM ? $assignment->assignable_id : null;
 
-        $shadow = $this->upsertLegacyShadow(
+        // Phase 1 (PR P): legacy location_hardware shadow writes are disabled.
+        // The canonical Device above is the source of truth; provenance now
+        // flows through integration_events.canonical_device_id.
+        $this->upsertLegacyShadow(
             $device,
             $siteConfig->site_id,
             $legacyCategory,
             $payload,
             $roomId,
         );
-
-        if ($device->legacy_location_hardware_id !== $shadow->id) {
-            $device->forceFill(['legacy_location_hardware_id' => $shadow->id])->save();
-        }
 
         return [
             'device' => $device->fresh(),
@@ -115,22 +115,21 @@ class UnifiOperationalBridgeService
         $targetId = $room?->id ?? $siteId;
         $active = $device->assignments()->active()->latest('id')->first();
 
+        // Phase 1 (PR P): shadow placement sync is disabled. The canonical
+        // DeviceAssignment above carries the authoritative site/room binding.
         if ($active && $active->assignable_type === $targetType && $active->assignable_id === $targetId) {
-            $this->syncLegacyShadowPlacement($device, $siteId, $room?->id);
-
             return $active;
         }
 
-        $assignment = $this->replaceActiveAssignment($device, $targetType, $targetId, $userId);
-        $this->syncLegacyShadowPlacement($device, $siteId, $room?->id);
-
-        return $assignment;
+        return $this->replaceActiveAssignment($device, $targetType, $targetId, $userId);
     }
 
     public function applyHealthUpdate(IntegrationSiteConfig $siteConfig, array $entry): bool
     {
+        // Phase 1 (PR P): health updates now only touch the canonical Device.
+        // Legacy location_hardware shadow writes were removed because
+        // provenance is carried by integration_events.canonical_device_id.
         $device = $this->resolveCanonicalDeviceForHealth($siteConfig, $entry);
-        $legacyShadow = $this->resolveLegacyShadowForHealth($siteConfig, $entry, $device);
         $lastSeenAt = $this->parseTimestamp($entry['last_seen_at'] ?? null);
 
         if ($device) {
@@ -143,15 +142,7 @@ class UnifiOperationalBridgeService
             $device->save();
         }
 
-        if ($legacyShadow) {
-            $legacyShadow->fill([
-                'status' => $device ? $this->mapDeviceToLegacyStatus($device) : $this->mapLegacyStatus($entry['status'] ?? null),
-                'last_seen_at' => $lastSeenAt ?? $legacyShadow->last_seen_at,
-            ]);
-            $legacyShadow->save();
-        }
-
-        return $device !== null || $legacyShadow !== null;
+        return $device !== null;
     }
 
     private function ensureInventoryPlacement(Device $device, int $siteId): DeviceAssignment
@@ -200,96 +191,44 @@ class UnifiOperationalBridgeService
         });
     }
 
-    private function syncLegacyShadowPlacement(Device $device, int $siteId, ?int $roomId): void
-    {
-        $legacyShadow = $this->findLegacyShadowForDevice($device);
-
-        if (!$legacyShadow) {
-            $legacyShadow = $this->upsertLegacyShadow(
-                $device,
-                $siteId,
-                $this->resolveLegacyCategoryFromDevice($device),
-                [],
-                $roomId,
-            );
-        } else {
-            $legacyShadow->fill([
-                'site_id' => $siteId,
-                'room_id' => $roomId,
-                'status' => $this->mapDeviceToLegacyStatus($device),
-                'last_seen_at' => $device->last_seen_at,
-            ]);
-            $legacyShadow->save();
-        }
-
-        if ($device->legacy_location_hardware_id !== $legacyShadow->id) {
-            $device->forceFill(['legacy_location_hardware_id' => $legacyShadow->id])->save();
-        }
-    }
-
+    /**
+     * Phase 1 (PR P) no-op shadow writer.
+     *
+     * Historically this wrote to the legacy `location_hardware` table to keep
+     * the UniFi compatibility shadow in sync with the canonical Device. That
+     * responsibility is retired: provenance is now carried by
+     * `integration_events.canonical_device_id` (seeded in migration
+     * 2026_04_14_000004). This method is intentionally preserved as a stub so
+     * the restructure can be staged across PRs without breaking existing call
+     * signatures or tests. It emits a single debug log per device per request
+     * to aid observability, and must not throw.
+     *
+     * @return null Always null — callers must not depend on a LocationHardware return value.
+     */
     private function upsertLegacyShadow(
         Device $device,
         int $siteId,
         string $legacyCategory,
         array $payload,
         ?int $roomId = null,
-    ): LocationHardware {
-        $providerEntityId = $this->resolveProviderEntityId($payload) ?? ($device->external_ref['provider_entity_id'] ?? null);
-        $legacyShadow = $this->findLegacyShadowForDevice($device);
+    ): null {
+        static $loggedDevices = [];
 
-        if (!$legacyShadow && $providerEntityId) {
-            $legacyShadow = LocationHardware::query()
-                ->where('tenant_id', $device->tenant_id)
-                ->where('provider', 'unifi')
-                ->where('external_ref->provider_entity_id', $providerEntityId)
-                ->latest('id')
-                ->first();
+        $key = (int) ($device->id ?? 0);
+
+        if ($key > 0 && !isset($loggedDevices[$key])) {
+            $loggedDevices[$key] = true;
+
+            Log::debug('UnifiOperationalBridgeService::upsertLegacyShadow is a no-op (PR P Phase 1): legacy location_hardware writes disabled.', [
+                'device_id' => $device->id,
+                'tenant_id' => $device->tenant_id,
+                'site_id' => $siteId,
+                'room_id' => $roomId,
+                'legacy_category' => $legacyCategory,
+            ]);
         }
 
-        $legacyShadow ??= new LocationHardware([
-            'tenant_id' => $device->tenant_id,
-            'provider' => 'unifi',
-        ]);
-
-        $externalRef = is_array($legacyShadow->external_ref) ? $legacyShadow->external_ref : [];
-        $deviceExternalRef = is_array($device->external_ref) ? $device->external_ref : [];
-        $meta = is_array($legacyShadow->meta) ? $legacyShadow->meta : [];
-        $deviceMeta = is_array($device->meta) ? $device->meta : [];
-
-        $legacyShadow->fill([
-            'site_id' => $siteId,
-            'room_id' => $roomId,
-            'provider' => 'unifi',
-            'category' => $legacyCategory,
-            'name' => $device->name,
-            'serial' => $device->serial_number,
-            'mac' => $device->mac_address,
-            'status' => $this->mapDeviceToLegacyStatus($device),
-            'last_seen_at' => $device->last_seen_at,
-            'external_ref' => array_merge($externalRef, $deviceExternalRef, [
-                'provider' => 'unifi',
-                'provider_entity_id' => $providerEntityId,
-                'provider_type' => $payload['shortname'] ?? $deviceExternalRef['provider_type'] ?? null,
-                'model' => $payload['model'] ?? $device->model,
-                'firmware' => $payload['version'] ?? $payload['firmware_version'] ?? $device->firmware_version,
-                'ip' => $payload['ip'] ?? $device->ip_address,
-                'source_app' => $payload['productLine'] ?? $deviceExternalRef['source_app'] ?? null,
-                'host_id' => $payload['_resolved_host_id'] ?? $deviceExternalRef['host_id'] ?? null,
-            ]),
-            'meta' => array_merge($meta, $deviceMeta, [
-                'provider_type' => $payload['shortname'] ?? $deviceMeta['provider_type'] ?? null,
-                'model_long' => $payload['model'] ?? $payload['model_long_name'] ?? $device->model,
-                'product_line' => $payload['productLine'] ?? $deviceMeta['product_line'] ?? null,
-                'firmware_status' => $payload['firmwareStatus'] ?? $deviceMeta['firmware_status'] ?? null,
-                'uptime' => $payload['uptime'] ?? $deviceMeta['uptime'] ?? null,
-                'experience_score' => $payload['satisfaction'] ?? $deviceMeta['experience_score'] ?? null,
-                'host_id' => $payload['_resolved_host_id'] ?? $deviceMeta['host_id'] ?? null,
-            ]),
-            'notes' => $device->notes,
-        ]);
-        $legacyShadow->save();
-
-        return $legacyShadow;
+        return null;
     }
 
     private function findCanonicalDevice(IntegrationSiteConfig $siteConfig, string $providerEntityId, array $payload): ?Device
@@ -384,38 +323,6 @@ class UnifiOperationalBridgeService
         return null;
     }
 
-    private function resolveLegacyShadowForHealth(
-        IntegrationSiteConfig $siteConfig,
-        array $entry,
-        ?Device $device = null,
-    ): ?LocationHardware {
-        if ($device) {
-            $shadow = $this->findLegacyShadowForDevice($device);
-            if ($shadow) {
-                return $shadow;
-            }
-        }
-
-        $hardwareId = $entry['hardware_id'] ?? null;
-        if ($hardwareId) {
-            return LocationHardware::query()
-                ->where('tenant_id', $siteConfig->tenant_id)
-                ->find($hardwareId);
-        }
-
-        $providerEntityId = isset($entry['provider_entity_id']) ? trim((string) $entry['provider_entity_id']) : '';
-        if ($providerEntityId !== '') {
-            return LocationHardware::query()
-                ->where('tenant_id', $siteConfig->tenant_id)
-                ->where('provider', 'unifi')
-                ->where('external_ref->provider_entity_id', $providerEntityId)
-                ->latest('id')
-                ->first();
-        }
-
-        return null;
-    }
-
     private function findLegacyShadowForDevice(Device $device): ?LocationHardware
     {
         if ($device->legacy_location_hardware_id) {
@@ -474,25 +381,6 @@ class UnifiOperationalBridgeService
         }
 
         return $category;
-    }
-
-    private function resolveLegacyCategoryFromDevice(Device $device): string
-    {
-        return match ($device->category) {
-            'network' => match ($device->subcategory) {
-                'router' => LocationHardware::CATEGORY_GATEWAY,
-                'switch' => LocationHardware::CATEGORY_SWITCH,
-                'wireless_ap' => LocationHardware::CATEGORY_AP,
-                default => LocationHardware::CATEGORY_OTHER,
-            },
-            'cctv' => $device->subcategory === 'nvr'
-                ? LocationHardware::CATEGORY_NVR
-                : LocationHardware::CATEGORY_CAMERA,
-            'access_control' => LocationHardware::CATEGORY_DOOR,
-            'environmental' => LocationHardware::CATEGORY_SENSOR,
-            'server' => LocationHardware::CATEGORY_AI,
-            default => LocationHardware::CATEGORY_OTHER,
-        };
     }
 
     /**
@@ -562,34 +450,6 @@ class UnifiOperationalBridgeService
             DeviceStatus::Degraded, DeviceStatus::Maintenance => HealthStatus::Warning,
             DeviceStatus::Offline => HealthStatus::Critical,
             default => HealthStatus::Unknown,
-        };
-    }
-
-    private function mapDeviceToLegacyStatus(Device $device): string
-    {
-        return match ($device->status) {
-            DeviceStatus::Active => LocationHardware::STATUS_ONLINE,
-            DeviceStatus::Offline => LocationHardware::STATUS_OFFLINE,
-            DeviceStatus::Decommissioned, DeviceStatus::Lost => LocationHardware::STATUS_RETIRED,
-            default => LocationHardware::STATUS_UNKNOWN,
-        };
-    }
-
-    private function mapLegacyStatus(mixed $status): string
-    {
-        if (is_string($status)) {
-            return match (strtolower(trim($status))) {
-                'active', 'online', 'connected', 'up' => LocationHardware::STATUS_ONLINE,
-                'offline', 'disconnected', 'down' => LocationHardware::STATUS_OFFLINE,
-                'retired', 'decommissioned', 'lost' => LocationHardware::STATUS_RETIRED,
-                default => LocationHardware::STATUS_UNKNOWN,
-            };
-        }
-
-        return match ($status) {
-            1 => LocationHardware::STATUS_ONLINE,
-            0 => LocationHardware::STATUS_OFFLINE,
-            default => LocationHardware::STATUS_UNKNOWN,
         };
     }
 

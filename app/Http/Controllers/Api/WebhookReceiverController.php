@@ -141,8 +141,367 @@ class WebhookReceiverController extends Controller
             'gallagher' => $this->parseGallagherPayload($payload),
             'hikvision' => $this->parseHikvisionPayload($payload),
             'unifi' => $this->parseUnifiPayload($payload),
+            'queclink' => $this->parseQueclinkPayload($payload),
+            'milesight' => $this->parseMilesightPayload($payload),
+            'axis' => $this->parseAxisPayload($payload),
+            'paradox' => $this->parseParadoxPayload($payload),
+            'dsc' => $this->parseDscPayload($payload),
+            'bosch' => $this->parseBoschPayload($payload),
             default => $this->parseGenericPayload($provider, $payload),
         };
+    }
+
+    /**
+     * Queclink GV/GL-series cellular tracker payloads.
+     *
+     * Typical fields from GV series: imei, event, alarm, gps_time, lat/lng,
+     * speed, battery, device_name. Personal trackers may send sos/panic/
+     * fall/man_down alarms; vehicle trackers add ignition/tow/harsh driving.
+     */
+    protected function parseQueclinkPayload(array $payload): array
+    {
+        $alarm = strtolower((string) ($payload['alarm'] ?? $payload['event'] ?? ''));
+        $isSafety = in_array($alarm, ['sos', 'panic', 'emergency', 'man_down', 'fall'], true);
+        $isTamper = in_array($alarm, ['tamper', 'power_cut', 'powercut', 'cut'], true);
+
+        $eventType = match (true) {
+            $isSafety => 'sos_triggered',
+            $isTamper => 'tamper_detected',
+            in_array($alarm, ['geofence_enter', 'geofence-in'], true) => 'geofence_enter',
+            in_array($alarm, ['geofence_exit', 'geofence-out'], true) => 'geofence_exit',
+            in_array($alarm, ['low_battery', 'battery_low'], true) => 'battery_low',
+            $alarm !== '' => $alarm,
+            default => 'unknown',
+        };
+
+        return [
+            'site_id' => $payload['site_id'] ?? null,
+            'source_app' => 'queclink',
+            'source_event_id' => $payload['message_id']
+                ?? $payload['msg_id']
+                ?? $payload['event_id']
+                ?? null,
+            'occurred_at' => $payload['gps_time']
+                ?? $payload['time']
+                ?? $payload['timestamp']
+                ?? null,
+            'severity' => $isSafety
+                ? IntegrationEvent::SEVERITY_CRITICAL
+                : ($isTamper ? IntegrationEvent::SEVERITY_WARN : IntegrationEvent::SEVERITY_INFO),
+            'event_type' => $eventType,
+            'normalized_payload' => [
+                'summary' => $payload['message'] ?? ($eventType . ' from Queclink device'),
+                'imei' => $payload['imei'] ?? $payload['device_id'] ?? null,
+                'latitude' => $payload['lat'] ?? $payload['latitude'] ?? null,
+                'longitude' => $payload['lng'] ?? $payload['lon'] ?? $payload['longitude'] ?? null,
+                'battery' => $payload['battery'] ?? $payload['battery_pct'] ?? null,
+            ],
+        ];
+    }
+
+    /**
+     * Milesight LoRaWAN Cloud / Development Platform payloads.
+     *
+     * Typical decoded payload has devEUI, applicationID, object (decoded
+     * sensor data), and an optional alarm code. The Milesight Cloud posts
+     * webhooks for both uplink data and device-lifecycle events.
+     */
+    protected function parseMilesightPayload(array $payload): array
+    {
+        $object = is_array($payload['object'] ?? null) ? $payload['object'] : [];
+        $alarm = strtolower((string) ($object['alarm']
+            ?? $object['alarm_type']
+            ?? $payload['alarm']
+            ?? ''));
+
+        $isFall = in_array($alarm, ['fall', 'fall_detected'], true);
+        $isBedExit = in_array($alarm, ['bed_exit', 'bed_exited'], true);
+        $isLeak = in_array($alarm, ['leak', 'leak_detected', 'water_leak'], true);
+        $isLowBattery = in_array($alarm, ['low_battery', 'battery_low'], true);
+
+        $eventType = match (true) {
+            $isFall => 'fall_detected',
+            $isBedExit => 'bed_exit',
+            $isLeak => 'water_leak',
+            $isLowBattery => 'battery_low',
+            ! empty($alarm) => $alarm,
+            isset($payload['type']) => strtolower((string) $payload['type']),
+            default => 'uplink',
+        };
+
+        $severity = match (true) {
+            $isFall, $isBedExit => IntegrationEvent::SEVERITY_CRITICAL,
+            $isLeak => IntegrationEvent::SEVERITY_WARN,
+            $isLowBattery => IntegrationEvent::SEVERITY_WARN,
+            default => IntegrationEvent::SEVERITY_INFO,
+        };
+
+        return [
+            'site_id' => $payload['site_id'] ?? null,
+            'source_app' => 'milesight',
+            'source_event_id' => $payload['fCnt']
+                ?? $payload['frameCount']
+                ?? $payload['id']
+                ?? null,
+            'occurred_at' => $payload['timestamp']
+                ?? $payload['time']
+                ?? $payload['publishedAt']
+                ?? null,
+            'severity' => $severity,
+            'event_type' => $eventType,
+            'normalized_payload' => [
+                'summary' => 'Milesight '.$eventType,
+                'devEUI' => $payload['devEUI']
+                    ?? $payload['deviceEUI']
+                    ?? $payload['dev_eui']
+                    ?? null,
+                'applicationID' => $payload['applicationID']
+                    ?? $payload['applicationId']
+                    ?? null,
+                'object' => $object,
+            ],
+        ];
+    }
+
+    /**
+     * Axis VAPIX HTTP event notification / ONVIF event payloads.
+     *
+     * Typical fields: timestamp, eventName, source (camera ID/name),
+     * serialNumber, deviceId, optional severity. AI-analytics events nest
+     * channel/trigger/analytics under data.*.
+     */
+    protected function parseAxisPayload(array $payload): array
+    {
+        $eventName = (string) ($payload['eventName'] ?? $payload['event'] ?? '');
+        $eventKey = strtolower($eventName);
+
+        $isTamper = in_array($eventKey, ['tamperalarm', 'tamper', 'tamper_alarm'], true);
+        $isMotion = in_array($eventKey, ['motiontrigger', 'objectdetected', 'motion_trigger', 'object_detected'], true);
+        $isModeChange = in_array($eventKey, ['daynightmode', 'day_night_mode'], true);
+
+        $eventType = match (true) {
+            $isTamper => 'tamper_detected',
+            $isMotion => 'motion_detected',
+            $isModeChange => 'mode_change',
+            $eventName !== '' => $eventKey,
+            default => 'unknown',
+        };
+
+        $severity = match (true) {
+            $isTamper => IntegrationEvent::SEVERITY_CRITICAL,
+            $isMotion, $isModeChange => IntegrationEvent::SEVERITY_INFO,
+            // Fall back to vendor-provided severity if present (some models include it).
+            isset($payload['severity']) => $this->mapSeverity((string) $payload['severity']),
+            default => IntegrationEvent::SEVERITY_INFO,
+        };
+
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+
+        return [
+            'site_id' => $payload['site_id'] ?? null,
+            'source_app' => 'axis',
+            'source_event_id' => $payload['eventId']
+                ?? $payload['event_id']
+                ?? $payload['id']
+                ?? null,
+            'occurred_at' => $payload['timestamp']
+                ?? $payload['time']
+                ?? $payload['occurredAt']
+                ?? null,
+            'severity' => $severity,
+            'event_type' => $eventType,
+            'normalized_payload' => [
+                'summary' => $payload['message'] ?? ('Axis '.($eventName !== '' ? $eventName : $eventType)),
+                'source' => $payload['source'] ?? null,
+                'serialNumber' => $payload['serialNumber'] ?? null,
+                'deviceId' => $payload['deviceId'] ?? null,
+                'channel' => $data['channel'] ?? null,
+                'trigger' => $data['trigger'] ?? null,
+                'analytics' => $data['analytics'] ?? null,
+            ],
+        ];
+    }
+
+    /**
+     * Paradox Insight Gold / IP150 webhook payloads.
+     *
+     * Typical fields: event_code, event_description, panel_id, partition,
+     * user_id, zone_id, timestamp (epoch ms), event_group. event_description
+     * is free-form; always drive classification from event_group.
+     */
+    protected function parseParadoxPayload(array $payload): array
+    {
+        $group = strtolower((string) ($payload['event_group'] ?? ''));
+
+        $isAlarm = in_array($group, ['alarm', 'duress'], true);
+        $isWarn = in_array($group, ['tamper', 'low battery', 'low_battery', 'phone line', 'phone_line'], true);
+
+        $eventType = match (true) {
+            $group === 'duress' => 'duress_triggered',
+            $group === 'alarm' => 'alarm_triggered',
+            $group === 'tamper' => 'tamper_detected',
+            in_array($group, ['low battery', 'low_battery'], true) => 'battery_low',
+            in_array($group, ['phone line', 'phone_line'], true) => 'phone_line_trouble',
+            $group === 'arm' => 'panel_armed',
+            $group === 'disarm' => 'panel_disarmed',
+            in_array($group, ['zone open/closed', 'zone_open_closed', 'zone open', 'zone closed'], true) => 'zone_state_change',
+            $group !== '' => str_replace(' ', '_', $group),
+            default => 'unknown',
+        };
+
+        $severity = match (true) {
+            $isAlarm => IntegrationEvent::SEVERITY_CRITICAL,
+            $isWarn => IntegrationEvent::SEVERITY_WARN,
+            default => IntegrationEvent::SEVERITY_INFO,
+        };
+
+        return [
+            'site_id' => $payload['site_id'] ?? null,
+            'source_app' => 'paradox',
+            'source_event_id' => $payload['event_id']
+                ?? $payload['event_code']
+                ?? null,
+            'occurred_at' => $payload['timestamp']
+                ?? $payload['time']
+                ?? null,
+            'severity' => $severity,
+            'event_type' => $eventType,
+            'normalized_payload' => [
+                'summary' => $payload['event_description']
+                    ?? ('Paradox '.$eventType),
+                'event_code' => $payload['event_code'] ?? null,
+                'event_group' => $payload['event_group'] ?? null,
+                'panel_id' => $payload['panel_id'] ?? null,
+                'partition' => $payload['partition'] ?? null,
+                'user_id' => $payload['user_id'] ?? null,
+                'zone_id' => $payload['zone_id'] ?? null,
+            ],
+        ];
+    }
+
+    /**
+     * DSC PowerSeries Neo IP / Envisalink TPI webhook payloads.
+     *
+     * TPI event code ranges drive severity and event_type:
+     *   601-610 → zone alarm (critical)
+     *   621-624 → tamper (warn)
+     *   650-657 → ready/arm/disarm (info)
+     *   800-899 → panic/medical/fire (critical)
+     */
+    protected function parseDscPayload(array $payload): array
+    {
+        $code = (int) ($payload['code'] ?? 0);
+
+        $isZoneAlarm = $code >= 601 && $code <= 610;
+        $isTamper = $code >= 621 && $code <= 624;
+        $isReadyArm = $code >= 650 && $code <= 657;
+        $isPanicMedicalFire = $code >= 800 && $code <= 899;
+
+        $eventType = match (true) {
+            $isZoneAlarm => 'zone_alarm',
+            $isTamper => 'tamper_detected',
+            $isReadyArm => 'panel_state_change',
+            $isPanicMedicalFire => 'panic_triggered',
+            $code > 0 => 'dsc_code_'.$code,
+            default => 'unknown',
+        };
+
+        $severity = match (true) {
+            $isZoneAlarm, $isPanicMedicalFire => IntegrationEvent::SEVERITY_CRITICAL,
+            $isTamper => IntegrationEvent::SEVERITY_WARN,
+            $isReadyArm => IntegrationEvent::SEVERITY_INFO,
+            default => IntegrationEvent::SEVERITY_INFO,
+        };
+
+        return [
+            'site_id' => $payload['site_id'] ?? null,
+            'source_app' => 'dsc',
+            'source_event_id' => $payload['event_id']
+                ?? (isset($payload['code'], $payload['timestamp'])
+                    ? $payload['code'].'-'.$payload['timestamp']
+                    : null),
+            'occurred_at' => $payload['timestamp']
+                ?? $payload['time']
+                ?? null,
+            'severity' => $severity,
+            'event_type' => $eventType,
+            'normalized_payload' => [
+                'summary' => $payload['message'] ?? ('DSC '.$eventType.' (code '.$code.')'),
+                'code' => $code,
+                'partition' => $payload['partition'] ?? null,
+                'zone' => $payload['zone'] ?? null,
+                'account' => $payload['account'] ?? null,
+            ],
+        ];
+    }
+
+    /**
+     * Bosch B/G/D-series panel payloads via Remote Portal webhook.
+     *
+     * Typical fields: eventType, panelSerial, area, point, occurredAt,
+     * priority (1-255 with <50 = critical, 50-100 = high, >100 = info).
+     * eventType strings drive primary classification; priority is a fallback.
+     */
+    protected function parseBoschPayload(array $payload): array
+    {
+        $eventType = (string) ($payload['eventType'] ?? '');
+        $eventKey = strtolower($eventType);
+        $priority = isset($payload['priority']) ? (int) $payload['priority'] : null;
+
+        $criticalTypes = ['intrusion', 'fire', 'medical', 'panic'];
+        $warnTypes = ['trouble', 'tamper', 'lowbattery', 'low_battery'];
+        $infoTypes = ['arm', 'disarm', 'pointok', 'point_ok'];
+
+        $isCritical = in_array($eventKey, $criticalTypes, true);
+        $isWarn = in_array($eventKey, $warnTypes, true);
+        $isInfo = in_array($eventKey, $infoTypes, true);
+
+        $mappedEventType = match (true) {
+            $eventKey === 'intrusion' => 'intrusion_detected',
+            $eventKey === 'fire' => 'fire_alarm',
+            $eventKey === 'medical' => 'medical_alarm',
+            $eventKey === 'panic' => 'panic_triggered',
+            $eventKey === 'trouble' => 'panel_trouble',
+            $eventKey === 'tamper' => 'tamper_detected',
+            in_array($eventKey, ['lowbattery', 'low_battery'], true) => 'battery_low',
+            $eventKey === 'arm' => 'panel_armed',
+            $eventKey === 'disarm' => 'panel_disarmed',
+            in_array($eventKey, ['pointok', 'point_ok'], true) => 'point_ok',
+            $eventType !== '' => $eventKey,
+            default => 'unknown',
+        };
+
+        $severity = match (true) {
+            $isCritical => IntegrationEvent::SEVERITY_CRITICAL,
+            $isWarn => IntegrationEvent::SEVERITY_WARN,
+            $isInfo => IntegrationEvent::SEVERITY_INFO,
+            // Priority-based fallback when eventType is unrecognised.
+            $priority !== null && $priority < 50 => IntegrationEvent::SEVERITY_CRITICAL,
+            $priority !== null && $priority <= 100 => IntegrationEvent::SEVERITY_WARN,
+            default => IntegrationEvent::SEVERITY_INFO,
+        };
+
+        return [
+            'site_id' => $payload['site_id'] ?? null,
+            'source_app' => 'bosch',
+            'source_event_id' => $payload['eventId']
+                ?? $payload['event_id']
+                ?? $payload['id']
+                ?? null,
+            'occurred_at' => $payload['occurredAt']
+                ?? $payload['timestamp']
+                ?? $payload['time']
+                ?? null,
+            'severity' => $severity,
+            'event_type' => $mappedEventType,
+            'normalized_payload' => [
+                'summary' => $payload['message'] ?? ('Bosch '.$mappedEventType),
+                'panelSerial' => $payload['panelSerial'] ?? null,
+                'area' => $payload['area'] ?? null,
+                'point' => $payload['point'] ?? null,
+                'priority' => $priority,
+            ],
+        ];
     }
 
     protected function parseGallagherPayload(array $payload): array
