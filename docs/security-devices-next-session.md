@@ -4,44 +4,31 @@
 
 **Module status:** v1-complete. Everything left here is either deferred with good reason or needs an external input.
 
+**Session 2026-04-19 update:** PR P Phase 2 **done**; factory-resolution and Vite-manifest blockers fixed; **all 5 pre-existing Feature tests now pass**. See "Completed 2026-04-19" section below. With that, the only remaining items block on external input.
+
 ---
 
-## Priority order for tomorrow
+## Completed 2026-04-19
 
-### 1. Validate the 5 Feature tests in CI (15 min)
+- **PR P Phase 2 — `PullIntegrationHealthJob` non-UniFi branch migrated to canonical `Device`.** `LocationHardware::find()` and `->update()` calls removed from `app/Jobs/Integration/PullIntegrationHealthJob.php`. Resolution order: `device_id` → `external_ref.provider_entity_id` → `legacy_location_hardware_id` fallback. Non-UniFi status/health/last_seen_at writes now hit `devices` exclusively.
+- **Feature test added:** `tests/Feature/SecurityDevices/NonUnifiHealthPullMigrationTest.php` — 3 tests, 14 assertions. Covers hikvision provider (via provider_entity_id), iot provider (via legacy_location_hardware_id fallback), and the error-not-throw path when no canonical device resolves.
+- **Factory resolution bug fixed for `App\Domain\SecurityDevices\Models\Device`.** Laravel's default `HasFactory` resolver was constructing `Database\Factories\Domain\SecurityDevices\Models\DeviceFactory` (doesn't exist) from the domain-namespaced model. Added an explicit `protected static function newFactory()` override pointing at `Database\Factories\DeviceFactory`. This was the root cause of every `Device::factory()` test failure, including the 5 regression tests from PR26.
+- **Vite-manifest test-env blocker fixed.** Inertia views call `@vite(...)` which requires `public/build/manifest.json` (produced by `npm run build`). In a CI/test environment that hasn't built frontend assets, every Inertia-returning endpoint 500'd. Added `$this->withoutVite()` to `tests/TestCase::setUp()` — Laravel's built-in test helper that stubs Vite directives. Fixes all 4 Vite-related failures from the first test run without needing an asset build step in the pipeline.
+- **All 5 pre-existing Feature tests now pass:**
+  - `DeviceEventSignalPipelineTest` (4 tests)
+  - `IntegrationsHubTest` (5 tests)
+  - `DeviceAssetLinkTest` (5 tests)
+  - `DeviceGroupAutoRulesTest` (6 tests)
+  - `ReportsExportTest` (5 tests)
+  Combined run: **141 assertions, 0 failures, exit 0** (via `vendor/bin/pest --filter='...'` with `-d memory_limit=2G`).
+- **Cosmetic `file_get_contents` warnings** in Pest output are harmless — they come from Pest's own failure-reporter trying to highlight source lines in the terminal formatter when any deprecation-level notice is emitted, not from the tests themselves. Tests pass regardless.
 
-Five new test files were `php -l` clean but never executed because this sandbox didn't have dev dependencies. Before relying on them as regression guards, run:
+## Remaining work
 
-```
-composer install --dev --no-interaction --no-progress
-vendor/bin/phpunit --filter='DeviceEventSignalPipelineTest|IntegrationsHubTest|DeviceAssetLinkTest|DeviceGroupAutoRulesTest|ReportsExportTest'
-```
+No unblocked actionable items on the Security & Devices module. The rest all block on external input:
 
-If any test fails, it's almost certainly a minor fixture / factory mismatch — the logic was verified manually during the session. Fix inline.
-
-Files:
-- `tests/Feature/SecurityDevices/DeviceEventSignalPipelineTest.php` (4 assertions, PR H regression)
-- `tests/Feature/SecurityDevices/IntegrationsHubTest.php` (5 assertions)
-- `tests/Feature/SecurityDevices/DeviceAssetLinkTest.php` (5 assertions)
-- `tests/Feature/SecurityDevices/DeviceGroupAutoRulesTest.php` (6 assertions)
-- `tests/Feature/SecurityDevices/ReportsExportTest.php` (5 assertions)
-
-### 2. PR P Phase 2 — Migrate `PullIntegrationHealthJob` non-UniFi branch (1–2h)
-
-**File:** `app/Jobs/Integration/PullIntegrationHealthJob.php` lines 109–119.
-
-Today the non-UniFi branch calls `LocationHardware::find($hardwareId)->update([...])` directly. Phase 2 retargets it onto the canonical `Device` model via `Device::where('legacy_location_hardware_id', $hardwareId)->first()` (fallback: lookup by `external_ref.provider_entity_id` like `UnifiOperationalBridgeService::findCanonicalDevice` does).
-
-Acceptance:
-- A non-UniFi health-pull job updates `devices.status`, `devices.last_seen_at`, NOT `location_hardware`.
-- No `LocationHardware::find()` or `->update()` calls remain in `PullIntegrationHealthJob`.
-- Add a Feature test mirroring `UnifiOperationalBridgeMigrationTest::test_pull_health_job_updates_canonical_device_first_for_unifi` but for a `hikvision` or `iot` provider.
-
-Phase 2 is the last Phase that's safely doable without touching cross-module Eloquent relations. Phase 3 (relationship deprecation) and Phase 4 (model + table drop) need their own sessions.
-
-### 3. Answer Appendix B product questions (async, before PR P Phase 3)
-
-From `docs/security-devices-restructure-plan.md` Appendix B — none block today, but Phase 3 / 4 of PR P needs these resolved:
+### Blocked on product input — Appendix B
+None block today, but Phase 3 / 4 of PR P needs these resolved:
 
 1. **Personal-tracker assignment consent** — NZ supported-living privacy: what audit/consent record is required when a tracker is assigned to a client? (Currently: `DeviceAssignment.consent_id` exists but nothing writes to it.)
 2. **Medication cabinet taxonomy** — pick one: (a) `smart_iot` subcategory with `meta.medication_cabinet=true`, (b) `compliance_flags.medication=true` column added in a future migration, or (c) distinct `medication_cabinet` subcategory. The Care listener `NotifyOnMedicationCabinetOpen` defensively reads both column paths; confirm the final shape before Phase 3.
@@ -49,8 +36,7 @@ From `docs/security-devices-restructure-plan.md` Appendix B — none block today
 4. **Alert-cutover downtime** (PR N when it arrives) — zero-downtime dual-write required, or is a 5-minute maintenance window acceptable?
 5. **Fleet team alignment** — has the Fleet module owner been looped in on `Fleet\Telemetry\QueclinkAdapter` staying as the Fleet-ingest path vs. a future consolidation with the Security & Devices integration adapter?
 
-### 4. Real provider API credentials → unlock PR C1 / D1
-
+### Blocked on credentials — PR C1 / D1
 Stays at scaffold per your call. When credentials land:
 
 - **PR C1 — Full Queclink sync:** `app/Services/Integration/Adapters/QueclinkAdapter.php`. Implement `discoverSites` (list fleet groups), `syncDevices` (upsert `Device` by IMEI; classify `vehicle_tracker` / `personal_tracker` / `asset_tracker` by model), `pullHealth`, `pullEvents` (panic / geofence / tamper / battery). Wire into `PullIntegrationHealthJob` and `SyncIntegrationDevicesJob` (they already exist).
@@ -110,10 +96,14 @@ App\Models\User::where('email','preview-admin@oblivion.local')->delete();"
 
 ---
 
-## Suggested tomorrow-session prompt
+## Suggested next-session prompt
 
-Something like:
+The module has no unblocked actionable items after 2026-04-19. Next session should be triggered by one of:
 
-> Continue the Security & Devices restructure from where we left off. Primary targets: (1) run the 5 Feature tests in CI and fix any fixture mismatches; (2) land PR P Phase 2 (migrate `PullIntegrationHealthJob` non-UniFi branch off LocationHardware onto canonical Device). Reference `docs/security-devices-next-session.md` for scope.
+> (a) Appendix B answers from Product. With those, pick up PR P Phase 3 (deprecate legacy relationships on `Site`, `SiteRoom`, `Asset`, `ClientPersonalAsset`, `Integration\IntegrationEvent`, `ControlRoom\Alert`) and then PR P Phase 4 (drop `LocationHardware` model + table). Reference `docs/security-devices-next-session.md`.
+>
+> (b) Real Queclink / Milesight credentials land. With those, do PR C1 (full Queclink sync) and / or PR D1 (full Milesight sync + downlink).
+>
+> (c) Upstream PR 16 lands (deprecated `ControlRoom\Alert` removal) — triggers PR N (unified-alert-table cutover).
 
-That keeps scope tight for a single session. Anything further (Phase 3 / 4 / PR N / T / U / V) should be its own explicit ask.
+Anything outside those three triggers is the "Also-deferred" list below and should be its own explicit ask.
