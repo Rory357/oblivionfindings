@@ -69,6 +69,7 @@ import {
     Receipt,
     Route,
     Send,
+    Server,
     Settings,
     Shield,
     ShieldAlert,
@@ -1871,6 +1872,16 @@ function buildSecurityDevicesSubPanelGroups(): SubPanelGroup[] {
                     title: 'Access Control',
                     href: '/security-devices/access-control',
                     icon: Key,
+                },
+                {
+                    title: 'IT Infrastructure',
+                    href: '/security-devices/it-infrastructure',
+                    icon: Server,
+                },
+                {
+                    title: 'Facilities',
+                    href: '/security-devices/facilities',
+                    icon: Building2,
                 },
                 {
                     title: 'Device Groups',
