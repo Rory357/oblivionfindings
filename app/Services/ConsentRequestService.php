@@ -18,13 +18,12 @@ use RuntimeException;
  */
 class ConsentRequestService
 {
-
     /**
      * Staff creates a new consent request.
      *
-     * @param array<string, mixed> $data Keys: client_id, consent_type_id,
-     *        recipient_user_id, recipient_relationship, purpose, and the
-     *        optional Right-7 disclosure fields.
+     * @param  array<string, mixed>  $data  Keys: client_id, consent_type_id,
+     *                                      recipient_user_id, recipient_relationship, purpose, and the
+     *                                      optional Right-7 disclosure fields.
      */
     public function create(array $data, User $requester, ?string $expiresInDays = null): ConsentRequest
     {
@@ -69,7 +68,7 @@ class ConsentRequestService
      * the requester.
      *
      * @return ClientConsent The consent row that now authorises whatever the
-     *   request was asking about.
+     *                       request was asking about.
      */
     public function approve(
         ConsentRequest $request,
@@ -130,7 +129,7 @@ class ConsentRequestService
      */
     public function cancel(ConsentRequest $request, User $staff, string $reason): void
     {
-        if (!$request->isPending()) {
+        if (! $request->isPending()) {
             throw new RuntimeException('Only pending requests can be cancelled.');
         }
 
@@ -237,7 +236,7 @@ class ConsentRequestService
 
     private function assertActionable(ConsentRequest $request): void
     {
-        if (!$request->isActionable()) {
+        if (! $request->isActionable()) {
             throw new RuntimeException(sprintf(
                 'Consent request #%d is not actionable (status=%s).',
                 $request->id,
@@ -254,7 +253,7 @@ class ConsentRequestService
     }
 
     /**
-     * @param array<string, mixed> $meta
+     * @param  array<string, mixed>  $meta
      * @return array<int, array<string, mixed>>
      */
     private function appendAudit(ConsentRequest $request, string $event, ?int $actorId, array $meta = []): array

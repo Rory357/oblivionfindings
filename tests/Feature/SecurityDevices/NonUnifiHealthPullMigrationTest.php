@@ -188,7 +188,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
         {
             public function __construct(private string $providerSlug, private array $healthResults) {}
 
-            public function testConnection(IntegrationTenantSecret $secret): bool
+            public function test_connection(IntegrationTenantSecret $secret): bool
             {
                 return true;
             }
@@ -200,7 +200,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
 
             public function syncDevices(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): SyncResult
             {
-                return new SyncResult();
+                return new SyncResult;
             }
 
             public function pullHealth(IntegrationSiteConfig $siteConfig, IntegrationTenantSecret $tenantSecret): array

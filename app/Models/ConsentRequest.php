@@ -20,16 +20,25 @@ class ConsentRequest extends Model
     use SoftDeletes;
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_DECLINED = 'declined';
+
     public const STATUS_CANCELLED = 'cancelled';
+
     public const STATUS_EXPIRED = 'expired';
 
     public const RELATION_SELF = 'client';
+
     public const RELATION_NEXT_OF_KIN = 'next_of_kin';
+
     public const RELATION_WELFARE_GUARDIAN = 'welfare_guardian';
+
     public const RELATION_EPOA_PERSONAL_CARE = 'epoa_personal_care';
+
     public const RELATION_PARENT_GUARDIAN = 'parent_guardian';
+
     public const RELATION_COURT_APPOINTED = 'court_appointed';
 
     /**
@@ -163,7 +172,7 @@ class ConsentRequest extends Model
 
     public function isActionable(): bool
     {
-        return $this->isPending() && !$this->isExpired();
+        return $this->isPending() && ! $this->isExpired();
     }
 
     public function authorityToConsent(): string

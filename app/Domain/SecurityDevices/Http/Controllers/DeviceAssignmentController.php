@@ -28,7 +28,7 @@ class DeviceAssignmentController extends Controller
         abort_unless($user->canDo('securityDevices.devices.assign'), 403);
 
         $validated = $request->validate([
-            'assignable_type' => ['required', 'string', 'in:' . implode(',', DeviceAssignment::VALID_TARGETS)],
+            'assignable_type' => ['required', 'string', 'in:'.implode(',', DeviceAssignment::VALID_TARGETS)],
             'assignable_id' => ['required', 'integer', 'min:1'],
             'assignment_type' => ['nullable', 'string', 'in:permanent,temporary,loan,shared'],
             'expected_return_at' => ['nullable', 'date', 'after:today'],
@@ -58,7 +58,7 @@ class DeviceAssignmentController extends Controller
             return back()->withErrors(['assignable_type' => $e->getMessage()]);
         }
 
-        return back()->with('success', "Device assigned successfully.");
+        return back()->with('success', 'Device assigned successfully.');
     }
 
     /**
@@ -85,10 +85,10 @@ class DeviceAssignmentController extends Controller
             return;
         }
 
-        if (!$consentId) {
+        if (! $consentId) {
             throw new \InvalidArgumentException(
                 'Assigning a tracking device to a client requires a valid consent. '
-                . 'Request consent via the family portal or record it in person before assigning.'
+                .'Request consent via the family portal or record it in person before assigning.'
             );
         }
 
@@ -101,10 +101,10 @@ class DeviceAssignmentController extends Controller
             })
             ->first();
 
-        if (!$consent) {
+        if (! $consent) {
             throw new \InvalidArgumentException(
                 'The chosen consent is not valid for this client (missing, not given, expired, '
-                . 'or belongs to a different client).'
+                .'or belongs to a different client).'
             );
         }
     }
@@ -119,11 +119,11 @@ class DeviceAssignmentController extends Controller
 
         $released = $this->service->release($device, $user->id);
 
-        if (!$released) {
+        if (! $released) {
             return back()->with('info', 'Device has no active assignment to release.');
         }
 
-        return back()->with('success', "Device released to pool.");
+        return back()->with('success', 'Device released to pool.');
     }
 
     /**
