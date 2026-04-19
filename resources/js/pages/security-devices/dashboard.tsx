@@ -15,10 +15,12 @@ import {
     Building2,
     Cctv,
     Cpu,
+    FileText,
     GitBranch,
     HeartPulse,
     Key,
     LayoutDashboard,
+    Link2,
     MonitorOff,
     Plus,
     Server,
@@ -358,6 +360,8 @@ export default function Dashboard({ stats, domainSummary, healthSummary, attenti
                                         { href: '/security-devices/device-groups', label: 'Device Groups', icon: GitBranch },
                                         { href: '/security-devices/maintenance-health', label: 'Maintenance & Health', icon: Wrench },
                                         { href: '/security-devices/alerts-events', label: 'Alerts & Events', icon: Bell },
+                                        { href: '/security-devices/integrations', label: 'APIs & Integrations', icon: Link2 },
+                                        { href: '/security-devices/reports', label: 'Reports', icon: FileText },
                                     ].map(({ href, label, icon: Icon }) => (
                                         <Link
                                             key={href}
