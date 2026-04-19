@@ -68,4 +68,10 @@ jobs:
           DB_DATABASE: oblivion_findings
           DB_USERNAME: testUser
           DB_PASSWORD: test101
+          # Avoid Redis (no service) — keep queue/cache/broadcast in-memory.
+          # FleetDemoSeeder triggers events that would otherwise queue to Redis.
+          QUEUE_CONNECTION: sync
+          CACHE_STORE: array
+          BROADCAST_CONNECTION: log
+          SESSION_DRIVER: array
         run: php artisan migrate:fresh --seed --force
