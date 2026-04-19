@@ -36,7 +36,7 @@ class ConsentRequestCreatedNotification extends Notification
             ->line("Consent type: {$consentTypeName}")
             ->line("Purpose: {$request->purpose}")
             ->when($request->retention_period_days, fn ($m) => $m->line("Data retention: {$request->retention_period_days} days"))
-            ->line("Please review and respond by " . $request->expires_at->format('d F Y') . ".")
+            ->line('Please review and respond by '.$request->expires_at->format('d F Y').'.')
             ->action('Review request', url("/portal/clients/{$request->client_id}/consent-requests/{$request->id}"))
             ->line('You can approve, decline, or contact the care team for more information.')
             ->salutation('Ngā mihi, Oblivion Findings');

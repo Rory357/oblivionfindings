@@ -36,7 +36,7 @@ class ConsentRequestReminderNotification extends Notification
             ->line("This is a friendly reminder that a consent review for {$clientName} is still waiting on your response.")
             ->line("Consent type: {$consentTypeName}")
             ->line("Purpose: {$request->purpose}")
-            ->line("Please review and respond by " . $request->expires_at->format('d F Y') . " ({$daysRemaining} day(s) remaining).")
+            ->line('Please review and respond by '.$request->expires_at->format('d F Y')." ({$daysRemaining} day(s) remaining).")
             ->action('Review request', $this->actionUrl())
             ->line('If you have any questions, please contact the care team before the deadline.')
             ->salutation('Ngā mihi, Oblivion Findings');

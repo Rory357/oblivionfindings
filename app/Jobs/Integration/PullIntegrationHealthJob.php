@@ -38,8 +38,7 @@ class PullIntegrationHealthJob implements ShouldQueue
     public function handle(
         IntegrationAdapterRegistry $registry,
         UnifiOperationalBridgeService $unifiRuntime,
-    ): void
-    {
+    ): void {
         try {
             $adapter = $registry->resolve($this->provider);
         } catch (\RuntimeException $e) {
@@ -56,7 +55,7 @@ class PullIntegrationHealthJob implements ShouldQueue
             ->connected()
             ->first();
 
-        if (!$tenantSecret) {
+        if (! $tenantSecret) {
             Log::warning('PullIntegrationHealthJob: no connected secret found', [
                 'tenant_id' => $this->tenantId,
                 'provider' => $this->provider,
@@ -111,8 +110,9 @@ class PullIntegrationHealthJob implements ShouldQueue
 
                         $device = $this->resolveCanonicalDevice($siteConfig, $entry);
 
-                        if (!$device) {
+                        if (! $device) {
                             $errored++;
+
                             continue;
                         }
 

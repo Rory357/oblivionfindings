@@ -32,9 +32,13 @@ class ConsentRequestFlowTest extends TestCase
     use RefreshDatabase;
 
     private User $staff;
+
     private User $familyMember;
+
     private User $strangerFamily;
+
     private Client $client;
+
     private ConsentType $consentType;
 
     protected function setUp(): void

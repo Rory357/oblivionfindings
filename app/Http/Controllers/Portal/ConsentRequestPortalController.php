@@ -38,7 +38,7 @@ class ConsentRequestPortalController extends Controller
         return inertia('portal/consent-requests/Show', [
             'client' => [
                 'id' => $client->id,
-                'full_name' => $client->full_name ?? $client->name ?? ('Client #' . $client->id),
+                'full_name' => $client->full_name ?? $client->name ?? ('Client #'.$client->id),
             ],
             'request' => [
                 'id' => $consentRequest->id,

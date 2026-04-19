@@ -34,7 +34,7 @@ class ConsentRequestPolicy
      */
     public function respond(User $user, ConsentRequest $request): bool
     {
-        if (!$request->isActionable()) {
+        if (! $request->isActionable()) {
             return false;
         }
 

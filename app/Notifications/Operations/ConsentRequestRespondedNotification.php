@@ -36,7 +36,7 @@ class ConsentRequestRespondedNotification extends Notification
             ->subject("Consent {$verb}: {$client?->full_name}")
             ->greeting("Kia ora {$notifiable->name},")
             ->line("{$recipientName} has {$verb} the consent request for {$client?->full_name}.")
-            ->line("Consent type: " . ($request->consentType?->name ?? 'N/A'))
+            ->line('Consent type: '.($request->consentType?->name ?? 'N/A'))
             ->when($request->response_notes, fn ($m) => $m->line("Notes: {$request->response_notes}"))
             ->action('View request', url("/operations/clients/{$request->client_id}/consent-requests/{$request->id}"));
     }

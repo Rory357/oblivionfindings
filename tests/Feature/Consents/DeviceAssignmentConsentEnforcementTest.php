@@ -3,7 +3,6 @@
 namespace Tests\Feature\Consents;
 
 use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
@@ -23,7 +22,9 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private Client $client;
+
     private Device $tracker;
 
     protected function setUp(): void

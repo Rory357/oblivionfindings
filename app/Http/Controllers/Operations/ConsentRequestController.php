@@ -36,7 +36,7 @@ class ConsentRequestController extends Controller
             ->map(fn ($r) => $this->toSummary($r));
 
         return inertia('operations/clients/consent-requests/Index', [
-            'client' => ['id' => $client->id, 'full_name' => $client->full_name ?? $client->name ?? ('Client #' . $client->id)],
+            'client' => ['id' => $client->id, 'full_name' => $client->full_name ?? $client->name ?? ('Client #'.$client->id)],
             'requests' => $requests,
             'stats' => [
                 'total' => $requests->count(),
@@ -68,7 +68,7 @@ class ConsentRequestController extends Controller
             ]);
 
         return inertia('operations/clients/consent-requests/Create', [
-            'client' => ['id' => $client->id, 'full_name' => $client->full_name ?? $client->name ?? ('Client #' . $client->id)],
+            'client' => ['id' => $client->id, 'full_name' => $client->full_name ?? $client->name ?? ('Client #'.$client->id)],
             'consent_types' => $consentTypes,
             'portal_users' => $portalUsers,
             'relationship_options' => [
@@ -106,7 +106,7 @@ class ConsentRequestController extends Controller
             ->where('users.id', $data['recipient_user_id'])
             ->exists();
 
-        if (!$linked) {
+        if (! $linked) {
             return back()->withErrors([
                 'recipient_user_id' => 'The recipient must be a family-portal user linked to this client.',
             ]);
@@ -137,7 +137,7 @@ class ConsentRequestController extends Controller
         ]);
 
         return inertia('operations/clients/consent-requests/Show', [
-            'client' => ['id' => $client->id, 'full_name' => $client->full_name ?? $client->name ?? ('Client #' . $client->id)],
+            'client' => ['id' => $client->id, 'full_name' => $client->full_name ?? $client->name ?? ('Client #'.$client->id)],
             'request' => $this->toDetail($consentRequest),
         ]);
     }
