@@ -1158,7 +1158,7 @@ class ClientController extends Controller
         Password::sendResetLink(['email' => $email]);
     }
 
-    public function edit(Client $client)
+    public function edit(Request $request, Client $client)
     {
         $this->authorize('update', $client);
 
@@ -1178,7 +1178,7 @@ class ClientController extends Controller
         }
         $serviceContexts = $serviceContextsQuery->get(['id', 'type', 'name', 'is_active']);
 
-        return inertia('operations/clients/edit', [
+        $payload = [
             'client' => $client->only([
                 'id','site_id','service_context_id','nhi_number','first_name','last_name','preferred_name','date_of_birth','gender','status',
                 'phone','email','address_line_1','address_line_2','suburb','city','postcode',
@@ -1187,7 +1187,16 @@ class ClientController extends Controller
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
             'defaultServiceContextId' => ServiceContext::defaultId(),
-        ]);
+        ];
+
+        // The edit form is rendered inline as a modal on the index page —
+        // no standalone Inertia page exists. Return JSON when the modal
+        // requests it; otherwise send users back to the client detail view.
+        if ($request->wantsJson() || $request->boolean('modal')) {
+            return response()->json($payload);
+        }
+
+        return redirect()->route('operations.clients.show', $client);
     }
 
     public function update(UpdateClientRequest $request, Client $client)
@@ -1201,6 +1210,12 @@ class ClientController extends Controller
                 'title' => "Client updated: {$client->first_name} {$client->last_name}",
                 'url' => url("/clients/{$client->id}"),
             ]);
+
+            // Modal submissions want to stay on the current page so the
+            // dialog can close and the caller can reload fresh data.
+            if ($request->boolean('_modal')) {
+                return back()->with('success', 'Client updated successfully.');
+            }
 
             return redirect()
                 ->route('clients.index')

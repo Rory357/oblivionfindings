@@ -6,7 +6,9 @@ use App\Models\Announcement;
 use App\Models\AppSetting;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -32,22 +34,32 @@ class HandleInertiaRequests extends Middleware
             $can = $this->getUserPermissions($user);
         }
 
-        // UI terminology (defaults merged with saved overrides)
-        $labelDefaults = config('labels');
-        $labelOverrides = AppSetting::query()
-            ->where('key', 'like', 'labels.%')
+        // Pull all app-settings we need for chrome (labels / theme / branding)
+        // in one query and key by setting name. Avoids 4+ round-trips per page.
+        $settings = AppSetting::query()
+            ->where(function ($q) {
+                $q->where('key', 'like', 'labels.%')
+                    ->orWhereIn('key', [
+                        'theme.light',
+                        'theme.dark',
+                        'branding.name',
+                        'branding.logo_path',
+                    ]);
+            })
             ->get(['key', 'value'])
-            ->mapWithKeys(fn ($row) => [str_replace('labels.', '', $row->key) => $row->value])
+            ->keyBy('key');
+
+        $labelOverrides = $settings
+            ->filter(fn ($row, $key) => str_starts_with($key, 'labels.'))
+            ->mapWithKeys(fn ($row, $key) => [substr($key, strlen('labels.')) => $row->value])
             ->toArray();
 
-        $labels = array_merge($labelDefaults, $labelOverrides);
+        $labels = array_merge(config('labels'), $labelOverrides);
 
-        // Organisation theme + branding
-        $themeLight = AppSetting::query()->where('key', 'theme.light')->value('value') ?? [];
-        $themeDark = AppSetting::query()->where('key', 'theme.dark')->value('value') ?? [];
-
-        $brandingName = AppSetting::query()->where('key', 'branding.name')->value('value');
-        $logoPath = AppSetting::query()->where('key', 'branding.logo_path')->value('value');
+        $themeLight = $settings->get('theme.light')?->value ?? [];
+        $themeDark = $settings->get('theme.dark')?->value ?? [];
+        $brandingName = $settings->get('branding.name')?->value;
+        $logoPath = $settings->get('branding.logo_path')?->value;
         $logoUrl = $logoPath ? Storage::disk('public')->url($logoPath) : null;
 
         return [
@@ -88,9 +100,15 @@ class HandleInertiaRequests extends Middleware
                         'relation' => $c->pivot->relation ?? null,
                     ])->values()->all()
                     : null,
-                'unreadMessageCount' => $user ? \App\Models\OpsMessage::whereIn('conversation_id',
-                    \App\Models\OpsConversationParticipant::where('user_id', $user->id)->pluck('conversation_id')
-                )->where('sender_id', '!=', $user->id)->where('is_read', false)->count() : 0,
+                'unreadMessageCount' => $user
+                    ? \App\Models\OpsMessage::query()
+                        ->whereExists(fn ($q) => $q->from('ops_conversation_participants')
+                            ->whereColumn('ops_conversation_participants.conversation_id', 'ops_messages.conversation_id')
+                            ->where('ops_conversation_participants.user_id', $user->id))
+                        ->where('sender_id', '!=', $user->id)
+                        ->where('is_read', false)
+                        ->count()
+                    : 0,
             ],
 
             'labels' => $labels,
@@ -121,8 +139,10 @@ class HandleInertiaRequests extends Middleware
                 'info' => session('info'),
             ],
 
-            // Header inbox (notifications + announcements)
-            'inbox' => $user ? [
+            // Header inbox (notifications + announcements). Deferred so the
+            // initial page render doesn't block on these queries — Inertia
+            // fetches them in a follow-up request after mount.
+            'inbox' => Inertia::defer(fn () => $user ? [
                 'notifications' => [
                     'unread_count' => $user->unreadNotifications()->count(),
                     'items' => $user->notifications()
@@ -141,17 +161,32 @@ class HandleInertiaRequests extends Middleware
                         ->values(),
                 ],
                 'announcements' => Announcement::inboxFor($user),
-            ] : null,
+            ] : null),
         ];
     }
 
     /**
-     * Get user permissions with caching to reduce DB queries.
-     * Permissions are cached for the duration of the request.
+     * Permission map bust — bump when permission shape/keys change so
+     * stale caches from previous deploys are ignored.
+     */
+    protected const PERMISSIONS_CACHE_VERSION = 'v1';
+
+    /**
+     * Get user permissions, deduped per-request via `once()` and cached
+     * across requests via the cache store. Short TTL keeps role changes
+     * visible without needing explicit invalidation.
      */
     protected function getUserPermissions($user): array
     {
-        return once(function () use ($user) {
+        return once(fn () => Cache::remember(
+            sprintf('user:%d:capabilities:%s', $user->id, self::PERMISSIONS_CACHE_VERSION),
+            300,
+            fn () => $this->buildUserPermissions($user),
+        ));
+    }
+
+    protected function buildUserPermissions($user): array
+    {
             return [
                 'sites' => [
                     'viewAny' => $user->canDo('sites.viewAny'),
@@ -627,6 +662,5 @@ class HandleInertiaRequests extends Middleware
                     'reportsExport' => $user->canDo('roadmap.reports.export'),
                 ],
             ];
-        });
     }
 }

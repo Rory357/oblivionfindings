@@ -103,8 +103,8 @@ function NavItemComponent({
                 className={`
                     relative transition-all duration-200
                     ${isNested ? 'pl-8' : ''}
-                    ${isActive 
-                        ? 'bg-primary/10 text-primary font-medium' 
+                    ${isActive
+                        ? 'bg-primary/10 !text-slate-800 dark:!text-slate-100 font-medium'
                         : 'hover:bg-slate-100 dark:hover:bg-slate-800'
                     }
                     rounded-lg my-0.5

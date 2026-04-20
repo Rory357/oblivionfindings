@@ -320,10 +320,9 @@ export default function SiteShow({
     // Checklist for onboarding
     const isOnboardingComplete = !!site.onboarding_completed_at;
 
-    // Collapsible setup completeness — default collapsed when 100%, expanded otherwise
-    const [setupExpanded, setSetupExpanded] = useState(
-        !isOnboardingComplete || percent < 100,
-    );
+    // Collapsible setup completeness — always default to collapsed so it stays
+    // unobtrusive; users can expand to see the checklist.
+    const [setupExpanded, setSetupExpanded] = useState(false);
 
     return (
         <AppLayout
@@ -392,127 +391,71 @@ export default function SiteShow({
                         }
                     />
 
-                    {/* Onboarding progress banner */}
-                    {!isOnboardingComplete && (
-                        <Card className="border-indigo-500/20 bg-indigo-500/5">
-                            <CardContent className="flex items-center justify-between py-4">
-                                <div className="flex items-center gap-3">
-                                    <PlayCircle className="h-8 w-8 text-indigo-400" />
-                                    <div>
-                                        <div className="font-medium text-indigo-200">
-                                            Site Onboarding in Progress
-                                        </div>
-                                        <div className="text-sm text-slate-400">
-                                            Complete the onboarding wizard to
-                                            set up this site fully
-                                        </div>
-                                    </div>
-                                </div>
-                                <Button asChild>
-                                    <Link href={`/sites/${site.id}/onboarding`}>
-                                        Continue Onboarding
-                                    </Link>
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    )}
                 </div>
 
-                {/* Setup completeness */}
-                <Card
-                    className={
-                        isOnboardingComplete
-                            ? 'border-emerald-500/30 bg-emerald-500/5'
-                            : ''
-                    }
-                >
-                    <CardHeader
-                        className="cursor-pointer pb-3 select-none"
-                        onClick={() => setSetupExpanded((v) => !v)}
-                    >
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                {isOnboardingComplete ? (
-                                    <>
-                                        <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                                        <span>Setup Complete</span>
-                                    </>
-                                ) : (
-                                    'Setup Completeness'
-                                )}
-                            </CardTitle>
-                            <div className="flex items-center gap-3">
-                                <span
-                                    className={`text-sm font-medium ${isOnboardingComplete ? 'text-emerald-400' : 'text-slate-300'}`}
-                                >
-                                    {checklist.filter((c) => c.done).length} of{' '}
-                                    {checklist.length} items ({percent}%)
-                                </span>
-                                {isOnboardingComplete && (
-                                    <Badge
-                                        variant="outline"
-                                        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                                    >
-                                        Ready
-                                    </Badge>
-                                )}
-                                {setupExpanded ? (
-                                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                                ) : (
-                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                )}
-                            </div>
-                        </div>
-                        {/* Always-visible progress bar */}
-                        <div className="mt-3 w-full">
-                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                {/* Setup completeness — compact, unobtrusive strip.
+                    Hidden entirely once fully onboarded. */}
+                {!isOnboardingComplete && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/30">
+                        <button
+                            type="button"
+                            onClick={() => setSetupExpanded((v) => !v)}
+                            className="flex w-full items-center gap-3 px-3 py-2 text-left text-xs"
+                        >
+                            <div className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
                                 <div
                                     className={`h-full rounded-full transition-all duration-500 ${
-                                        percent === 100
-                                            ? 'bg-emerald-500'
-                                            : percent >= 70
-                                              ? 'bg-indigo-500'
-                                              : percent >= 40
-                                                ? 'bg-amber-500'
-                                                : 'bg-slate-500'
+                                        percent >= 70
+                                            ? 'bg-indigo-500'
+                                            : percent >= 40
+                                              ? 'bg-amber-500'
+                                              : 'bg-slate-400'
                                     }`}
                                     style={{ width: `${percent}%` }}
                                 />
                             </div>
-                        </div>
-                    </CardHeader>
-                    {setupExpanded && (
-                        <CardContent>
-                            <div className="space-y-4">
-                                {/* Checklist items */}
-                                <div className="grid gap-2 sm:grid-cols-2">
+                            <span className="text-muted-foreground">
+                                Site setup
+                            </span>
+                            <span className="font-medium">
+                                {checklist.filter((c) => c.done).length}/
+                                {checklist.length} · {percent}%
+                            </span>
+                            <Link
+                                href={`/sites/${site.id}/onboarding`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="ml-auto text-indigo-500 hover:underline"
+                            >
+                                Continue →
+                            </Link>
+                            {setupExpanded ? (
+                                <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                            ) : (
+                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                        </button>
+                        {setupExpanded && (
+                            <div className="border-t border-slate-200 px-3 py-3 dark:border-slate-800">
+                                <div className="grid gap-1.5 sm:grid-cols-2">
                                     {checklist.map((item) => (
                                         <div
                                             key={item.key}
-                                            className={`flex items-center gap-2 text-sm ${
+                                            className={`flex items-center gap-2 text-xs ${
                                                 item.done
-                                                    ? 'text-emerald-300'
-                                                    : 'text-slate-500'
+                                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                                    : 'text-muted-foreground'
                                             }`}
                                         >
-                                            <div
-                                                className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ${
-                                                    item.done
-                                                        ? 'bg-emerald-500/20 text-emerald-400'
-                                                        : 'bg-muted text-muted-foreground'
-                                                }`}
-                                            >
-                                                {item.done ? (
-                                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                                ) : (
-                                                    <Circle className="h-3.5 w-3.5" />
-                                                )}
-                                            </div>
+                                            {item.done ? (
+                                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                            ) : (
+                                                <Circle className="h-3.5 w-3.5 shrink-0" />
+                                            )}
                                             <span
                                                 className={
                                                     item.done
                                                         ? ''
-                                                        : 'opacity-70'
+                                                        : 'opacity-80'
                                                 }
                                             >
                                                 {item.label}
@@ -520,24 +463,10 @@ export default function SiteShow({
                                         </div>
                                     ))}
                                 </div>
-
-                                {/* Summary */}
-                                <div className="flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-                                    <span>
-                                        {checklist.filter((c) => c.done).length}{' '}
-                                        of {checklist.length} items completed
-                                    </span>
-                                    {isOnboardingComplete && (
-                                        <span className="flex items-center gap-1 text-emerald-400">
-                                            <CheckCircle2 className="h-3.5 w-3.5" />
-                                            Site is fully configured
-                                        </span>
-                                    )}
-                                </div>
                             </div>
-                        </CardContent>
-                    )}
-                </Card>
+                        )}
+                    </div>
+                )}
 
                 {/* Main Tabs */}
                 <Tabs defaultValue="overview" className="space-y-4">

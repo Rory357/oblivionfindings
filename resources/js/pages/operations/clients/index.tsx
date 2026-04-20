@@ -1,5 +1,6 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
+import { ClientEditDialog } from '@/components/client-edit-dialog';
 import { ClientSafetyBadges } from '@/components/client-safety-ribbon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import {
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { MapPin, Pencil } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 export default function ClientsIndex({ clients }) {
@@ -35,6 +37,7 @@ export default function ClientsIndex({ clients }) {
     const [respiteFilter, setRespiteFilter] = useState<'all' | 'yes' | 'no'>(
         'all',
     );
+    const [editingClientId, setEditingClientId] = useState<number | null>(null);
 
     const filteredClients = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -136,126 +139,146 @@ export default function ClientsIndex({ clients }) {
                 </div>
 
                 {/* List */}
-                <div className="grid grid-cols-3 gap-1 space-y-2">
-                    {filteredClients.map((client) => (
-                        <div
-                            key={client.id}
-                            className="flex flex-col gap-3 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                            <div className="flex items-start gap-3">
-                                <Avatar className="h-25 w-25">
-                                    <AvatarImage
-                                        src={
-                                            client.avatar ??
-                                            client.profile_photo_url
-                                        }
-                                        alt={`${client.first_name} ${client.last_name}`}
-                                    />
-                                    <AvatarFallback>
-                                        {getInitials(
-                                            `${client.first_name} ${client.last_name}`,
-                                        )}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <div className="text-sm font-medium">
-                                        {client.first_name} {client.last_name}
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                                        <div className="text-xs text-slate-500">
-                                            Status: {client.status}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {filteredClients.map((client) => {
+                        const isActive = client.status === 'active';
+                        return (
+                            <div
+                                key={client.id}
+                                className="group relative flex flex-col rounded-xl border bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                            >
+                                {/* Top: Avatar + identity */}
+                                <div className="flex min-w-0 items-start gap-4">
+                                    <Avatar className="h-14 w-14 shrink-0 ring-2 ring-background shadow-sm">
+                                        <AvatarImage
+                                            src={
+                                                client.avatar ??
+                                                client.profile_photo_url
+                                            }
+                                            alt={`${client.first_name} ${client.last_name}`}
+                                        />
+                                        <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                                            {getInitials(
+                                                `${client.first_name} ${client.last_name}`,
+                                            )}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                        <div className="truncate text-base font-semibold leading-tight">
+                                            {client.first_name}{' '}
+                                            {client.last_name}
                                         </div>
-                                        {client.onboarding ? (
-                                            <div
-                                                className={`rounded-full px-2 py-0.5 text-xs ${
-                                                    client.onboarding.status ===
-                                                    'complete'
-                                                        ? 'bg-emerald-50 text-emerald-700'
-                                                        : 'bg-amber-50 text-amber-700'
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <span
+                                                className={`inline-block h-1.5 w-1.5 rounded-full ${
+                                                    isActive
+                                                        ? 'bg-emerald-500 ring-2 ring-emerald-500/20'
+                                                        : 'bg-slate-400 ring-2 ring-slate-400/20'
                                                 }`}
-                                            >
-                                                Onboarding:{' '}
-                                                {client.onboarding.status ===
-                                                'complete'
-                                                    ? 'Complete'
-                                                    : 'Incomplete'}
-                                                {typeof client.onboarding
-                                                    .percent === 'number'
-                                                    ? ` • ${client.onboarding.percent}%`
-                                                    : ''}
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                    <ClientSafetyBadges
-                                        summary={client.safety}
-                                        className="mt-1"
-                                    />
-                                    <div className="mt-1 text-xs text-slate-500">
-                                        {siteSingular}:{' '}
-                                        {client.site ? (
-                                            can?.sites?.update ? (
-                                                <Link
-                                                    href={`/sites/${client.site.id}/edit`}
-                                                    className="text-indigo-300 hover:text-indigo-200"
-                                                >
-                                                    {client.site.name}
-                                                </Link>
-                                            ) : (
-                                                <span className="text-slate-300">
-                                                    {client.site.name}
-                                                </span>
-                                            )
-                                        ) : (
-                                            <span className="text-slate-500">
-                                                —
+                                            />
+                                            <span className="capitalize text-muted-foreground">
+                                                {client.status}
                                             </span>
-                                        )}
+                                        </div>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <MapPin className="h-3 w-3 shrink-0" />
+                                            <span className="truncate">
+                                                {client.site ? (
+                                                    can?.sites?.update ? (
+                                                        <Link
+                                                            href={`/sites/${client.site.id}/edit`}
+                                                            className="hover:text-primary hover:underline"
+                                                        >
+                                                            {client.site.name}
+                                                        </Link>
+                                                    ) : (
+                                                        client.site.name
+                                                    )
+                                                ) : (
+                                                    `No ${siteSingular.toLowerCase()} assigned`
+                                                )}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="flex items-center gap-2">
-                                {/* Care view is the consolidated frontline
-                                    page — the default target for support
-                                    workers. Managers still get "View" for the
-                                    admin show page. */}
-                                {role === 'support_worker' ? (
-                                    <Button variant="outline" size="sm" asChild>
-                                        <Link href={`/operations/clients/${client.id}/care`}>
-                                            Open
-                                        </Link>
-                                    </Button>
-                                ) : (
-                                    <>
-                                        <Button variant="outline" size="sm" asChild>
-                                            <Link href={`/operations/clients/${client.id}`}>
-                                                View
-                                            </Link>
-                                        </Button>
-                                        <Button variant="ghost" size="sm" asChild>
-                                            <Link href={`/operations/clients/${client.id}/care`}>
-                                                Care view
-                                            </Link>
-                                        </Button>
-                                    </>
+                                {/* Safety badges */}
+                                {client.safety?.has_any && (
+                                    <div className="mt-3">
+                                        <ClientSafetyBadges
+                                            summary={client.safety}
+                                        />
+                                    </div>
                                 )}
 
-                                {canManage && (
-                                    <>
-                                        <Link
-                                            href={`/operations/clients/${client.id}/edit`}
-                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                {/* Footer: actions */}
+                                <div className="mt-auto flex items-center gap-1.5 pt-4">
+                                    {role === 'support_worker' ? (
+                                        <Button
+                                            variant="default"
+                                            size="sm"
+                                            className="flex-1"
+                                            asChild
                                         >
-                                            Edit
-                                        </Link>
-                                    </>
-                                )}
+                                            <Link
+                                                href={`/operations/clients/${client.id}/care`}
+                                            >
+                                                Open care view
+                                            </Link>
+                                        </Button>
+                                    ) : (
+                                        <>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="flex-1"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/operations/clients/${client.id}`}
+                                                >
+                                                    View
+                                                </Link>
+                                            </Button>
+                                            <Button
+                                                variant="default"
+                                                size="sm"
+                                                className="flex-1"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/operations/clients/${client.id}/care`}
+                                                >
+                                                    Care view
+                                                </Link>
+                                            </Button>
+                                        </>
+                                    )}
+
+                                    {canManage && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 w-8 p-0"
+                                            title="Edit"
+                                            onClick={() =>
+                                                setEditingClientId(client.id)
+                                            }
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            <span className="sr-only">
+                                                Edit
+                                            </span>
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     {clients.length === 0 && (
-                        <div className="rounded-md border p-4 text-sm text-slate-500">
+                        <div className="col-span-full rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
                             No{' '}
                             {labels?.['client.plural']?.toLowerCase() ??
                                 'clients'}{' '}
@@ -264,7 +287,7 @@ export default function ClientsIndex({ clients }) {
                     )}
 
                     {clients.length > 0 && filteredClients.length === 0 && (
-                        <div className="rounded-md border p-4 text-sm text-muted-foreground">
+                        <div className="col-span-full rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
                             No clients match your search.
                         </div>
                     )}
@@ -277,6 +300,15 @@ export default function ClientsIndex({ clients }) {
                     </div>
                 ) : null}
             </PageShell>
+
+            <ClientEditDialog
+                clientId={editingClientId}
+                open={editingClientId !== null}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) setEditingClientId(null);
+                }}
+                siteSingular={siteSingular}
+            />
         </AppLayout>
     );
 }

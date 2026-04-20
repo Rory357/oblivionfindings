@@ -1,3 +1,8 @@
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
     Accessibility,
@@ -89,17 +94,30 @@ function Pill({
     children: React.ReactNode;
     title?: string;
 }) {
-    return (
+    const pill = (
         <span
-            title={title}
             className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap',
+                'inline-flex min-w-0 max-w-full cursor-default items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
                 toneClasses[tone],
             )}
         >
             <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-            <span>{children}</span>
+            <span className="min-w-0 truncate">{children}</span>
         </span>
+    );
+
+    if (!title) return pill;
+
+    return (
+        <Tooltip delayDuration={150}>
+            <TooltipTrigger asChild>{pill}</TooltipTrigger>
+            <TooltipContent
+                side="top"
+                className="max-w-xs whitespace-normal break-words text-center"
+            >
+                {title}
+            </TooltipContent>
+        </Tooltip>
     );
 }
 
@@ -178,7 +196,11 @@ export default function ClientSafetyRibbon({
                                 key={`allergy-${a.key ?? i}`}
                                 tone="danger"
                                 icon={AlertTriangle}
-                                title={a.group ? `Allergy (${a.group})` : 'Allergy'}
+                                title={
+                                    a.group
+                                        ? `Allergy (${a.group}): ${a.label}`
+                                        : `Allergy: ${a.label}`
+                                }
                             >
                                 Allergy: {a.label}
                             </Pill>

@@ -7,6 +7,7 @@ import ClientSafetyRibbon, {
 import HealthSummaryCard, {
     type HealthSummary,
 } from '@/components/clinical/health-summary-card';
+import { ClientEditDialog } from '@/components/client-edit-dialog';
 import ClientObservationsTab from '@/components/clinical/client-observations-tab';
 import {
     HalfMoonGauge,
@@ -661,6 +662,7 @@ export default function ClientShow({
               ) as TabKey) || 'profile'
             : 'profile';
     const [tab, setTab] = useState<TabKey>(initialTab);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
 
     // Lazy-load transport data when tab is first opened
     const [transportLoaded, setTransportLoaded] = useState(!!transport);
@@ -901,17 +903,14 @@ export default function ClientShow({
                                 </Button>
                                 {can.edit && (
                                     <Button
+                                        type="button"
                                         size="sm"
                                         variant="outline"
                                         className="border-white/20 bg-white/10 text-white hover:bg-white/20"
-                                        asChild
+                                        onClick={() => setEditDialogOpen(true)}
                                     >
-                                        <Link
-                                            href={`/operations/clients/${client.id}/edit`}
-                                        >
-                                            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                            Edit
-                                        </Link>
+                                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                        Edit
                                     </Button>
                                 )}
                             </div>
@@ -7670,6 +7669,12 @@ export default function ClientShow({
                     </Card>
                 )}
             </PageShell>
+
+            <ClientEditDialog
+                clientId={client.id}
+                open={editDialogOpen}
+                onOpenChange={setEditDialogOpen}
+            />
         </AppLayout>
     );
 }
