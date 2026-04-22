@@ -1,4 +1,5 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import GlobalNavSearch from '@/components/global-nav-search';
 import GlobalQueryBar from '@/components/global-query-bar';
 import InboxMenus from '@/components/inbox-menus';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,7 @@ export function AppSidebarHeader({
                 </div>
 
                 <div className="flex items-center">
+                    <GlobalNavSearch />
                     <GlobalQueryBar />
                     <InboxMenus />
                 </div>

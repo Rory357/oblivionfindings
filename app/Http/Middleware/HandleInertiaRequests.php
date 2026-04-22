@@ -169,7 +169,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v1';
+    protected const PERMISSIONS_CACHE_VERSION = 'v2';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -214,12 +214,14 @@ class HandleInertiaRequests extends Middleware
                 ],
                 'clients' => [
                     'viewAny' => $user->canDo('clients.viewAny'),
+                    'viewAssigned' => $user->canDo('clients.viewAssigned'),
                     'create' => $user->canDo('clients.create'),
                     'update' => $user->canDo('clients.update'),
                     'assignmentsUpdate' => $user->canDo('clients.assignments.update'),
                 ],
                 'shifts' => [
                     'viewAny' => $user->canDo('shifts.viewAny'),
+                    'viewAssigned' => $user->canDo('shifts.viewAssigned'),
                     'create' => $user->canDo('shifts.create'),
                     'update' => $user->canDo('shifts.update'),
                     'manageAny' => $user->canDo('shifts.manageAny'),
@@ -276,6 +278,8 @@ class HandleInertiaRequests extends Middleware
 
                 'rostering' => [
                     'viewAny' => $user->canDo('rostering.viewAny'),
+                    'autoSchedule' => $user->canDo('rostering.autoSchedule'),
+                    'publish' => $user->canDo('rostering.publish'),
                 ],
 
                 'fleet' => [
@@ -285,6 +289,28 @@ class HandleInertiaRequests extends Middleware
                 ],
                 'controlRoom' => [
                     'viewAny' => $user->canDo('controlRoom.viewAny'),
+                    'alertsView' => $user->canDo('controlRoom.alerts.view'),
+                    'alertsManage' => $user->canDo('controlRoom.alerts.manage'),
+                    'alertsAssign' => $user->canDo('controlRoom.alerts.assign'),
+                    'alertsEscalate' => $user->canDo('controlRoom.alerts.escalate'),
+                    'alertsCreate' => $user->canDo('controlRoom.alerts.create'),
+                    'reportsView' => $user->canDo('controlRoom.reports.view'),
+                ],
+
+                'securityDevices' => [
+                    'viewAny' => $user->canDo('securityDevices.viewAny'),
+                    'devicesView' => $user->canDo('securityDevices.devices.view'),
+                    'devicesCreate' => $user->canDo('securityDevices.devices.create'),
+                    'devicesUpdate' => $user->canDo('securityDevices.devices.update'),
+                    'devicesDelete' => $user->canDo('securityDevices.devices.delete'),
+                    'devicesAssign' => $user->canDo('securityDevices.devices.assign'),
+                    'groupsManage' => $user->canDo('securityDevices.groups.manage'),
+                    'eventsView' => $user->canDo('securityDevices.events.view'),
+                    'maintenanceView' => $user->canDo('securityDevices.maintenance.view'),
+                    'maintenanceManage' => $user->canDo('securityDevices.maintenance.manage'),
+                    'integrationsView' => $user->canDo('securityDevices.integrations.view'),
+                    'integrationsManage' => $user->canDo('securityDevices.integrations.manage'),
+                    'reportsView' => $user->canDo('securityDevices.reports.view'),
                 ],
 
                 'calendar' => [
@@ -297,8 +323,13 @@ class HandleInertiaRequests extends Middleware
 
                 'clinical' => [
                     'dashboard' => $user->canDo('clinical.dashboard'),
+                    'observationsView' => $user->canDo('clinical.observations.view'),
+                    'observationsViewAssigned' => $user->canDo('clinical.observations.viewAssigned'),
                     'observationsRecord' => $user->canDo('clinical.observations.record'),
                     'observationsRecordClinical' => $user->canDo('clinical.observations.recordClinical'),
+                    'eventsView' => $user->canDo('clinical.events.view'),
+                    'eventsViewAssigned' => $user->canDo('clinical.events.viewAssigned'),
+                    'eventsRecord' => $user->canDo('clinical.events.record'),
                 ],
 
                 'hazards' => [
@@ -660,6 +691,138 @@ class HandleInertiaRequests extends Middleware
                     'decisionsView' => $user->canDo('roadmap.decisions.view'),
                     'decisionsManage' => $user->canDo('roadmap.decisions.manage'),
                     'reportsExport' => $user->canDo('roadmap.reports.export'),
+                ],
+
+                // Operations domain capabilities referenced by the sidebar
+                // and guarded by route middleware across the Operations module.
+                'operations' => [
+                    'dashboard' => $user->canDo('operations.dashboard.view'),
+                    'reports' => [
+                        'view' => $user->canDo('operations.reports.view'),
+                    ],
+                ],
+                'care_plans' => [
+                    'viewAny' => $user->canDo('care_plans.viewAny'),
+                    'create' => $user->canDo('care_plans.create'),
+                    'update' => $user->canDo('care_plans.update'),
+                    'delete' => $user->canDo('care_plans.delete'),
+                    'goalsManage' => $user->canDo('care_plans.goals.manage'),
+                ],
+                'progress_notes' => [
+                    'viewAny' => $user->canDo('progress_notes.viewAny'),
+                    'create' => $user->canDo('progress_notes.create'),
+                    'update' => $user->canDo('progress_notes.update'),
+                ],
+                'service_agreements' => [
+                    'viewAny' => $user->canDo('service_agreements.viewAny'),
+                    'create' => $user->canDo('service_agreements.create'),
+                    'update' => $user->canDo('service_agreements.update'),
+                    'delete' => $user->canDo('service_agreements.delete'),
+                ],
+                'billing' => [
+                    'viewAny' => $user->canDo('billing.viewAny'),
+                    'create' => $user->canDo('billing.create'),
+                    'approve' => $user->canDo('billing.approve'),
+                ],
+                'invoices' => [
+                    'viewAny' => $user->canDo('invoices.viewAny'),
+                    'create' => $user->canDo('invoices.create'),
+                    'send' => $user->canDo('invoices.send'),
+                    'void' => $user->canDo('invoices.void'),
+                ],
+                'funding' => [
+                    'viewAny' => $user->canDo('funding.viewAny'),
+                    'claimsCreate' => $user->canDo('funding.claims.create'),
+                    'claimsSubmit' => $user->canDo('funding.claims.submit'),
+                ],
+                'messages' => [
+                    'viewAny' => $user->canDo('messages.viewAny'),
+                    'send' => $user->canDo('messages.send'),
+                ],
+                'handovers' => [
+                    'viewAny' => $user->canDo('handovers.viewAny'),
+                    'create' => $user->canDo('handovers.create'),
+                ],
+                'quotes' => [
+                    'viewAny' => $user->canDo('quotes.viewAny'),
+                    'create' => $user->canDo('quotes.create'),
+                    'update' => $user->canDo('quotes.update'),
+                ],
+                'mileage' => [
+                    'viewAny' => $user->canDo('mileage.viewAny'),
+                    'viewOwn' => $user->canDo('mileage.viewOwn'),
+                    'create' => $user->canDo('mileage.create'),
+                    'approve' => $user->canDo('mileage.approve'),
+                ],
+                'custom_forms' => [
+                    'viewAny' => $user->canDo('custom_forms.viewAny'),
+                    'create' => $user->canDo('custom_forms.create'),
+                    'update' => $user->canDo('custom_forms.update'),
+                    'submit' => $user->canDo('custom_forms.submit'),
+                ],
+                'evv' => [
+                    'viewAny' => $user->canDo('evv.viewAny'),
+                    'record' => $user->canDo('evv.record'),
+                    'verify' => $user->canDo('evv.verify'),
+                ],
+                'care_note_templates' => [
+                    'viewAny' => $user->canDo('care_note_templates.viewAny'),
+                ],
+                'note_templates' => [
+                    'viewAny' => $user->canDo('note_templates.viewAny'),
+                    'manage' => $user->canDo('note_templates.manage'),
+                ],
+                'client_funds' => [
+                    'manage' => $user->canDo('client_funds.manage'),
+                ],
+                'price_books' => [
+                    'viewAny' => $user->canDo('price_books.viewAny'),
+                    'create' => $user->canDo('price_books.create'),
+                    'update' => $user->canDo('price_books.update'),
+                ],
+                'recurring_charges' => [
+                    'viewAny' => $user->canDo('recurring_charges.viewAny'),
+                    'manage' => $user->canDo('recurring_charges.manage'),
+                ],
+                'payroll_exports' => [
+                    'viewAny' => $user->canDo('payroll_exports.viewAny'),
+                    'manage' => $user->canDo('payroll_exports.manage'),
+                ],
+                'payroll' => [
+                    'export' => $user->canDo('payroll.export'),
+                ],
+                'family_portal' => [
+                    'viewAny' => $user->canDo('family_portal.viewAny'),
+                    'manage' => $user->canDo('family_portal.manage'),
+                ],
+                'onboarding' => [
+                    'viewAny' => $user->canDo('onboarding.viewAny'),
+                    'view' => $user->canDo('onboarding.view'),
+                    'create' => $user->canDo('onboarding.create'),
+                    'edit' => $user->canDo('onboarding.edit'),
+                ],
+                'job_board' => [
+                    'viewAny' => $user->canDo('job_board.viewAny'),
+                    'create' => $user->canDo('job_board.create'),
+                    'claim' => $user->canDo('job_board.claim'),
+                    'approve' => $user->canDo('job_board.approve'),
+                ],
+                'qualifications' => [
+                    'viewAny' => $user->canDo('qualifications.viewAny'),
+                    'create' => $user->canDo('qualifications.create'),
+                    'edit' => $user->canDo('qualifications.edit'),
+                    'delete' => $user->canDo('qualifications.delete'),
+                ],
+                'geofences' => [
+                    'viewAny' => $user->canDo('geofences.viewAny'),
+                    'create' => $user->canDo('geofences.create'),
+                    'edit' => $user->canDo('geofences.edit'),
+                    'delete' => $user->canDo('geofences.delete'),
+                ],
+                'roster_templates' => [
+                    'viewAny' => $user->canDo('roster_templates.viewAny'),
+                    'create' => $user->canDo('roster_templates.create'),
+                    'update' => $user->canDo('roster_templates.update'),
                 ],
             ];
     }
