@@ -9,6 +9,11 @@ use Inertia\Inertia;
 
 class CurrencyController extends Controller
 {
+    public function create()
+    {
+        return redirect()->route('finance.currencies.index');
+    }
+
     public function index(Request $request)
     {
         $orgId = $request->user()->organization_id;

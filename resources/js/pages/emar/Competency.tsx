@@ -4,14 +4,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { AlertTriangle, Award, CheckCircle, Clock, Pencil, Plus, Trash2, UserX, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
@@ -107,6 +107,10 @@ function NewAssessmentDialog({ staff, staffWithoutAssessment }: { staff: Props['
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>New Competency Assessment</DialogTitle>
+                    <DialogDescription>
+                        Record a staff member&apos;s medication competency,
+                        permissions, and renewal dates.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -260,6 +264,10 @@ function EditAssessmentDialog({ assessment, staff, staffWithoutAssessment, open,
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Competency Assessment</DialogTitle>
+                    <DialogDescription>
+                        Update the competency outcome, permissions, or renewal
+                        details for this assessment.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -367,6 +375,8 @@ function EditAssessmentDialog({ assessment, staff, staffWithoutAssessment, open,
 }
 
 export default function Competency({ assessments, expiringSoon, expired, staffWithoutAssessment, staff, filters }: Props) {
+    const { auth } = usePage().props as any;
+    const canManageCompetency = auth?.can?.medications?.ordersManage ?? false;
     const [editOpen, setEditOpen] = useState(false);
     const [editingAssessment, setEditingAssessment] = useState<any>(null);
 
@@ -407,9 +417,11 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                 </div>
 
                 {/* New Assessment Button */}
-                <div className="mb-4 flex justify-end">
-                    <NewAssessmentDialog staff={staff} staffWithoutAssessment={staffWithoutAssessment} />
-                </div>
+                {canManageCompetency && (
+                    <div className="mb-4 flex justify-end">
+                        <NewAssessmentDialog staff={staff} staffWithoutAssessment={staffWithoutAssessment} />
+                    </div>
+                )}
 
                 <Tabs defaultValue="assessments">
                     <TabsList className="mb-4">
@@ -442,7 +454,7 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                                             <th className="p-3 text-left font-medium">Expiry</th>
                                             <th className="p-3 text-left font-medium">Assessor</th>
                                             <th className="p-3 text-left font-medium">Permissions</th>
-                                            <th className="p-3 text-left font-medium">Actions</th>
+                                            {canManageCompetency && <th className="p-3 text-left font-medium">Actions</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -466,20 +478,22 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                                                             {a.can_witness_controlled && <Badge className="bg-blue-100 text-blue-700 text-[10px]">CD Witness</Badge>}
                                                         </div>
                                                     </td>
-                                                    <td className="p-3">
-                                                        <div className="flex items-center gap-1">
-                                                            <Button size="icon" variant="ghost" onClick={() => openEditAssessment(a)}>
-                                                                <Pencil className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                            <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteAssessment(a.id)}>
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </div>
-                                                    </td>
+                                                    {canManageCompetency && (
+                                                        <td className="p-3">
+                                                            <div className="flex items-center gap-1">
+                                                                <Button size="icon" variant="ghost" onClick={() => openEditAssessment(a)}>
+                                                                    <Pencil className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                                <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteAssessment(a.id)}>
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </div>
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             );
                                         })}
-                                        {assessments.data.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No assessments found.</td></tr>}
+                                        {assessments.data.length === 0 && <tr><td colSpan={canManageCompetency ? 8 : 7} className="p-6 text-center text-muted-foreground">No assessments found.</td></tr>}
                                     </tbody>
                                 </table>
                             </CardContent>
@@ -497,9 +511,11 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                                                 <span className="text-sm">
                                                     Expires: <span className="font-medium text-amber-600">{a.expiry_date ? new Date(a.expiry_date).toLocaleDateString('en-NZ') : '—'}</span>
                                                 </span>
-                                                <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteAssessment(a.id)}>
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
+                                                {canManageCompetency && (
+                                                    <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteAssessment(a.id)}>
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -530,7 +546,7 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                 </Tabs>
             </PageShell>
 
-            {editingAssessment && (
+            {canManageCompetency && editingAssessment && (
                 <EditAssessmentDialog
                     assessment={editingAssessment}
                     staff={staff}

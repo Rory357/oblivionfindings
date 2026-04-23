@@ -22,7 +22,8 @@ class TrainingDashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.training.view'), 403);
+        $canView = $user && ($user->canDo('hr.training.view') || $user->canDo('training.viewAny'));
+        abort_unless($canView, 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $staffUserIds = $this->hrStaffUserIdsForTenant($tenantId);
 

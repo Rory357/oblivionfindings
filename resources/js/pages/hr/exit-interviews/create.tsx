@@ -42,6 +42,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Create', href: '/hr/exit-interviews/create' },
 ];
 
+const NOT_SPECIFIED_VALUE = '__not_specified__';
+
 export default function ExitInterviewCreate({ employees, interviewers, departureReasons }: Props) {
     const form = useForm({
         employee_profile_id: '',
@@ -61,7 +63,7 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         const submitData: any = { ...form.data };
-        if (submitData.would_recommend === '') {
+        if (submitData.would_recommend === '' || submitData.would_recommend === NOT_SPECIFIED_VALUE) {
             submitData.would_recommend = null;
         } else {
             submitData.would_recommend = submitData.would_recommend === 'true';
@@ -197,7 +199,7 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                 >
                                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">Not specified</SelectItem>
+                                        <SelectItem value={NOT_SPECIFIED_VALUE}>Not specified</SelectItem>
                                         <SelectItem value="true">Yes</SelectItem>
                                         <SelectItem value="false">No</SelectItem>
                                     </SelectContent>

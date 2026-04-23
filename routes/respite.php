@@ -180,7 +180,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Daily Notes
-    Route::middleware('permission:respite.daily-notes.view')->group(function () {
+    Route::middleware('permission:respite.daily-notes.view|respite.daily')->group(function () {
         Route::get('/respite/daily-notes', [RespiteDailyNoteController::class, 'index'])->name('respite.daily-notes.index');
         Route::get('/respite/daily-notes/with-concerns', [RespiteDailyNoteController::class, 'withConcerns'])->name('respite.daily-notes.with-concerns');
         Route::get('/respite/daily-notes/with-incidents', [RespiteDailyNoteController::class, 'withIncidents'])->name('respite.daily-notes.with-incidents');
@@ -188,13 +188,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/respite/daily-notes/{dailyNote}', [RespiteDailyNoteController::class, 'show'])->name('respite.daily-notes.show');
         Route::get('/respite/stays/{stay}/daily-notes', [RespiteDailyNoteController::class, 'forStay'])->name('respite.stays.daily-notes');
     });
-    Route::middleware('permission:respite.daily-notes.manage')->group(function () {
+    Route::middleware('permission:respite.daily-notes.manage|respite.daily')->group(function () {
         Route::post('/respite/daily-notes', [RespiteDailyNoteController::class, 'store'])->name('respite.daily-notes.store');
         Route::put('/respite/daily-notes/{dailyNote}', [RespiteDailyNoteController::class, 'update'])->name('respite.daily-notes.update');
     });
 
     // Risk Plan Activations
-    Route::middleware('permission:respite.risk-plans.view')->group(function () {
+    Route::middleware('permission:respite.risk-plans.view|respite.risk')->group(function () {
         Route::get('/respite/risk-plan-activations', [RespiteRiskPlanActivationController::class, 'index'])->name('respite.risk-plan-activations.index');
         Route::get('/respite/risk-plan-activations/needing-acknowledgment', [RespiteRiskPlanActivationController::class, 'needingAcknowledgment'])->name('respite.risk-plan-activations.needing-acknowledgment');
         Route::get('/respite/risk-plan-activations/create', [RespiteRiskPlanActivationController::class, 'create'])->name('respite.risk-plan-activations.create');
@@ -202,7 +202,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/respite/stays/{stay}/risk-plan-activations', [RespiteRiskPlanActivationController::class, 'forStay'])->name('respite.stays.risk-plan-activations');
         Route::get('/respite/clients/{clientId}/risk-plan-activations', [RespiteRiskPlanActivationController::class, 'forClient'])->name('respite.clients.risk-plan-activations');
     });
-    Route::middleware('permission:respite.risk-plans.manage')->group(function () {
+    Route::middleware('permission:respite.risk-plans.manage|respite.risk')->group(function () {
         Route::post('/respite/risk-plan-activations', [RespiteRiskPlanActivationController::class, 'store'])->name('respite.risk-plan-activations.store');
         Route::put('/respite/risk-plan-activations/{riskPlanActivation}', [RespiteRiskPlanActivationController::class, 'update'])->name('respite.risk-plan-activations.update');
         Route::post('/respite/risk-plan-activations/{riskPlanActivation}/review', [RespiteRiskPlanActivationController::class, 'review'])->name('respite.risk-plan-activations.review');

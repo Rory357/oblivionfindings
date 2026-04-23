@@ -110,6 +110,9 @@ class WanderingAlertController extends Controller
                 'total_this_week' => $totalThisWeek,
             ],
             'filters' => $request->only(['status']),
+            'can' => [
+                'manage' => (bool) ($request->user()?->canDo('fleet.manage') || $request->user()?->canDo('assets.alerts.manage')),
+            ],
         ]);
     }
 }

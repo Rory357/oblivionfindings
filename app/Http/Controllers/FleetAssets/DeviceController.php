@@ -89,6 +89,28 @@ class DeviceController extends Controller
                 ],
             ],
             'stats' => $stats,
+            'pairing_options' => [
+                'devices' => Device::query()
+                    ->where('domain', 'tracking')
+                    ->whereDoesntHave('activeAssetLinks')
+                    ->orderBy('provider')
+                    ->orderBy('device_uid')
+                    ->get()
+                    ->map(fn (Device $device) => [
+                        'id' => $device->id,
+                        'label' => trim(collect([$device->provider, $device->device_uid])->filter()->implode(' - ')),
+                    ])
+                    ->values(),
+                'assets' => Asset::query()
+                    ->where('status', 'active')
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'asset_tag'])
+                    ->map(fn (Asset $asset) => [
+                        'id' => $asset->id,
+                        'label' => trim(collect([$asset->name, $asset->asset_tag])->filter()->implode(' - ')),
+                    ])
+                    ->values(),
+            ],
         ]);
     }
 
@@ -119,7 +141,8 @@ class DeviceController extends Controller
                 'name' => $device->name,
                 'imei' => $device->imei,
                 'serial_number' => $device->serial_number,
-                'status' => $device->status?->value,
+                'device_status' => $device->status?->value,
+                'link_status' => $activeLink ? 'paired' : 'unpaired',
                 'health_status' => $device->health_status?->value,
                 'paired_at' => $activeLink?->linked_at?->toISOString(),
                 'unpaired_at' => null,

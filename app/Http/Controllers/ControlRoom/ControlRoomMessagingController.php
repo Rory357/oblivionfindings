@@ -122,7 +122,15 @@ class ControlRoomMessagingController extends Controller
         $alertId = $request->input('alert_id');
         $userId = $request->input('user_id');
 
-        abort_unless($alertId || $userId, 400, 'Either alert_id or user_id is required.');
+        if (! $alertId && ! $userId) {
+            if ($request->expectsJson() || $request->wantsJson()) {
+                abort(400, 'Either alert_id or user_id is required.');
+            }
+
+            return redirect()
+                ->route('control-room.messaging.index')
+                ->with('info', 'Message thread selection required.');
+        }
 
         $query = Communication::query()
             ->with(['targetUser:id,name', 'initiatedBy:id,name']);

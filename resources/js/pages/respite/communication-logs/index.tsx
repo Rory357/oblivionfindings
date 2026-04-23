@@ -17,6 +17,7 @@ type Props = {
 };
 
 export default function CommunicationLogsIndex({ logs, filters, channels }: Props) {
+    const ANY = '__any__';
     const [localFilters, setLocalFilters] = useState(filters);
 
     const applyFilter = (key: string, value: string) => {
@@ -53,10 +54,10 @@ export default function CommunicationLogsIndex({ logs, filters, channels }: Prop
                     <CardContent className="grid gap-4 sm:grid-cols-3">
                         <div>
                             <Label>Channel</Label>
-                            <Select value={localFilters.channel || ''} onValueChange={(v) => applyFilter('channel', v)}>
+                            <Select value={localFilters.channel || ANY} onValueChange={(v) => applyFilter('channel', v === ANY ? '' : v)}>
                                 <SelectTrigger><SelectValue placeholder="All channels" /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All channels</SelectItem>
+                                    <SelectItem value={ANY}>All channels</SelectItem>
                                     {Object.entries(channels).map(([key, label]) => (
                                         <SelectItem key={key} value={key}>{label}</SelectItem>
                                     ))}

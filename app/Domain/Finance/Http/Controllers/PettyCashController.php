@@ -8,6 +8,7 @@ use App\Domain\Finance\Services\PettyCashService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class PettyCashController extends Controller
@@ -49,7 +50,11 @@ class PettyCashController extends Controller
             ->orderBy('code')
             ->get(['id', 'code', 'name']);
 
-        $users = User::where('organization_id', $orgId)
+        $users = User::query()
+            ->when(
+                $orgId && Schema::hasColumn('users', 'organization_id'),
+                fn ($query) => $query->where('organization_id', $orgId),
+            )
             ->orderBy('name')
             ->get(['id', 'name']);
 

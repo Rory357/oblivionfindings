@@ -172,7 +172,11 @@ export default function ClientCalendar({ client, pending_visit_count }: Props) {
 
     const fetchEvents = useCallback(async (info: any, successCallback: any, failureCallback: any) => {
         try {
-            const res = await fetch(`/clients/${client.id}/calendar/events?start=${info.startStr}&end=${info.endStr}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+            const params = new URLSearchParams({
+                start: info.startStr,
+                end: info.endStr,
+            });
+            const res = await fetch(`/clients/${client.id}/calendar/events?${params.toString()}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             successCallback(await res.json());
         } catch (e) { failureCallback(e); }

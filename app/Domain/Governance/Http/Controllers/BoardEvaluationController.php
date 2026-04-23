@@ -17,7 +17,19 @@ class BoardEvaluationController extends Controller
 
         $evaluations = BoardEvaluation::withCount('responses')
             ->orderByDesc('created_at')
-            ->paginate(15);
+            ->paginate(15)
+            ->through(function (BoardEvaluation $evaluation) {
+                return [
+                    'id' => $evaluation->id,
+                    'title' => $evaluation->title,
+                    'evaluation_type' => $evaluation->evaluation_type,
+                    'status' => $this->presentEvaluationStatus($evaluation->status),
+                    'period_start' => now()->setYear($evaluation->year)->startOfYear()->toDateString(),
+                    'period_end' => now()->setYear($evaluation->year)->endOfYear()->toDateString(),
+                    'due_date' => ($evaluation->opened_at?->copy()->addWeeks(2) ?? now()->setYear($evaluation->year)->endOfYear())->toDateString(),
+                    'responses_count' => $evaluation->responses_count,
+                ];
+            });
 
         return Inertia::render('Governance/Evaluations/Index', [
             'evaluations' => $evaluations,

@@ -7,6 +7,7 @@ use App\Models\BillingEntry;
 use App\Models\Client;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class InvoiceController extends Controller
 {
@@ -39,10 +40,7 @@ class InvoiceController extends Controller
             'overdue' => Invoice::where('organization_id', $orgId)->overdue()->count(),
         ];
 
-        $clients = Client::query()
-            ->where('organization_id', $orgId)
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+        $clients = $this->clientOptions($orgId);
 
         return inertia('operations/invoices/Index', [
             'invoices' => $invoices,
@@ -59,10 +57,7 @@ class InvoiceController extends Controller
 
         $orgId = $auth->organization_id;
 
-        $clients = Client::query()
-            ->where('organization_id', $orgId)
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+        $clients = $this->clientOptions($orgId);
 
         $billingEntries = BillingEntry::query()
             ->where('organization_id', $orgId)
@@ -221,5 +216,17 @@ class InvoiceController extends Controller
         $invoice->update(['status' => 'cancelled']);
 
         return redirect()->back()->with('success', 'Invoice voided.');
+    }
+
+    private function clientOptions(?int $orgId)
+    {
+        return Client::query()
+            ->when(
+                $orgId && Schema::hasColumn('clients', 'organization_id'),
+                fn ($query) => $query->where('organization_id', $orgId),
+            )
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name']);
     }
 }

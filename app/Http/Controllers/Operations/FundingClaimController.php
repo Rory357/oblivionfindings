@@ -14,8 +14,7 @@ class FundingClaimController extends Controller
 {
     public function index(Request $request)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('funding_claims.viewAny'), 403);
+        $auth = $this->authorizeAny($request, ['funding.viewAny', 'funding_claims.viewAny']);
 
         $data = $request->validate([
             'status' => ['nullable', 'string', 'in:draft,submitted,approved,rejected,paid'],
@@ -50,8 +49,7 @@ class FundingClaimController extends Controller
 
     public function create(Request $request)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('funding_claims.create'), 403);
+        $auth = $this->authorizeAny($request, ['funding.claims.create', 'funding_claims.create']);
 
         $agreements = ServiceAgreement::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -67,8 +65,7 @@ class FundingClaimController extends Controller
 
     public function store(Request $request)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('funding_claims.create'), 403);
+        $auth = $this->authorizeAny($request, ['funding.claims.create', 'funding_claims.create']);
 
         $data = $request->validate([
             'service_agreement_id' => ['required', 'integer', 'exists:service_agreements,id'],
@@ -126,8 +123,7 @@ class FundingClaimController extends Controller
 
     public function show(Request $request, $claim)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('funding_claims.view'), 403);
+        $auth = $this->authorizeAny($request, ['funding.viewAny', 'funding_claims.view']);
 
         $claim = FundingClaim::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -148,8 +144,7 @@ class FundingClaimController extends Controller
 
     public function submit(Request $request, $claim)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('funding_claims.submit'), 403);
+        $auth = $this->authorizeAny($request, ['funding.claims.submit', 'funding_claims.submit']);
 
         $claim = FundingClaim::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -167,8 +162,7 @@ class FundingClaimController extends Controller
 
     public function approve(Request $request, $claim)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('funding_claims.approve'), 403);
+        $auth = $this->authorizeAny($request, ['funding.claims.approve', 'funding_claims.approve']);
 
         $claim = FundingClaim::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -182,5 +176,16 @@ class FundingClaimController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Claim approved.');
+    }
+
+    private function authorizeAny(Request $request, array $permissions)
+    {
+        $user = $request->user();
+        abort_unless(
+            $user && collect($permissions)->contains(fn (string $permission) => $user->canDo($permission)),
+            403,
+        );
+
+        return $user;
     }
 }

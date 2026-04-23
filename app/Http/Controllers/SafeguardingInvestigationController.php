@@ -45,8 +45,9 @@ class SafeguardingInvestigationController extends Controller
         $this->authorize('investigate', $concern);
 
         $validated = $request->validate([
-            'status' => 'nullable|in:planned,in_progress,completed,on_hold',
+            'status' => 'nullable|in:planned,in_progress,paused,completed,abandoned,pending,cancelled,on_hold',
             'evidence_collected' => 'nullable|array',
+            'evidence_summary' => 'nullable|string',
             'interviews_conducted' => 'nullable|array',
             'findings' => 'nullable|string',
             'outcome' => 'nullable|string',
@@ -54,6 +55,15 @@ class SafeguardingInvestigationController extends Controller
             'completed_at' => 'nullable|date',
             'report_completed' => 'nullable|boolean',
         ]);
+
+        if (array_key_exists('evidence_summary', $validated)) {
+            $validated['evidence_collected'] = $this->normalizeListField($validated['evidence_summary']);
+            unset($validated['evidence_summary']);
+        }
+
+        if (array_key_exists('status', $validated)) {
+            $validated['status'] = $this->normalizeStatus($validated['status']);
+        }
 
         $validated['updated_by'] = auth()->id();
 
@@ -64,5 +74,29 @@ class SafeguardingInvestigationController extends Controller
         $investigation->update($validated);
 
         return back()->with('success', 'Investigation updated successfully.');
+    }
+
+    private function normalizeListField(?string $value): ?array
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $entries = array_values(array_filter(array_map(
+            fn (string $entry) => trim($entry),
+            preg_split('/\r\n|\r|\n/', $value) ?: [],
+        )));
+
+        return $entries === [] ? null : $entries;
+    }
+
+    private function normalizeStatus(?string $value): ?string
+    {
+        return match ($value) {
+            'pending' => 'planned',
+            'cancelled' => 'abandoned',
+            'on_hold' => 'paused',
+            default => $value,
+        };
     }
 }

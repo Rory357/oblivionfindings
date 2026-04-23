@@ -27,7 +27,8 @@ class TrainingController extends Controller
     public function catalog(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.training.view'), 403);
+        $canView = $user && ($user->canDo('hr.training.view') || $user->canDo('training.viewAny'));
+        abort_unless($canView, 403);
 
         $courses = HrCourse::query()
             ->forTenant($user->tenant_id)
@@ -64,7 +65,7 @@ class TrainingController extends Controller
                 ['value' => 'self_paced', 'label' => 'Self-Paced'],
             ],
             'can' => [
-                'manage' => $user->canDo('hr.training.manage'),
+                'manage' => $user->canDo('hr.training.manage') || $user->canDo('training.manageCourses'),
             ],
         ]);
     }
@@ -75,7 +76,8 @@ class TrainingController extends Controller
     public function showCourse(Request $request, HrCourse $course)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.training.view'), 403);
+        $canView = $user && ($user->canDo('hr.training.view') || $user->canDo('training.viewAny'));
+        abort_unless($canView, 403);
 
         $course->load([
             'sessions' => fn ($q) => $q->orderBy('session_date'),
@@ -88,8 +90,8 @@ class TrainingController extends Controller
             'course' => $course,
             'users' => $users,
             'can' => [
-                'manage' => $user->canDo('hr.training.manage'),
-                'enroll' => $user->canDo('hr.training.manage'),
+                'manage' => $user->canDo('hr.training.manage') || $user->canDo('training.manageCourses'),
+                'enroll' => $user->canDo('hr.training.manage') || $user->canDo('training.enrol'),
             ],
         ]);
     }
@@ -117,7 +119,12 @@ class TrainingController extends Controller
     public function enroll(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.training.manage'), 403);
+        $canEnroll = $user && (
+            $user->canDo('hr.training.manage')
+            || $user->canDo('training.manageCourses')
+            || $user->canDo('training.enrol')
+        );
+        abort_unless($canEnroll, 403);
 
         $data = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -143,7 +150,12 @@ class TrainingController extends Controller
     public function completeEnrollment(Request $request, HrCourseEnrollment $enrollment)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.training.manage'), 403);
+        $canComplete = $user && (
+            $user->canDo('hr.training.manage')
+            || $user->canDo('training.manageCourses')
+            || $user->canDo('training.record')
+        );
+        abort_unless($canComplete, 403);
 
         $data = $request->validate([
             'score' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -162,7 +174,8 @@ class TrainingController extends Controller
     public function downloadCertificate(Request $request, HrCourseEnrollment $enrollment)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.training.view'), 403);
+        $canView = $user && ($user->canDo('hr.training.view') || $user->canDo('training.viewAny'));
+        abort_unless($canView, 403);
         abort_unless($enrollment->status === 'completed', 404, 'Certificate is only available for completed enrollments.');
 
         // Generate if not already generated

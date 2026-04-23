@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
@@ -60,6 +60,7 @@ const statusConfig: Record<string, { color: string; icon: any }> = {
 };
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const UNASSIGNED_STAFF_VALUE = '__unassigned__';
 
 function EditTemplateDialog({ template, staff, open, onOpenChange }: { template: Template; staff: { id: number; name: string }[]; open: boolean; onOpenChange: (open: boolean) => void }) {
     const form = useForm({
@@ -91,6 +92,10 @@ function EditTemplateDialog({ template, staff, open, onOpenChange }: { template:
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Edit Round Template</DialogTitle>
+                    <DialogDescription>
+                        Update the timing, staff assignment, and generation days
+                        for this medication round template.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div>
@@ -110,12 +115,25 @@ function EditTemplateDialog({ template, staff, open, onOpenChange }: { template:
                     </div>
                     <div>
                         <Label>Default Assigned Staff</Label>
-                        <Select value={form.data.default_assigned_to} onValueChange={(v) => form.setData('default_assigned_to', v)}>
+                        <Select
+                            value={
+                                form.data.default_assigned_to ||
+                                UNASSIGNED_STAFF_VALUE
+                            }
+                            onValueChange={(v) =>
+                                form.setData(
+                                    'default_assigned_to',
+                                    v === UNASSIGNED_STAFF_VALUE ? '' : v,
+                                )
+                            }
+                        >
                             <SelectTrigger className="mt-1">
                                 <SelectValue placeholder="Unassigned" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">Unassigned</SelectItem>
+                                <SelectItem value={UNASSIGNED_STAFF_VALUE}>
+                                    Unassigned
+                                </SelectItem>
                                 {staff.map((s) => (
                                     <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                                 ))}
@@ -243,6 +261,11 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
                             <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>New Round Template</DialogTitle>
+                                    <DialogDescription>
+                                        Create a reusable medication round
+                                        schedule and optionally assign a default
+                                        staff member.
+                                    </DialogDescription>
                                 </DialogHeader>
                                 <form onSubmit={submitTemplate} className="space-y-4">
                                     <div>
@@ -262,12 +285,33 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
                                     </div>
                                     <div>
                                         <Label>Default Assigned Staff</Label>
-                                        <Select value={templateForm.data.default_assigned_to} onValueChange={(v) => templateForm.setData('default_assigned_to', v)}>
+                                        <Select
+                                            value={
+                                                templateForm.data
+                                                    .default_assigned_to ||
+                                                UNASSIGNED_STAFF_VALUE
+                                            }
+                                            onValueChange={(v) =>
+                                                templateForm.setData(
+                                                    'default_assigned_to',
+                                                    v ===
+                                                        UNASSIGNED_STAFF_VALUE
+                                                        ? ''
+                                                        : v,
+                                                )
+                                            }
+                                        >
                                             <SelectTrigger className="mt-1">
                                                 <SelectValue placeholder="Unassigned" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="">Unassigned</SelectItem>
+                                                <SelectItem
+                                                    value={
+                                                        UNASSIGNED_STAFF_VALUE
+                                                    }
+                                                >
+                                                    Unassigned
+                                                </SelectItem>
                                                 {staff.map((s) => (
                                                     <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                                                 ))}

@@ -295,7 +295,22 @@ class IncidentController extends Controller
                 'resolved_at' => optional($incident->resolved_at)->toISOString(),
                 'created_at' => optional($incident->created_at)->toISOString(),
             ],
+            'can' => [
+                'manage' => $incident->exists && ($this->getUserCanManage($incident) ?? false),
+            ],
         ]);
+    }
+
+    private function getUserCanManage(FleetIncident $incident): bool
+    {
+        $user = request()->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        return (bool) $user->canDo('fleet.manage')
+            || (bool) $user->canDo('fleet.incidents.manage');
     }
 
     public function update(Request $request, FleetIncident $incident)

@@ -46,7 +46,7 @@ class DataBreachController extends Controller
             'filters' => $request->only(['q', 'status', 'requires_notification']),
             'stats' => [
                 'total' => DataBreachLog::count(),
-                'open' => DataBreachLog::whereNotIn('status', ['resolved', 'closed'])->count(),
+                'open' => DataBreachLog::where('status', '!=', 'resolved')->count(),
                 'requiring_notification' => DataBreachLog::where('requires_authority_notification', true)
                     ->whereNull('authority_notified_at')
                     ->count(),
@@ -95,7 +95,7 @@ class DataBreachController extends Controller
         );
         $validated['discovered_by_user_id'] = auth()->id();
         $validated['created_by'] = auth()->id();
-        $validated['status'] = 'reported';
+        $validated['status'] = 'discovered';
 
         $breach = DataBreachLog::create($validated);
 
@@ -133,7 +133,7 @@ class DataBreachController extends Controller
             'measures_taken' => 'nullable|string',
             'requires_authority_notification' => 'boolean',
             'requires_subject_notification' => 'boolean',
-            'status' => 'sometimes|in:reported,investigating,contained,resolved,closed',
+            'status' => 'sometimes|in:discovered,under_investigation,contained,notified,resolved',
         ]);
 
         $breach->update($validated);
@@ -152,10 +152,16 @@ class DataBreachController extends Controller
             'authority_reference' => 'nullable|string|max:255',
         ]);
 
-        $breach->update([
+        $attributes = [
             'authority_notified_at' => now(),
             'authority_reference' => $request->authority_reference,
-        ]);
+        ];
+
+        if ($breach->status !== 'resolved') {
+            $attributes['status'] = 'notified';
+        }
+
+        $breach->update($attributes);
 
         return back()->with('success', 'ICO notification recorded.');
     }
@@ -171,10 +177,16 @@ class DataBreachController extends Controller
             'notification_method' => 'required|string|max:255',
         ]);
 
-        $breach->update([
+        $attributes = [
             'subjects_notified_at' => now(),
             'notification_method' => $request->notification_method,
-        ]);
+        ];
+
+        if ($breach->status !== 'resolved') {
+            $attributes['status'] = 'notified';
+        }
+
+        $breach->update($attributes);
 
         return back()->with('success', 'Subject notification recorded.');
     }

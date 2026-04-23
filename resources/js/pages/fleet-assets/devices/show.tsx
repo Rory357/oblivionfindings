@@ -31,7 +31,8 @@ type Props = {
         device_uid: string;
         imei: string | null;
         serial_number: string | null;
-        status: string;
+        device_status: string;
+        link_status: 'paired' | 'unpaired';
         paired_at: string | null;
         unpaired_at: string | null;
         last_seen_at: string | null;
@@ -71,7 +72,7 @@ export default function DeviceShow({ tracker }: Props) {
                 lng: Number(lng),
                 title: `${device.vendor ?? ''} - ${device.device_uid ?? ''}`,
                 type: 'vehicle' as const,
-                status: device.status,
+                status: device.device_status,
             }];
         }
         return [];
@@ -82,7 +83,7 @@ export default function DeviceShow({ tracker }: Props) {
         return { lat: -36.8485, lng: 174.7633 };
     }, [lat, lng]);
 
-    const isOnline = device.status === 'paired';
+    const isOperational = device.device_status === 'active' || device.device_status === 'degraded';
 
     return (
         <AppLayout
@@ -101,16 +102,17 @@ export default function DeviceShow({ tracker }: Props) {
                 />
 
                 {/* Status Banner */}
-                <div className={cn('rounded-lg border px-5 py-4', statusBannerColors[device.status] ?? statusBannerColors.unpaired)}>
+                <div className={cn('rounded-lg border px-5 py-4', statusBannerColors[device.link_status] ?? statusBannerColors.unpaired)}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            {isOnline ? <Wifi className="h-5 w-5" /> : <WifiOff className="h-5 w-5" />}
+                            {isOperational ? <Wifi className="h-5 w-5" /> : <WifiOff className="h-5 w-5" />}
                             <div>
                                 <span className="font-medium">{device.vendor} - {device.device_uid}</span>
                             </div>
-                            <Badge variant={isOnline ? 'default' : 'secondary'}>{device.status ?? 'unknown'}</Badge>
+                            <Badge variant={device.link_status === 'paired' ? 'default' : 'secondary'}>{device.link_status}</Badge>
+                            <Badge variant={isOperational ? 'secondary' : 'outline'}>{device.device_status ?? 'unknown'}</Badge>
                         </div>
-                        {device.asset && device.status === 'paired' && (
+                        {device.asset && device.link_status === 'paired' && (
                             <Button
                                 variant="destructive"
                                 size="sm"

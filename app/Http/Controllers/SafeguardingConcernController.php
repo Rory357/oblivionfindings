@@ -98,7 +98,7 @@ class SafeguardingConcernController extends Controller
         $this->authorize('create', SafeguardingConcern::class);
 
         $validated = $request->validate([
-            'subject_type' => 'nullable|string',
+            'subject_type' => 'nullable|in:client,staff,other',
             'subject_id' => 'nullable|integer',
             'subject_name' => 'nullable|string|max:255',
             'concern_type' => 'required|string',
@@ -107,17 +107,19 @@ class SafeguardingConcernController extends Controller
             'description' => 'required|string',
             'occurred_at' => 'nullable|date',
             'location' => 'nullable|string',
-            'alleged_perpetrator_type' => 'nullable|string',
+            'alleged_perpetrator_type' => 'nullable|in:client,staff,family,other',
             'alleged_perpetrator_id' => 'nullable|integer',
             'alleged_perpetrator_name' => 'nullable|string|max:255',
             'alleged_perpetrator_details' => 'nullable|string',
             'reporter_notes' => 'nullable|string',
-            'witnesses' => 'nullable|array',
+            'witnesses' => 'nullable',
             'immediate_actions' => 'nullable|string',
             'requires_external_referral' => 'boolean',
             'site_id' => 'nullable|exists:sites,id',
             'related_incident_id' => 'nullable|exists:client_incidents,id',
         ]);
+
+        $validated = $this->normalizeConcernInput($request, $validated);
 
         $validated['reported_by_user_id'] = auth()->id();
         $validated['reported_at'] = now();
@@ -153,7 +155,7 @@ class SafeguardingConcernController extends Controller
         ]);
 
         return Inertia::render('safeguarding/show', [
-            'concern' => $concern,
+            'concern' => $this->serializeConcernForShow($concern),
             'canUpdate' => auth()->user()->can('update', $concern),
             'canInvestigate' => auth()->user()->can('investigate', $concern),
             'canReportExternal' => auth()->user()->can('reportExternal', $concern),
@@ -171,7 +173,7 @@ class SafeguardingConcernController extends Controller
         $concern->load(['subject', 'allegedPerpetrator', 'site']);
 
         return Inertia::render('safeguarding/edit', [
-            'concern' => $concern,
+            'concern' => $this->serializeConcernForForm($concern),
             'clients' => Client::select('id', 'first_name', 'last_name')
                 ->orderBy('last_name')
                 ->orderBy('first_name')
@@ -189,7 +191,7 @@ class SafeguardingConcernController extends Controller
         $this->authorize('update', $concern);
 
         $validated = $request->validate([
-            'subject_type' => 'nullable|string',
+            'subject_type' => 'nullable|in:client,staff,other',
             'subject_id' => 'nullable|integer',
             'subject_name' => 'nullable|string|max:255',
             'concern_type' => 'required|string',
@@ -198,16 +200,18 @@ class SafeguardingConcernController extends Controller
             'description' => 'required|string',
             'occurred_at' => 'nullable|date',
             'location' => 'nullable|string',
-            'alleged_perpetrator_type' => 'nullable|string',
+            'alleged_perpetrator_type' => 'nullable|in:client,staff,family,other',
             'alleged_perpetrator_id' => 'nullable|integer',
             'alleged_perpetrator_name' => 'nullable|string|max:255',
             'alleged_perpetrator_details' => 'nullable|string',
-            'witnesses' => 'nullable|array',
+            'witnesses' => 'nullable',
             'immediate_actions' => 'nullable|string',
             'requires_external_referral' => 'boolean',
             'protective_measures' => 'nullable|string',
             'site_id' => 'nullable|exists:sites,id',
         ]);
+
+        $validated = $this->normalizeConcernInput($request, $validated);
 
         $validated['updated_by'] = auth()->id();
 
@@ -297,5 +301,171 @@ class SafeguardingConcernController extends Controller
         ]);
 
         return back()->with('success', 'Subject marked as informed.');
+    }
+
+    private function normalizeConcernInput(Request $request, array $validated): array
+    {
+        $subjectType = (string) $request->input('subject_type', '');
+        $validated['subject_type'] = match ($subjectType) {
+            'client' => Client::class,
+            'staff' => User::class,
+            default => null,
+        };
+        $validated['subject_id'] = in_array($subjectType, ['client', 'staff'], true)
+            ? ($validated['subject_id'] ?? null)
+            : null;
+        $validated['subject_name'] = $subjectType === 'other'
+            ? $this->nullableString($request->input('other_subject_name'))
+            : null;
+
+        $perpetratorType = (string) $request->input('alleged_perpetrator_type', '');
+        $validated['alleged_perpetrator_type'] = match ($perpetratorType) {
+            'client' => Client::class,
+            'staff' => User::class,
+            default => null,
+        };
+        $validated['alleged_perpetrator_id'] = in_array($perpetratorType, ['client', 'staff'], true)
+            ? ($validated['alleged_perpetrator_id'] ?? null)
+            : null;
+        $validated['alleged_perpetrator_name'] = in_array($perpetratorType, ['family', 'other'], true)
+            ? $this->nullableString($request->input('other_perpetrator_name'))
+            : null;
+        $validated['alleged_perpetrator_details'] = $this->nullableString($request->input('perpetrator_relationship'))
+            ?? ($validated['alleged_perpetrator_details'] ?? null);
+
+        $validated['immediate_actions'] = $request->boolean('immediate_action_taken')
+            ? $this->nullableString($request->input('immediate_action_description'))
+            : null;
+        $validated['witnesses'] = $this->normalizeWitnesses($request->input('witnesses'));
+        $validated['subject_informed'] = $request->boolean('subject_informed');
+        $validated['requires_external_referral'] = $request->boolean('requires_external_referral');
+
+        return $validated;
+    }
+
+    private function serializeConcernForForm(SafeguardingConcern $concern): array
+    {
+        return [
+            ...$concern->toArray(),
+            'subject_type' => match ($concern->subject_type) {
+                Client::class, 'client' => 'client',
+                User::class, 'staff' => 'staff',
+                default => $concern->subject_name ? 'other' : '',
+            },
+            'other_subject_name' => $concern->subject_name,
+            'alleged_perpetrator_type' => match ($concern->alleged_perpetrator_type) {
+                Client::class, 'client' => 'client',
+                User::class, 'staff' => 'staff',
+                default => $concern->alleged_perpetrator_name ? 'other' : '',
+            },
+            'other_perpetrator_name' => $concern->alleged_perpetrator_name,
+            'perpetrator_relationship' => $concern->alleged_perpetrator_details,
+            'immediate_action_taken' => filled($concern->immediate_actions),
+            'immediate_action_description' => $concern->immediate_actions,
+        ];
+    }
+
+    private function serializeConcernForShow(SafeguardingConcern $concern): array
+    {
+        return [
+            ...$concern->toArray(),
+            'reportedBy' => $this->serializeUser($concern->reportedBy),
+            'assignedTo' => $this->serializeUser($concern->assignedTo),
+            'closedBy' => $this->serializeUser($concern->closedBy),
+            'allegedPerpetrator' => $concern->allegedPerpetrator?->toArray(),
+            'investigations' => $concern->investigations
+                ->map(fn ($investigation) => [
+                    ...$investigation->toArray(),
+                    'evidence_summary' => $this->serializeList($investigation->evidence_collected),
+                ])
+                ->values()
+                ->all(),
+            'externalReports' => $concern->externalReports
+                ->map(fn ($report) => [
+                    ...$report->toArray(),
+                    'reported_by' => $this->serializeUser($report->reportedBy),
+                    'acknowledgment_received' => (bool) $report->acknowledgement_received,
+                    'acknowledgment_date' => $report->acknowledged_at?->toISOString(),
+                    'acknowledgment_reference' => $report->acknowledgement_reference,
+                ])
+                ->values()
+                ->all(),
+            'riskAssessments' => $concern->riskAssessments
+                ->map(fn ($assessment) => [
+                    ...$assessment->toArray(),
+                    'risk_factors' => $this->serializeList($assessment->risk_factors),
+                    'protective_factors' => $this->serializeList($assessment->protective_factors),
+                    'protective_measures' => $this->serializeList($assessment->protective_measures),
+                ])
+                ->values()
+                ->all(),
+            'actionPlans' => $concern->actionPlans
+                ->map(fn ($plan) => [
+                    ...$plan->toArray(),
+                    'assigned_to' => $this->serializeUser($plan->assignedTo),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function normalizeWitnesses(mixed $witnesses): ?array
+    {
+        if (is_array($witnesses)) {
+            $entries = array_values(array_filter(array_map(
+                fn (mixed $entry) => is_string($entry) ? trim($entry) : '',
+                $witnesses,
+            )));
+
+            return $entries === [] ? null : $entries;
+        }
+
+        if (! is_string($witnesses)) {
+            return null;
+        }
+
+        $entries = array_values(array_filter(array_map(
+            fn (string $entry) => trim($entry),
+            preg_split('/\r\n|\r|\n/', $witnesses) ?: [],
+        )));
+
+        return $entries === [] ? null : $entries;
+    }
+
+    private function serializeList(mixed $value): ?string
+    {
+        if (is_array($value)) {
+            $entries = array_values(array_filter(array_map(
+                fn (mixed $entry) => is_string($entry) ? trim($entry) : '',
+                $value,
+            )));
+
+            return $entries === [] ? null : implode("\n", $entries);
+        }
+
+        return $this->nullableString($value);
+    }
+
+    private function serializeUser(?User $user): ?array
+    {
+        if (! $user) {
+            return null;
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+        ];
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 }

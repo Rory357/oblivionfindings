@@ -288,7 +288,11 @@ export default function MyCalendar() {
     const fetchEvents = useCallback(
         async (info: any, successCallback: any, failureCallback: any) => {
             try {
-                const res = await fetch(`/my-calendar/events?start=${info.startStr}&end=${info.endStr}`, {
+                const params = new URLSearchParams({
+                    start: info.startStr,
+                    end: info.endStr,
+                });
+                const res = await fetch(`/my-calendar/events?${params.toString()}`, {
                     credentials: 'same-origin',
                     headers: { 'Accept': 'application/json' },
                 });

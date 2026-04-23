@@ -306,6 +306,9 @@ class VehicleBookingController extends Controller
 
         return Inertia::render('fleet-assets/bookings/show', [
             'booking' => $booking,
+            'can' => [
+                'manage' => (bool) $request->user()?->canDo('fleet.manage'),
+            ],
         ]);
     }
 

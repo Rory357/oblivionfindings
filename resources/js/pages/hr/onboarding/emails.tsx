@@ -19,7 +19,10 @@ interface Props {
         subject: string;
         body: string;
     };
-    emailLog?: any[];
+    emailLog?: {
+        data: any[];
+        links?: any[];
+    } | any[];
     showLog?: boolean;
     can: {
         manage: boolean;
@@ -37,6 +40,8 @@ type Tab = 'templates' | 'preview' | 'log';
 export default function OnboardingEmails({ templates, preview, emailLog, showLog, can }: Props) {
     const hasPreview = !!preview;
     const hasLog = !!showLog;
+    const logEntries = Array.isArray(emailLog) ? emailLog : emailLog?.data ?? [];
+    const logLinks = Array.isArray(emailLog) ? [] : emailLog?.links ?? [];
 
     const [activeTab, setActiveTab] = useState<Tab>(
         hasPreview ? 'preview' : hasLog ? 'log' : 'templates',
@@ -200,47 +205,56 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {!emailLog || emailLog.length === 0 ? (
+                            {logEntries.length === 0 ? (
                                 <div className="py-8 text-center text-sm text-muted-foreground">
                                     <Send className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                     <p>No emails have been sent yet.</p>
                                 </div>
                             ) : (
-                                <table className="w-full text-sm">
-                                    <thead className="border-b bg-muted/50">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left font-medium">Recipient</th>
-                                            <th className="px-4 py-3 text-left font-medium">Template</th>
-                                            <th className="px-4 py-3 text-left font-medium">Sent At</th>
-                                            <th className="px-4 py-3 text-center font-medium">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {emailLog.map((entry: any, i: number) => (
-                                            <tr key={entry.id ?? i} className="hover:bg-muted/30">
-                                                <td className="px-4 py-3">{entry.recipient ?? entry.to ?? '-'}</td>
-                                                <td className="px-4 py-3">{entry.template_name ?? entry.template ?? '-'}</td>
-                                                <td className="px-4 py-3">
-                                                    <span className="flex items-center gap-1 text-muted-foreground">
-                                                        <Clock className="h-3 w-3" />
-                                                        {entry.sent_at ? formatDate(entry.sent_at) : '-'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <Badge className={
-                                                        entry.status === 'sent' || entry.status === 'delivered'
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : entry.status === 'failed'
-                                                              ? 'bg-red-100 text-red-800'
-                                                              : 'bg-gray-100 text-gray-800'
-                                                    }>
-                                                        {entry.status ?? 'unknown'}
-                                                    </Badge>
-                                                </td>
+                                <div className="space-y-4">
+                                    <table className="w-full text-sm">
+                                        <thead className="border-b bg-muted/50">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left font-medium">Recipient</th>
+                                                <th className="px-4 py-3 text-left font-medium">Template</th>
+                                                <th className="px-4 py-3 text-left font-medium">Sent At</th>
+                                                <th className="px-4 py-3 text-center font-medium">Status</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {logEntries.map((entry: any, i: number) => (
+                                                <tr key={entry.id ?? i} className="hover:bg-muted/30">
+                                                    <td className="px-4 py-3">
+                                                        {entry.recipient ?? entry.to ?? entry.employee_profile?.user?.name ?? '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {entry.template_name ?? entry.template ?? entry.onboarding_email?.template_name ?? '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="flex items-center gap-1 text-muted-foreground">
+                                                            <Clock className="h-3 w-3" />
+                                                            {entry.sent_at || entry.created_at ? formatDate(entry.sent_at ?? entry.created_at) : '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <Badge className={
+                                                            entry.status === 'sent' || entry.status === 'delivered'
+                                                                ? 'bg-green-100 text-green-800'
+                                                                : entry.status === 'failed'
+                                                                  ? 'bg-red-100 text-red-800'
+                                                                  : 'bg-gray-100 text-gray-800'
+                                                        }>
+                                                            {entry.status ?? 'unknown'}
+                                                        </Badge>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    {logLinks.length > 3 && (
+                                        <LaravelPagination links={logLinks} />
+                                    )}
+                                </div>
                             )}
                         </CardContent>
                     </Card>

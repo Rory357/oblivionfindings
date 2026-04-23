@@ -13,12 +13,23 @@ type Props = {
     stayId?: string;
     clientId?: string;
     clientRisks: any[];
-    planTypes: string[];
+    planTypes: Record<string, string>;
 };
 
 export default function RiskPlanActivationCreate({ stays, stayId, clientId, clientRisks, planTypes }: Props) {
-    const { data, setData, post, processing, errors } = useForm({
+    const resolveClientId = (selectedStayId: string): string => {
+        const selectedStay = stays.find((stay: any) => String(stay.id) === selectedStayId);
+
+        if (selectedStay?.client?.id != null) {
+            return String(selectedStay.client.id);
+        }
+
+        return clientId || '';
+    };
+
+    const { data, setData, post, processing, errors, transform } = useForm({
         stay_id: stayId || '',
+        client_id: stayId ? resolveClientId(stayId) : clientId || '',
         plan_type: '',
         plan_name: '',
         plan_details: [] as string[],
@@ -34,13 +45,14 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setData({
-            ...data,
+        transform((current) => ({
+            ...current,
+            client_id: current.client_id || resolveClientId(current.stay_id),
             plan_details: planDetails.filter(Boolean),
             triggers: triggers.filter(Boolean),
             interventions: interventions.filter(Boolean),
             escalation_steps: escalationSteps.filter(Boolean),
-        });
+        }));
         post('/respite/risk-plan-activations');
     };
 
@@ -96,7 +108,13 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label>Stay *</Label>
-                                    <Select value={data.stay_id} onValueChange={(v) => setData('stay_id', v)}>
+                                    <Select
+                                        value={data.stay_id}
+                                        onValueChange={(value) => {
+                                            setData('stay_id', value);
+                                            setData('client_id', resolveClientId(value));
+                                        }}
+                                    >
                                         <SelectTrigger><SelectValue placeholder="Select stay" /></SelectTrigger>
                                         <SelectContent>
                                             {stays.map((s: any) => (
@@ -113,8 +131,8 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
                                     <Select value={data.plan_type} onValueChange={(v) => setData('plan_type', v)}>
                                         <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                                         <SelectContent>
-                                            {planTypes.map((t) => (
-                                                <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                                            {Object.entries(planTypes).map(([value, label]) => (
+                                                <SelectItem key={value} value={value}>{label}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>

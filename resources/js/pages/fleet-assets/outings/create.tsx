@@ -75,6 +75,9 @@ type Props = {
     vehicles: VehicleOption[];
     drivers: DriverOption[];
     auth_user: { id: number; name: string };
+    can: {
+        manage: boolean;
+    };
 };
 
 const PURPOSE_TYPES = [
@@ -85,7 +88,7 @@ const PURPOSE_TYPES = [
     { value: 'shopping', label: 'Shopping', icon: ShoppingBag, color: 'border-purple-500 bg-purple-50 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700' },
 ];
 
-export default function OutingCreate({ clients, vehicles, drivers, auth_user }: Props) {
+export default function OutingCreate({ clients, vehicles, drivers, auth_user, can }: Props) {
     const safeClients = clients ?? [];
     const safeVehicles = vehicles ?? [];
     const safeDrivers = drivers ?? [];
@@ -232,6 +235,38 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user }: 
         e.preventDefault();
         form.post('/fleet-assets/outings');
     }, [form]);
+
+    if (!can.manage) {
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Fleet & Assets', href: '/fleet-assets' },
+                    { title: 'Outings', href: '/fleet-assets/outings' },
+                    { title: 'Plan Outing', href: '#' },
+                ]}
+            >
+                <Head title="Plan Outing" />
+                <PageShell>
+                    <FleetHero
+                        title="Plan Community Outing"
+                        description="Create a new outing for residents."
+                        backHref="/fleet-assets/outings"
+                        backLabel="Back to Outings"
+                    />
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">View-only</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                                Planning or changing outings requires fleet outing management access.
+                            </p>
+                        </CardContent>
+                    </Card>
+                </PageShell>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout

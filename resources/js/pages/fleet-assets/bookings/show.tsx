@@ -54,6 +54,9 @@ type Props = {
         passengers: number | null;
         notes: string | null;
     };
+    can: {
+        manage: boolean;
+    };
 };
 
 const statusBannerColors: Record<string, string> = {
@@ -67,8 +70,9 @@ const statusBannerColors: Record<string, string> = {
 
 const statusSteps = ['pending', 'approved', 'checked_out', 'returned'];
 
-export default function BookingShow({ booking }: Props) {
+export default function BookingShow({ booking, can }: Props) {
     const b = booking ?? {} as Props['booking'];
+    const canManage = can.manage;
     const checkoutForm = useForm({ odometer_out: '' });
     const returnForm = useForm({ odometer_in: '', condition_on_return: '', return_notes: '' });
     const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -287,7 +291,7 @@ export default function BookingShow({ booking }: Props) {
                 {/* Action Buttons - More Prominent */}
                 <div className="space-y-4">
                     {/* Pending: Approve / Reject */}
-                    {b.status === 'pending' && (
+                    {canManage && b.status === 'pending' && (
                         <Card className="border-2 border-amber-200 dark:border-amber-800">
                             <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
@@ -318,7 +322,7 @@ export default function BookingShow({ booking }: Props) {
                     )}
 
                     {/* Approved: Checkout */}
-                    {b.status === 'approved' && (
+                    {canManage && b.status === 'approved' && (
                         <Card className="border-2 border-blue-200 dark:border-blue-800">
                             <CardHeader>
                                 <CardTitle className="text-base">Checkout Vehicle</CardTitle>
@@ -359,7 +363,7 @@ export default function BookingShow({ booking }: Props) {
                     )}
 
                     {/* Checked Out: Return */}
-                    {b.status === 'checked_out' && (
+                    {canManage && b.status === 'checked_out' && (
                         <Card className="border-2 border-purple-200 dark:border-purple-800">
                             <CardHeader>
                                 <CardTitle className="text-base">Return Vehicle</CardTitle>
@@ -420,13 +424,22 @@ export default function BookingShow({ booking }: Props) {
                     )}
 
                     {/* Cancel (available for pending, approved, checked_out) */}
-                    {['pending', 'approved', 'checked_out'].includes(b.status ?? '') && (
+                    {canManage && ['pending', 'approved', 'checked_out'].includes(b.status ?? '') && (
                         <Button
                             variant="outline"
                             onClick={() => setShowCancelDialog(true)}
                         >
                             Cancel Booking
                         </Button>
+                    )}
+                    {!canManage && ['pending', 'approved', 'checked_out'].includes(b.status ?? '') && (
+                        <Card>
+                            <CardContent className="pt-6">
+                                <p className="text-sm text-muted-foreground">
+                                    Booking workflow actions require fleet manager access.
+                                </p>
+                            </CardContent>
+                        </Card>
                     )}
                 </div>
 

@@ -51,7 +51,7 @@ type PageProps = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance/dashboard' },
-    { title: 'IRD E-Filing', href: '/finance/ird-filings' },
+    { title: 'IRD Filings', href: '/finance/ird-filings' },
 ];
 
 const formatCurrency = (amount: number) =>
@@ -123,14 +123,14 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="IRD E-Filing" />
+            <Head title="IRD Filings" />
 
             <div className="mx-auto max-w-6xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">IRD E-Filing</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">IRD Filings</h1>
                         <p className="text-muted-foreground">
-                            Prepare and submit tax filings directly to Inland Revenue
+                            Prepare and submit IRD e-filings directly to Inland Revenue
                         </p>
                     </div>
                     <Button onClick={() => setShowCreateForm(!showCreateForm)}>

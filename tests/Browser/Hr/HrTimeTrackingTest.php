@@ -19,6 +19,6 @@ test('hr timesheets page loads', function () {
         $browser->loginAs($user)
             ->visit('/hr/time/timesheets')
             ->waitForText('Timesheet', 10)
-            ->assertPathIs('/hr/time/timesheets');
+            ->assertPathIs('/hr/time');
     });
 });

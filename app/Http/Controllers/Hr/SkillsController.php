@@ -22,7 +22,7 @@ class SkillsController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.skills.view'), 403);
+        abort_unless($this->canView($user), 403);
 
         $tenantId = null;
         $category = $request->query('category');
@@ -54,8 +54,8 @@ class SkillsController extends Controller
                 'q' => $search,
             ],
             'can' => [
-                'create' => $user->canDo('hr.skills.manage'),
-                'manage' => $user->canDo('hr.skills.manage'),
+                'create' => $this->canManage($user),
+                'manage' => $this->canManage($user),
             ],
         ]);
     }
@@ -67,7 +67,7 @@ class SkillsController extends Controller
     public function matrix(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.skills.view'), 403);
+        abort_unless($this->canView($user), 403);
 
         $tenantId = null;
 
@@ -78,7 +78,7 @@ class SkillsController extends Controller
             'skills' => $matrixData['skills'],
             'proficiencyLevels' => SkillsMatrixService::PROFICIENCY_LEVELS,
             'can' => [
-                'assess' => $user->canDo('hr.skills.manage'),
+                'assess' => $this->canManage($user),
             ],
         ]);
     }
@@ -90,7 +90,7 @@ class SkillsController extends Controller
     public function storeSkill(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.skills.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -116,7 +116,7 @@ class SkillsController extends Controller
     public function assessEmployee(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.skills.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $validated = $request->validate([
             'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
@@ -138,5 +138,23 @@ class SkillsController extends Controller
         );
 
         return redirect()->back()->with('success', 'Skill assessment recorded.');
+    }
+
+    private function canView($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.skills.view')
+            || $user->canDo('hr.skills.manage')
+            || $user->canDo('hr.performance.view')
+            || $user->canDo('hr.performance.manage')
+        );
+    }
+
+    private function canManage($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.skills.manage')
+            || $user->canDo('hr.performance.manage')
+        );
     }
 }

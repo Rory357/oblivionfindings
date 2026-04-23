@@ -93,19 +93,19 @@ class BoardInterestController extends Controller
 
         $boardMember = auth()->user()->boardMember;
 
-        if (!$boardMember) {
-            return redirect()->route('governance.dashboard')
-                ->with('error', 'You are not a board member.');
-        }
+        $interests = collect();
 
-        $interests = BoardMemberInterest::where('board_member_id', $boardMember->id)
-            ->orderByDesc('declared_at')
-            ->get()
-            ->map(fn (BoardMemberInterest $interest) => $this->presentInterest($interest));
+        if ($boardMember) {
+            $interests = BoardMemberInterest::where('board_member_id', $boardMember->id)
+                ->orderByDesc('declared_at')
+                ->get()
+                ->map(fn (BoardMemberInterest $interest) => $this->presentInterest($interest));
+        }
 
         return Inertia::render('Governance/Interests/MyInterests', [
             'interests' => $interests,
             'boardMember' => $boardMember,
+            'canDeclare' => $boardMember !== null,
         ]);
     }
 

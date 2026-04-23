@@ -387,10 +387,16 @@ class DeviceController extends Controller
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.create'), 403);
 
+        $prefillDomain = $request->string('domain')->toString();
+        if (! in_array($prefillDomain, DeviceTaxonomy::domains(), true)) {
+            $prefillDomain = '';
+        }
+
         return Inertia::render('security-devices/devices/create', [
             'taxonomy' => DeviceTaxonomy::all(),
             'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
             'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+            'prefillDomain' => $prefillDomain,
         ]);
     }
 

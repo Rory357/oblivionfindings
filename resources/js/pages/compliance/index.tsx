@@ -132,7 +132,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                         { label: 'Incidents', value: kpis.openIncidents },
                         { label: 'Discrepancies', value: kpis.openCdDiscrepancies },
                         { label: 'MAR Exceptions', value: kpis.marExceptionsToday },
-                        { label: 'Audit Events', value: kpis.auditEventsLast30d },
+                        { label: 'Audit Events', value: kpis.auditEvents30d },
                     ]}
                     actions={
                         <div className="flex gap-2 flex-wrap">

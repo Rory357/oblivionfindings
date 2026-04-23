@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -57,6 +57,10 @@ function ScheduleReviewDialog({ clients }: { clients: Props['clients'] }) {
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Schedule Medication Review</DialogTitle>
+                    <DialogDescription>
+                        Schedule a medication review and capture any trigger or
+                        reviewer details up front.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div className="space-y-2">
@@ -152,6 +156,10 @@ function CompleteReviewDialog({ review }: { review: any }) {
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Complete Review — {review.client?.last_name}, {review.client?.first_name}</DialogTitle>
+                    <DialogDescription>
+                        Capture the clinical summary, recommendations, and the
+                        next planned review date.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div className="space-y-2">
@@ -217,6 +225,10 @@ function EditReviewDialog({ review, clients, open, onOpenChange }: { review: any
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Edit Medication Review</DialogTitle>
+                    <DialogDescription>
+                        Update the scheduled review details before it is
+                        completed.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div className="space-y-2">

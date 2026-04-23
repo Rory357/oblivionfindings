@@ -50,6 +50,9 @@ type Props = {
         date_from?: string;
         date_to?: string;
     };
+    can: {
+        manage: boolean;
+    };
 };
 
 function resultBadge(passed: boolean) {
@@ -66,7 +69,7 @@ function typeBadge(type: string) {
     return <Badge variant="outline">{type}</Badge>;
 }
 
-export default function InspectionsIndex({ inspections, vehicles, filters }: Props) {
+export default function InspectionsIndex({ inspections, vehicles, filters, can }: Props) {
     const allInspections = inspections ?? [];
     const totalCount = allInspections.length;
     const passedCount = allInspections.filter((i) => i.passed).length;
@@ -102,13 +105,13 @@ export default function InspectionsIndex({ inspections, vehicles, filters }: Pro
             <PageShell>
                 <FleetHero
                     title="Vehicle Inspections"
-                    actions={
+                    actions={can.manage ? (
                         <Button asChild>
                             <Link href="/fleet-assets/inspections/create">
                                 <Plus className="mr-2 h-4 w-4" /> New Inspection
                             </Link>
                         </Button>
-                    }
+                    ) : undefined}
                 />
 
                 {/* Dark KPI Cards + ProgressRing */}

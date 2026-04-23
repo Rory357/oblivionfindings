@@ -134,7 +134,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <Link href={`/operations/recurring-charges/${charge.id}`} className="text-sm font-semibold hover:underline">
+                                        <Link href={`/operations/recurring-charges/${charge.id}/edit`} className="text-sm font-semibold hover:underline">
                                             {charge.name}
                                         </Link>
                                         <Badge variant={charge.is_active ? 'default' : 'secondary'} className="h-4 px-1.5 text-[9px]">
@@ -161,7 +161,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                                 </div>
                                 <div className="flex shrink-0 gap-1">
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/operations/recurring-charges/${charge.id}`}>
+                                        <Link href={`/operations/recurring-charges/${charge.id}/edit`}>
                                             <Eye className="h-3.5 w-3.5" />
                                         </Link>
                                     </Button>

@@ -32,6 +32,6 @@ test('rostering page loads', function () {
         $browser->loginAs($user)
             ->visit('/rostering')
             ->waitForText('Roster', 10)
-            ->assertPresent('body');
+            ->assertPathIs('/rostering');
     });
 });

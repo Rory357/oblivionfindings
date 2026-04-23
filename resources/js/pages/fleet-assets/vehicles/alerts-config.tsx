@@ -55,6 +55,9 @@ type Props = {
     };
     config: Partial<AlertConfig>;
     geofences: Array<{ id: number; name: string; is_active: boolean }>;
+    can: {
+        manage: boolean;
+    };
 };
 
 const DEFAULT_CONFIG: AlertConfig = {
@@ -126,7 +129,8 @@ const ALERT_TYPES = [
     },
 ];
 
-export default function VehicleAlertsConfig({ asset, config: rawConfig, geofences }: Props) {
+export default function VehicleAlertsConfig({ asset, config: rawConfig, geofences, can }: Props) {
+    const canManage = can.manage;
     const [config, setConfig] = useState<AlertConfig>(() => ({
         ...DEFAULT_CONFIG,
         ...Object.fromEntries(
@@ -146,6 +150,10 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
     };
 
     const handleSave = () => {
+        if (!canManage) {
+            return;
+        }
+
         setProcessing(true);
         router.post(`/fleet-assets/vehicles/${asset.id}/alerts-config`, { config } as any, {
             onFinish: () => setProcessing(false),
@@ -187,6 +195,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                                     type="checkbox"
                                                     checked={rule.enabled}
                                                     onChange={(e) => updateRule(key, 'enabled', e.target.checked)}
+                                                    disabled={!canManage}
                                                     className="peer sr-only"
                                                 />
                                                 <div className="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring dark:bg-gray-700" />
@@ -205,11 +214,12 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                                     <Input
                                                         type="number"
                                                         value={String(rule.threshold)}
+                                                        disabled={!canManage}
                                                         onChange={(e) => updateRule(key, 'threshold', Number(e.target.value))}
                                                     />
                                                 )}
                                                 {thresholdType === 'sensitivity' && (
-                                                    <Select value={String(rule.threshold)} onValueChange={(v) => updateRule(key, 'threshold', v)}>
+                                                    <Select value={String(rule.threshold)} onValueChange={(v) => updateRule(key, 'threshold', v)} disabled={!canManage}>
                                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                                         <SelectContent>
                                                             <SelectItem value="low">Low</SelectItem>
@@ -219,7 +229,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                                     </Select>
                                                 )}
                                                 {thresholdType === 'select' && (
-                                                    <Select value={String(rule.threshold) || '__all__'} onValueChange={(v) => updateRule(key, 'threshold', v === '__all__' ? '' : v)}>
+                                                    <Select value={String(rule.threshold) || '__all__'} onValueChange={(v) => updateRule(key, 'threshold', v === '__all__' ? '' : v)} disabled={!canManage}>
                                                         <SelectTrigger><SelectValue placeholder="Select geofence" /></SelectTrigger>
                                                         <SelectContent>
                                                             <SelectItem value="__all__">All geofences</SelectItem>
@@ -236,6 +246,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                                         <Input
                                                             type="time"
                                                             value={rule.start_time ?? '18:00'}
+                                                            disabled={!canManage}
                                                             onChange={(e) => updateRule(key, 'start_time', e.target.value)}
                                                             className="w-auto"
                                                         />
@@ -243,6 +254,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                                         <Input
                                                             type="time"
                                                             value={rule.end_time ?? '06:00'}
+                                                            disabled={!canManage}
                                                             onChange={(e) => updateRule(key, 'end_time', e.target.value)}
                                                             className="w-auto"
                                                         />
@@ -253,7 +265,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                             {/* Severity */}
                                             <div>
                                                 <Label>Severity</Label>
-                                                <Select value={rule.severity} onValueChange={(v) => updateRule(key, 'severity', v)}>
+                                                <Select value={rule.severity} onValueChange={(v) => updateRule(key, 'severity', v)} disabled={!canManage}>
                                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="low">Low</SelectItem>
@@ -270,6 +282,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                                     <input
                                                         type="checkbox"
                                                         checked={rule.notify_control_room}
+                                                        disabled={!canManage}
                                                         onChange={(e) => updateRule(key, 'notify_control_room', e.target.checked)}
                                                         className="h-4 w-4 rounded border-gray-300"
                                                     />
@@ -286,10 +299,14 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                 </div>
 
                 <div className="flex items-center gap-2 pt-4">
-                    <Button onClick={handleSave} disabled={processing}>
-                        {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Save Configuration
-                    </Button>
+                    {canManage ? (
+                        <Button onClick={handleSave} disabled={processing}>
+                            {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Save Configuration
+                        </Button>
+                    ) : (
+                        <Badge variant="secondary">View-only</Badge>
+                    )}
                     <Button variant="outline" asChild>
                         <Link href={`/fleet-assets/vehicles/${asset.id}`}>Cancel</Link>
                     </Button>

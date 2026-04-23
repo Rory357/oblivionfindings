@@ -22,11 +22,12 @@ type Props = {
         with_incidents?: string;
         sensitive?: string;
     };
-    shiftPeriods: string[];
+    shiftPeriods: Record<string, string>;
     wellbeingLevels: any;
 };
 
 export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props) {
+    const ANY = '__any__';
     const [localFilters, setLocalFilters] = useState(filters);
 
     const applyFilter = (key: string, value: string) => {
@@ -85,12 +86,12 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
                             </div>
                             <div>
                                 <Label>Shift Period</Label>
-                                <Select value={localFilters.shift_period || ''} onValueChange={(v) => applyFilter('shift_period', v)}>
+                                <Select value={localFilters.shift_period || ANY} onValueChange={(v) => applyFilter('shift_period', v === ANY ? '' : v)}>
                                     <SelectTrigger><SelectValue placeholder="All shifts" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">All shifts</SelectItem>
-                                        {shiftPeriods.map((sp) => (
-                                            <SelectItem key={sp} value={sp}>{sp}</SelectItem>
+                                        <SelectItem value={ANY}>All shifts</SelectItem>
+                                        {Object.entries(shiftPeriods).map(([value, label]) => (
+                                            <SelectItem key={value} value={value}>{label}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

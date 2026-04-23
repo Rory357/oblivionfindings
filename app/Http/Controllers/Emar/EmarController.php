@@ -1661,6 +1661,7 @@ class EmarController extends Controller
             'user_id' => 'required|exists:users,id',
             'assessment_type' => 'required|string|max:255',
             'assessment_date' => 'required|date',
+            'expiry_date' => 'nullable|date|after_or_equal:assessment_date',
             'medication_knowledge' => 'required|boolean',
             'five_rights' => 'required|boolean',
             'safety_checks' => 'required|boolean',
@@ -1677,6 +1678,8 @@ class EmarController extends Controller
             'areas_for_improvement' => 'nullable|string',
             'action_plan' => 'nullable|string',
             'assessor_comments' => 'nullable|string',
+            'can_administer_unsupervised' => 'nullable|boolean',
+            'can_witness_controlled' => 'nullable|boolean',
         ]);
 
         $booleanFields = [
@@ -1691,7 +1694,10 @@ class EmarController extends Controller
         $validated['pass_threshold'] = 10;
         $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
         $validated['assessor_id'] = auth()->id();
-        $validated['expiry_date'] = \Carbon\Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
+        $validated['expiry_date'] = $validated['expiry_date']
+            ?? \Carbon\Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
+        $validated['can_administer_unsupervised'] = (bool) ($validated['can_administer_unsupervised'] ?? false);
+        $validated['can_witness_controlled'] = (bool) ($validated['can_witness_controlled'] ?? false);
 
         MedicationCompetencyAssessment::create($validated);
 
@@ -1701,6 +1707,7 @@ class EmarController extends Controller
     public function updateCompetency(Request $request, MedicationCompetencyAssessment $assessment)
     {
         $validated = $request->validate([
+            'user_id' => 'nullable|exists:users,id',
             'assessment_type' => 'nullable|string|max:255',
             'assessment_date' => 'nullable|date',
             'medication_knowledge' => 'nullable|boolean',
@@ -1719,8 +1726,28 @@ class EmarController extends Controller
             'areas_for_improvement' => 'nullable|string',
             'action_plan' => 'nullable|string',
             'assessor_comments' => 'nullable|string',
-            'expiry_date' => 'nullable|date',
+            'expiry_date' => 'nullable|date|after_or_equal:assessment_date',
+            'can_administer_unsupervised' => 'nullable|boolean',
+            'can_witness_controlled' => 'nullable|boolean',
         ]);
+
+        $booleanFields = [
+            'medication_knowledge', 'five_rights', 'safety_checks', 'documentation',
+            'controlled_drugs', 'prn_assessment', 'insulin_competent', 'inhaler_competent',
+            'topical_competent', 'covert_admin_knowledge', 'error_reporting', 'allergy_awareness',
+        ];
+
+        if (collect($booleanFields)->contains(fn ($field) => array_key_exists($field, $validated))) {
+            $merged = array_merge($assessment->only($booleanFields), $validated);
+            $totalScore = collect($booleanFields)->filter(fn ($field) => !empty($merged[$field]))->count();
+            $validated['total_score'] = $totalScore;
+            $validated['pass_threshold'] = 10;
+            $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
+        }
+
+        if (!array_key_exists('expiry_date', $validated) && !empty($validated['assessment_date'])) {
+            $validated['expiry_date'] = \Carbon\Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
+        }
 
         $assessment->update($validated);
 

@@ -14,6 +14,7 @@ type Props = {
 };
 
 export default function CommunicationLogCreate({ stays, stayId, channels }: Props) {
+    const hasStays = stays.length > 0;
     const { data, setData, post, processing, errors } = useForm({
         stay_id: stayId || '',
         channel: '',
@@ -64,10 +65,15 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
                             <CardTitle className="text-base">Log Details</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {!hasStays && (
+                                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                    No respite stays are available yet. Create or admit a stay before logging communication.
+                                </div>
+                            )}
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label>Stay</Label>
-                                    <Select value={data.stay_id} onValueChange={(v) => setData('stay_id', v)}>
+                                    <Select value={data.stay_id} onValueChange={(v) => setData('stay_id', v)} disabled={!hasStays}>
                                         <SelectTrigger><SelectValue placeholder="Select a stay" /></SelectTrigger>
                                         <SelectContent>
                                             {stays.map((s) => (
@@ -151,7 +157,7 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
                     </Card>
 
                     <div className="flex justify-end">
-                        <Button type="submit" disabled={processing}>
+                        <Button type="submit" disabled={processing || !hasStays}>
                             Save Communication Log
                         </Button>
                     </div>

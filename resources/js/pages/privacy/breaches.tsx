@@ -26,6 +26,13 @@ type Props = {
 
 export default function DataBreaches({ filters, breaches, stats }: Props) {
     const ANY = '__any__';
+    const statusLabels: Record<string, string> = {
+        discovered: 'discovered',
+        under_investigation: 'under investigation',
+        contained: 'contained',
+        notified: 'notified',
+        resolved: 'resolved',
+    };
     const { auth } = usePage().props as any;
     const can = auth?.can?.privacy ?? {};
 
@@ -35,15 +42,16 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'resolved':
-            case 'closed':
-                return 'bg-green-100 text-green-800 border-green-200';
-            case 'investigating':
+            case 'under_investigation':
                 return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'reported':
+            case 'discovered':
                 return 'bg-yellow-100 text-yellow-800 border-yellow-200';
             case 'contained':
                 return 'bg-orange-100 text-orange-800 border-orange-200';
+            case 'resolved':
+                return 'bg-green-100 text-green-800 border-green-200';
+            case 'notified':
+                return 'bg-purple-100 text-purple-800 border-purple-200';
             default:
                 return 'bg-slate-100 text-slate-800 border-slate-200';
         }
@@ -118,8 +126,8 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                 <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {['reported', 'investigating', 'contained', 'resolved', 'closed'].map((s) => (
-                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    {['discovered', 'under_investigation', 'contained', 'notified', 'resolved'].map((s) => (
+                                        <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -156,7 +164,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <Badge className={getStatusColor(breach.status)}>
-                                                    {breach.status}
+                                                    {statusLabels[breach.status] ?? breach.status}
                                                 </Badge>
                                                 {breach.requires_authority_notification && !breach.authority_notified_at && (
                                                     <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">

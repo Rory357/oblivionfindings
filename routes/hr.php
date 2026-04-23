@@ -219,7 +219,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.compliance.view')->group(function () {
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
         Route::get('/compliance/calendar', [ComplianceCalendarController::class, 'index'])->name('compliance.calendar');
-        Route::get('/compliance/staff/{user}', [ComplianceController::class, 'staffDetail'])->name('compliance.staff');
+        Route::get('/compliance/staff/{staff}', [ComplianceController::class, 'staffDetail'])->name('compliance.staff');
 
         Route::middleware('permission:hr.compliance.manage')->group(function () {
             Route::get('/compliance/matrix', [ComplianceMatrixController::class, 'index'])->name('compliance.matrix');
@@ -235,7 +235,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Training Dashboard
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.training.view')->group(function () {
+    Route::middleware('permission:hr.training.view|training.viewAny')->group(function () {
         Route::get('/compliance/training', [TrainingDashboardController::class, 'index'])->name('training.index');
     });
 
@@ -285,6 +285,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.leave.viewAny')->group(function () {
         Route::get('/leave', [LeaveController::class, 'index'])->name('leave.index');
         Route::get('/leave/balances', [LeaveController::class, 'balances'])->name('leave.balances');
+        Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
 
         Route::middleware('permission:hr.leave.manage')->group(function () {
             Route::get('/leave/create', [LeaveController::class, 'create'])->name('leave.create');
@@ -936,11 +937,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Exit Interviews
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.onboarding.view')->prefix('exit-interviews')->name('exit-interviews.')->group(function () {
+    Route::middleware('permission:hr.exit-interviews.view|hr.exit-interviews.manage|hr.onboarding.view|hr.onboarding.manage')->prefix('exit-interviews')->name('exit-interviews.')->group(function () {
         Route::get('/', [ExitInterviewController::class, 'index'])->name('index');
         Route::get('/trends', [ExitInterviewController::class, 'trends'])->name('trends');
 
-        Route::middleware('permission:hr.onboarding.manage')->group(function () {
+        Route::middleware('permission:hr.exit-interviews.manage|hr.onboarding.manage')->group(function () {
             Route::get('/create', [ExitInterviewController::class, 'create'])->name('create');
             Route::post('/', [ExitInterviewController::class, 'store'])->name('store');
         });
@@ -975,15 +976,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/entries/{entry}/amendments', [TimeTrackingController::class, 'entryAmendments'])->name('entries.amendments');
             Route::post('/clock-on-behalf', [TimeTrackingController::class, 'clockOnBehalf'])->name('clock-on-behalf');
         });
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Leave Reports
-    |--------------------------------------------------------------------------
-    */
-    Route::middleware('permission:hr.leave.viewAny')->group(function () {
-        Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
     });
 
     /*
@@ -1060,14 +1052,18 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Training Catalog & Course Management
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.training.view')->group(function () {
+    Route::middleware('permission:hr.training.view|training.viewAny')->group(function () {
         Route::get('/training/catalog', [TrainingController::class, 'catalog'])->name('training.catalog');
         Route::get('/training/courses/{course}', [TrainingController::class, 'showCourse'])->name('training.courses.show');
         Route::get('/training/enrollments/{enrollment}/certificate', [TrainingController::class, 'downloadCertificate'])->name('training.certificate');
     });
-    Route::middleware('permission:hr.training.manage')->group(function () {
+    Route::middleware('permission:hr.training.manage|training.manageCourses')->group(function () {
         Route::post('/training/courses', [TrainingController::class, 'storeCourse'])->name('training.courses.store');
+    });
+    Route::middleware('permission:hr.training.manage|training.manageCourses|training.enrol')->group(function () {
         Route::post('/training/enroll', [TrainingController::class, 'enroll'])->name('training.enroll');
+    });
+    Route::middleware('permission:hr.training.manage|training.manageCourses|training.record')->group(function () {
         Route::put('/training/enrollments/{enrollment}/complete', [TrainingController::class, 'completeEnrollment'])->name('training.enrollments.complete');
     });
 });

@@ -126,6 +126,9 @@ class AlertController extends Controller
             ],
             'archived_asset_alerts' => $archivedAssetAlerts,
             'filters' => $request->only(['status', 'severity', 'asset_id']),
+            'can' => [
+                'manage' => (bool) ($request->user()?->canDo('fleet.manage') || $request->user()?->canDo('assets.alerts.manage')),
+            ],
         ]);
     }
 

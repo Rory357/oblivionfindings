@@ -20,13 +20,29 @@ use Inertia\Inertia;
 
 class VehicleController extends Controller
 {
+    private function canManageFleet(?\App\Models\User $user): bool
+    {
+        return (bool) $user?->canDo('fleet.manage');
+    }
+
+    private function canManageMaintenance(?\App\Models\User $user): bool
+    {
+        return $this->canManageFleet($user) || (bool) $user?->canDo('fleet.maintenance.manage');
+    }
+
     private function hasFleetFields(): bool
     {
         return Schema::hasColumn('assets', 'home_site_id');
     }
 
+    private function hasVehicleAlertConfigField(): bool
+    {
+        return Schema::hasColumn('assets', 'alert_config');
+    }
+
     public function index(Request $request)
     {
+        $user = $request->user();
         $hasFleetFields = $this->hasFleetFields();
 
         $eagerLoads = [
@@ -126,11 +142,15 @@ class VehicleController extends Controller
             ],
             'sites' => $sites,
             'filters' => $request->only(['status', 'search', 'site_id']),
+            'can' => [
+                'manage' => $this->canManageFleet($user),
+            ],
         ]);
     }
 
     public function show(Request $request, Asset $asset)
     {
+        $user = $request->user();
         $hasFleetFields = $this->hasFleetFields();
 
         $eagerLoads = [
@@ -300,6 +320,10 @@ class VehicleController extends Controller
             'sites' => $sites,
             'eligible_drivers' => $eligibleDrivers,
             'service_prediction' => $this->buildServicePrediction($asset),
+            'can' => [
+                'manage' => $this->canManageFleet($user),
+                'inspect' => $this->canManageMaintenance($user),
+            ],
             'timeline' => \Inertia\Inertia::optional(fn () =>
                 app(\App\Services\Fleet\FleetTimelineService::class)
                     ->forVehicle($asset->id, now()->subDays(14), 40)
@@ -366,6 +390,12 @@ class VehicleController extends Controller
             'odometer_km' => ['nullable', 'numeric', 'min:0'],
             'inspection_due_at' => ['nullable', 'date'],
             'requires_inspection' => ['nullable', 'boolean'],
+            'has_wheelchair_ramp' => ['nullable', 'boolean'],
+            'has_hoist' => ['nullable', 'boolean'],
+            'has_child_seat_anchors' => ['nullable', 'boolean'],
+            'has_medical_storage' => ['nullable', 'boolean'],
+            'seating_capacity' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'accessibility_notes' => ['nullable', 'string', 'max:5000'],
             'name' => ['sometimes', 'string', 'max:255'],
             'status' => ['sometimes', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:5000'],
@@ -401,6 +431,7 @@ class VehicleController extends Controller
 
     public function trips(Request $request)
     {
+        $user = $request->user();
         $query = FleetTrip::query()
             ->with([
                 'asset:id,name,asset_tag',
@@ -619,11 +650,15 @@ class VehicleController extends Controller
             'trips_by_day' => $tripsByDay,
             'top_vehicles' => $topVehicles,
             'distance_trend' => $distanceTrend,
+            'can' => [
+                'manage' => $this->canManageFleet($user),
+            ],
         ]);
     }
 
     public function fuel(Request $request)
     {
+        $user = $request->user();
         $query = FleetFuelLog::query()
             ->with(['asset:id,name,asset_tag', 'user:id,name'])
             ->latest('logged_at');
@@ -761,6 +796,9 @@ class VehicleController extends Controller
                 'worst_efficiency' => $worstEfficiency,
             ],
             'efficiency' => $efficiency,
+            'can' => [
+                'log_fuel' => $this->canManageFleet($user),
+            ],
         ]);
     }
 
@@ -823,7 +861,7 @@ class VehicleController extends Controller
     public function alertsConfig(Request $request, Asset $asset)
     {
         $config = [];
-        if ($this->hasFleetFields() && $asset->alert_config) {
+        if ($this->hasVehicleAlertConfigField() && $asset->alert_config) {
             $config = is_string($asset->alert_config) ? json_decode($asset->alert_config, true) : (array) $asset->alert_config;
         }
 
@@ -841,6 +879,9 @@ class VehicleController extends Controller
             ],
             'config' => $config,
             'geofences' => $geofences,
+            'can' => [
+                'manage' => (bool) $request->user()?->canDo('fleet.manage'),
+            ],
         ]);
     }
 
@@ -850,8 +891,10 @@ class VehicleController extends Controller
             'config' => ['required', 'array'],
         ]);
 
-        if ($this->hasFleetFields()) {
+        if ($this->hasVehicleAlertConfigField()) {
             $asset->update(['alert_config' => json_encode($data['config'])]);
+        } else {
+            return back()->with('error', 'Vehicle alert configuration is not available until the fleet schema is updated.');
         }
 
         AuditLogger::log('fleet.vehicle.alerts_config', $asset, [

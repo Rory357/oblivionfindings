@@ -51,8 +51,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:training.viewAny')->group(function () {
         Route::get('/training/courses', [TrainingCourseController::class, 'index'])
             ->name('training.courses.index');
-        Route::get('/training/courses/{course}', [TrainingCourseController::class, 'show'])
-            ->name('training.courses.show');
+        Route::get('/training/matrix', fn () => redirect()->route('hr.training.index'))
+            ->name('training.matrix');
     });
 
     Route::middleware('permission:training.manageCourses')->group(function () {
@@ -66,6 +66,11 @@ Route::middleware(['auth'])->group(function () {
             ->name('training.courses.update');
         Route::delete('/training/courses/{course}', [TrainingCourseController::class, 'destroy'])
             ->name('training.courses.destroy');
+    });
+
+    Route::middleware('permission:training.viewAny')->group(function () {
+        Route::get('/training/courses/{course}', [TrainingCourseController::class, 'show'])
+            ->name('training.courses.show');
     });
 
     // Staff Training Records — disabled until StaffTrainingRecordController implementation is complete.

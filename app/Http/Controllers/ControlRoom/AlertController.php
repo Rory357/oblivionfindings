@@ -147,6 +147,13 @@ class AlertController extends Controller
             'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir']),
             'stats' => $stats,
             'staff' => $staff,
+            'basePath' => '/control-room/integration-alerts',
+            'pageTitle' => 'Integration Alerts',
+            'pageDescription' => 'Monitor and triage alerts raised by external integrations.',
+            'pageBreadcrumbs' => [
+                ['title' => 'Control Room', 'href' => '/control-room'],
+                ['title' => 'Integration Alerts', 'href' => '/control-room/integration-alerts'],
+            ],
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
                 'assign' => $user->canDo('controlRoom.alerts.assign'),

@@ -49,6 +49,9 @@ type Props = {
     vehicles: Vehicle[];
     users: UserOption[];
     current_user_id: number;
+    can: {
+        manage: boolean;
+    };
 };
 
 const FUEL_LEVELS = [
@@ -91,7 +94,7 @@ type FormData = {
     notes: string;
 };
 
-export default function HandoverCreate({ vehicles, users, current_user_id }: Props) {
+export default function HandoverCreate({ vehicles, users, current_user_id, can }: Props) {
     const form = useForm<FormData>({
         asset_id: '',
         incoming_user_id: '',
@@ -127,6 +130,37 @@ export default function HandoverCreate({ vehicles, users, current_user_id }: Pro
     };
 
     const currentUserName = (users ?? []).find((u) => u.id === current_user_id)?.name ?? 'Current User';
+
+    if (!can.manage) {
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Fleet & Assets', href: '/fleet-assets' },
+                    { title: 'Shift Handovers', href: '/fleet-assets/handovers' },
+                    { title: 'New Handover', href: '#' },
+                ]}
+            >
+                <Head title="New Shift Handover" />
+                <PageShell>
+                    <FleetHero
+                        title="New Shift Handover"
+                        backHref="/fleet-assets/handovers"
+                        backLabel="Back to Handovers"
+                    />
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">View-only</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                                Creating handovers requires fleet manager access.
+                            </p>
+                        </CardContent>
+                    </Card>
+                </PageShell>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout

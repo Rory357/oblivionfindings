@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, QrCode, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Props = {
     clientId: number | null;
@@ -38,6 +38,11 @@ export default function MedicationScanVerificationPanel({
         emptyMedicationScanCapture(),
     );
     const [verifying, setVerifying] = useState(false);
+    const onChangeRef = useRef(onChange);
+
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    }, [onChange]);
 
     useEffect(() => {
         setCapture(emptyMedicationScanCapture());
@@ -45,8 +50,8 @@ export default function MedicationScanVerificationPanel({
     }, [resetKey, medicationId]);
 
     useEffect(() => {
-        onChange?.(capture);
-    }, [capture, onChange]);
+        onChangeRef.current?.(capture);
+    }, [capture]);
 
     const description = useMemo(() => {
         if (!scanVerification) {

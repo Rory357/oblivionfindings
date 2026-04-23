@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -87,6 +87,11 @@ export default function Destructions({ destructions, filters, staff, clients, me
                         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Record Medication Destruction</DialogTitle>
+                                <DialogDescription>
+                                    Capture disposal details, witnesses, and
+                                    controlled-drug authorisation where
+                                    required.
+                                </DialogDescription>
                             </DialogHeader>
                             <form onSubmit={submit} className="space-y-4">
                                 {/* Client */}

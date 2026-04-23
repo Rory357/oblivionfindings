@@ -78,26 +78,37 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
         { key: draftKey, enabled: bootstrapped },
     );
 
-    // Bootstrap: resume from backend (after Step 2 round-trip) OR prompt for local draft.
+    // Pick up the persisted draft whenever the server redirects back with an
+    // incident id. Inertia keeps this page mounted, so we need to react to
+    // prop changes instead of only bootstrapping on first render.
+    useEffect(() => {
+        if (!resumeIncident) {
+            return;
+        }
+
+        setData({
+            client_id: String(resumeIncident.client_id ?? ''),
+            type: (resumeIncident.type as IncidentType) || 'injury',
+            severity: (resumeIncident.severity as IncidentSeverity) || 'low',
+            occurred_at: resumeIncident.occurred_at ? toLocalInput(resumeIncident.occurred_at) : '',
+            description: resumeIncident.description ?? '',
+            immediate_action_taken: resumeIncident.immediate_action_taken ?? '',
+            witnesses: resumeIncident.witnesses ?? '',
+            injured_person_name: resumeIncident.injured_person_name ?? '',
+            injured_person_role: resumeIncident.injured_person_role ?? '',
+            injury_body_part: resumeIncident.injury_body_part ?? '',
+            injury_nature: resumeIncident.injury_nature ?? '',
+            medical_treatment_type: resumeIncident.medical_treatment_type ?? '',
+        });
+        setIncidentId(resumeIncident.id);
+        setStep(2);
+        setResumePrompt(null);
+        setBootstrapped(true);
+    }, [resumeIncident]);
+
+    // Bootstrap: prompt for a local draft when there is no server-side draft to resume.
     useEffect(() => {
         if (resumeIncident) {
-            setData({
-                client_id: String(resumeIncident.client_id ?? ''),
-                type: (resumeIncident.type as IncidentType) || 'injury',
-                severity: (resumeIncident.severity as IncidentSeverity) || 'low',
-                occurred_at: resumeIncident.occurred_at ? toLocalInput(resumeIncident.occurred_at) : '',
-                description: resumeIncident.description ?? '',
-                immediate_action_taken: resumeIncident.immediate_action_taken ?? '',
-                witnesses: resumeIncident.witnesses ?? '',
-                injured_person_name: resumeIncident.injured_person_name ?? '',
-                injured_person_role: resumeIncident.injured_person_role ?? '',
-                injury_body_part: resumeIncident.injury_body_part ?? '',
-                injury_nature: resumeIncident.injury_nature ?? '',
-                medical_treatment_type: resumeIncident.medical_treatment_type ?? '',
-            });
-            setIncidentId(resumeIncident.id);
-            setStep(2);
-            setBootstrapped(true);
             return;
         }
 

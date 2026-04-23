@@ -61,10 +61,13 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.transform(data => ({
+        form.transform((data) => ({
             ...data,
             template_id: data.template_id ? parseInt(data.template_id) : null,
-        })).post('/hr/feedback/request');
+        }));
+        form.post('/hr/feedback/request', {
+            onFinish: () => form.transform((data) => data),
+        });
     };
 
     const isSelfAssessment = form.data.review_type === 'self';
@@ -239,8 +242,16 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                                         {availableReviewers.map(emp => {
                                             const selected = form.data.reviewer_user_ids.includes(String(emp.id));
                                             return (
-                                                <label key={emp.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition-all ${selected ? 'border-blue-300 bg-blue-50/50 shadow-sm' : 'hover:bg-muted/50'}`}>
-                                                    <Checkbox checked={selected} onCheckedChange={() => toggleReviewer(String(emp.id))} />
+                                                <label
+                                                    key={emp.id}
+                                                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition-all ${selected ? 'border-blue-300 bg-blue-50/50 shadow-sm' : 'hover:bg-muted/50'}`}
+                                                    onClick={() => toggleReviewer(String(emp.id))}
+                                                >
+                                                    <Checkbox
+                                                        checked={selected}
+                                                        onCheckedChange={() => toggleReviewer(String(emp.id))}
+                                                        onClick={(event) => event.stopPropagation()}
+                                                    />
                                                     <div className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white ${avatarColor(emp.id)}`}>
                                                         {getInitials(emp.name)}
                                                     </div>

@@ -31,7 +31,7 @@ type Props = {
     staff: Array<{ id: number; name: string }>;
 };
 
-const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const;
+const RISK_LEVELS = ['low', 'medium', 'high', 'very_high'] as const;
 
 const parseList = (value: string) => {
     const items = value

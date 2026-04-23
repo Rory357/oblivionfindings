@@ -1,17 +1,16 @@
-import PasswordController from '@/actions/App/Http/Controllers/Settings/PasswordController';
 import InputError from '@/components/input-error';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { edit, update } from '@/routes/user-password';
 import { type BreadcrumbItem } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head } from '@inertiajs/react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { edit } from '@/routes/user-password';
 import { Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -65,7 +64,7 @@ export default function Password() {
                     </CardHeader>
                     <CardContent>
                         <Form
-                            {...PasswordController.update.form()}
+                            {...update.form()}
                             options={{
                                 preserveScroll: true,
                             }}

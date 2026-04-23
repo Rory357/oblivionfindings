@@ -90,6 +90,9 @@ type Props = {
         worst_efficiency: EfficiencyRow | null;
     };
     efficiency: EfficiencyRow[];
+    can: {
+        log_fuel: boolean;
+    };
 };
 
 export default function FuelIndex({
@@ -98,6 +101,7 @@ export default function FuelIndex({
     filters: rawFilters,
     summary: rawSummary,
     efficiency: rawEfficiency,
+    can,
 }: Props) {
     const fuelLogs = rawFuelLogs?.data ?? [];
     const meta = rawFuelLogs?.meta ?? { current_page: 1, last_page: 1, total: 0 };
@@ -194,158 +198,160 @@ export default function FuelIndex({
                                 <Download className="mr-2 h-4 w-4" />
                                 Export CSV
                             </Button>
-                            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button size="sm">
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Log Fuel
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-lg">
-                                    <DialogHeader>
-                                        <DialogTitle>Log Fuel Fill-up</DialogTitle>
-                                        <DialogDescription>
-                                            Record a fuel purchase for a vehicle.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <form onSubmit={handleSubmit}>
-                                        <div className="grid gap-4 py-4">
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="asset_id">Vehicle *</Label>
-                                                <Select
-                                                    value={form.data.asset_id}
-                                                    onValueChange={(v) => form.setData('asset_id', v)}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select vehicle" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {vehicles.map((v) => (
-                                                            <SelectItem key={v.id} value={String(v.id)}>
-                                                                {v.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                {form.errors.asset_id && (
-                                                    <p className="text-xs text-destructive">{form.errors.asset_id}</p>
-                                                )}
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
+                            {can.log_fuel && (
+                                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button size="sm">
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Log Fuel
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-lg">
+                                        <DialogHeader>
+                                            <DialogTitle>Log Fuel Fill-up</DialogTitle>
+                                            <DialogDescription>
+                                                Record a fuel purchase for a vehicle.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <form onSubmit={handleSubmit}>
+                                            <div className="grid gap-4 py-4">
                                                 <div className="grid gap-2">
-                                                    <Label htmlFor="logged_at">Date *</Label>
-                                                    <Input
-                                                        id="logged_at"
-                                                        type="date"
-                                                        value={form.data.logged_at}
-                                                        onChange={(e) => form.setData('logged_at', e.target.value)}
-                                                    />
-                                                    {form.errors.logged_at && (
-                                                        <p className="text-xs text-destructive">{form.errors.logged_at}</p>
-                                                    )}
-                                                </div>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="odometer_km">Odometer (km)</Label>
-                                                    <Input
-                                                        id="odometer_km"
-                                                        type="number"
-                                                        step="0.1"
-                                                        placeholder="e.g. 45230"
-                                                        value={form.data.odometer_km}
-                                                        onChange={(e) => form.setData('odometer_km', e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="quantity_litres">Litres *</Label>
-                                                    <Input
-                                                        id="quantity_litres"
-                                                        type="number"
-                                                        step="0.01"
-                                                        placeholder="e.g. 55.5"
-                                                        value={form.data.quantity_litres}
-                                                        onChange={(e) => form.setData('quantity_litres', e.target.value)}
-                                                    />
-                                                    {form.errors.quantity_litres && (
-                                                        <p className="text-xs text-destructive">{form.errors.quantity_litres}</p>
-                                                    )}
-                                                </div>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="total_cost">Total Cost ($) *</Label>
-                                                    <Input
-                                                        id="total_cost"
-                                                        type="number"
-                                                        step="0.01"
-                                                        placeholder="e.g. 120.50"
-                                                        value={form.data.total_cost}
-                                                        onChange={(e) => form.setData('total_cost', e.target.value)}
-                                                    />
-                                                    {form.errors.total_cost && (
-                                                        <p className="text-xs text-destructive">{form.errors.total_cost}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="fuel_type">Fuel Type</Label>
+                                                    <Label htmlFor="asset_id">Vehicle *</Label>
                                                     <Select
-                                                        value={form.data.fuel_type}
-                                                        onValueChange={(v) => form.setData('fuel_type', v)}
+                                                        value={form.data.asset_id}
+                                                        onValueChange={(v) => form.setData('asset_id', v)}
                                                     >
                                                         <SelectTrigger>
-                                                            <SelectValue placeholder="Select type" />
+                                                            <SelectValue placeholder="Select vehicle" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="petrol">Petrol</SelectItem>
-                                                            <SelectItem value="diesel">Diesel</SelectItem>
-                                                            <SelectItem value="electric">Electric</SelectItem>
-                                                            <SelectItem value="hybrid">Hybrid</SelectItem>
-                                                            <SelectItem value="lpg">LPG</SelectItem>
+                                                            {vehicles.map((v) => (
+                                                                <SelectItem key={v.id} value={String(v.id)}>
+                                                                    {v.name}
+                                                                </SelectItem>
+                                                            ))}
                                                         </SelectContent>
                                                     </Select>
+                                                    {form.errors.asset_id && (
+                                                        <p className="text-xs text-destructive">{form.errors.asset_id}</p>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="logged_at">Date *</Label>
+                                                        <Input
+                                                            id="logged_at"
+                                                            type="date"
+                                                            value={form.data.logged_at}
+                                                            onChange={(e) => form.setData('logged_at', e.target.value)}
+                                                        />
+                                                        {form.errors.logged_at && (
+                                                            <p className="text-xs text-destructive">{form.errors.logged_at}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="odometer_km">Odometer (km)</Label>
+                                                        <Input
+                                                            id="odometer_km"
+                                                            type="number"
+                                                            step="0.1"
+                                                            placeholder="e.g. 45230"
+                                                            value={form.data.odometer_km}
+                                                            onChange={(e) => form.setData('odometer_km', e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="quantity_litres">Litres *</Label>
+                                                        <Input
+                                                            id="quantity_litres"
+                                                            type="number"
+                                                            step="0.01"
+                                                            placeholder="e.g. 55.5"
+                                                            value={form.data.quantity_litres}
+                                                            onChange={(e) => form.setData('quantity_litres', e.target.value)}
+                                                        />
+                                                        {form.errors.quantity_litres && (
+                                                            <p className="text-xs text-destructive">{form.errors.quantity_litres}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="total_cost">Total Cost ($) *</Label>
+                                                        <Input
+                                                            id="total_cost"
+                                                            type="number"
+                                                            step="0.01"
+                                                            placeholder="e.g. 120.50"
+                                                            value={form.data.total_cost}
+                                                            onChange={(e) => form.setData('total_cost', e.target.value)}
+                                                        />
+                                                        {form.errors.total_cost && (
+                                                            <p className="text-xs text-destructive">{form.errors.total_cost}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="fuel_type">Fuel Type</Label>
+                                                        <Select
+                                                            value={form.data.fuel_type}
+                                                            onValueChange={(v) => form.setData('fuel_type', v)}
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select type" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="petrol">Petrol</SelectItem>
+                                                                <SelectItem value="diesel">Diesel</SelectItem>
+                                                                <SelectItem value="electric">Electric</SelectItem>
+                                                                <SelectItem value="hybrid">Hybrid</SelectItem>
+                                                                <SelectItem value="lpg">LPG</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="station_name">Station</Label>
+                                                        <Input
+                                                            id="station_name"
+                                                            placeholder="e.g. BP Penrose"
+                                                            value={form.data.station_name}
+                                                            onChange={(e) => form.setData('station_name', e.target.value)}
+                                                        />
+                                                    </div>
                                                 </div>
                                                 <div className="grid gap-2">
-                                                    <Label htmlFor="station_name">Station</Label>
+                                                    <Label htmlFor="notes">Notes</Label>
                                                     <Input
-                                                        id="station_name"
-                                                        placeholder="e.g. BP Penrose"
-                                                        value={form.data.station_name}
-                                                        onChange={(e) => form.setData('station_name', e.target.value)}
+                                                        id="notes"
+                                                        placeholder="Optional notes..."
+                                                        value={form.data.notes}
+                                                        onChange={(e) => form.setData('notes', e.target.value)}
                                                     />
                                                 </div>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        id="full_tank"
+                                                        type="checkbox"
+                                                        className="rounded border-gray-300"
+                                                        checked={form.data.full_tank}
+                                                        onChange={(e) => form.setData('full_tank', e.target.checked)}
+                                                    />
+                                                    <Label htmlFor="full_tank" className="text-sm font-normal">Full tank fill-up</Label>
+                                                </div>
                                             </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="notes">Notes</Label>
-                                                <Input
-                                                    id="notes"
-                                                    placeholder="Optional notes..."
-                                                    value={form.data.notes}
-                                                    onChange={(e) => form.setData('notes', e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    id="full_tank"
-                                                    type="checkbox"
-                                                    className="rounded border-gray-300"
-                                                    checked={form.data.full_tank}
-                                                    onChange={(e) => form.setData('full_tank', e.target.checked)}
-                                                />
-                                                <Label htmlFor="full_tank" className="text-sm font-normal">Full tank fill-up</Label>
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                                                Cancel
-                                            </Button>
-                                            <Button type="submit" disabled={form.processing}>
-                                                {form.processing ? 'Saving...' : 'Save Fuel Log'}
-                                            </Button>
-                                        </DialogFooter>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
+                                            <DialogFooter>
+                                                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                                                    Cancel
+                                                </Button>
+                                                <Button type="submit" disabled={form.processing}>
+                                                    {form.processing ? 'Saving...' : 'Save Fuel Log'}
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                            )}
                         </div>
                     }
                 />

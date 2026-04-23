@@ -10,6 +10,7 @@ use App\Domain\Finance\Http\Requests\StoreCreditNoteRequest;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class CreditNoteController extends Controller
@@ -59,9 +60,19 @@ class CreditNoteController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $clients = Client::where('organization_id', $orgId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $clients = Client::query()
+            ->when(
+                $orgId && Schema::hasColumn('clients', 'organization_id'),
+                fn ($query) => $query->where('organization_id', $orgId),
+            )
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn (Client $client) => [
+                'id' => $client->id,
+                'name' => trim($client->first_name . ' ' . $client->last_name),
+            ])
+            ->values();
 
         $accounts = FinAccount::forOrganization($orgId)
             ->active()

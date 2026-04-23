@@ -348,8 +348,8 @@ test('fleet mobile dashboard page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/fleet-assets/mobile/dashboard')
-            ->waitForText('Mobile', 10)
-            ->assertSee('Mobile');
+            ->waitFor('@fleet-mobile-dashboard-heading', 10)
+            ->assertSeeIn('@fleet-mobile-dashboard-heading', 'Mobile Dashboard');
     });
 });
 

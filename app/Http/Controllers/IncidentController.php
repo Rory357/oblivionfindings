@@ -76,9 +76,13 @@ class IncidentController extends Controller
 
     public function create(Request $request)
     {
-        abort_unless($request->user()?->canDo('incidents.create'), 403);
+        $user = $request->user();
+        abort_unless($user?->canDo('incidents.create'), 403);
 
         $clients = Client::query()
+            ->when(! $user->canDo('clients.viewAny'), function ($query) use ($user) {
+                $query->whereHas('supportWorkers', fn ($staff) => $staff->whereKey($user->id));
+            })
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -255,6 +259,7 @@ class IncidentController extends Controller
                 'submit' => $user ? $user->can('submit', $incident) : false,
                 'review' => $user ? $user->can('review', $incident) : false,
                 'close' => $user ? $user->can('close', $incident) : false,
+                'reopen' => $user ? $user->can('reopen', $incident) : false,
                 'templatesManage' => $user?->canDo('incidents.templates.manage') ?? false,
                 'followupsManage' => $user?->canDo('incidents.followups.manage') ?? false,
                 'followupsComplete' => $user?->canDo('incidents.followups.complete') ?? false,
@@ -270,6 +275,14 @@ class IncidentController extends Controller
         $this->authorize('update', $incident);
 
         $user = $request->user();
+
+        // The show page mixes full-form saves with smaller partial updates
+        // (for example corrective actions), so preserve the existing core
+        // values when those fields are omitted from the request.
+        $request->merge([
+            'type' => $request->input('type', $incident->type),
+            'severity' => $request->input('severity', $incident->severity),
+        ]);
 
         // Audit guardrail: once submitted/reviewed, lock core incident fields.
         // Managers can still add review notes and manage portal visibility.

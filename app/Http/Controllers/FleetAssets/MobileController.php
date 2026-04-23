@@ -52,6 +52,9 @@ class MobileController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
             ],
+            'can' => [
+                'start_inspection' => (bool) ($user?->canDo('fleet.manage') || $user?->canDo('fleet.maintenance.manage')),
+            ],
         ]);
     }
 }

@@ -15,6 +15,15 @@ class MileageController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
+        $canApprove = (bool) $user?->canDo('fleet.manage')
+            || (bool) $user?->canDo('fleet.mileage.approve')
+            || (bool) $user?->hasRole('admin');
+        $canViewAll = $canApprove
+            || (bool) $user?->canDo('fleet.viewAny')
+            || (bool) $user?->canDo('assets.viewAny')
+            || (bool) $user?->hasRole('admin');
+
         if (!Schema::hasTable('fleet_personal_trips')) {
             return Inertia::render('fleet-assets/mileage/index', [
                 'trips' => ['data' => [], 'links' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0]],
@@ -27,17 +36,18 @@ class MileageController extends Controller
                     'pending_approval' => 0,
                 ],
                 'staff_summary' => [],
+                'is_manager' => $canViewAll,
+                'can' => [
+                    'approve' => $canApprove,
+                ],
             ]);
         }
-
-        $user = $request->user();
-        $isManager = $user->can('fleet.viewAny') || $user->hasRole('admin');
 
         $query = FleetPersonalTrip::query()
             ->with(['user:id,name', 'client:id,first_name,last_name', 'approvedBy:id,name']);
 
         // Non-managers only see their own trips
-        if (!$isManager) {
+        if (!$canViewAll) {
             $query->where('user_id', $user->id);
         } elseif ($request->filled('user_id')) {
             $query->where('user_id', (int) $request->input('user_id'));
@@ -64,7 +74,7 @@ class MileageController extends Controller
         $monthQuery = FleetPersonalTrip::query()
             ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')]);
 
-        if (!$isManager) {
+        if (!$canViewAll) {
             $monthQuery->where('user_id', $user->id);
         }
 
@@ -73,14 +83,14 @@ class MileageController extends Controller
         $totalReimbursement = (clone $monthQuery)->sum('total_amount');
 
         $pendingQuery = FleetPersonalTrip::where('status', 'pending');
-        if (!$isManager) {
+        if (!$canViewAll) {
             $pendingQuery->where('user_id', $user->id);
         }
         $pendingApproval = $pendingQuery->count();
 
         // Staff summary for managers
         $staffSummary = [];
-        if ($isManager) {
+        if ($canViewAll) {
             $staffSummary = FleetPersonalTrip::query()
                 ->join('users', 'fleet_personal_trips.user_id', '=', 'users.id')
                 ->whereBetween('date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
@@ -100,7 +110,7 @@ class MileageController extends Controller
 
         // Staff list for filter dropdown (managers only)
         $staff = [];
-        if ($isManager) {
+        if ($canViewAll) {
             $staff = User::query()
                 ->whereIn('id', FleetPersonalTrip::distinct()->pluck('user_id'))
                 ->orderBy('name')
@@ -146,7 +156,10 @@ class MileageController extends Controller
                 'pending_approval' => $pendingApproval,
             ],
             'staff_summary' => $staffSummary,
-            'is_manager' => $isManager,
+            'is_manager' => $canViewAll,
+            'can' => [
+                'approve' => $canApprove,
+            ],
         ]);
     }
 

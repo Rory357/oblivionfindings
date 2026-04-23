@@ -21,7 +21,7 @@ class SuccessionController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        abort_unless($this->canView($user), 403);
 
         $plans = HrSuccessionPlan::query()
             ->with(['currentHolder:id,name', 'position:id,title,department'])
@@ -39,6 +39,7 @@ class SuccessionController extends Controller
             'role_title' => $plan->role_title,
             'department' => $plan->department,
             'risk_level' => $plan->risk_level,
+            'current_holder_name' => $plan->currentHolder?->name,
             'current_holder' => $plan->currentHolder?->only('id', 'name'),
             'position' => $plan->position?->only('id', 'title'),
             'candidates_count' => $plan->candidates_count,
@@ -62,6 +63,9 @@ class SuccessionController extends Controller
             'readinessSummary' => $readinessSummary,
             'departments' => $departments,
             'filters' => $request->only(['risk_level', 'department', 'active_only']),
+            'can' => [
+                'manage' => $this->canManage($user),
+            ],
         ]);
     }
 
@@ -145,7 +149,7 @@ class SuccessionController extends Controller
     public function show(Request $request, HrSuccessionPlan $plan)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        abort_unless($this->canView($user), 403);
 
         $plan->load([
             'currentHolder:id,name,email',
@@ -168,6 +172,7 @@ class SuccessionController extends Controller
                 'risk_level' => $plan->risk_level,
                 'notes' => $plan->notes,
                 'is_active' => $plan->is_active,
+                'current_holder_name' => $plan->currentHolder?->name,
                 'current_holder' => $plan->currentHolder?->only('id', 'name', 'email'),
                 'position' => $plan->position?->only('id', 'title', 'department'),
                 'creator' => $plan->creator?->only('id', 'name'),
@@ -190,6 +195,9 @@ class SuccessionController extends Controller
                 ]),
             ],
             'employees' => $employees,
+            'can' => [
+                'manage' => $this->canManage($user),
+            ],
         ]);
     }
 
@@ -199,7 +207,7 @@ class SuccessionController extends Controller
     public function update(Request $request, HrSuccessionPlan $plan)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'role_title' => ['sometimes', 'string', 'max:255'],
@@ -221,7 +229,7 @@ class SuccessionController extends Controller
     public function addCandidate(Request $request, HrSuccessionPlan $plan)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
@@ -250,7 +258,7 @@ class SuccessionController extends Controller
     public function updateCandidate(Request $request, HrSuccessionCandidate $candidate)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'readiness' => ['sometimes', Rule::in(['ready_now', 'ready_1_year', 'ready_2_years', 'developing'])],
@@ -265,5 +273,18 @@ class SuccessionController extends Controller
         ]));
 
         return redirect()->back()->with('success', 'Candidate updated.');
+    }
+
+    private function canView($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.performance.view')
+            || $user->canDo('hr.performance.manage')
+        );
+    }
+
+    private function canManage($user): bool
+    {
+        return (bool) $user && $user->canDo('hr.performance.manage');
     }
 }

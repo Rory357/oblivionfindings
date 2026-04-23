@@ -101,6 +101,7 @@ type Props = {
     };
     sites: Site[];
     staff: Staff[];
+    can_manage: boolean;
     filters?: {
         site_id: string | null;
         ppe_type_id: string | null;
@@ -181,7 +182,7 @@ const categoryColor = (c: string) => {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function PpeIndex({ types, inventory, allocations, stats, sites, staff, filters }: Props) {
+export default function PpeIndex({ types, inventory, allocations, stats, sites, staff, filters, can_manage }: Props) {
     const currentFilters = filters ?? { site_id: null, ppe_type_id: null, condition: null, status: null };
 
     /* Dialog states */
@@ -325,10 +326,12 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                         <Search className="h-4 w-4" />
                                         Filters
                                     </span>
-                                    <Button size="sm" onClick={() => setAddItemOpen(true)}>
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Add Item
-                                    </Button>
+                                    {can_manage && (
+                                        <Button size="sm" onClick={() => setAddItemOpen(true)}>
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add Item
+                                        </Button>
+                                    )}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
@@ -472,7 +475,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                                     </td>
                                                     <td className="py-2.5">
                                                         <div className="flex flex-wrap gap-1.5">
-                                                            {item.status === 'available' && (
+                                                            {can_manage && item.status === 'available' && (
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
@@ -485,7 +488,8 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                                                     Allocate
                                                                 </Button>
                                                             )}
-                                                            {item.status !== 'condemned' &&
+                                                            {can_manage &&
+                                                                item.status !== 'condemned' &&
                                                                 item.status !== 'retired' && (
                                                                     <Button
                                                                         variant="outline"
@@ -535,12 +539,14 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
 
                     {/* ========== PPE TYPES TAB ========== */}
                     <TabsContent value="types" className="space-y-4">
-                        <div className="flex justify-end">
-                            <Button size="sm" onClick={() => setAddTypeOpen(true)}>
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Add Type
-                            </Button>
-                        </div>
+                        {can_manage && (
+                            <div className="flex justify-end">
+                                <Button size="sm" onClick={() => setAddTypeOpen(true)}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add Type
+                                </Button>
+                            </div>
+                        )}
 
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             {types.map((t) => (
@@ -645,7 +651,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                                         )}
                                                     </td>
                                                     <td className="py-2.5">
-                                                        {!a.returned_at && (
+                                                        {can_manage && !a.returned_at && (
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"

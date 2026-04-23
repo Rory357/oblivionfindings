@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use Laravel\Dusk\Browser;
 
 test('hr people index loads', function () {
@@ -26,9 +27,9 @@ test('hr people directory loads', function () {
 test('hr people profile documents page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
-        $staff = \App\Models\Staff::factory()->forUser($user)->create();
+        $profile = HrEmployeeProfile::query()->firstOrFail();
         $browser->loginAs($user)
-            ->visit('/hr/people/' . $staff->id . '/documents')
+            ->visit('/hr/people/' . $profile->id . '/documents')
             ->waitForText('Document', 10)
             ->assertPathBeginsWith('/hr/people');
     });
@@ -37,9 +38,9 @@ test('hr people profile documents page loads', function () {
 test('hr people profile edit page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
-        $staff = \App\Models\Staff::factory()->forUser($user)->create();
+        $profile = HrEmployeeProfile::query()->firstOrFail();
         $browser->loginAs($user)
-            ->visit('/hr/people/' . $staff->id . '/edit')
+            ->visit('/hr/people/' . $profile->id . '/edit')
             ->waitForText('Edit', 10)
             ->assertPathBeginsWith('/hr/people');
     });

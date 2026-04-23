@@ -39,6 +39,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ShiftController extends Controller
@@ -298,12 +299,16 @@ class ShiftController extends Controller
 
         $assignmentCandidates = [];
         if ($auth->canDo('shifts.manageAny') && in_array($shift->status, ['draft', 'scheduled', 'in_progress'], true)) {
-            $assignmentCandidates = app(ShiftAssignmentRecommendationService::class)->forShift(
-                $shift,
-                $auth,
-                8,
-                $this->shiftStaffBypassPermissions(),
-            );
+            try {
+                $assignmentCandidates = app(ShiftAssignmentRecommendationService::class)->forShift(
+                    $shift,
+                    $auth,
+                    8,
+                    $this->shiftStaffBypassPermissions(),
+                );
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
         }
         $coverage = app(ShiftCoverageService::class)->coverageStatusForShift($shift);
 
@@ -419,21 +424,45 @@ class ShiftController extends Controller
             ] : null,
             'assignmentCandidates' => $assignmentCandidates,
             'coverage' => $coverage,
-            'linkedTimesheet' => Timesheet::where('shift_id', $shift->id)
-                ->select(['id', 'status', 'work_date', 'starts_at', 'ends_at', 'exported_to_payroll_at', 'payroll_reference', 'reconciliation_status'])
-                ->first(),
+            'linkedTimesheet' => (function () use ($shift) {
+                $columns = ['id', 'status', 'work_date', 'starts_at', 'ends_at', 'exported_to_payroll_at', 'payroll_reference'];
+
+                if (Schema::hasColumn('timesheets', 'reconciliation_status')) {
+                    $columns[] = 'reconciliation_status';
+                }
+
+                $timesheet = Timesheet::where('shift_id', $shift->id)
+                    ->select($columns)
+                    ->first();
+
+                if ($timesheet && ! array_key_exists('reconciliation_status', $timesheet->getAttributes())) {
+                    $timesheet->setAttribute('reconciliation_status', null);
+                }
+
+                return $timesheet;
+            })(),
             'handoverSummary' => (function () use ($shift) {
+                $columns = ['id', 'incoming_staff_id'];
+
+                if (Schema::hasColumn('shift_handovers', 'status')) {
+                    $columns[] = 'status';
+                }
+
+                if (Schema::hasColumn('shift_handovers', 'observations_summary')) {
+                    $columns[] = 'observations_summary';
+                }
+
                 $h = ShiftHandover::where('outgoing_shift_id', $shift->id)
-                    ->select(['id', 'status', 'incoming_staff_id', 'observations_summary'])
+                    ->select($columns)
                     ->with(['incomingStaff:id,name'])
                     ->latest()
                     ->first();
 
                 return $h ? [
                     'id' => $h->id,
-                    'status' => $h->status,
+                    'status' => $h->getAttribute('status'),
                     'incoming_staff_name' => $h->incomingStaff?->name,
-                    'observations_summary' => $h->observations_summary,
+                    'observations_summary' => $h->getAttribute('observations_summary'),
                 ] : null;
             })(),
             'can' => [

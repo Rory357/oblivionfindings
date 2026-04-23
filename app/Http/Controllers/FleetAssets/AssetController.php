@@ -4,8 +4,12 @@ namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\AssetAssignment;
 use App\Models\AssetCategory;
+use App\Models\Client;
+use App\Models\ClientEmergencyContact;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -13,9 +17,42 @@ use Inertia\Inertia;
 
 class AssetController extends Controller
 {
+    private function mapAssetAssignment(AssetAssignment $assignment): array
+    {
+        return [
+            'id' => $assignment->id,
+            'assignee' => [
+                'id' => $assignment->assignee_id,
+                'name' => $this->resolveAssignmentAssigneeName($assignment),
+            ],
+            'assigned_at' => optional($assignment->assigned_at)->toISOString(),
+            'returned_at' => optional($assignment->released_at)->toISOString(),
+            'purpose' => $assignment->purpose,
+        ];
+    }
+
+    private function resolveAssignmentAssigneeName(AssetAssignment $assignment): string
+    {
+        return match ($assignment->assignee_type) {
+            'staff' => User::query()->whereKey($assignment->assignee_id)->value('name') ?? "Staff #{$assignment->assignee_id}",
+            'client' => Client::query()
+                ->whereKey($assignment->assignee_id)
+                ->get(['first_name', 'last_name'])
+                ->map(fn ($client) => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')))
+                ->first() ?: "Client #{$assignment->assignee_id}",
+            'whanau' => ClientEmergencyContact::query()->whereKey($assignment->assignee_id)->value('name') ?? "Whanau #{$assignment->assignee_id}",
+            default => ucfirst((string) $assignment->assignee_type) . " #{$assignment->assignee_id}",
+        };
+    }
+
     private function hasFleetFields(): bool
     {
         return Schema::hasColumn('assets', 'home_site_id');
+    }
+
+    private function hasTable(string $table): bool
+    {
+        return Schema::hasTable($table);
     }
 
     public function index(Request $request)
@@ -125,12 +162,18 @@ class AssetController extends Controller
     public function show(Request $request, Asset $asset)
     {
         $hasFleetFields = $this->hasFleetFields();
+        $hasDeviceAssetLinks = $this->hasTable('device_asset_links');
+        $hasFleetVehicleStateSnapshots = $this->hasTable('fleet_vehicle_state_snapshots');
+        $hasFleetVehicleBookings = $this->hasTable('fleet_vehicle_bookings');
+        $hasFleetWorkOrders = $this->hasTable('fleet_work_orders');
+        $hasFleetChecklistRuns = $this->hasTable('fleet_checklist_runs');
+        $hasFleetChecklistTemplates = $this->hasTable('fleet_checklist_templates');
+        $hasFleetServiceSchedules = $this->hasTable('fleet_service_schedules');
 
         $eagerLoads = [
             'site:id,name',
             'client:id,first_name,last_name',
-            'trackers',
-            'inspections' => fn ($q) => $q->latest()->limit(20),
+            'inspections' => fn ($q) => $q->latest()->limit(20)->with('inspectedBy:id,name'),
             'maintenanceLogs' => fn ($q) => $q->latest()->limit(20),
             'documents',
             'assignments' => fn ($q) => $q->latest()->limit(20),
@@ -138,14 +181,33 @@ class AssetController extends Controller
             'alerts' => fn ($q) => $q->latest()->limit(20),
             'geofences',
             'scanEvents' => fn ($q) => $q->latest()->limit(20),
-            'fleetState',
-            'workOrders' => fn ($q) => $q->latest()->limit(20),
-            'checklistRuns' => fn ($q) => $q->latest()->limit(20),
-            'checklistRuns.template',
-            'serviceSchedules',
-            'bookings' => fn ($q) => $q->latest()->limit(20),
             'categoryRef:id,name,slug',
         ];
+
+        if ($hasFleetVehicleStateSnapshots) {
+            $eagerLoads[] = 'fleetState';
+        }
+
+        if ($hasFleetWorkOrders) {
+            $eagerLoads['workOrders'] = fn ($q) => $q->latest()->limit(20)->with('assignedTo:id,name');
+        }
+
+        if ($hasFleetChecklistRuns) {
+            $eagerLoads['checklistRuns'] = fn ($q) => $q->latest()->limit(20);
+
+            if ($hasFleetChecklistTemplates) {
+                $eagerLoads[] = 'checklistRuns.template';
+            }
+        }
+
+        if ($hasFleetServiceSchedules) {
+            $eagerLoads[] = 'serviceSchedules';
+        }
+
+        if ($hasFleetVehicleBookings) {
+            $eagerLoads['bookings'] = fn ($q) => $q->latest()->limit(20);
+        }
+
         if ($hasFleetFields) {
             $eagerLoads[] = 'homeSite';
             $eagerLoads[] = 'primaryDriver';
@@ -183,13 +245,15 @@ class AssetController extends Controller
             ]);
         }
 
-        foreach ($asset->workOrders as $item) {
-            $timeline->push([
-                'type' => 'work_order',
-                'date' => optional($item->created_at)->toISOString(),
-                'summary' => "Work order: {$item->title}",
-                'id' => $item->id,
-            ]);
+        if ($hasFleetWorkOrders) {
+            foreach ($asset->workOrders as $item) {
+                $timeline->push([
+                    'type' => 'work_order',
+                    'date' => optional($item->created_at)->toISOString(),
+                    'summary' => "Work order: {$item->title}",
+                    'id' => $item->id,
+                ]);
+            }
         }
 
         foreach ($asset->alerts as $item) {
@@ -202,6 +266,7 @@ class AssetController extends Controller
         }
 
         $timeline = $timeline->sortByDesc('date')->values()->take(50);
+        $currentAssignment = $asset->assignments->first(fn ($assignment) => $assignment->released_at === null);
 
         $safeAsset = [
             'id' => $asset->id,
@@ -209,7 +274,12 @@ class AssetController extends Controller
             'asset_tag' => $asset->asset_tag,
             'category' => $asset->category,
             'status' => $asset->status,
+            'risk_level' => $asset->risk_level,
             'description' => $asset->description,
+            'manufacturer' => $asset->manufacturer,
+            'model' => $asset->model,
+            'serial_number' => $asset->serial_number,
+            'location' => $asset->location,
             'site_id' => $asset->site_id,
             'site' => $asset->site ? ['id' => $asset->site->id, 'name' => $asset->site->name] : null,
             'client' => $asset->client ? ['id' => $asset->client->id, 'name' => trim(($asset->client->first_name ?? '') . ' ' . ($asset->client->last_name ?? ''))] : null,
@@ -222,32 +292,40 @@ class AssetController extends Controller
             'primary_driver' => $asset->primaryDriver ? ['id' => $asset->primaryDriver->id, 'name' => $asset->primaryDriver->name] : null,
             'purchase_date' => optional($asset->purchase_date)->toDateString(),
             'warranty_expires_at' => optional($asset->warranty_expires_at)->toDateString(),
+            'requires_inspection' => (bool) $asset->requires_inspection,
+            'inspection_due_at' => optional($asset->inspection_due_at)->toDateString(),
             'wof_expires_at' => optional($asset->wof_expires_at)->toDateString(),
             'registration_expires_at' => optional($asset->registration_expires_at)->toDateString(),
             'cof_expires_at' => optional($asset->cof_expires_at)->toDateString(),
             'insurance_expires_at' => optional($asset->insurance_expires_at)->toDateString(),
+            'requires_maintenance' => (bool) $asset->requires_maintenance,
+            'maintenance_due_at' => optional($asset->maintenance_due_at)->toDateString(),
             'notes' => $asset->notes,
-            'trackers' => \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
-                ->active()
-                ->forAsset($asset->id)
-                ->with('device:id,device_uid,name,status,health_status,provider,last_seen_at,battery_level,imei,serial_number')
-                ->get()
-                ->map(fn ($link) => [
-                    'id' => $link->device?->id,
-                    'device_uid' => $link->device?->device_uid,
-                    'name' => $link->device?->name,
-                    'vendor' => $link->device?->provider,
-                    'status' => $link->device?->status?->value,
-                    'health_status' => $link->device?->health_status?->value,
-                    'last_seen_at' => $link->device?->last_seen_at?->toISOString(),
-                    'battery_level' => $link->device?->battery_level,
-                    'link_type' => $link->link_type?->value,
-                    'linked_at' => $link->linked_at?->toISOString(),
-                    'detail_url' => $link->device ? "/security-devices/devices/{$link->device->id}" : null,
-                ])
-                ->filter(fn ($t) => $t['id'] !== null)
-                ->values(),
-            'fleet_state' => $asset->fleetState ? [
+            'trackers' => $hasDeviceAssetLinks
+                ? \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
+                    ->active()
+                    ->forAsset($asset->id)
+                    ->with('device:id,device_uid,name,status,health_status,provider,last_seen_at,battery_level,imei,serial_number')
+                    ->get()
+                    ->map(fn ($link) => [
+                        'id' => $link->device?->id,
+                        'device_uid' => $link->device?->device_uid,
+                        'name' => $link->device?->name,
+                        'vendor' => $link->device?->provider,
+                        'status' => $link->device?->status?->value,
+                        'health_status' => $link->device?->health_status?->value,
+                        'last_seen_at' => $link->device?->last_seen_at?->toISOString(),
+                        'battery_level' => $link->device?->battery_level,
+                        'imei' => $link->device?->imei,
+                        'serial_number' => $link->device?->serial_number,
+                        'link_type' => $link->link_type?->value,
+                        'linked_at' => $link->linked_at?->toISOString(),
+                        'detail_url' => $link->device ? "/security-devices/devices/{$link->device->id}" : null,
+                    ])
+                    ->filter(fn ($t) => $t['id'] !== null)
+                    ->values()
+                : collect(),
+            'fleet_state' => $hasFleetVehicleStateSnapshots && $asset->fleetState ? [
                 'status' => $asset->fleetState->status,
                 'latitude' => $asset->fleetState->latitude,
                 'longitude' => $asset->fleetState->longitude,
@@ -257,22 +335,31 @@ class AssetController extends Controller
             ] : null,
             'documents' => $asset->documents->map(fn ($d) => [
                 'id' => $d->id,
-                'title' => $d->title,
-                'file_path' => $d->file_path,
-                'created_at' => optional($d->created_at)->toISOString(),
+                'name' => $d->title ?: ($d->original_name ?: 'Document'),
+                'type' => $d->category ?: ($d->mime_type ?: 'document'),
+                'uploaded_at' => optional($d->created_at)->toISOString(),
+                'url' => "/assets/{$asset->id}/documents/{$d->id}/download",
             ])->values(),
             'inspections' => $asset->inspections->map(fn ($i) => [
                 'id' => $i->id,
-                'passed' => $i->passed ?? null,
-                'created_at' => optional($i->created_at)->toISOString(),
+                'type' => 'Inspection',
+                'result' => $i->result,
+                'inspected_at' => optional($i->inspected_at ?? $i->created_at)->toISOString(),
+                'inspector' => $i->inspectedBy?->name,
+                'notes' => $i->notes,
             ])->values(),
-            'work_orders' => $asset->workOrders->map(fn ($w) => [
-                'id' => $w->id,
-                'title' => $w->title,
-                'priority' => $w->priority,
-                'status' => $w->status,
-                'created_at' => optional($w->created_at)->toISOString(),
-            ])->values(),
+            'work_orders' => $hasFleetWorkOrders
+                ? $asset->workOrders->map(fn ($w) => [
+                    'id' => $w->id,
+                    'title' => $w->title,
+                    'priority' => $w->priority,
+                    'status' => $w->status,
+                    'category' => $w->category,
+                    'due_at' => optional($w->due_at)->toISOString(),
+                    'assigned_to' => $w->assignedTo?->name,
+                    'created_at' => optional($w->created_at)->toISOString(),
+                ])->values()
+                : collect(),
             'archived_alerts' => $asset->alerts->map(fn ($a) => [
                 'id' => $a->id,
                 'alert_type' => $a->alert_type,
@@ -287,35 +374,40 @@ class AssetController extends Controller
                 'type' => $g->type,
                 'is_active' => $g->is_active,
             ])->values(),
-            'assignments' => $asset->assignments->map(fn ($a) => [
-                'id' => $a->id,
-                'assigned_to' => $a->assigned_to ?? null,
-                'assigned_at' => optional($a->assigned_at)->toISOString(),
-            ])->values(),
+            'current_assignment' => $currentAssignment ? $this->mapAssetAssignment($currentAssignment) : null,
+            'assignments' => $asset->assignments->map(fn ($a) => $this->mapAssetAssignment($a))->values(),
             'ownerships' => $asset->ownerships->map(fn ($o) => [
                 'id' => $o->id,
                 'owner_type' => $o->owner_type ?? null,
                 'started_at' => optional($o->started_at)->toISOString(),
             ])->values(),
-            'service_schedules' => $asset->serviceSchedules->map(fn ($s) => [
-                'id' => $s->id,
-                'name' => $s->name ?? $s->service_type ?? null,
-                'next_due_at' => optional($s->next_due_at)->toDateString(),
-                'is_active' => $s->is_active,
-            ])->values(),
-            'bookings' => $asset->bookings->map(fn ($b) => [
-                'id' => $b->id,
-                'purpose' => $b->purpose,
-                'status' => $b->status,
-                'starts_at' => optional($b->starts_at)->toISOString(),
-                'ends_at' => optional($b->ends_at)->toISOString(),
-            ])->values(),
-            'checklist_runs' => $asset->checklistRuns->map(fn ($c) => [
-                'id' => $c->id,
-                'passed' => $c->passed,
-                'template' => $c->template ? ['id' => $c->template->id, 'name' => $c->template->name] : null,
-                'completed_at' => optional($c->completed_at)->toISOString(),
-            ])->values(),
+            'service_schedules' => $hasFleetServiceSchedules
+                ? $asset->serviceSchedules->map(fn ($s) => [
+                    'id' => $s->id,
+                    'name' => $s->name ?? $s->service_type ?? null,
+                    'interval_km' => $s->interval_km,
+                    'interval_days' => $s->interval_days,
+                    'last_completed_at' => optional($s->last_completed_at)->toISOString(),
+                    'next_due_at' => optional($s->next_due_at)->toDateString(),
+                ])->values()
+                : collect(),
+            'bookings' => $hasFleetVehicleBookings
+                ? $asset->bookings->map(fn ($b) => [
+                    'id' => $b->id,
+                    'purpose' => $b->purpose,
+                    'status' => $b->status,
+                    'starts_at' => optional($b->starts_at)->toISOString(),
+                    'ends_at' => optional($b->ends_at)->toISOString(),
+                ])->values()
+                : collect(),
+            'checklist_runs' => $hasFleetChecklistRuns
+                ? $asset->checklistRuns->map(fn ($c) => [
+                    'id' => $c->id,
+                    'passed' => $c->passed,
+                    'template' => $hasFleetChecklistTemplates && $c->template ? ['id' => $c->template->id, 'name' => $c->template->name] : null,
+                    'completed_at' => optional($c->completed_at)->toISOString(),
+                ])->values()
+                : collect(),
             'created_at' => optional($asset->created_at)->toISOString(),
             'updated_at' => optional($asset->updated_at)->toISOString(),
         ];

@@ -75,6 +75,9 @@ type Props = {
         speed_kph: number;
         last_seen_at: string | null;
     } | null;
+    can: {
+        manage: boolean;
+    };
 };
 
 const STATUS_CONFIG: Record<string, { color: string; bgColor: string; label: string }> = {
@@ -92,9 +95,10 @@ const PURPOSE_LABELS: Record<string, string> = {
     shopping: 'Shopping',
 };
 
-export default function OutingShow({ outing, vehicle_state }: Props) {
+export default function OutingShow({ outing, vehicle_state, can }: Props) {
     const safeOuting = outing ?? ({} as OutingData);
     const safeResidents = safeOuting.residents ?? [];
+    const canManage = can?.manage ?? false;
     const statusConfig = STATUS_CONFIG[safeOuting.status] ?? STATUS_CONFIG.planned;
 
     const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -170,6 +174,7 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                     backHref="/fleet-assets/outings"
                     backLabel="Back to Outings"
                     actions={
+                        canManage ? (
                         <div className="flex gap-2">
                             {safeOuting.status === 'planned' && (() => {
                                 const allPreChecked = safeResidents.length === 0 || safeResidents.every((r) => r.pre_check_completed);
@@ -226,6 +231,7 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                                 );
                             })()}
                         </div>
+                        ) : undefined
                     }
                 />
 
@@ -248,6 +254,12 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                         </span>
                     </div>
                 </div>
+
+                {!canManage && ['planned', 'active'].includes(safeOuting.status) && (
+                    <p className="text-sm text-muted-foreground">
+                        Outing updates are view-only for your account.
+                    </p>
+                )}
 
                 {/* Main content: 2-column layout */}
                 <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
@@ -365,15 +377,17 @@ export default function OutingShow({ outing, vehicle_state }: Props) {
                                                                 Returned
                                                             </Badge>
                                                         ) : (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="h-6 text-[10px] px-2"
-                                                                onClick={() => router.post(`/fleet-assets/outings/${safeOuting.id}/residents/${resident.id}/return`)}
-                                                            >
-                                                                <UserCheck className="mr-1 h-3 w-3" />
-                                                                Mark Returned
-                                                            </Button>
+                                                            canManage ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-6 text-[10px] px-2"
+                                                                    onClick={() => router.post(`/fleet-assets/outings/${safeOuting.id}/residents/${resident.id}/return`)}
+                                                                >
+                                                                    <UserCheck className="mr-1 h-3 w-3" />
+                                                                    Mark Returned
+                                                                </Button>
+                                                            ) : null
                                                         )
                                                     )}
                                                     {safeOuting.status === 'completed' && resident.returned_at && (

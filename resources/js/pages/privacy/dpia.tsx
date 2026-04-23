@@ -26,6 +26,18 @@ type Props = {
 
 export default function DPIAIndex({ filters, dpias, stats }: Props) {
     const ANY = '__any__';
+    const OUTCOME_LABELS: Record<string, string> = {
+        approved: 'approved',
+        approved_with_conditions: 'approved with conditions',
+        requires_dpo_review: 'requires DPO review',
+        rejected: 'rejected',
+    };
+    const RISK_LABELS: Record<string, string> = {
+        low: 'low',
+        medium: 'medium',
+        high: 'high',
+        very_high: 'very high',
+    };
     const { auth } = usePage().props as any;
     const can = auth?.can?.privacy ?? {};
 
@@ -39,7 +51,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                 return 'bg-green-100 text-green-800 border-green-200';
             case 'approved_with_conditions':
                 return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            case 'requires_changes':
+            case 'requires_dpo_review':
                 return 'bg-orange-100 text-orange-800 border-orange-200';
             case 'rejected':
                 return 'bg-red-100 text-red-800 border-red-200';
@@ -56,7 +68,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                 return 'bg-yellow-100 text-yellow-800 border-yellow-200';
             case 'high':
                 return 'bg-orange-100 text-orange-800 border-orange-200';
-            case 'critical':
+            case 'very_high':
                 return 'bg-red-100 text-red-800 border-red-200';
             default:
                 return 'bg-slate-100 text-slate-800 border-slate-200';
@@ -132,7 +144,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     <SelectItem value="approved">Approved</SelectItem>
                                     <SelectItem value="approved_with_conditions">Approved with Conditions</SelectItem>
-                                    <SelectItem value="requires_changes">Requires Changes</SelectItem>
+                                    <SelectItem value="requires_dpo_review">Requires DPO Review</SelectItem>
                                     <SelectItem value="rejected">Rejected</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -150,7 +162,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                                     <SelectItem value="low">Low</SelectItem>
                                     <SelectItem value="medium">Medium</SelectItem>
                                     <SelectItem value="high">High</SelectItem>
-                                    <SelectItem value="critical">Critical</SelectItem>
+                                    <SelectItem value="very_high">Very High</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -170,14 +182,14 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <Badge className={getOutcomeColor(dpia.outcome)}>
-                                                    {dpia.outcome ? dpia.outcome.replace(/_/g, ' ') : 'Pending Review'}
+                                                    {dpia.outcome ? OUTCOME_LABELS[dpia.outcome] ?? dpia.outcome.replace(/_/g, ' ') : 'Pending review'}
                                                 </Badge>
                                                 <Badge className={getRiskColor(dpia.overall_risk_level)}>
-                                                    {dpia.overall_risk_level} risk
+                                                    {RISK_LABELS[dpia.overall_risk_level] ?? dpia.overall_risk_level} risk
                                                 </Badge>
                                                 {dpia.residual_risk_level && (
                                                     <Badge variant="outline">
-                                                        Residual: {dpia.residual_risk_level}
+                                                        Residual: {RISK_LABELS[dpia.residual_risk_level] ?? dpia.residual_risk_level}
                                                     </Badge>
                                                 )}
                                             </div>

@@ -74,6 +74,7 @@ type Substance = {
     requires_tracking: boolean;
     is_controlled_substance: boolean;
     status: string;
+    can_manage_entries: boolean;
     sds_records: SdsRecord[];
     storage_locations: StorageLocation[];
     exposure_records: ExposureRecord[];
@@ -234,9 +235,11 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                 <FileText className="h-4 w-4" />
                                 Safety Data Sheets
                             </CardTitle>
-                            <Button size="sm" onClick={() => setSdsOpen(true)}>
-                                Upload SDS
-                            </Button>
+                            {substance.can_manage_entries && (
+                                <Button size="sm" onClick={() => setSdsOpen(true)}>
+                                    Upload SDS
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -297,9 +300,11 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                 <MapPin className="h-4 w-4" />
                                 Storage Locations
                             </CardTitle>
-                            <Button size="sm" onClick={() => setStorageOpen(true)}>
-                                Add Location
-                            </Button>
+                            {substance.can_manage_entries && (
+                                <Button size="sm" onClick={() => setStorageOpen(true)}>
+                                    Add Location
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -353,9 +358,11 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                 <Activity className="h-4 w-4" />
                                 Exposure Records
                             </CardTitle>
-                            <Button size="sm" onClick={() => setExposureOpen(true)}>
-                                Record Exposure
-                            </Button>
+                            {substance.can_manage_entries && (
+                                <Button size="sm" onClick={() => setExposureOpen(true)}>
+                                    Record Exposure
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>

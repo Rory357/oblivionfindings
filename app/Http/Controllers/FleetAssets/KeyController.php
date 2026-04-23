@@ -91,6 +91,9 @@ class KeyController extends Controller
             'recent_logs' => $recentLogs,
             'users' => $users,
             'vehicles' => $vehicles,
+            'can' => [
+                'manage' => (bool) $request->user()?->canDo('fleet.manage'),
+            ],
         ]);
     }
 

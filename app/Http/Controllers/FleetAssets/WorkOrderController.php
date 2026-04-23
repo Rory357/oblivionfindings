@@ -126,7 +126,10 @@ class WorkOrderController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
+        $asset = Asset::query()->select('id', 'category')->findOrFail($data['asset_id']);
+
         $data['reported_by_user_id'] = $request->user()->id;
+        $data['category'] = $asset->category ?: 'maintenance';
         $data['status'] = 'open';
 
         $workOrder = FleetWorkOrder::create($data);

@@ -2,9 +2,9 @@
 
 namespace App\Http\Responses;
 
+use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Http\JsonResponse;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
-use Laravel\Fortify\Fortify;
 
 class RegisterResponse implements RegisterResponseContract
 {
@@ -15,8 +15,16 @@ class RegisterResponse implements RegisterResponseContract
      */
     public function toResponse($request)
     {
+        $guard = app(StatefulGuard::class);
+        $guard->logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        $message = 'Account created. An administrator must approve your access before you can log in.';
+
         return $request->wantsJson()
-            ? new JsonResponse('', 201)
-            : redirect()->intended(Fortify::redirects('register'));
+            ? new JsonResponse(['message' => $message], 201)
+            : redirect()->route('login')->with('status', $message);
     }
 }

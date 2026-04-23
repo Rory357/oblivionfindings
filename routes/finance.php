@@ -542,6 +542,8 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
 
     // ── EFTPOS ────────────────────────────────────────────────────────────
     Route::middleware('permission:finance.bank.manage')->group(function () {
+        Route::redirect('/eftpos-terminals', '/finance/eftpos/terminals')
+            ->name('eftpos.terminals.legacy');
         Route::get('/eftpos/terminals', [EftposController::class, 'terminals'])->name('eftpos.terminals');
         Route::post('/eftpos/terminals', [EftposController::class, 'storeTerminal'])->name('eftpos.terminals.store');
         Route::put('/eftpos/terminals/{terminal}', [EftposController::class, 'updateTerminal'])->name('eftpos.terminals.update');

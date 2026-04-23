@@ -27,6 +27,15 @@ type Props = {
 
 export default function DataSubjectRequests({ filters, requests, stats }: Props) {
     const ANY = '__any__';
+    const STATUS_LABELS: Record<string, string> = {
+        received: 'received',
+        under_review: 'under review',
+        identity_verification: 'pending verification',
+        in_progress: 'in progress',
+        completed: 'completed',
+        rejected: 'rejected',
+        withdrawn: 'withdrawn',
+    };
     const { auth } = usePage().props as any;
     const can = auth?.can?.privacy ?? {};
 
@@ -40,10 +49,11 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                 return 'bg-green-100 text-green-800 border-green-200';
             case 'in_progress':
                 return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'pending':
-            case 'pending_verification':
+            case 'received':
+            case 'under_review':
+            case 'identity_verification':
                 return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            case 'refused':
+            case 'rejected':
                 return 'bg-red-100 text-red-800 border-red-200';
             case 'overdue':
                 return 'bg-orange-100 text-orange-800 border-orange-200';
@@ -151,11 +161,11 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
                             >
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {['pending', 'pending_verification', 'in_progress', 'completed', 'refused', 'withdrawn'].map((s) => (
-                                        <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+                                    {['received', 'under_review', 'identity_verification', 'in_progress', 'completed', 'rejected', 'withdrawn'].map((s) => (
+                                        <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -181,7 +191,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                                 </div>
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     <Badge className={getStatusColor(request.status)}>
-                                                        {request.status.replace(/_/g, ' ')}
+                                                        {STATUS_LABELS[request.status] ?? request.status.replace(/_/g, ' ')}
                                                     </Badge>
                                                     <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
                                                         {getRequestTypeLabel(request.request_type)}
@@ -210,7 +220,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                                     )}
                                                 </div>
                                                 <div className="mt-2 text-xs text-slate-500">
-                                                    Requester: {request.requester_name}
+                                                    Requester: {request.subject_name}
                                                     {request.received_at && ` • Received: ${new Date(request.received_at).toLocaleDateString()}`}
                                                     {request.due_date && ` • Due: ${new Date(request.extended_due_date || request.due_date).toLocaleDateString()}`}
                                                     {request.assigned_to && ` • Assigned: ${request.assigned_to.name}`}

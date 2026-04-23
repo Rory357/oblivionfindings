@@ -2,7 +2,7 @@ import FleetHero from '@/components/fleet-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -72,6 +72,10 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>New Prescriber Order</DialogTitle>
+                    <DialogDescription>
+                        Capture a new or changed prescriber order, including
+                        verbal and telephone orders.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {isVerbalOrTelephone && (
@@ -282,6 +286,10 @@ function NewCovertDialog({ clients }: { clients: Props['clients'] }) {
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>New Covert Administration Authorisation</DialogTitle>
+                    <DialogDescription>
+                        Record the legal and clinical approvals for covert
+                        medication administration.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">

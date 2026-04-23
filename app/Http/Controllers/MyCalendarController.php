@@ -25,8 +25,8 @@ class MyCalendarController extends Controller
         $userId = $request->user()->id;
 
         try {
-            $start = Carbon::parse($request->input('start', now()->startOfWeek()));
-            $end = Carbon::parse($request->input('end', now()->endOfWeek()));
+            $start = $this->parseCalendarBoundary($request->input('start'), now()->startOfWeek());
+            $end = $this->parseCalendarBoundary($request->input('end'), now()->endOfWeek());
         } catch (\Exception $e) {
             $start = now()->startOfWeek();
             $end = now()->endOfWeek();
@@ -146,5 +146,20 @@ class MyCalendarController extends Controller
         }
 
         return response()->json($events);
+    }
+
+    private function parseCalendarBoundary(mixed $value, Carbon $fallback): Carbon
+    {
+        if ($value instanceof Carbon) {
+            return $value->copy();
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return $fallback->copy();
+        }
+
+        $normalized = preg_replace('/(?<=T\d{2}:\d{2}:\d{2}) (?=\d{2}:\d{2}$)/', '+', trim($value)) ?? trim($value);
+
+        return Carbon::parse($normalized);
     }
 }

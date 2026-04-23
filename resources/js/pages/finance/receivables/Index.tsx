@@ -59,7 +59,7 @@ const formatNZD = (amount: number) =>
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance/dashboard' },
-    { title: 'Accounts Receivable', href: '/finance/receivables' },
+    { title: 'Receivables', href: '/finance/receivables' },
 ];
 
 function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () => void }) {
@@ -150,13 +150,13 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Accounts Receivable" />
+            <Head title="Receivables" />
             <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Accounts Receivable</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">Receivables</h1>
                         <p className="text-muted-foreground">
-                            Outstanding invoices, payments, and receivables management.
+                            Accounts receivable dashboard for outstanding invoices and payments.
                         </p>
                     </div>
                     <div className="flex gap-2">

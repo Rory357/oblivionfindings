@@ -79,12 +79,25 @@ const iconMap: Record<string, LucideIcon> = {
     'facilities': Building2,
 };
 
+function singularizeTitle(title: string): string {
+    if (title.endsWith('ies')) {
+        return `${title.slice(0, -3)}y`;
+    }
+
+    if (title.endsWith('s')) {
+        return title.slice(0, -1);
+    }
+
+    return title;
+}
+
 // ── Component ─────────────────────────────────────────────────────
 
 export default function CategoryPage({ devices, stats, filters, filterOptions, pageConfig }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const PageIcon = iconMap[pageConfig.icon] ?? Server;
     const pageUrl = `/security-devices/${pageConfig.slug}`;
+    const registerLabel = `Register ${singularizeTitle(pageConfig.title)}`;
 
     const applyFilters = (newFilters: Record<string, string>) => {
         router.get(
@@ -123,7 +136,7 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                         <Button asChild size="sm">
                             <Link href={`/security-devices/devices/create?domain=${pageConfig.domain}`}>
                                 <Plus className="mr-2 h-4 w-4" />
-                                Register {pageConfig.title.replace(/s$/, '')}
+                                {registerLabel}
                             </Link>
                         </Button>
                     }
@@ -272,7 +285,7 @@ export default function CategoryPage({ devices, stats, filters, filterOptions, p
                         action={
                             <Button asChild size="sm">
                                 <Link href={`/security-devices/devices/create?domain=${pageConfig.domain}`}>
-                                    Register {pageConfig.title.replace(/s$/, '')}
+                                    {registerLabel}
                                 </Link>
                             </Button>
                         }

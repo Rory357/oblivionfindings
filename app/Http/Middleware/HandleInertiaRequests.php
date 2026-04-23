@@ -7,6 +7,7 @@ use App\Models\AppSetting;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -62,6 +63,12 @@ class HandleInertiaRequests extends Middleware
         $logoPath = $settings->get('branding.logo_path')?->value;
         $logoUrl = $logoPath ? Storage::disk('public')->url($logoPath) : null;
 
+        $hasOpsMessagingTables = Schema::hasTable('ops_messages')
+            && Schema::hasTable('ops_conversation_participants');
+        $hasNotificationsTable = Schema::hasTable('notifications');
+        $hasAnnouncementsTables = Schema::hasTable('announcements')
+            && Schema::hasTable('announcement_user_reads');
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -100,7 +107,7 @@ class HandleInertiaRequests extends Middleware
                         'relation' => $c->pivot->relation ?? null,
                     ])->values()->all()
                     : null,
-                'unreadMessageCount' => $user
+                'unreadMessageCount' => $user && $hasOpsMessagingTables
                     ? \App\Models\OpsMessage::query()
                         ->whereExists(fn ($q) => $q->from('ops_conversation_participants')
                             ->whereColumn('ops_conversation_participants.conversation_id', 'ops_messages.conversation_id')
@@ -144,23 +151,27 @@ class HandleInertiaRequests extends Middleware
             // fetches them in a follow-up request after mount.
             'inbox' => Inertia::defer(fn () => $user ? [
                 'notifications' => [
-                    'unread_count' => $user->unreadNotifications()->count(),
-                    'items' => $user->notifications()
-                        ->latest()
-                        ->limit(8)
-                        ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
-                        ->map(fn ($n) => [
-                            'id' => $n->id,
-                            'type' => $n->type,
-                            'data' => $n->data,
-                            'read_at' => optional($n->read_at)->toISOString(),
-                            'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
-                            'escalation_count' => (int) ($n->escalation_count ?? 0),
-                            'created_at' => optional($n->created_at)->toISOString(),
-                        ])
-                        ->values(),
+                    'unread_count' => $hasNotificationsTable ? $user->unreadNotifications()->count() : 0,
+                    'items' => $hasNotificationsTable
+                        ? $user->notifications()
+                            ->latest()
+                            ->limit(8)
+                            ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
+                            ->map(fn ($n) => [
+                                'id' => $n->id,
+                                'type' => $n->type,
+                                'data' => $n->data,
+                                'read_at' => optional($n->read_at)->toISOString(),
+                                'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
+                                'escalation_count' => (int) ($n->escalation_count ?? 0),
+                                'created_at' => optional($n->created_at)->toISOString(),
+                            ])
+                            ->values()
+                        : collect(),
                 ],
-                'announcements' => Announcement::inboxFor($user),
+                'announcements' => $hasAnnouncementsTables
+                    ? Announcement::inboxFor($user)
+                    : ['unread_count' => 0, 'items' => []],
             ] : null),
         ];
     }

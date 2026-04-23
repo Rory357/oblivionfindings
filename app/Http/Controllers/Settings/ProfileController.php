@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Models\Staff;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,9 +22,37 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+        $user->loadMissing([
+            'roles:id,name,label',
+            'staffProfile:id,user_id,job_title,mobile_phone',
+        ]);
+
+        $roles = $user->roles
+            ->map(fn ($role) => $role->label ?: str($role->name)->replace('_', ' ')->title()->toString())
+            ->values()
+            ->all();
+
         return Inertia::render('settings/profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'profile' => [
+                'phone' => $user->cellphone ?? $user->staffProfile?->mobile_phone,
+                'jobTitle' => $user->staffProfile?->job_title,
+                'timezone' => $user->timezone ?? 'Pacific/Auckland',
+                'dateFormat' => $user->date_format ?? 'DD/MM/YYYY',
+                'timeFormat' => $user->time_format ?? '24',
+                'emailVerifiedAt' => $this->serializeDateTime($user->email_verified_at),
+                'createdAt' => $this->serializeDateTime($user->created_at),
+                'updatedAt' => $this->serializeDateTime($user->updated_at),
+                'lastLoginAt' => $this->serializeDateTime(data_get($user, 'last_login_at')),
+                'passwordChangedAt' => $this->serializeDateTime(data_get($user, 'password_changed_at')),
+                'roles' => $roles,
+                'twoFactorEnabled' => $user->two_factor_confirmed_at !== null,
+                'microsoftLinked' => false,
+                'googleLinked' => false,
+                'profilePhotoPath' => $user->profile_photo_path,
+            ],
         ]);
     }
 
@@ -32,15 +61,50 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $validated = $request->validated();
+        $user = $request->user();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        $user->fill([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'cellphone' => $validated['phone'],
+            'timezone' => $validated['timezone'],
+            'date_format' => $validated['date_format'],
+            'time_format' => $validated['time_format'],
+        ]);
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
         }
 
-        $request->user()->save();
+        $user->save();
+
+        $staffAttributes = [
+            'job_title' => $validated['job_title'],
+            'mobile_phone' => $validated['phone'],
+        ];
+
+        if (
+            $user->staffProfile()->exists()
+            || filled($staffAttributes['job_title'])
+            || filled($staffAttributes['mobile_phone'])
+        ) {
+            Staff::query()->updateOrCreate(
+                ['user_id' => $user->id],
+                $staffAttributes,
+            );
+        }
 
         return to_route('profile.edit');
+    }
+
+    private function serializeDateTime(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format(\DateTimeInterface::ATOM);
+        }
+
+        return filled($value) ? (string) $value : null;
     }
 
 

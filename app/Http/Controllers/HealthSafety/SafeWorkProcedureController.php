@@ -10,10 +10,33 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class SafeWorkProcedureController extends Controller
 {
+    private const PROCEDURE_CATEGORIES = [
+        'manual_handling',
+        'infection_control',
+        'medication',
+        'chemical_handling',
+        'fire_safety',
+        'vehicle_operation',
+        'vehicle_safety',
+        'personal_care',
+        'challenging_behaviour',
+        'lone_working',
+        'equipment_use',
+        'electrical_safety',
+        'working_at_height',
+        'working_at_heights',
+        'confined_spaces',
+        'emergency_procedures',
+        'ppe',
+        'general',
+        'other',
+    ];
+
     /**
      * List safe work procedures.
      */
@@ -62,14 +85,28 @@ class SafeWorkProcedureController extends Controller
     }
 
     /**
+     * Edit form.
+     */
+    public function edit(SafeWorkProcedure $procedure): \Inertia\Response
+    {
+        return Inertia::render('health-safety/procedures/edit', [
+            'procedure' => $this->mapProcedureForForm($procedure),
+        ]);
+    }
+
+    /**
      * Store a new procedure.
      */
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'emergency_procedures' => $this->normalizeTextList($request->input('emergency_procedures')),
+        ]);
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'reference_number' => 'required|string|max:100|unique:safe_work_procedures,reference_number',
-            'category' => 'required|in:manual_handling,infection_control,medication,chemical_handling,fire_safety,vehicle_operation,personal_care,challenging_behaviour,lone_working,equipment_use,other',
+            'category' => ['required', Rule::in(self::PROCEDURE_CATEGORIES)],
             'purpose' => 'nullable|string',
             'scope' => 'nullable|string',
             'hazards_addressed' => 'nullable|array',
@@ -104,9 +141,12 @@ class SafeWorkProcedureController extends Controller
     /**
      * Show a procedure with versions.
      */
-    public function show(SafeWorkProcedure $procedure): \Inertia\Response
+    public function show(Request $request, SafeWorkProcedure $procedure): \Inertia\Response
     {
         $procedure->load(['approvedBy:id,name', 'creator:id,name', 'updater:id,name']);
+        $user = $request->user();
+        $canManageDrafts = (bool) ($user?->canDo('hazards.manage') || $user?->canDo('hazards.create'));
+        $canApprove = (bool) ($user?->canDo('hazards.manage') && $procedure->status !== 'approved');
 
         $versions = $procedure->versions()
             ->with('changedBy:id,name')
@@ -145,7 +185,9 @@ class SafeWorkProcedureController extends Controller
         return Inertia::render('health-safety/procedures/show', [
             'procedure' => $procedureData,
             'versions' => $versions,
-            'canApprove' => $procedure->status !== 'approved',
+            'canApprove' => $canApprove,
+            'canEdit' => $canManageDrafts,
+            'canSubmitForReview' => $canManageDrafts && $procedure->status === 'draft',
         ]);
     }
 
@@ -154,9 +196,14 @@ class SafeWorkProcedureController extends Controller
      */
     public function update(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
+        $request->merge([
+            'emergency_procedures' => $this->normalizeTextList($request->input('emergency_procedures')),
+        ]);
+
         $validated = $request->validate([
+            'reference_number' => ['nullable', 'string', 'max:100', Rule::unique('safe_work_procedures', 'reference_number')->ignore($procedure->id)],
             'title' => 'nullable|string|max:255',
-            'category' => 'nullable|in:manual_handling,infection_control,medication,chemical_handling,fire_safety,vehicle_operation,personal_care,challenging_behaviour,lone_working,equipment_use,other',
+            'category' => ['nullable', Rule::in(self::PROCEDURE_CATEGORIES)],
             'purpose' => 'nullable|string',
             'scope' => 'nullable|string',
             'hazards_addressed' => 'nullable|array',
@@ -197,6 +244,25 @@ class SafeWorkProcedureController extends Controller
     }
 
     /**
+     * Submit a draft procedure for review.
+     */
+    public function submitForReview(Request $request, SafeWorkProcedure $procedure): RedirectResponse
+    {
+        if ($procedure->status === 'approved') {
+            return redirect()->route('health-safety.procedures.show', $procedure)
+                ->with('success', 'Procedure is already approved.');
+        }
+
+        $procedure->update([
+            'status' => 'under_review',
+            'updated_by' => $request->user()->id,
+        ]);
+
+        return redirect()->route('health-safety.procedures.show', $procedure)
+            ->with('success', 'Procedure submitted for review.');
+    }
+
+    /**
      * Approve a procedure.
      */
     public function approve(Request $request, SafeWorkProcedure $procedure): RedirectResponse
@@ -210,5 +276,53 @@ class SafeWorkProcedureController extends Controller
 
         return redirect()->route('health-safety.procedures.show', $procedure)
             ->with('success', 'Procedure approved.');
+    }
+
+    private function mapProcedureForForm(SafeWorkProcedure $procedure): array
+    {
+        $steps = collect($procedure->steps ?? [])
+            ->map(function ($step, int $index) {
+                return [
+                    'step_number' => (int) ($step['step_number'] ?? ($index + 1)),
+                    'description' => (string) ($step['description'] ?? ''),
+                    'safety_notes' => (string) ($step['safety_notes'] ?? ''),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'id' => $procedure->id,
+            'title' => $procedure->title,
+            'reference_number' => $procedure->reference_number,
+            'category' => $procedure->category,
+            'purpose' => $procedure->purpose ?? '',
+            'scope' => $procedure->scope ?? '',
+            'steps' => $steps !== [] ? $steps : [['step_number' => 1, 'description' => '', 'safety_notes' => '']],
+            'ppe_required' => $procedure->ppe_required ?? [],
+            'emergency_procedures' => is_array($procedure->emergency_procedures)
+                ? implode("\n", array_filter($procedure->emergency_procedures))
+                : (string) ($procedure->emergency_procedures ?? ''),
+            'applicable_roles' => $procedure->applicable_roles ?? [],
+            'applicable_sites' => $procedure->applicable_sites ?? [],
+        ];
+    }
+
+    private function normalizeTextList(mixed $value): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_array($value)) {
+            $items = array_map(static fn ($item) => trim((string) $item), $value);
+
+            return array_values(array_filter($items, static fn ($item) => $item !== ''));
+        }
+
+        $items = preg_split('/\r\n|\r|\n/', (string) $value) ?: [];
+        $items = array_map(static fn ($item) => trim($item), $items);
+
+        return array_values(array_filter($items, static fn ($item) => $item !== ''));
     }
 }

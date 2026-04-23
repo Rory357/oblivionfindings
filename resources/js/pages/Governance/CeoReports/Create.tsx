@@ -21,8 +21,7 @@ interface Props extends PageProps {
 export default function CeoReportCreate({ auth, meetings }: Props) {
   const { data, setData, post, processing, errors } = useForm({
     governance_meeting_id: '',
-    title: '',
-    executive_summary: '',
+    operational_summary: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -56,14 +55,13 @@ export default function CeoReportCreate({ auth, meetings }: Props) {
 
               <div>
                 <Label>Report Title</Label>
-                <Input value={data.title} onChange={e => setData('title', e.target.value)} />
-                {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
+                <Input value={meetings.find((meeting) => String(meeting.id) === data.governance_meeting_id)?.title ?? 'Will be generated from the selected meeting'} readOnly />
               </div>
 
               <div>
                 <Label>Executive Summary</Label>
-                <Textarea value={data.executive_summary} onChange={e => setData('executive_summary', e.target.value)} rows={8} />
-                {errors.executive_summary && <p className="text-red-500 text-sm mt-1">{errors.executive_summary}</p>}
+                <Textarea value={data.operational_summary} onChange={e => setData('operational_summary', e.target.value)} rows={8} />
+                {errors.operational_summary && <p className="text-red-500 text-sm mt-1">{errors.operational_summary}</p>}
               </div>
 
               <div className="flex justify-end gap-3">

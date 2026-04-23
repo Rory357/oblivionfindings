@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -661,6 +662,10 @@ function AddMedicationDialog({ clients }: { clients: Props['clients'] }) {
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Add Medication</DialogTitle>
+                    <DialogDescription>
+                        Create a medication profile with scheduling, safety
+                        flags, and administration details.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <MedicationFormFields
@@ -736,6 +741,10 @@ function EditMedicationDialog({
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Medication</DialogTitle>
+                    <DialogDescription>
+                        Update the medication schedule, dosage, or safety
+                        requirements for this client.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <MedicationFormFields
@@ -797,6 +806,10 @@ function ImportCsvDialog() {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Import Medications from CSV</DialogTitle>
+                    <DialogDescription>
+                        Upload a CSV of medication rows using the documented
+                        client and dose format.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="rounded-md border border-blue-200 bg-blue-50/50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30">
@@ -908,6 +921,10 @@ function AddAllergyDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Add Medication Allergy</DialogTitle>
+                    <DialogDescription>
+                        Record a medication allergy for the selected client so
+                        it is visible on medication workflows.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">

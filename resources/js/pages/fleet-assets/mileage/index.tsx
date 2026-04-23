@@ -78,6 +78,9 @@ type Props = {
     };
     staff_summary: StaffSummary[];
     is_manager?: boolean;
+    can?: {
+        approve: boolean;
+    };
 };
 
 const _PURPOSE_LABELS: Record<string, string> = {
@@ -103,9 +106,10 @@ function statusBadge(status: string) {
     }
 }
 
-export default function MileageIndex({ trips, filters, staff, stats, staff_summary, is_manager }: Props) {
+export default function MileageIndex({ trips, filters, staff, stats, staff_summary, is_manager, can }: Props) {
     const { labels } = usePage().props as any;
     const clientSingular = labels?.['client.singular'] ?? 'Client';
+    const canApprove = can?.approve ?? false;
     const PURPOSE_LABELS: Record<string, string> = {
         ..._PURPOSE_LABELS,
         client_visit: `${clientSingular} Visit`,
@@ -305,7 +309,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">{clientSingular}</th>
                                                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Amount</th>
                                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                                                    {is_manager && <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>}
+                                                    {canApprove && <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>}
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y">
@@ -342,7 +346,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                         <td className="px-4 py-3">
                                                             {statusBadge(trip.status)}
                                                         </td>
-                                                        {is_manager && (
+                                                        {canApprove && (
                                                             <td className="px-4 py-3 text-right">
                                                                 {trip.status === 'pending' && (
                                                                     <div className="flex items-center justify-end gap-1">

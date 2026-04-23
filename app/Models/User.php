@@ -35,6 +35,9 @@ class User extends Authenticatable
         'profile_photo_path',
         'cellphone',
         'work_phone',
+        'timezone',
+        'date_format',
+        'time_format',
     ];
 
     /**

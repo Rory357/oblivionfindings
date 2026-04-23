@@ -30,11 +30,14 @@ class HandoverController extends Controller
                 ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name])
                 ->values();
 
-            return Inertia::render('fleet-assets/handovers/index', [
-                'handovers' => collect(),
-                'vehicles' => $vehicles,
-                'filters' => $request->only(['vehicle_id', 'status', 'date_from', 'date_to']),
-            ]);
+        return Inertia::render('fleet-assets/handovers/index', [
+            'handovers' => collect(),
+            'vehicles' => $vehicles,
+            'filters' => $request->only(['vehicle_id', 'status', 'date_from', 'date_to']),
+            'can' => [
+                'manage' => (bool) $auth?->canDo('fleet.manage'),
+            ],
+        ]);
         }
 
         $query = FleetShiftHandover::query()
@@ -105,6 +108,9 @@ class HandoverController extends Controller
             'handovers' => $handovers,
             'vehicles' => $vehicles,
             'filters' => $request->only(['vehicle_id', 'status', 'date_from', 'date_to']),
+            'can' => [
+                'manage' => (bool) $auth?->canDo('fleet.manage'),
+            ],
         ]);
     }
 
@@ -137,6 +143,9 @@ class HandoverController extends Controller
             'vehicles' => $vehicles,
             'users' => $users,
             'current_user_id' => $auth->id,
+            'can' => [
+                'manage' => (bool) $auth?->canDo('fleet.manage'),
+            ],
         ]);
     }
 
@@ -200,10 +209,9 @@ class HandoverController extends Controller
 
     public function show(FleetShiftHandover $handover)
     {
-        app(UserSiteAccessService::class)->assertCanAccessFleetHandover(
+        $this->assertCanAccessSpecificHandover(
             request()->user(),
             $handover,
-            self::BYPASS_PERMISSIONS,
             'You are not authorized to view handovers for vehicles at this site.',
         );
 
@@ -250,10 +258,9 @@ class HandoverController extends Controller
 
     public function accept(Request $request, FleetShiftHandover $handover)
     {
-        app(UserSiteAccessService::class)->assertCanAccessFleetHandover(
+        $this->assertCanAccessSpecificHandover(
             $request->user(),
             $handover,
-            self::BYPASS_PERMISSIONS,
             'You are not authorized to accept handovers for vehicles at this site.',
         );
 
@@ -281,16 +288,21 @@ class HandoverController extends Controller
 
     public function dispute(Request $request, FleetShiftHandover $handover)
     {
-        app(UserSiteAccessService::class)->assertCanAccessFleetHandover(
+        $this->assertCanAccessSpecificHandover(
             $request->user(),
             $handover,
-            self::BYPASS_PERMISSIONS,
             'You are not authorized to dispute handovers for vehicles at this site.',
         );
 
         if ($handover->status !== 'pending_acceptance') {
             return back()->with('error', 'This handover has already been processed.');
         }
+
+        abort_unless(
+            $handover->incoming_user_id === $request->user()->id,
+            403,
+            'Only the incoming user can dispute this handover.'
+        );
 
         $data = $request->validate([
             'dispute_reason' => ['required', 'string', 'max:2000'],
@@ -328,5 +340,30 @@ class HandoverController extends Controller
             $nested->whereIn('site_id', $siteIds)
                 ->orWhereIn('home_site_id', $siteIds);
         });
+    }
+
+    protected function assertCanAccessSpecificHandover(
+        User $user,
+        FleetShiftHandover $handover,
+        string $message,
+    ): void {
+        if ($this->userIsHandoverParticipant($user, $handover)) {
+            return;
+        }
+
+        app(UserSiteAccessService::class)->assertCanAccessFleetHandover(
+            $user,
+            $handover,
+            self::BYPASS_PERMISSIONS,
+            $message,
+        );
+    }
+
+    protected function userIsHandoverParticipant(User $user, FleetShiftHandover $handover): bool
+    {
+        return in_array($user->id, [
+            $handover->outgoing_user_id,
+            $handover->incoming_user_id,
+        ], true);
     }
 }

@@ -17,7 +17,7 @@ class CalendarController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.calendar.view'), 403);
+        abort_unless($this->canView($user), 403);
 
         $start = $request->query('start', now()->startOfMonth()->toDateString());
         $end = $request->query('end', now()->endOfMonth()->toDateString());
@@ -56,7 +56,7 @@ class CalendarController extends Controller
                 'end' => $end,
             ],
             'can' => [
-                'manage' => $user->canDo('hr.calendar.manage'),
+                'manage' => $this->canManage($user),
             ],
         ]);
     }
@@ -67,7 +67,7 @@ class CalendarController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.calendar.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -96,7 +96,7 @@ class CalendarController extends Controller
     public function update(Request $request, HrCalendarEvent $event)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.calendar.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -121,10 +121,30 @@ class CalendarController extends Controller
     public function destroy(Request $request, HrCalendarEvent $event)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.calendar.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $event->delete();
 
         return redirect()->back()->with('success', 'Calendar event deleted.');
+    }
+
+    private function canView($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.calendar.view')
+            || $user->canDo('hr.calendar.manage')
+            || $user->canDo('calendar.view')
+            || $user->canDo('calendar.viewAny')
+            || $user->canDo('calendar.manage_recurring')
+        );
+    }
+
+    private function canManage($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.calendar.manage')
+            || $user->canDo('calendar.create')
+            || $user->canDo('calendar.manage_recurring')
+        );
     }
 }

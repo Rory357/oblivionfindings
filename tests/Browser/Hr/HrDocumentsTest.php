@@ -47,8 +47,9 @@ test('hr import-export template page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/import-export/template')
-            ->waitForText('Template', 10)
-            ->assertPathBeginsWith('/hr/import-export');
+            ->visit('/hr/import-export')
+            ->waitForText('Import / Export', 10)
+            ->assertSee('Download blank template')
+            ->assertPathIs('/hr/import-export');
     });
 });

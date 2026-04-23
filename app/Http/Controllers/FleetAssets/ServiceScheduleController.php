@@ -15,6 +15,8 @@ class ServiceScheduleController extends Controller
 {
     public function index(Request $request)
     {
+        $canManage = $this->canManageMaintenance($request);
+
         // Sorting
         $allowedSorts = ['name', 'next_due_at', 'created_at'];
         $sort = $request->input('sort', 'next_due_at');
@@ -157,6 +159,9 @@ class ServiceScheduleController extends Controller
             'schedules_per_vehicle' => $schedulesPerVehicle,
             'monthly_completions' => $monthlyCompletions,
             'upcoming_timeline' => $upcomingTimeline,
+            'can' => [
+                'manage' => $canManage,
+            ],
         ]);
     }
 
@@ -223,5 +228,12 @@ class ServiceScheduleController extends Controller
         ]);
 
         return back()->with('success', 'Service schedule updated.');
+    }
+
+    private function canManageMaintenance(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->canDo('fleet.manage') || $user?->canDo('fleet.maintenance.manage'));
     }
 }

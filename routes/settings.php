@@ -131,6 +131,12 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:settings.access.manage')
         ->name('settings.notifications.escalations.update');
 
+    // Legacy notification settings URLs kept for older links and browser tests.
+    Route::redirect('settings/notification-escalations', '/settings/notifications/escalations', 301)
+        ->name('settings.notification_escalations.legacy');
+    Route::redirect('settings/notification-roles', '/settings/notifications/roles', 301)
+        ->name('settings.notification_roles.legacy');
+
     // Email & SMS Templates
     Route::get('settings/templates', [NotificationTemplateController::class, 'index'])
         ->middleware('permission:settings.templates.manage')

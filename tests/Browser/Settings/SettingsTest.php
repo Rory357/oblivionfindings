@@ -68,8 +68,8 @@ test('two-factor settings page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/settings/two-factor')
-            ->waitForText('Two', 10)
-            ->assertSee('Two');
+            ->waitForText('Confirm your password', 10)
+            ->assertPathBeginsWith('/user/confirm-password');
     });
 });
 
@@ -128,8 +128,8 @@ test('access settings page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/settings/access')
-            ->waitForText('Access', 10)
-            ->assertSee('Access');
+            ->waitForText('Overrides & Governance', 10)
+            ->assertSee('Overrides & Governance');
     });
 });
 

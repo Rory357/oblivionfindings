@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
  * These routes provide the enhanced medication management system API endpoints.
  */
 
-Route::middleware(['auth:sanctum'])->prefix('api/medications')->group(function () {
+Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(function () {
     // Dashboard
     Route::get('/dashboard/widgets', [MedicationsApiController::class, 'getDashboardWidgets'])
         ->middleware('permission:medications.view|clients.viewAny')

@@ -40,6 +40,14 @@ class RespiteCommunicationLogController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
+        if ($stays->isEmpty()) {
+            $stays = RespiteStay::query()
+                ->with('client')
+                ->orderByDesc('created_at')
+                ->limit(20)
+                ->get();
+        }
+
         return Inertia::render('respite/communication-logs/create', [
             'stays' => $stays,
             'stayId' => $request->stay_id,

@@ -18,7 +18,8 @@ test('governance dashboard data page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/governance/dashboard-data')
-            ->waitForText('Dashboard', 10)
-            ->assertSee('Dashboard');
+            ->waitFor('@governance-cockpit-heading', 30)
+            ->assertPathIs('/governance/dashboard')
+            ->assertSee('Executive & Board Cockpit');
     });
 });

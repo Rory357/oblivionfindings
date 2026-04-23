@@ -10,7 +10,9 @@ use App\Domain\Roadmap\Services\RoadmapScoringService;
 use App\Domain\Roadmap\Http\Requests\StoreInitiativeRequest;
 use App\Domain\Roadmap\Http\Requests\UpdateInitiativeRequest;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class InitiativeController extends Controller
 {
@@ -20,8 +22,12 @@ class InitiativeController extends Controller
         protected RoadmapChangeLogService $changeLogService,
     ) {}
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse|RedirectResponse
     {
+        if (! $this->shouldReturnJson($request)) {
+            return redirect()->route('roadmap.dashboard');
+        }
+
         $tenantId = $this->tenantId($request);
 
         $query = Initiative::query()
@@ -250,5 +256,12 @@ class InitiativeController extends Controller
         if ($tenantId !== null && $resourceTenantId !== null && $tenantId !== $resourceTenantId) {
             abort(403, 'Tenant scope mismatch.');
         }
+    }
+
+    protected function shouldReturnJson(Request $request): bool
+    {
+        return $request->expectsJson()
+            || $request->wantsJson()
+            || $request->ajax();
     }
 }

@@ -292,8 +292,8 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
             <Head title="Messaging - Control Room" />
             <PageShell>
                 <PageHeader
-                    title="Quick Messaging"
-                    description="Direct communication with field staff and alert-linked conversations."
+                    title="Messaging"
+                    description="Message field staff and manage alert-linked conversations."
                 />
 
                 <Card className="overflow-hidden">

@@ -11,14 +11,25 @@ type Props = {
 };
 
 export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
+    const statusLabels: Record<string, string> = {
+        received: 'received',
+        under_review: 'under review',
+        identity_verification: 'pending verification',
+        in_progress: 'in progress',
+        completed: 'completed',
+        rejected: 'rejected',
+        withdrawn: 'withdrawn',
+    };
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'completed':
                 return 'bg-green-100 text-green-800';
             case 'in_progress':
                 return 'bg-blue-100 text-blue-800';
-            case 'pending':
-            case 'pending_verification':
+            case 'received':
+            case 'under_review':
+            case 'identity_verification':
                 return 'bg-yellow-100 text-yellow-800';
             case 'rejected':
                 return 'bg-red-100 text-red-800';
@@ -75,7 +86,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
                             <Badge className={getStatusColor(dsr.status)}>
-                                {dsr.status?.replace(/_/g, ' ')}
+                                {statusLabels[dsr.status] ?? dsr.status?.replace(/_/g, ' ')}
                             </Badge>
                             <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
                                 {getRequestTypeLabel(dsr.request_type)}

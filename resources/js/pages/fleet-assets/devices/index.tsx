@@ -8,12 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
+    DialogDescription,
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import type React from 'react';
@@ -56,18 +64,24 @@ type PaginatedDevices = {
 type Props = {
     devices: PaginatedDevices | Device[];
     stats?: { total: number; online: number; offline: number; unpaired: number };
+    pairing_options: {
+        devices: Array<{ id: number; label: string }>;
+        assets: Array<{ id: number; label: string }>;
+    };
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (status) {
-        case 'online': return 'default';
+        case 'active': return 'default';
         case 'offline': return 'secondary';
-        case 'stale': return 'destructive';
+        case 'degraded': return 'destructive';
+        case 'maintenance': return 'outline';
+        case 'in_stock': return 'secondary';
         default: return 'outline';
     }
 }
 
-export default function DevicesIndex({ devices, stats }: Props) {
+export default function DevicesIndex({ devices, stats, pairing_options }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [sortField, setSortField] = useState<string>('');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -80,10 +94,12 @@ export default function DevicesIndex({ devices, stats }: Props) {
 
     // Use stats from backend (reflects all devices, not just current page)
     const totalDevices = stats?.total ?? allDevices.length;
-    const onlineCount = stats?.online ?? allDevices.filter((d) => d.status === 'online').length;
-    const offlineCount = stats?.offline ?? allDevices.filter((d) => d.status === 'offline' || d.status === 'stale').length;
+    const onlineCount = stats?.online ?? allDevices.filter((d) => d.status === 'active').length;
+    const offlineCount = stats?.offline ?? allDevices.filter((d) => d.status === 'offline' || d.status === 'degraded').length;
     const unpairedCount = stats?.unpaired ?? allDevices.filter((d) => !d.asset).length;
     const onlinePct = totalDevices > 0 ? Math.round((onlineCount / totalDevices) * 100) : 0;
+    const availableDevices = pairing_options?.devices ?? [];
+    const availableAssets = pairing_options?.assets ?? [];
 
     function handleSort(field: string) {
         const newDir = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
@@ -105,16 +121,13 @@ export default function DevicesIndex({ devices, stats }: Props) {
     }
 
     const pairForm = useForm({
-        vendor: '',
-        device_uid: '',
-        imei: '',
-        serial_number: '',
+        device_id: '',
         asset_id: '',
     });
 
     const handlePair = (e: React.FormEvent) => {
         e.preventDefault();
-        pairForm.post('/fleet-assets/devices', {
+        pairForm.post('/fleet-assets/devices/pair', {
             onSuccess: () => {
                 pairForm.reset();
                 setDialogOpen(false);
@@ -144,51 +157,56 @@ export default function DevicesIndex({ devices, stats }: Props) {
                             </DialogTrigger>
                             <DialogContent>
                                 <DialogHeader>
-                                    <DialogTitle>Pair New Device</DialogTitle>
+                                    <DialogTitle>Pair Tracking Device</DialogTitle>
+                                    <DialogDescription>
+                                        Link an existing tracking device from the shared registry to a fleet asset.
+                                    </DialogDescription>
                                 </DialogHeader>
                                 <form onSubmit={handlePair} className="grid gap-4">
                                     <div>
-                                        <label className="text-sm font-medium">Vendor *</label>
-                                        <Input
-                                            value={pairForm.data.vendor}
-                                            onChange={(e) => pairForm.setData('vendor', e.target.value)}
-                                            placeholder="e.g. Digital Matter"
-                                        />
+                                        <label className="text-sm font-medium">Tracking Device *</label>
+                                        <Select
+                                            value={pairForm.data.device_id}
+                                            onValueChange={(value) => pairForm.setData('device_id', value)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select an unpaired device" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {availableDevices.map((device) => (
+                                                    <SelectItem key={device.id} value={String(device.id)}>
+                                                        {device.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div>
-                                        <label className="text-sm font-medium">Device UID *</label>
-                                        <Input
-                                            value={pairForm.data.device_uid}
-                                            onChange={(e) => pairForm.setData('device_uid', e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium">IMEI</label>
-                                        <Input
-                                            value={pairForm.data.imei}
-                                            onChange={(e) => pairForm.setData('imei', e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium">Serial Number</label>
-                                        <Input
-                                            value={pairForm.data.serial_number}
-                                            onChange={(e) => pairForm.setData('serial_number', e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium">Asset ID *</label>
-                                        <Input
-                                            type="number"
+                                        <label className="text-sm font-medium">Vehicle Asset *</label>
+                                        <Select
                                             value={pairForm.data.asset_id}
-                                            onChange={(e) => pairForm.setData('asset_id', e.target.value)}
-                                            placeholder="Enter asset ID"
-                                        />
+                                            onValueChange={(value) => pairForm.setData('asset_id', value)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a vehicle" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {availableAssets.map((asset) => (
+                                                    <SelectItem key={asset.id} value={String(asset.id)}>
+                                                        {asset.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
-                                    {pairForm.errors.vendor && <p className="text-xs text-destructive">{pairForm.errors.vendor}</p>}
-                                    {pairForm.errors.device_uid && <p className="text-xs text-destructive">{pairForm.errors.device_uid}</p>}
+                                    {availableDevices.length === 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            No unpaired tracking devices are available. Register one in Security & Devices first, then return here to link it.
+                                        </p>
+                                    )}
+                                    {pairForm.errors.device_id && <p className="text-xs text-destructive">{pairForm.errors.device_id}</p>}
                                     {pairForm.errors.asset_id && <p className="text-xs text-destructive">{pairForm.errors.asset_id}</p>}
-                                    <Button type="submit" disabled={pairForm.processing}>
+                                    <Button type="submit" disabled={pairForm.processing || !pairForm.data.device_id || !pairForm.data.asset_id}>
                                         {pairForm.processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radio className="mr-2 h-4 w-4" />}
                                         Pair Device
                                     </Button>

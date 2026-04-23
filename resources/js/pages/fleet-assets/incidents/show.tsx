@@ -55,6 +55,9 @@ type Props = {
         resolved_at: string | null;
         created_at: string | null;
     };
+    can: {
+        manage: boolean;
+    };
 };
 
 const severityBannerColors: Record<string, string> = {
@@ -91,7 +94,7 @@ const typeLabels: Record<string, string> = {
     other: 'Other',
 };
 
-export default function IncidentShow({ incident: inc }: Props) {
+export default function IncidentShow({ incident: inc, can }: Props) {
     const updateForm = useForm({
         status: inc.status,
         resolution_notes: inc.resolution_notes ?? '',
@@ -334,7 +337,7 @@ export default function IncidentShow({ incident: inc }: Props) {
                         </Card>
 
                         {/* Status Update Form */}
-                        {!['closed'].includes(inc.status) && (
+                        {can.manage && !['closed'].includes(inc.status) && (
                             <Card className="border-2 border-dashed">
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-base">Update Status</CardTitle>
@@ -373,6 +376,19 @@ export default function IncidentShow({ incident: inc }: Props) {
                                             Update Incident
                                         </Button>
                                     </form>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {!can.manage && (
+                            <Card className="border-dashed">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base">Status</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm text-muted-foreground">
+                                        This incident is view-only for your account.
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}

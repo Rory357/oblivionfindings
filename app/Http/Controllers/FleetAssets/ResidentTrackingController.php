@@ -216,6 +216,9 @@ class ResidentTrackingController extends Controller
             'recent_alerts' => $recentAlerts,
             'active_outings' => $activeOutings,
             'geofences' => $mapGeofences,
+            'can' => [
+                'manage' => (bool) $user?->canDo('fleet.manage'),
+            ],
         ]);
     }
 
@@ -294,6 +297,9 @@ class ResidentTrackingController extends Controller
             'clients' => $availableClients,
             'available_trackers' => $availableTrackers,
             'assigned_trackers' => $assignedTrackers,
+            'can' => [
+                'manage' => (bool) $user?->canDo('fleet.manage'),
+            ],
         ]);
     }
 

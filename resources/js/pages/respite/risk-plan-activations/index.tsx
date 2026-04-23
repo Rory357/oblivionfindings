@@ -11,8 +11,8 @@ import { Head, Link, router } from '@inertiajs/react';
 type Props = {
     activations: { data: any[]; links: any[] };
     filters: any;
-    planTypes: string[];
-    statuses: string[];
+    planTypes: Record<string, string>;
+    statuses: Record<string, string>;
 };
 
 const statusColors: Record<string, string> = {
@@ -65,8 +65,8 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {planTypes.map((t) => (
-                                        <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                                    {Object.entries(planTypes).map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>{label}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -77,8 +77,8 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                                 <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {statuses.map((s) => (
-                                        <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+                                    {Object.entries(statuses).map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>{label}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

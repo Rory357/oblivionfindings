@@ -26,14 +26,11 @@ test('hr job postings create page loads', function () {
 test('hr job postings edit page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
-        $posting = \App\Domain\Hr\Models\HrJobPosting::create([
+        $posting = \App\Domain\Hr\Models\HrJobPosting::factory()->create([
+            'tenant_id' => 1,
             'title' => 'Test Posting',
-            'slug' => 'test-posting-' . uniqid(),
-            'department' => 'IT',
-            'location' => 'Auckland',
-            'employment_type' => 'full_time',
             'status' => 'draft',
-            'description' => 'Test description',
+            'created_by' => $user->id,
         ]);
         $browser->loginAs($user)
             ->visit('/hr/job-postings/' . $posting->id . '/edit')
@@ -45,14 +42,11 @@ test('hr job postings edit page loads', function () {
 test('hr job postings preview page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
-        $posting = \App\Domain\Hr\Models\HrJobPosting::create([
+        $posting = \App\Domain\Hr\Models\HrJobPosting::factory()->create([
+            'tenant_id' => 1,
             'title' => 'Test Preview Posting',
-            'slug' => 'test-preview-' . uniqid(),
-            'department' => 'IT',
-            'location' => 'Auckland',
-            'employment_type' => 'full_time',
             'status' => 'draft',
-            'description' => 'Test description for preview',
+            'created_by' => $user->id,
         ]);
         $browser->loginAs($user)
             ->visit('/hr/job-postings/' . $posting->id . '/preview')

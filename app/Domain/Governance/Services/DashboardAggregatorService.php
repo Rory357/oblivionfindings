@@ -483,11 +483,19 @@ class DashboardAggregatorService
 
         $totalAssets = DB::table('assets')->where('status', 'active')->count();
 
-        $overdueInspections = DB::table('assets')
-            ->where('status', 'active')
-            ->whereNotNull('next_inspection_date')
-            ->where('next_inspection_date', '<', now())
-            ->count();
+        $overdueInspections = 0;
+        if (Schema::hasColumn('assets', 'inspection_due_at')) {
+            $inspectionQuery = DB::table('assets')
+                ->where('status', 'active')
+                ->whereNotNull('inspection_due_at')
+                ->where('inspection_due_at', '<', now());
+
+            if (Schema::hasColumn('assets', 'requires_inspection')) {
+                $inspectionQuery->where('requires_inspection', true);
+            }
+
+            $overdueInspections = $inspectionQuery->count();
+        }
 
         $recentIncidents = 0;
         if (Schema::hasTable('asset_incidents')) {
@@ -497,7 +505,12 @@ class DashboardAggregatorService
         }
 
         $fleetCount = 0;
-        if (Schema::hasTable('vehicles')) {
+        if (Schema::hasColumn('assets', 'category')) {
+            $fleetCount = DB::table('assets')
+                ->where('status', 'active')
+                ->where('category', 'vehicle')
+                ->count();
+        } elseif (Schema::hasTable('vehicles')) {
             $fleetCount = DB::table('vehicles')->where('status', 'active')->count();
         }
 

@@ -64,16 +64,16 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
       user={auth.user}
       breadcrumbs={[
         { title: 'Governance', href: '/governance/dashboard' },
-        { title: 'Action Items', href: '/governance/actions' },
+        { title: 'Actions', href: '/governance/actions' },
       ]}
     >
-      <Head title="Action Items" />
+      <Head title="Actions" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Action Items</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Actions</h1>
               <p className="text-gray-500 mt-1">Track board decisions and follow-ups</p>
             </div>
           </div>

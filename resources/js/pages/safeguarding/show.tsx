@@ -3,7 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -212,8 +219,12 @@ const investigationStatusColor = (status: string) => {
     const map: Record<string, string> = {
         completed: 'bg-green-100 text-green-800 border-green-200',
         in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
+        planned: 'bg-slate-100 text-slate-800 border-slate-200',
+        paused: 'bg-amber-100 text-amber-800 border-amber-200',
+        abandoned: 'bg-red-100 text-red-800 border-red-200',
         pending: 'bg-slate-100 text-slate-800 border-slate-200',
         cancelled: 'bg-red-100 text-red-800 border-red-200',
+        on_hold: 'bg-amber-100 text-amber-800 border-amber-200',
     };
     return map[status] ?? 'bg-slate-100 text-slate-800 border-slate-200';
 };
@@ -748,9 +759,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     <div key={inv.id} className="rounded-lg border p-4 space-y-2">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <div className="flex items-center gap-2">
-                                                <Badge className={investigationStatusColor(inv.status ?? 'pending')}>
-                                                    {label(inv.status ?? 'pending')}
-                                                </Badge>
+                            <Badge className={investigationStatusColor(inv.status ?? 'planned')}>
+                                {label(inv.status ?? 'planned')}
+                            </Badge>
                                                 <Badge variant="outline">
                                                     {label(inv.investigation_type ?? 'internal')}
                                                 </Badge>
@@ -779,6 +790,12 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                                 <p className="whitespace-pre-wrap">{inv.findings}</p>
                                             </div>
                                         )}
+                                        {inv.evidence_summary && (
+                                            <div className="text-sm">
+                                                <span className="text-xs text-muted-foreground">Evidence Summary</span>
+                                                <p className="whitespace-pre-wrap">{inv.evidence_summary}</p>
+                                            </div>
+                                        )}
                                         {inv.recommendations && (
                                             <div className="text-sm">
                                                 <span className="text-xs text-muted-foreground">Recommendations</span>
@@ -787,7 +804,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                         )}
 
                                         {/* Update section */}
-                                        {canInvestigate && inv.status !== 'completed' && inv.status !== 'cancelled' && !isClosed && (
+                                        {canInvestigate && !['completed', 'abandoned', 'cancelled'].includes(inv.status ?? '') && !isClosed && (
                                             <div>
                                                 <Button
                                                     size="sm"
@@ -821,13 +838,14 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                                                         <SelectValue placeholder="Select status" />
                                                                     </SelectTrigger>
                                                                     <SelectContent>
-                                                                        <SelectItem value="pending">Pending</SelectItem>
-                                                                        <SelectItem value="in_progress">In Progress</SelectItem>
-                                                                        <SelectItem value="completed">Completed</SelectItem>
-                                                                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                                                                    </SelectContent>
-                                                                </Select>
-                                                            </div>
+                                                                <SelectItem value="planned">Planned</SelectItem>
+                                                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                                                <SelectItem value="paused">Paused</SelectItem>
+                                                                <SelectItem value="completed">Completed</SelectItem>
+                                                                <SelectItem value="abandoned">Abandoned</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
                                                             <div>
                                                                 <Label className="text-xs">Completed At</Label>
                                                                 <Input
@@ -1100,6 +1118,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Assign Concern</DialogTitle>
+                        <DialogDescription>
+                            Assign this concern to the staff member responsible for follow-up.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div>
@@ -1142,6 +1163,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Update Status</DialogTitle>
+                        <DialogDescription>
+                            Move the concern to the correct safeguarding workflow stage.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div>
@@ -1181,6 +1205,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Close Concern</DialogTitle>
+                        <DialogDescription>
+                            Record the closure summary and any lessons learned before closing this concern.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div>
@@ -1227,6 +1254,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>New Risk Assessment</DialogTitle>
+                        <DialogDescription>
+                            Capture current risks, protective factors, and review timing for this concern.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -1435,6 +1465,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Start Investigation</DialogTitle>
+                        <DialogDescription>
+                            Set the investigation scope, lead investigator, and expected completion date.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -1551,6 +1584,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Log External Report</DialogTitle>
+                        <DialogDescription>
+                            Record the authority, contact method, and summary of the external report.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -1665,6 +1701,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Add Action</DialogTitle>
+                        <DialogDescription>
+                            Create a follow-up action with an owner, priority, and due date.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div>
@@ -1694,10 +1733,19 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                         <SelectValue placeholder="Select type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="immediate">Immediate</SelectItem>
-                                        <SelectItem value="short_term">Short Term</SelectItem>
-                                        <SelectItem value="long_term">Long Term</SelectItem>
-                                        <SelectItem value="preventive">Preventive</SelectItem>
+                                        <SelectItem value="protective_measure">
+                                            Protective Measure
+                                        </SelectItem>
+                                        <SelectItem value="support_service">
+                                            Support Service
+                                        </SelectItem>
+                                        <SelectItem value="policy_change">Policy Change</SelectItem>
+                                        <SelectItem value="training">Training</SelectItem>
+                                        <SelectItem value="supervision">Supervision</SelectItem>
+                                        <SelectItem value="monitoring">Monitoring</SelectItem>
+                                        <SelectItem value="referral">Referral</SelectItem>
+                                        <SelectItem value="investigation">Investigation</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 {actionForm.errors.action_type && (
@@ -1777,6 +1825,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Complete Action</DialogTitle>
+                        <DialogDescription>
+                            Confirm the action is complete and note any remaining follow-up.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div>
@@ -1812,6 +1863,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Record Acknowledgment</DialogTitle>
+                        <DialogDescription>
+                            Capture when the authority acknowledged the report and any reference number provided.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div>

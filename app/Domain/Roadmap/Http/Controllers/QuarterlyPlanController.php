@@ -6,6 +6,8 @@ use App\Domain\Roadmap\Models\QuarterlyRoadmapPlan;
 use App\Domain\Roadmap\Services\QuarterlyRoadmapPlannerService;
 use App\Domain\Roadmap\Http\Requests\StoreQuarterlyPlanRequest;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class QuarterlyPlanController extends Controller
@@ -14,8 +16,12 @@ class QuarterlyPlanController extends Controller
         protected QuarterlyRoadmapPlannerService $plannerService,
     ) {}
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse|RedirectResponse
     {
+        if (! $this->shouldReturnJson($request)) {
+            return redirect()->route('roadmap.dashboard');
+        }
+
         $tenantId = $this->tenantId($request);
 
         $query = QuarterlyRoadmapPlan::query()
@@ -143,5 +149,12 @@ class QuarterlyPlanController extends Controller
         if ($tenantId !== null && $resourceTenantId !== null && $tenantId !== $resourceTenantId) {
             abort(403, 'Tenant scope mismatch.');
         }
+    }
+
+    protected function shouldReturnJson(Request $request): bool
+    {
+        return $request->expectsJson()
+            || $request->wantsJson()
+            || $request->ajax();
     }
 }

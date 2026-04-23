@@ -66,8 +66,18 @@ Route::get('/about', function () {
 })->name('about');
 
 Route::get('/privacy', function () {
+    $user = auth()->user();
+
+    if ($user && method_exists($user, 'canDo') && $user->canDo('privacy.viewRequests')) {
+        return redirect()->route('privacy.dashboard');
+    }
+
     return Inertia::render('privacy');
 })->name('privacy');
+
+Route::get('/privacy-policy', function () {
+    return Inertia::render('privacy');
+})->name('privacy.policy');
 
 Route::get('/terms', function () {
     return Inertia::render('terms');
@@ -188,13 +198,9 @@ require __DIR__.'/api_medications.php';
 
 // ── Backward-compatible redirects (old → new Operations URLs) ────────
 Route::middleware(['auth'])->group(function () {
-    Route::redirect('/clients', '/operations/clients');
     Route::redirect('/clients/{any}', '/operations/clients/{any}')->where('any', '.*');
-    Route::redirect('/shifts', '/operations/shifts');
     Route::redirect('/shifts/{any}', '/operations/shifts/{any}')->where('any', '.*');
-    Route::redirect('/timesheets', '/operations/timesheets');
     Route::redirect('/timesheets/{any}', '/operations/timesheets/{any}')->where('any', '.*');
-    Route::redirect('/rostering', '/operations/rostering');
     Route::redirect('/rostering/{any}', '/operations/rostering/{any}')->where('any', '.*');
     Route::redirect('/medications/{any}', '/emar/{any}')->where('any', '.*');
     Route::redirect('/emergency-access', '/emar/emergency-access');

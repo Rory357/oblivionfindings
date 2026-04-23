@@ -149,6 +149,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/maintenance/dashboard', MaintenanceDashboardController::class)->name('fleet-assets.maintenance.dashboard');
         Route::get('/maintenance/work-orders', [WorkOrderController::class, 'index'])->name('fleet-assets.work-orders.index');
         Route::get('/maintenance/work-orders/create', [WorkOrderController::class, 'create'])->name('fleet-assets.work-orders.create');
+        Route::post('/maintenance/work-orders', [WorkOrderController::class, 'store'])->name('fleet-assets.work-orders.store');
         Route::get('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'show'])->whereNumber('workOrder')->name('fleet-assets.work-orders.show');
 
         Route::get('/maintenance/checklists', [ChecklistController::class, 'index'])->name('fleet-assets.checklists.index');
@@ -164,7 +165,6 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Maintenance — write (requires maintenance manage or fleet manage)
     Route::middleware('permission:fleet.maintenance.manage|fleet.manage')->group(function () {
-        Route::post('/maintenance/work-orders', [WorkOrderController::class, 'store'])->name('fleet-assets.work-orders.store');
         Route::put('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'update'])->whereNumber('workOrder')->name('fleet-assets.work-orders.update');
         Route::post('/maintenance/work-orders/bulk-action', [WorkOrderController::class, 'bulkAction'])->name('fleet-assets.work-orders.bulk-action');
 
@@ -231,15 +231,23 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
         Route::get('/handovers', [HandoverController::class, 'index'])->name('fleet-assets.handovers.index');
         Route::get('/handovers/create', [HandoverController::class, 'create'])->name('fleet-assets.handovers.create');
-        Route::get('/handovers/{handover}', [HandoverController::class, 'show'])->whereNumber('handover')->name('fleet-assets.handovers.show');
     });
+
+    Route::get('/handovers/{handover}', [HandoverController::class, 'show'])
+        ->whereNumber('handover')
+        ->name('fleet-assets.handovers.show');
 
     // Shift Handovers — write (create/accept/dispute require manage)
     Route::middleware('permission:fleet.manage')->group(function () {
         Route::post('/handovers', [HandoverController::class, 'store'])->name('fleet-assets.handovers.store');
-        Route::post('/handovers/{handover}/accept', [HandoverController::class, 'accept'])->whereNumber('handover')->name('fleet-assets.handovers.accept');
-        Route::post('/handovers/{handover}/dispute', [HandoverController::class, 'dispute'])->whereNumber('handover')->name('fleet-assets.handovers.dispute');
     });
+
+    Route::post('/handovers/{handover}/accept', [HandoverController::class, 'accept'])
+        ->whereNumber('handover')
+        ->name('fleet-assets.handovers.accept');
+    Route::post('/handovers/{handover}/dispute', [HandoverController::class, 'dispute'])
+        ->whereNumber('handover')
+        ->name('fleet-assets.handovers.dispute');
 
     // Incidents (view, create, report)
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {

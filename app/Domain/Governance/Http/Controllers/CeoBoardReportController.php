@@ -16,7 +16,8 @@ class CeoBoardReportController extends Controller
 
         $reports = CeoBoardReport::with(['meeting', 'submittedBy'])
             ->orderByDesc('created_at')
-            ->paginate(15);
+            ->paginate(15)
+            ->through(fn (CeoBoardReport $report) => $this->presentReport($report));
 
         return Inertia::render('Governance/CeoReports/Index', [
             'reports' => $reports,
@@ -70,7 +71,7 @@ class CeoBoardReportController extends Controller
         $report->load(['meeting', 'submittedBy']);
 
         return Inertia::render('Governance/CeoReports/Show', [
-            'report' => $report,
+            'report' => $this->presentReport($report),
         ]);
     }
 
@@ -100,5 +101,51 @@ class CeoBoardReportController extends Controller
         $report->submit();
 
         return redirect()->back()->with('success', 'CEO report submitted to board.');
+    }
+
+    protected function presentReport(CeoBoardReport $report): array
+    {
+        $report->loadMissing(['meeting', 'submittedBy']);
+
+        $title = $report->meeting
+            ? 'CEO Report - ' . $report->meeting->title
+            : 'CEO Report #' . $report->id;
+
+        return [
+            'id' => $report->id,
+            'title' => $title,
+            'status' => $report->status,
+            'executive_summary' => $report->operational_summary,
+            'operational_highlights' => $this->explodeParagraphs($report->key_achievements),
+            'financial_summary' => $this->explodeParagraphs($report->financial_summary),
+            'risk_updates' => $this->explodeParagraphs($report->challenges_and_risks),
+            'compliance_updates' => $this->explodeParagraphs($report->compliance_status),
+            'strategic_progress' => $this->explodeParagraphs($report->staffing_update),
+            'recommendations' => $this->explodeParagraphs($report->recommendations),
+            'meeting' => $report->meeting ? [
+                'id' => $report->meeting->id,
+                'title' => $report->meeting->title,
+                'scheduled_at' => $report->meeting->scheduled_at?->toIso8601String(),
+            ] : null,
+            'author' => $report->submittedBy ? [
+                'id' => $report->submittedBy->id,
+                'name' => $report->submittedBy->name,
+            ] : null,
+            'submitted_at' => $report->submitted_at?->toIso8601String(),
+            'created_at' => $report->created_at?->toIso8601String(),
+        ];
+    }
+
+    protected function explodeParagraphs(?string $value): ?array
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        return collect(preg_split('/\r\n|\r|\n/', trim($value)))
+            ->map(fn (?string $line) => trim((string) $line))
+            ->filter()
+            ->values()
+            ->all();
     }
 }

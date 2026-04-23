@@ -19,7 +19,7 @@ class PositionController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.positions.view'), 403);
+        abort_unless($this->canView($user), 403);
 
         $tenantId = $user->tenant_id;
         $search = trim((string) $request->query('q', ''));
@@ -70,7 +70,7 @@ class PositionController extends Controller
                 'status' => $status,
             ],
             'can' => [
-                'manage' => $user->canDo('hr.positions.manage'),
+                'manage' => $this->canManage($user),
             ],
         ]);
     }
@@ -78,7 +78,7 @@ class PositionController extends Controller
     public function create(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.positions.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $tenantId = $user->tenant_id;
         $parentPositions = HrPosition::forTenant($tenantId)->active()->orderBy('title')->get(['id', 'title', 'code']);
@@ -97,7 +97,7 @@ class PositionController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.positions.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -124,7 +124,7 @@ class PositionController extends Controller
     public function show(Request $request, HrPosition $position)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.positions.view'), 403);
+        abort_unless($this->canView($user), 403);
 
         $position->load([
             'reportsTo:id,title,code',
@@ -164,7 +164,7 @@ class PositionController extends Controller
                 ])->all(),
             ],
             'can' => [
-                'manage' => $user->canDo('hr.positions.manage'),
+                'manage' => $this->canManage($user),
             ],
         ]);
     }
@@ -172,7 +172,7 @@ class PositionController extends Controller
     public function edit(Request $request, HrPosition $position)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.positions.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $parentPositions = HrPosition::forTenant($user->tenant_id)
             ->active()
@@ -200,7 +200,7 @@ class PositionController extends Controller
     public function update(Request $request, HrPosition $position)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.positions.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -219,5 +219,23 @@ class PositionController extends Controller
         $this->positionService->updatePosition($position, $validated);
 
         return redirect()->route('hr.positions.show', $position)->with('success', 'Position updated.');
+    }
+
+    private function canView($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.positions.view')
+            || $user->canDo('hr.positions.manage')
+            || $user->canDo('hr.employees.viewAny')
+            || $user->canDo('hr.employees.manage')
+        );
+    }
+
+    private function canManage($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.positions.manage')
+            || $user->canDo('hr.employees.manage')
+        );
     }
 }

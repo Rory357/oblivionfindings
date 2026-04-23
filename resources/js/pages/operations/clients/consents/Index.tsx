@@ -63,6 +63,7 @@ type Props = {
 export default function ConsentsIndex({ client, consents = [], stats = {} as any, consent_types = [] }: Props) {
     const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`;
+    const hasConsentTypes = consent_types.length > 0;
 
     const [showRecord, setShowRecord] = useState(false);
     const [showWithdraw, setShowWithdraw] = useState<number | null>(null);
@@ -115,12 +116,22 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                 description={`Manage consent records for ${name}.`}
                 backHref={`/operations/clients/${client.id}`}
                 actions={
-                    <Button className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => setShowRecord(true)}>
+                    <Button className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => setShowRecord(true)} disabled={!hasConsentTypes}>
                         <Plus className="h-4 w-4" /> Record Consent
                     </Button>
                 }
             />
             <PageShell>
+                {!hasConsentTypes && (
+                    <Card className="border-amber-200 bg-amber-50/70">
+                        <CardContent className="flex items-start gap-3 p-4 text-sm text-amber-900">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                            <div>
+                                Consent types have not been configured yet, so new consent records are temporarily unavailable on this page.
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                     {[
@@ -146,7 +157,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                             </div>
                             <p className="font-medium">No Consent Records</p>
                             <p className="mt-1 text-sm text-muted-foreground">Record the first consent for {client.first_name}.</p>
-                            <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => setShowRecord(true)}>
+                            <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => setShowRecord(true)} disabled={!hasConsentTypes}>
                                 <Plus className="h-3.5 w-3.5" /> Record Consent
                             </Button>
                         </CardContent>
@@ -175,7 +186,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                                                         </div>
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-semibold">{c.consent_type ?? c.consent_type_name ?? 'Consent'}</span>
+                                                                <span className="text-sm font-semibold">{c.consent_type?.name ?? c.consent_type_name ?? 'Consent'}</span>
                                                                 <Badge className={`border-0 text-[10px] capitalize ${style.bg}`}>{displayStatus}</Badge>
                                                                 {c.capacity_assessed && <Badge className="border-0 bg-purple-100 text-purple-700 text-[10px]">Capacity Assessed</Badge>}
                                                                 {c.is_expiring_soon && !c.is_expired && <Badge className="border-0 bg-amber-100 text-amber-700 text-[10px] animate-pulse">Expiring Soon</Badge>}

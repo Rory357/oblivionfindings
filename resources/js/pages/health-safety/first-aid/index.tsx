@@ -19,6 +19,7 @@ type Props = {
     stats: { records_30d: number; ambulance_calls_30d: number; linked_to_incidents: number };
     staff: Array<{ id: number; name: string }>;
     sites: Array<{ id: number; name: string }>;
+    can_create: boolean;
 };
 
 const PERSON_TYPES = [
@@ -58,7 +59,7 @@ const OUTCOMES = [
     { value: 'other', label: 'Other' },
 ];
 
-export default function FirstAidIndex({ records, stats, staff, sites }: Props) {
+export default function FirstAidIndex({ records, stats, staff, sites, can_create }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
 
     const form = useForm({
@@ -101,12 +102,12 @@ export default function FirstAidIndex({ records, stats, staff, sites }: Props) {
                         { label: 'Ambulance Calls', value: stats.ambulance_calls_30d },
                         { label: 'Linked to Incidents', value: stats.linked_to_incidents },
                     ]}
-                    actions={
+                    actions={can_create ? (
                         <Button size="sm" onClick={() => setDialogOpen(true)}>
                             <Plus className="mr-1.5 h-4 w-4" />
                             Record First Aid
                         </Button>
-                    }
+                    ) : undefined}
                 />
 
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -35,9 +35,14 @@ export default function ProcedureRunsIndex({ runs, templates, filters }: Props) 
             <Head title="Procedure Runs" />
 
             <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Procedure Runs</h1>
-                    <div className="mt-1 text-sm text-slate-500">Track execution of procedure templates.</div>
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-lg font-semibold">Procedure Runs</h1>
+                        <div className="mt-1 text-sm text-slate-500">Track execution of procedure templates.</div>
+                    </div>
+                    <Link href="/respite/procedure-runs/create" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                        New Run
+                    </Link>
                 </div>
                 <RespiteSubnav />
 

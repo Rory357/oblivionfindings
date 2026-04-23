@@ -53,7 +53,7 @@ class DataSubjectRequestController extends Controller
                 'completed_30_days' => DataSubjectRequest::where('status', 'completed')
                     ->where('completed_at', '>=', now()->subDays(30))
                     ->count(),
-                'pending_verification' => DataSubjectRequest::where('status', 'pending_verification')->count(),
+                'pending_verification' => DataSubjectRequest::whereIn('status', ['received', 'identity_verification'])->count(),
             ],
         ]);
     }
@@ -83,7 +83,7 @@ class DataSubjectRequestController extends Controller
         ]);
 
         $validated['created_by'] = auth()->id();
-        $validated['status'] = 'pending_verification';
+        $validated['status'] = 'identity_verification';
 
         $dsr = DataSubjectRequest::create($validated);
 
@@ -117,7 +117,7 @@ class DataSubjectRequestController extends Controller
     public function update(Request $request, DataSubjectRequest $dsRequest): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => 'sometimes|in:pending_verification,in_progress,completed,rejected,withdrawn',
+            'status' => 'sometimes|in:received,under_review,identity_verification,in_progress,completed,rejected,withdrawn',
             'assigned_to_user_id' => 'nullable|exists:users,id',
             'completion_notes' => 'nullable|string',
         ]);

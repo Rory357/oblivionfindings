@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use Laravel\Dusk\Browser;
 
 test('hr compliance index loads', function () {
@@ -76,8 +77,9 @@ test('hr vetting create page loads', function () {
 test('hr compliance staff page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
+        $profile = HrEmployeeProfile::query()->firstOrFail();
         $browser->loginAs($user)
-            ->visit('/hr/compliance/staff/' . $user->id)
+            ->visit('/hr/compliance/staff/' . $profile->user_id)
             ->waitForText('Compliance', 10)
             ->assertPathBeginsWith('/hr/compliance/staff');
     });

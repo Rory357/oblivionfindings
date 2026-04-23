@@ -243,7 +243,10 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                 <div className="flex w-80 flex-col border-r bg-background">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b px-4 py-3">
-                        <h1 className="text-lg font-semibold">Chat</h1>
+                        <div>
+                            <h1 className="text-lg font-semibold">Messages</h1>
+                            <p className="text-xs text-muted-foreground">Secure team conversations and client coordination.</p>
+                        </div>
                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setShowNewChat(true); setSelectedId(null); }}>
                             <Plus className="h-4 w-4" />
                         </Button>

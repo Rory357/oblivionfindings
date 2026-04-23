@@ -81,6 +81,7 @@ class PpeController extends Controller
             'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
             'staff' => User::select('id', 'name')->orderBy('name')->get(),
             'filters' => $filters,
+            'can_manage' => $request->user()?->canDo('hazards.manage') ?? false,
         ]);
     }
 

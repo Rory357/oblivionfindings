@@ -68,6 +68,9 @@ type Props = {
     filters: {
         status?: string;
     };
+    can: {
+        manage: boolean;
+    };
 };
 
 function alertTypeLabel(type: string): string {
@@ -81,8 +84,9 @@ function alertTypeLabel(type: string): string {
     }
 }
 
-export default function WanderingAlertsIndex({ alerts, stats, filters }: Props) {
+export default function WanderingAlertsIndex({ alerts, stats, filters, can }: Props) {
     const alertData = alerts?.data ?? [];
+    const canManage = can.manage;
 
     // Real-time WebSocket listener for wandering alert broadcasts.
     // NOTE: Requires Laravel Echo + Reverb/Pusher to be installed and configured.
@@ -277,29 +281,33 @@ export default function WanderingAlertsIndex({ alerts, stats, filters }: Props) 
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {alert.status !== 'acknowledged' && alert.status !== 'resolved' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleAcknowledge(alert.id)}
-                                                            >
-                                                                <Eye className="mr-1 h-3.5 w-3.5" />
-                                                                Ack
-                                                            </Button>
-                                                        )}
-                                                        {alert.status !== 'resolved' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleResolve(alert.id)}
-                                                                className="text-green-600"
-                                                            >
-                                                                <CheckCircle className="mr-1 h-3.5 w-3.5" />
-                                                                Resolve
-                                                            </Button>
-                                                        )}
-                                                    </div>
+                                                    {canManage ? (
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            {alert.status !== 'acknowledged' && alert.status !== 'resolved' && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => handleAcknowledge(alert.id)}
+                                                                >
+                                                                    <Eye className="mr-1 h-3.5 w-3.5" />
+                                                                    Ack
+                                                                </Button>
+                                                            )}
+                                                            {alert.status !== 'resolved' && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => handleResolve(alert.id)}
+                                                                    className="text-green-600"
+                                                                >
+                                                                    <CheckCircle className="mr-1 h-3.5 w-3.5" />
+                                                                    Resolve
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">View only</span>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))

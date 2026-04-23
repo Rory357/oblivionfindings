@@ -56,9 +56,12 @@ type ChecklistRun = {
 type Props = {
     templates: Template[];
     recent_runs: ChecklistRun[];
+    can: {
+        manage: boolean;
+    };
 };
 
-export default function ChecklistsIndex({ templates, recent_runs }: Props) {
+export default function ChecklistsIndex({ templates, recent_runs, can }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const templateForm = useForm({
         name: '',
@@ -87,7 +90,7 @@ export default function ChecklistsIndex({ templates, recent_runs }: Props) {
                 <FleetHero
                     title="Checklists"
                     description="Inspection and maintenance checklist templates and runs."
-                    actions={
+                    actions={can.manage ? (
                         <div className="flex gap-2">
                             <Button variant="outline" asChild>
                                 <Link href="/fleet-assets/maintenance/checklists/run">
@@ -166,7 +169,7 @@ export default function ChecklistsIndex({ templates, recent_runs }: Props) {
                                 </DialogContent>
                             </Dialog>
                         </div>
-                    }
+                    ) : undefined}
                 />
 
                 {/* Templates */}

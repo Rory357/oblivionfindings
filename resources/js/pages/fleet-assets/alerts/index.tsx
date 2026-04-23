@@ -71,6 +71,9 @@ type Props = {
         status?: string;
         asset_id?: string;
     };
+    can: {
+        manage: boolean;
+    };
 };
 
 const SEVERITY_BORDER: Record<string, string> = {
@@ -101,12 +104,18 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
     }
 }
 
-export default function AlertsIndex({ control_room_alerts: rawCrAlerts, archived_asset_alerts: rawArchivedAssetAlerts, filters: rawFilters }: Props) {
+export default function AlertsIndex({
+    control_room_alerts: rawCrAlerts,
+    archived_asset_alerts: rawArchivedAssetAlerts,
+    filters: rawFilters,
+    can,
+}: Props) {
     const crAlerts = rawCrAlerts?.data ?? [];
     const crMeta = rawCrAlerts?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const crLinks = rawCrAlerts?.links ?? [];
     const archivedAssetAlerts = rawArchivedAssetAlerts ?? [];
     const filters = rawFilters ?? {};
+    const canManage = can.manage;
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [bulkAction, setBulkAction] = useState<string | null>(null);
@@ -275,14 +284,16 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, archived
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
-                                <th className="px-4 py-3 text-left font-medium w-8">
-                                    <input
-                                        type="checkbox"
-                                        checked={operationalAlerts.length > 0 && selectedIds.length === operationalAlerts.length}
-                                        onChange={toggleSelectAll}
-                                        className="h-3.5 w-3.5 rounded border-gray-300"
-                                    />
-                                </th>
+                                {canManage && (
+                                    <th className="px-4 py-3 text-left font-medium w-8">
+                                        <input
+                                            type="checkbox"
+                                            checked={operationalAlerts.length > 0 && selectedIds.length === operationalAlerts.length}
+                                            onChange={toggleSelectAll}
+                                            className="h-3.5 w-3.5 rounded border-gray-300"
+                                        />
+                                    </th>
+                                )}
                                 <th className="px-4 py-3 text-left font-medium">Type</th>
                                 <SortHeader field="severity">Severity</SortHeader>
                                 <SortHeader field="status">Status</SortHeader>
@@ -295,14 +306,16 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, archived
                             {operationalAlerts.length > 0 ? (
                                 operationalAlerts.map((alert) => (
                                     <tr key={alert.id} className={`border-b transition-colors hover:bg-muted/30 transition-colors ${SEVERITY_BORDER[alert.severity] ?? ''}`}>
-                                        <td className="px-4 py-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(`cr-${alert.id}`)}
-                                                onChange={() => toggleSelect(`cr-${alert.id}`)}
-                                                className="h-3.5 w-3.5 rounded border-gray-300"
-                                            />
-                                        </td>
+                                        {canManage && (
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(`cr-${alert.id}`)}
+                                                    onChange={() => toggleSelect(`cr-${alert.id}`)}
+                                                    className="h-3.5 w-3.5 rounded border-gray-300"
+                                                />
+                                            </td>
+                                        )}
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
                                                 <AlertTriangle className={`h-4 w-4 ${alert.severity === 'critical' ? 'text-red-500' : 'text-amber-500'}`} />
@@ -330,33 +343,37 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, archived
                                             {alert.triggered_at ? formatDateTime(alert.triggered_at) : '---'}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <div className="flex gap-1">
-                                                {alert.status === 'open' && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => router.post(`/fleet-assets/alerts/${alert.id}/acknowledge`)}
-                                                    >
-                                                        Acknowledge
-                                                    </Button>
-                                                )}
-                                                {['open', 'ack', 'triaging'].includes(alert.status) && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => router.post(`/fleet-assets/alerts/${alert.id}/resolve`)}
-                                                    >
-                                                        <CheckCircle className="mr-1 h-3 w-3" />
-                                                        Resolve
-                                                    </Button>
-                                                )}
-                                            </div>
+                                            {canManage ? (
+                                                <div className="flex gap-1">
+                                                    {alert.status === 'open' && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => router.post(`/fleet-assets/alerts/${alert.id}/acknowledge`)}
+                                                        >
+                                                            Acknowledge
+                                                        </Button>
+                                                    )}
+                                                    {['open', 'ack', 'triaging'].includes(alert.status) && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => router.post(`/fleet-assets/alerts/${alert.id}/resolve`)}
+                                                        >
+                                                            <CheckCircle className="mr-1 h-3 w-3" />
+                                                            Resolve
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">View only</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-12">
+                                    <td colSpan={canManage ? 7 : 6} className="px-4 py-12">
                                         <FleetEmptyState icon={Bell} title="No operational alerts" description="Control Room fleet alerts appear here when triggered by geofence breaches, speed violations, or other configured rules." />
                                     </td>
                                 </tr>
@@ -417,7 +434,7 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, archived
                 </Card>
 
                 {/* Bulk Action Bar */}
-                {selectedIds.length > 0 && (
+                {canManage && selectedIds.length > 0 && (
                     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-lg border bg-background px-4 py-3 shadow-lg">
                         <span className="text-sm font-medium">{selectedIds.length} alert{selectedIds.length !== 1 ? 's' : ''} selected</span>
                         <div className="flex items-center gap-2">
@@ -450,7 +467,7 @@ export default function AlertsIndex({ control_room_alerts: rawCrAlerts, archived
                     </div>
                 )}
                 <ConfirmDialog
-                    open={bulkAction !== null}
+                    open={canManage && bulkAction !== null}
                     onClose={() => setBulkAction(null)}
                     onConfirm={() => { if (bulkAction) handleBulkAction(bulkAction); }}
                     title={bulkAction === 'acknowledge' ? 'Acknowledge Alerts' : 'Resolve Alerts'}

@@ -1,4 +1,3 @@
-import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Transition } from '@headlessui/react';
@@ -32,7 +31,7 @@ import { Separator } from '@/components/ui/separator';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit } from '@/routes/profile';
+import profileRoutes, { edit } from '@/routes/profile';
 import {
     Activity,
     AlertTriangle,
@@ -50,7 +49,7 @@ import {
     Upload,
     User,
 } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -80,6 +79,30 @@ const DATE_FORMATS = [
     { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
 ];
 
+type ProfileData = {
+    phone: string | null;
+    jobTitle: string | null;
+    timezone: string;
+    dateFormat: string;
+    timeFormat: string;
+    emailVerifiedAt: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+    lastLoginAt: string | null;
+    passwordChangedAt: string | null;
+    roles: string[];
+    twoFactorEnabled: boolean;
+    microsoftLinked: boolean;
+    googleLinked: boolean;
+    profilePhotoPath: string | null;
+};
+
+type ProfilePageProps = {
+    mustVerifyEmail: boolean;
+    status?: string;
+    profile: ProfileData;
+};
+
 function formatRelativeTime(dateString: string | null | undefined): string {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
@@ -106,43 +129,42 @@ function daysSince(dateString: string | null | undefined): number {
 export default function Profile({
     mustVerifyEmail,
     status,
-}: {
-    mustVerifyEmail: boolean;
-    status?: string;
-}) {
+    profile: profileData,
+}: ProfilePageProps) {
     const { auth } = usePage<SharedData>().props;
     const getInitials = useInitials();
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
     const removePhotoForm = useForm({});
+    const preferencesForm = useForm({
+        timezone: profileData.timezone,
+        date_format: profileData.dateFormat,
+        time_format: profileData.timeFormat,
+    });
     const fileInputRef = useRef<HTMLInputElement>(null);
     const passwordInput = useRef<HTMLInputElement>(null);
 
-    const user = auth.user as any;
-    const hasPhoto = !!user.profile_photo_path;
-    const avatarSrc = user.avatar ?? user.profile_photo_url;
-    const memberSince = user.created_at
-        ? new Date(user.created_at).toLocaleDateString('en-NZ', {
+    const hasPhoto = !!profileData.profilePhotoPath;
+    const avatarSrc = auth.user.avatar;
+    const memberSince = profileData.createdAt
+        ? new Date(profileData.createdAt).toLocaleDateString('en-NZ', {
               day: 'numeric',
               month: 'long',
               year: 'numeric',
           })
         : null;
 
-    const twoFactorEnabled = !!user.two_factor_enabled;
-    const passwordChangedDaysAgo = user.password_changed_at ? daysSince(user.password_changed_at) : null;
-    const roles: string[] = user.roles ?? (user.role ? [user.role] : []);
-
-    // Preferences state (local only until a preferences endpoint exists)
-    const [timezone, setTimezone] = useState('Pacific/Auckland');
-    const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
-    const [timeFormat, setTimeFormat] = useState('24');
+    const twoFactorEnabled = profileData.twoFactorEnabled;
+    const passwordChangedDaysAgo = profileData.passwordChangedAt
+        ? daysSince(profileData.passwordChangedAt)
+        : null;
+    const roles = profileData.roles;
 
     const handleFileSelect = useCallback(
         (file: File | null) => {
             if (!file) return;
             photoForm.setData('photo', file);
             setTimeout(() => {
-                photoForm.post('/settings/profile/photo', {
+                photoForm.post(profileRoutes.photo.update.url(), {
                     forceFormData: true,
                     preserveScroll: true,
                 });
@@ -160,6 +182,17 @@ export default function Profile({
             }
         },
         [handleFileSelect],
+    );
+
+    const submitPreferences = useCallback(
+        (event: React.FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+
+            preferencesForm.patch(profileRoutes.update.url(), {
+                preserveScroll: true,
+            });
+        },
+        [preferencesForm],
     );
 
     return (
@@ -245,7 +278,7 @@ export default function Profile({
                                             className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700"
                                             disabled={removePhotoForm.processing}
                                             onClick={() =>
-                                                removePhotoForm.delete('/settings/profile/photo', {
+                                                removePhotoForm.delete(profileRoutes.photo.destroy.url(), {
                                                     preserveScroll: true,
                                                 })
                                             }
@@ -275,7 +308,7 @@ export default function Profile({
                             </CardHeader>
                             <CardContent>
                                 <Form
-                                    {...ProfileController.update.form()}
+                                    {...profileRoutes.update.form()}
                                     options={{ preserveScroll: true }}
                                     className="space-y-5"
                                 >
@@ -314,7 +347,7 @@ export default function Profile({
                                                 </div>
                                             </div>
 
-                                            {mustVerifyEmail && auth.user.email_verified_at === null && (
+                                            {mustVerifyEmail && profileData.emailVerifiedAt === null && (
                                                 <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/30">
                                                     <p className="text-sm text-amber-700 dark:text-amber-400">
                                                         Your email address is unverified.{' '}
@@ -346,7 +379,7 @@ export default function Profile({
                                                         id="phone"
                                                         type="tel"
                                                         name="phone"
-                                                        defaultValue={user.phone ?? ''}
+                                                        defaultValue={profileData.phone ?? ''}
                                                         autoComplete="tel"
                                                         placeholder="+64 21 234 5678"
                                                     />
@@ -363,7 +396,7 @@ export default function Profile({
                                                     <Input
                                                         id="job_title"
                                                         name="job_title"
-                                                        defaultValue={user.job_title ?? ''}
+                                                        defaultValue={profileData.jobTitle ?? ''}
                                                         placeholder="e.g. Support Worker"
                                                     />
                                                     <InputError message={(errors as any).job_title} />
@@ -385,7 +418,7 @@ export default function Profile({
                                                     leave="transition ease-in-out"
                                                     leaveTo="opacity-0"
                                                 >
-                                                    <p className="text-sm font-medium text-green-600">Saved</p>
+                                                    <p className="text-sm font-medium text-green-600">Profile saved</p>
                                                 </Transition>
                                             </div>
                                         </>
@@ -403,11 +436,15 @@ export default function Profile({
                                 </CardTitle>
                                 <CardDescription>Customise your experience</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-5">
+                            <CardContent>
+                                <form className="space-y-5" onSubmit={submitPreferences}>
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="grid gap-2">
                                         <Label htmlFor="timezone">Timezone</Label>
-                                        <Select value={timezone} onValueChange={setTimezone}>
+                                        <Select
+                                            value={preferencesForm.data.timezone}
+                                            onValueChange={(value) => preferencesForm.setData('timezone', value)}
+                                        >
                                             <SelectTrigger id="timezone">
                                                 <SelectValue placeholder="Select timezone" />
                                             </SelectTrigger>
@@ -419,11 +456,15 @@ export default function Profile({
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        <InputError message={preferencesForm.errors.timezone} />
                                     </div>
 
                                     <div className="grid gap-2">
                                         <Label htmlFor="date_format">Date format</Label>
-                                        <Select value={dateFormat} onValueChange={setDateFormat}>
+                                        <Select
+                                            value={preferencesForm.data.date_format}
+                                            onValueChange={(value) => preferencesForm.setData('date_format', value)}
+                                        >
                                             <SelectTrigger id="date_format">
                                                 <SelectValue placeholder="Select format" />
                                             </SelectTrigger>
@@ -435,14 +476,15 @@ export default function Profile({
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                        <InputError message={preferencesForm.errors.date_format} />
                                     </div>
                                 </div>
 
                                 <div className="grid gap-2">
                                     <Label>Time format</Label>
                                     <RadioGroup
-                                        value={timeFormat}
-                                        onValueChange={setTimeFormat}
+                                        value={preferencesForm.data.time_format}
+                                        onValueChange={(value) => preferencesForm.setData('time_format', value)}
                                         className="flex gap-6"
                                     >
                                         <div className="flex items-center gap-2">
@@ -458,6 +500,7 @@ export default function Profile({
                                             </Label>
                                         </div>
                                     </RadioGroup>
+                                    <InputError message={preferencesForm.errors.time_format} />
                                 </div>
 
                                 <div className="grid gap-2">
@@ -474,10 +517,25 @@ export default function Profile({
                                 </div>
 
                                 <div className="pt-2">
-                                    <Button className="bg-violet-600 hover:bg-violet-700">
+                                    <Button
+                                        type="submit"
+                                        className="bg-violet-600 hover:bg-violet-700"
+                                        disabled={preferencesForm.processing}
+                                        data-test="save-preferences-button"
+                                    >
                                         Save preferences
                                     </Button>
+                                    <Transition
+                                        show={preferencesForm.recentlySuccessful}
+                                        enter="transition ease-in-out"
+                                        enterFrom="opacity-0"
+                                        leave="transition ease-in-out"
+                                        leaveTo="opacity-0"
+                                    >
+                                        <p className="mt-3 text-sm font-medium text-green-600">Preferences saved</p>
+                                    </Transition>
                                 </div>
+                                </form>
                             </CardContent>
                         </Card>
                     </div>
@@ -584,14 +642,14 @@ export default function Profile({
                                     <div className="flex flex-col items-center rounded-lg border bg-muted/30 p-4 text-center">
                                         <Clock className="mb-2 h-5 w-5 text-violet-500" />
                                         <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                                            {formatRelativeTime(user.last_login_at ?? user.updated_at)}
+                                            {formatRelativeTime(profileData.lastLoginAt ?? profileData.updatedAt)}
                                         </span>
                                         <span className="mt-0.5 text-xs text-muted-foreground">Last login</span>
                                     </div>
                                     <div className="flex flex-col items-center rounded-lg border bg-muted/30 p-4 text-center">
                                         <Activity className="mb-2 h-5 w-5 text-violet-500" />
                                         <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                                            {daysSince(user.created_at)}
+                                            {daysSince(profileData.createdAt)}
                                         </span>
                                         <span className="mt-0.5 text-xs text-muted-foreground">Days active</span>
                                     </div>
@@ -617,11 +675,11 @@ export default function Profile({
                                         <div>
                                             <p className="text-sm font-medium">Microsoft</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {(auth.user as any).microsoft_linked ? 'Connected' : 'Not connected'}
+                                                {profileData.microsoftLinked ? 'Connected' : 'Not connected'}
                                             </p>
                                         </div>
                                     </div>
-                                    {(auth.user as any).microsoft_linked ? (
+                                    {profileData.microsoftLinked ? (
                                         <Button size="sm" variant="outline" className="text-red-600" onClick={() => router.post('/auth/microsoft/disconnect', {}, { preserveScroll: true })}>
                                             Disconnect
                                         </Button>
@@ -640,11 +698,11 @@ export default function Profile({
                                         <div>
                                             <p className="text-sm font-medium">Google</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {(auth.user as any).google_linked ? 'Connected' : 'Not connected'}
+                                                {profileData.googleLinked ? 'Connected' : 'Not connected'}
                                             </p>
                                         </div>
                                     </div>
-                                    {(auth.user as any).google_linked ? (
+                                    {profileData.googleLinked ? (
                                         <Button size="sm" variant="outline" className="text-red-600" onClick={() => router.post('/auth/google/disconnect', {}, { preserveScroll: true })}>
                                             Disconnect
                                         </Button>
@@ -694,7 +752,7 @@ export default function Profile({
                                         </DialogDescription>
 
                                         <Form
-                                            {...ProfileController.destroy.form()}
+                                            {...profileRoutes.destroy.form()}
                                             options={{ preserveScroll: true }}
                                             onError={() => passwordInput.current?.focus()}
                                             resetOnSuccess

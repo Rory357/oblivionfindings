@@ -16,13 +16,14 @@ type Props = {
     stays: any[];
     stayId?: string;
     clientId?: string;
-    shiftPeriods: string[];
-    wellbeingLevels: any;
-    mobilityLevels: string[];
+    shiftPeriods: Record<string, string>;
+    wellbeingLevels: Record<string, Record<string, string>>;
+    mobilityLevels: Record<string, string>;
 };
 
 type DailyNoteDraft = {
     stay_id: string;
+    client_id: string;
     note_date: string;
     shift_period: string;
     mood: string;
@@ -51,13 +52,22 @@ const hasDraftContent = (d: DailyNoteDraft): boolean =>
         d.mobility
     );
 
-export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeingLevels, mobilityLevels }: Props) {
-    const wellbeingOptions = Array.isArray(wellbeingLevels) ? wellbeingLevels : Object.keys(wellbeingLevels || {});
+export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods, wellbeingLevels, mobilityLevels }: Props) {
     const page = usePage().props as { auth?: { user?: { id?: number } } };
     const userId = page.auth?.user?.id ?? 0;
+    const resolveClientId = (selectedStayId: string): string => {
+        const selectedStay = stays.find((stay: any) => String(stay.id) === selectedStayId);
+
+        if (selectedStay?.client?.id != null) {
+            return String(selectedStay.client.id);
+        }
+
+        return clientId || '';
+    };
 
     const { data, setData, post, processing, errors } = useForm<DailyNoteDraft>({
         stay_id: stayId || '',
+        client_id: stayId ? resolveClientId(stayId) : clientId || '',
         note_date: '',
         shift_period: '',
         mood: '',
@@ -108,6 +118,25 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
         setBootstrapped(true);
     };
 
+    const renderWellbeingSelect = (
+        field: 'mood' | 'appetite' | 'sleep_quality' | 'engagement',
+        label: string,
+        options: Record<string, string>,
+    ) => (
+        <div>
+            <Label>{label}</Label>
+            <Select value={data[field]} onValueChange={(value) => setData(field, value)}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                    {Object.entries(options).map(([value, optionLabel]) => (
+                        <SelectItem key={value} value={value}>{optionLabel}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            {errors[field] && <div className="mt-1 text-xs text-red-500">{errors[field]}</div>}
+        </div>
+    );
+
     return (
         <AppLayout breadcrumbs={[
             { title: 'Respite', href: '/respite' },
@@ -153,7 +182,13 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div>
                                     <Label>Stay</Label>
-                                    <Select value={data.stay_id} onValueChange={(v) => setData('stay_id', v)}>
+                                    <Select
+                                        value={data.stay_id}
+                                        onValueChange={(value) => {
+                                            setData('stay_id', value);
+                                            setData('client_id', resolveClientId(value));
+                                        }}
+                                    >
                                         <SelectTrigger><SelectValue placeholder="Select a stay" /></SelectTrigger>
                                         <SelectContent>
                                             {stays.map((s: any) => (
@@ -179,8 +214,8 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
                                     <Select value={data.shift_period} onValueChange={(v) => setData('shift_period', v)}>
                                         <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
                                         <SelectContent>
-                                            {shiftPeriods.map((sp) => (
-                                                <SelectItem key={sp} value={sp}>{sp}</SelectItem>
+                                            {Object.entries(shiftPeriods).map(([value, label]) => (
+                                                <SelectItem key={value} value={value}>{label}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -195,61 +230,17 @@ export default function DailyNoteCreate({ stays, stayId, shiftPeriods, wellbeing
                             <CardTitle className="text-base">Wellbeing</CardTitle>
                         </CardHeader>
                         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            <div>
-                                <Label>Mood</Label>
-                                <Select value={data.mood} onValueChange={(v) => setData('mood', v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                                    <SelectContent>
-                                        {wellbeingOptions.map((level: string) => (
-                                            <SelectItem key={level} value={level}>{level}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {errors.mood && <div className="mt-1 text-xs text-red-500">{errors.mood}</div>}
-                            </div>
-                            <div>
-                                <Label>Appetite</Label>
-                                <Select value={data.appetite} onValueChange={(v) => setData('appetite', v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                                    <SelectContent>
-                                        {wellbeingOptions.map((level: string) => (
-                                            <SelectItem key={level} value={level}>{level}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {errors.appetite && <div className="mt-1 text-xs text-red-500">{errors.appetite}</div>}
-                            </div>
-                            <div>
-                                <Label>Sleep Quality</Label>
-                                <Select value={data.sleep_quality} onValueChange={(v) => setData('sleep_quality', v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                                    <SelectContent>
-                                        {wellbeingOptions.map((level: string) => (
-                                            <SelectItem key={level} value={level}>{level}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {errors.sleep_quality && <div className="mt-1 text-xs text-red-500">{errors.sleep_quality}</div>}
-                            </div>
-                            <div>
-                                <Label>Engagement</Label>
-                                <Select value={data.engagement} onValueChange={(v) => setData('engagement', v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                                    <SelectContent>
-                                        {wellbeingOptions.map((level: string) => (
-                                            <SelectItem key={level} value={level}>{level}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {errors.engagement && <div className="mt-1 text-xs text-red-500">{errors.engagement}</div>}
-                            </div>
+                            {renderWellbeingSelect('mood', 'Mood', wellbeingLevels.mood ?? {})}
+                            {renderWellbeingSelect('appetite', 'Appetite', wellbeingLevels.appetite ?? {})}
+                            {renderWellbeingSelect('sleep_quality', 'Sleep Quality', wellbeingLevels.sleep_quality ?? {})}
+                            {renderWellbeingSelect('engagement', 'Engagement', wellbeingLevels.engagement ?? {})}
                             <div>
                                 <Label>Mobility</Label>
                                 <Select value={data.mobility} onValueChange={(v) => setData('mobility', v)}>
                                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                                     <SelectContent>
-                                        {mobilityLevels.map((level) => (
-                                            <SelectItem key={level} value={level}>{level}</SelectItem>
+                                        {Object.entries(mobilityLevels).map(([value, label]) => (
+                                            <SelectItem key={value} value={value}>{label}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

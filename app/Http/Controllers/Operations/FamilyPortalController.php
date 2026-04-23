@@ -12,7 +12,7 @@ class FamilyPortalController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('family_portal.viewAny'), 403);
+        abort_unless($auth && $this->canViewPortal($auth), 403);
 
         $clients = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -48,7 +48,7 @@ class FamilyPortalController extends Controller
     public function show(Request $request, $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('family_portal.viewAny'), 403);
+        abort_unless($auth && $this->canViewPortal($auth), 403);
 
         $client = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -63,7 +63,7 @@ class FamilyPortalController extends Controller
     public function edit(Request $request, $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('family_portal.manage'), 403);
+        abort_unless($auth && $this->canManagePortal($auth), 403);
 
         $client = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -78,7 +78,7 @@ class FamilyPortalController extends Controller
     public function update(Request $request, $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('family_portal.manage'), 403);
+        abort_unless($auth && $this->canManagePortal($auth), 403);
 
         Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -111,5 +111,17 @@ class FamilyPortalController extends Controller
         );
 
         return redirect()->back()->with('success', 'Portal settings updated.');
+    }
+
+    private function canViewPortal($auth): bool
+    {
+        return $auth->canDo('family_portal.viewAny')
+            || $auth->canDo('clients.update');
+    }
+
+    private function canManagePortal($auth): bool
+    {
+        return $auth->canDo('family_portal.manage')
+            || $auth->canDo('clients.update');
     }
 }

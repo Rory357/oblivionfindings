@@ -55,7 +55,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/', [FirstAidController::class, 'index'])->name('index');
         });
 
-        Route::middleware('permission:hazards.manage')->group(function () {
+        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::post('/', [FirstAidController::class, 'store'])->name('store');
         });
     });
@@ -67,13 +67,13 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/', [RestraintController::class, 'index'])->name('index');
         });
 
-        Route::middleware('permission:hazards.manage')->group(function () {
+        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             // Restraint Events
             Route::post('/events', [RestraintController::class, 'storeEvent'])->name('events.store');
-            Route::put('/events/{event}', [RestraintController::class, 'updateEvent'])->name('events.update');
-
-            // Behaviour Support Plans
             Route::post('/plans', [RestraintController::class, 'storePlan'])->name('plans.store');
+        });
+        Route::middleware('permission:hazards.manage')->group(function () {
+            Route::put('/events/{event}', [RestraintController::class, 'updateEvent'])->name('events.update');
             Route::put('/plans/{plan}', [RestraintController::class, 'updatePlan'])->name('plans.update');
         });
     });
@@ -85,14 +85,20 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/', [SafeWorkProcedureController::class, 'index'])->name('index');
         });
 
-        Route::middleware('permission:hazards.manage')->group(function () {
+        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::get('/create', [SafeWorkProcedureController::class, 'create'])->name('create');
             Route::post('/', [SafeWorkProcedureController::class, 'store'])->name('store');
+        });
+        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
+            Route::get('/{procedure}/edit', [SafeWorkProcedureController::class, 'edit'])->name('edit');
             Route::put('/{procedure}', [SafeWorkProcedureController::class, 'update'])->name('update');
+            Route::post('/{procedure}/submit-for-review', [SafeWorkProcedureController::class, 'submitForReview'])->name('submit-for-review');
+        });
+        Route::middleware('permission:hazards.manage')->group(function () {
             Route::post('/{procedure}/approve', [SafeWorkProcedureController::class, 'approve'])->name('approve');
         });
 
-        // Show route after /create to avoid wildcard conflict
+        // Show route after /create and /edit to avoid wildcard conflict
         Route::get('/{procedure}', [SafeWorkProcedureController::class, 'show'])
             ->middleware('permission:hazards.view')
             ->name('show');
@@ -140,12 +146,17 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
         Route::middleware('permission:hazards.view')->group(function () {
             Route::get('/', [HazardousSubstanceController::class, 'index'])->name('index');
+            Route::get('/{substance}/sds/{sds}/download', [HazardousSubstanceController::class, 'downloadSds'])->name('sds.download');
         });
 
-        Route::middleware('permission:hazards.manage')->group(function () {
+        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::get('/create', [HazardousSubstanceController::class, 'create'])->name('create');
             Route::post('/', [HazardousSubstanceController::class, 'store'])->name('store');
+        });
+        Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{substance}', [HazardousSubstanceController::class, 'update'])->name('update');
+        });
+        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
 
             // SDS Documents
             Route::post('/{substance}/sds', [HazardousSubstanceController::class, 'storeSds'])->name('sds.store');
@@ -155,6 +166,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
 
             // Exposure Records
             Route::post('/{substance}/exposure-records', [HazardousSubstanceController::class, 'storeExposureRecord'])->name('exposure-records.store');
+            Route::post('/{substance}/exposures', [HazardousSubstanceController::class, 'storeExposureRecord'])->name('exposures.store');
         });
 
         // Show route after /create to avoid wildcard conflict
@@ -170,9 +182,11 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/', [EmergencyDrillController::class, 'index'])->name('index');
         });
 
-        Route::middleware('permission:hazards.manage')->group(function () {
+        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::get('/create', [EmergencyDrillController::class, 'create'])->name('create');
             Route::post('/', [EmergencyDrillController::class, 'store'])->name('store');
+        });
+        Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{drill}', [EmergencyDrillController::class, 'update'])->name('update');
 
             // Participants
@@ -196,9 +210,11 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/', [ReturnToWorkController::class, 'index'])->name('index');
         });
 
-        Route::middleware('permission:hazards.manage')->group(function () {
+        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
             Route::get('/create', [ReturnToWorkController::class, 'create'])->name('create');
             Route::post('/', [ReturnToWorkController::class, 'store'])->name('store');
+        });
+        Route::middleware('permission:hazards.manage')->group(function () {
             Route::put('/{injury}', [ReturnToWorkController::class, 'update'])->name('update');
 
             // Return to Work Plans

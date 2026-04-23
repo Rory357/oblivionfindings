@@ -113,6 +113,7 @@ class LoneWorkerController extends Controller
                 'name' => $c->first_name . ' ' . $c->last_name,
             ]),
             'filters' => $filters,
+            'can_manage' => $request->user()?->canDo('hazards.manage') ?? false,
         ]);
     }
 

@@ -67,6 +67,9 @@ type Props = {
         upcoming: number;
     };
     chart_data: ChartItem[];
+    can: {
+        manage: boolean;
+    };
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -84,7 +87,7 @@ const PURPOSE_LABELS: Record<string, string> = {
     shopping: 'Shopping',
 };
 
-export default function OutingsIndex({ outings, filters, stats, chart_data }: Props) {
+export default function OutingsIndex({ outings, filters, stats, chart_data, can }: Props) {
     const safeOutings = outings?.data ?? [];
     const safeMeta = outings?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const safeLinks = outings?.links ?? [];
@@ -112,14 +115,14 @@ export default function OutingsIndex({ outings, filters, stats, chart_data }: Pr
                 <FleetHero
                     title="Community Outings"
                     description="Plan and manage resident outings and community access trips."
-                    actions={
+                    actions={can.manage ? (
                         <Button asChild>
                             <Link href="/fleet-assets/outings/create">
                                 <Plus className="mr-2 h-4 w-4" />
                                 Plan Outing
                             </Link>
                         </Button>
-                    }
+                    ) : undefined}
                 />
 
                 {/* KPI Cards */}
@@ -320,8 +323,8 @@ export default function OutingsIndex({ outings, filters, stats, chart_data }: Pr
                                 icon={MapPin}
                                 title="No Outings Yet"
                                 description="Plan community outings, medical appointments, and social activities for your residents."
-                                actionLabel="Plan First Outing"
-                                actionHref="/fleet-assets/outings/create"
+                                actionLabel={can.manage ? 'Plan First Outing' : undefined}
+                                actionHref={can.manage ? '/fleet-assets/outings/create' : undefined}
                             />
                         </CardContent>
                     </Card>

@@ -28,9 +28,10 @@ class RespiteProcedureRunController extends Controller
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        $templates = ProcedureTemplate::where('is_active', true)
-            ->select('id', 'name', 'category')
-            ->orderBy('category')
+        $templates = ProcedureTemplate::query()
+            ->where('active', true)
+            ->select('id', 'name', 'domain')
+            ->orderBy('domain')
             ->orderBy('name')
             ->get();
 
@@ -43,12 +44,13 @@ class RespiteProcedureRunController extends Controller
 
     public function create(Request $request): Response
     {
-        $templates = ProcedureTemplate::where('is_active', true)
-            ->select('id', 'name', 'category', 'description', 'estimated_duration_minutes')
-            ->orderBy('category')
+        $templates = ProcedureTemplate::query()
+            ->where('active', true)
+            ->select('id', 'name', 'domain', 'description', 'steps_json')
+            ->orderBy('domain')
             ->orderBy('name')
             ->get()
-            ->groupBy('category');
+            ->groupBy(fn (ProcedureTemplate $template) => $template->domain ?: 'general');
 
         return Inertia::render('respite/procedure-runs/create', [
             'templates' => $templates,
@@ -67,11 +69,11 @@ class RespiteProcedureRunController extends Controller
         ]);
 
         $template = ProcedureTemplate::findOrFail($validated['procedure_template_id']);
+        $steps = $template->steps_json ?? [];
 
-        $run = DB::transaction(function () use ($validated, $template) {
-            $slaDeadline = $template->sla_minutes
-                ? now()->addMinutes($template->sla_minutes)
-                : null;
+        $run = DB::transaction(function () use ($validated, $template, $steps) {
+            $slaMinutes = collect($steps)->sum(fn ($step) => (int) ($step['sla_minutes'] ?? 0));
+            $slaDeadline = $slaMinutes > 0 ? now()->addMinutes($slaMinutes) : null;
 
             $run = RespiteProcedureRun::create([
                 'procedure_template_id' => $template->id,
@@ -79,7 +81,7 @@ class RespiteProcedureRunController extends Controller
                 'subject_id' => $validated['subject_id'],
                 'status' => RespiteProcedureRun::STATUS_PENDING,
                 'current_step' => 0,
-                'total_steps' => count($template->steps ?? []),
+                'total_steps' => count($steps),
                 'step_states' => [],
                 'collected_evidence' => [],
                 'variables' => $validated['variables'] ?? [],
@@ -309,7 +311,7 @@ class RespiteProcedureRunController extends Controller
 
     protected function createTasksFromTemplate(RespiteProcedureRun $run, ProcedureTemplate $template): void
     {
-        $steps = $template->steps ?? [];
+        $steps = $template->steps_json ?? [];
 
         foreach ($steps as $index => $step) {
             $dueAt = null;

@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
 
 interface Question {
   text: string;
@@ -16,30 +15,25 @@ interface Question {
 }
 
 export default function EvaluationCreate({ auth }: PageProps) {
-  const [questions, setQuestions] = useState<Question[]>([
-    { text: '', type: 'rating' },
-  ]);
-
   const { data, setData, post, processing, errors } = useForm({
     title: '',
     evaluation_type: 'board',
     period_start: '',
     period_end: '',
     due_date: '',
-    questions: [] as Question[],
+    questions: [{ text: '', type: 'rating' }] as Question[],
   });
 
-  const addQuestion = () => setQuestions([...questions, { text: '', type: 'rating' }]);
-  const removeQuestion = (i: number) => setQuestions(questions.filter((_, idx) => idx !== i));
+  const addQuestion = () => setData('questions', [...data.questions, { text: '', type: 'rating' }]);
+  const removeQuestion = (i: number) => setData('questions', data.questions.filter((_, idx) => idx !== i));
   const updateQuestion = (i: number, field: keyof Question, value: string) => {
-    const updated = [...questions];
+    const updated = [...data.questions];
     updated[i] = { ...updated[i], [field]: value };
-    setQuestions(updated);
+    setData('questions', updated);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setData('questions', questions);
     post('/governance/evaluations');
   };
 
@@ -83,7 +77,7 @@ export default function EvaluationCreate({ auth }: PageProps) {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {questions.map((q, i) => (
+              {data.questions.map((q, i) => (
                 <div key={i} className="flex gap-3 items-start border rounded-lg p-3">
                   <div className="flex-1 space-y-2">
                     <Input placeholder={`Question ${i + 1}`} value={q.text} onChange={e => updateQuestion(i, 'text', e.target.value)} />
@@ -96,7 +90,7 @@ export default function EvaluationCreate({ auth }: PageProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  {questions.length > 1 && (
+                  {data.questions.length > 1 && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => removeQuestion(i)}>
                       <Trash2 className="w-4 h-4 text-red-500" />
                     </Button>

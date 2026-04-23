@@ -10,6 +10,9 @@ use App\Domain\Roadmap\Http\Controllers\SuggestionController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('roadmap')->name('roadmap.')->group(function () {
+    Route::redirect('/', '/roadmap/dashboard')
+        ->name('index');
+
     Route::get('/dashboard', [RoadmapDashboardController::class, 'index'])
         ->name('dashboard')
         ->middleware('permission:roadmap.view|governance.view');

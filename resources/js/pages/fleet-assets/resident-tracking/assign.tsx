@@ -54,9 +54,12 @@ type Props = {
     clients: ClientOption[];
     available_trackers: TrackerOption[];
     assigned_trackers: AssignedTracker[];
+    can: {
+        manage: boolean;
+    };
 };
 
-export default function ResidentTrackingAssign({ clients, available_trackers, assigned_trackers }: Props) {
+export default function ResidentTrackingAssign({ clients, available_trackers, assigned_trackers, can }: Props) {
     const form = useForm({
         client_id: '',
         tracker_id: '',
@@ -77,6 +80,38 @@ export default function ResidentTrackingAssign({ clients, available_trackers, as
             preserveScroll: true,
         });
     };
+
+    if (!can.manage) {
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Fleet & Assets', href: '/fleet-assets' },
+                    { title: 'Resident Tracking', href: '/fleet-assets/resident-tracking' },
+                    { title: 'Assign Tracker', href: '#' },
+                ]}
+            >
+                <Head title="Assign Tracker" />
+                <PageShell>
+                    <FleetHero
+                        title="Assign Tracker Device"
+                        subtitle="Link a personal tracker to a resident"
+                        backHref="/fleet-assets/resident-tracking"
+                        backLabel="Back to Tracking"
+                    />
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">View-only</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                                Assigning or unassigning trackers requires fleet manager access.
+                            </p>
+                        </CardContent>
+                    </Card>
+                </PageShell>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout

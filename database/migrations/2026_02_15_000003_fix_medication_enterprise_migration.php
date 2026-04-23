@@ -8,7 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Drop tables if they exist (from failed partial migration)
         Schema::dropIfExists('medication_dashboard_alerts');
         Schema::dropIfExists('medication_mar_attachments');
         Schema::dropIfExists('medication_scheduled_stock_counts');
@@ -16,7 +15,6 @@ return new class extends Migration
         Schema::dropIfExists('medication_allergies');
         Schema::dropIfExists('medication_order_versions');
 
-        // Now run the enterprise migration logic safely
         $this->runEnterpriseMigration();
     }
 
@@ -32,47 +30,55 @@ return new class extends Migration
 
     private function runEnterpriseMigration(): void
     {
-        // Enhance client_medications table with enterprise fields
-        Schema::table('client_medications', function (Blueprint $table) {
-            if (!Schema::hasColumn('client_medications', 'high_risk')) {
-                $table->boolean('high_risk')->default(false)->after('controlled_drug');
-            }
-            if (!Schema::hasColumn('client_medications', 'witness_required')) {
-                $table->boolean('witness_required')->default(false)->after('high_risk');
-            }
-            if (!Schema::hasColumn('client_medications', 'indication')) {
-                $table->text('indication')->nullable()->after('instructions');
-            }
-            if (!Schema::hasColumn('client_medications', 'dose_amount')) {
-                $table->decimal('dose_amount', 10, 4)->nullable()->after('dosage');
-            }
-            if (!Schema::hasColumn('client_medications', 'dose_unit')) {
-                $table->string('dose_unit', 50)->nullable()->after('dose_amount');
-            }
-            if (!Schema::hasColumn('client_medications', 'frequency_code')) {
-                $table->string('frequency_code', 50)->nullable()->after('frequency');
-            }
-            if (!Schema::hasColumn('client_medications', 'version')) {
-                $table->integer('version')->default(1)->after('state');
-            }
-            if (!Schema::hasColumn('client_medications', 'superseded_by')) {
-                $table->foreignId('superseded_by')->nullable()->after('version')->constrained('client_medications')->nullOnDelete();
-            }
-            if (!Schema::hasColumn('client_medications', 'superseded_at')) {
-                $table->timestamp('superseded_at')->nullable()->after('superseded_by');
-            }
-            if (!Schema::hasColumn('client_medications', 'deleted_at')) {
-                $table->softDeletes();
-            }
-        });
+        if (Schema::hasTable('client_medications')) {
+            Schema::table('client_medications', function (Blueprint $table) {
+                if (! Schema::hasColumn('client_medications', 'high_risk')) {
+                    $table->boolean('high_risk')->default(false)->after('controlled_drug');
+                }
 
-        // Create medication_order_versions table for full history
+                if (! Schema::hasColumn('client_medications', 'witness_required')) {
+                    $table->boolean('witness_required')->default(false)->after('high_risk');
+                }
+
+                if (! Schema::hasColumn('client_medications', 'indication')) {
+                    $table->text('indication')->nullable()->after('instructions');
+                }
+
+                if (! Schema::hasColumn('client_medications', 'dose_amount')) {
+                    $table->decimal('dose_amount', 10, 4)->nullable()->after('dosage');
+                }
+
+                if (! Schema::hasColumn('client_medications', 'dose_unit')) {
+                    $table->string('dose_unit', 50)->nullable()->after('dose_amount');
+                }
+
+                if (! Schema::hasColumn('client_medications', 'frequency_code')) {
+                    $table->string('frequency_code', 50)->nullable()->after('frequency');
+                }
+
+                if (! Schema::hasColumn('client_medications', 'version')) {
+                    $table->integer('version')->default(1)->after('state');
+                }
+
+                if (! Schema::hasColumn('client_medications', 'superseded_by')) {
+                    $table->foreignId('superseded_by')->nullable()->after('version')->constrained('client_medications')->nullOnDelete();
+                }
+
+                if (! Schema::hasColumn('client_medications', 'superseded_at')) {
+                    $table->timestamp('superseded_at')->nullable()->after('superseded_by');
+                }
+
+                if (! Schema::hasColumn('client_medications', 'deleted_at')) {
+                    $table->softDeletes();
+                }
+            });
+        }
+
         Schema::create('medication_order_versions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('client_medication_id')->constrained('client_medications')->cascadeOnDelete();
             $table->foreignId('client_id')->constrained('clients')->cascadeOnDelete();
             $table->integer('version_number');
-            
             $table->string('name');
             $table->string('dosage')->nullable();
             $table->decimal('dose_amount', 10, 4)->nullable();
@@ -99,18 +105,14 @@ return new class extends Migration
             $table->string('state', 20)->default('active');
             $table->timestamp('paused_at')->nullable();
             $table->boolean('active')->default(true);
-            
             $table->string('change_reason')->nullable();
             $table->foreignId('changed_by')->constrained('users')->restrictOnDelete();
             $table->timestamp('changed_at');
-            
             $table->timestamps();
-            
             $table->index(['client_medication_id', 'version_number'], 'mov_client_med_id_ver_idx');
             $table->index(['client_id', 'changed_at'], 'mov_client_id_changed_idx');
         });
 
-        // Create medication_allergies table
         Schema::create('medication_allergies', function (Blueprint $table) {
             $table->id();
             $table->foreignId('client_id')->constrained('clients')->cascadeOnDelete();
@@ -123,11 +125,9 @@ return new class extends Migration
             $table->foreignId('recorded_by')->constrained('users')->restrictOnDelete();
             $table->timestamps();
             $table->softDeletes();
-            
             $table->index(['client_id', 'allergen'], 'mall_client_allergen_idx');
         });
 
-        // Create medication_interactions table (reference)
         Schema::create('medication_interactions', function (Blueprint $table) {
             $table->id();
             $table->string('medication_a', 255);
@@ -138,28 +138,30 @@ return new class extends Migration
             $table->text('management')->nullable();
             $table->boolean('active')->default(true);
             $table->timestamps();
-            
             $table->index(['medication_a', 'medication_b'], 'mint_med_a_b_idx');
             $table->index(['medication_b', 'medication_a'], 'mint_med_b_a_idx');
         });
 
-        // Enhance controlled drug entries with more transaction types
-        Schema::table('client_controlled_drug_entries', function (Blueprint $table) {
-            if (!Schema::hasColumn('client_controlled_drug_entries', 'disposal_method')) {
-                $table->string('disposal_method')->nullable()->after('reason');
-            }
-            if (!Schema::hasColumn('client_controlled_drug_entries', 'disposal_authorisation')) {
-                $table->string('disposal_authorisation')->nullable()->after('disposal_method');
-            }
-            if (!Schema::hasColumn('client_controlled_drug_entries', 'batch_number')) {
-                $table->string('batch_number')->nullable()->after('unit');
-            }
-            if (!Schema::hasColumn('client_controlled_drug_entries', 'expiry_date')) {
-                $table->date('expiry_date')->nullable()->after('batch_number');
-            }
-        });
+        if (Schema::hasTable('client_controlled_drug_entries')) {
+            Schema::table('client_controlled_drug_entries', function (Blueprint $table) {
+                if (! Schema::hasColumn('client_controlled_drug_entries', 'disposal_method')) {
+                    $table->string('disposal_method')->nullable()->after('reason');
+                }
 
-        // Create medication_scheduled_stock_counts table
+                if (! Schema::hasColumn('client_controlled_drug_entries', 'disposal_authorisation')) {
+                    $table->string('disposal_authorisation')->nullable()->after('disposal_method');
+                }
+
+                if (! Schema::hasColumn('client_controlled_drug_entries', 'batch_number')) {
+                    $table->string('batch_number')->nullable()->after('unit');
+                }
+
+                if (! Schema::hasColumn('client_controlled_drug_entries', 'expiry_date')) {
+                    $table->date('expiry_date')->nullable()->after('batch_number');
+                }
+            });
+        }
+
         Schema::create('medication_scheduled_stock_counts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('client_id')->constrained('clients')->cascadeOnDelete();
@@ -175,44 +177,46 @@ return new class extends Migration
             $table->foreignId('witnessed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();
-            
             $table->index(['client_medication_id', 'scheduled_date'], 'mssc_med_id_date_idx');
             $table->index(['client_id', 'status'], 'mssc_client_status_idx');
         });
 
-        // Create medication_mar_attachments table - FIXED with shorter constraint names
-        Schema::create('medication_mar_attachments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('client_medication_administration_id')->constrained('client_medication_administrations', 'id', 'mmar_cmai_fk')->cascadeOnDelete();
-            $table->foreignId('client_id')->constrained('clients', 'id', 'mmar_client_fk')->cascadeOnDelete();
-            $table->string('file_name');
-            $table->string('file_path');
-            $table->string('mime_type', 100)->nullable();
-            $table->integer('file_size')->nullable();
-            $table->text('description')->nullable();
-            $table->foreignId('uploaded_by')->constrained('users', 'id', 'mmar_uploader_fk')->restrictOnDelete();
-            $table->timestamps();
-            
-            $table->index(['client_medication_administration_id'], 'mmar_admin_id_idx');
-        });
+        if (Schema::hasTable('client_medication_administrations')) {
+            Schema::create('medication_mar_attachments', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('client_medication_administration_id')->constrained('client_medication_administrations', 'id', 'mmar_cmai_fk')->cascadeOnDelete();
+                $table->foreignId('client_id')->constrained('clients', 'id', 'mmar_client_fk')->cascadeOnDelete();
+                $table->string('file_name');
+                $table->string('file_path');
+                $table->string('mime_type', 100)->nullable();
+                $table->integer('file_size')->nullable();
+                $table->text('description')->nullable();
+                $table->foreignId('uploaded_by')->constrained('users', 'id', 'mmar_uploader_fk')->restrictOnDelete();
+                $table->timestamps();
+                $table->index(['client_medication_administration_id'], 'mmar_admin_id_idx');
+            });
+        }
 
-        // Enhance administrations with more clinical detail
-        Schema::table('client_medication_administrations', function (Blueprint $table) {
-            if (!Schema::hasColumn('client_medication_administrations', 'late_minutes')) {
-                $table->integer('late_minutes')->nullable()->after('administered_at');
-            }
-            if (!Schema::hasColumn('client_medication_administrations', 'early_minutes')) {
-                $table->integer('early_minutes')->nullable()->after('late_minutes');
-            }
-            if (!Schema::hasColumn('client_medication_administrations', 'outcome')) {
-                $table->string('outcome', 50)->nullable()->after('status');
-            }
-            if (!Schema::hasColumn('client_medication_administrations', 'site')) {
-                $table->string('site', 100)->nullable()->after('dose_given');
-            }
-        });
+        if (Schema::hasTable('client_medication_administrations')) {
+            Schema::table('client_medication_administrations', function (Blueprint $table) {
+                if (! Schema::hasColumn('client_medication_administrations', 'late_minutes')) {
+                    $table->integer('late_minutes')->nullable()->after('administered_at');
+                }
 
-        // Create medication_dashboard_alerts table
+                if (! Schema::hasColumn('client_medication_administrations', 'early_minutes')) {
+                    $table->integer('early_minutes')->nullable()->after('late_minutes');
+                }
+
+                if (! Schema::hasColumn('client_medication_administrations', 'outcome')) {
+                    $table->string('outcome', 50)->nullable()->after('status');
+                }
+
+                if (! Schema::hasColumn('client_medication_administrations', 'site')) {
+                    $table->string('site', 100)->nullable()->after('dose_given');
+                }
+            });
+        }
+
         Schema::create('medication_dashboard_alerts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('client_id')->constrained('clients')->cascadeOnDelete();
@@ -226,7 +230,6 @@ return new class extends Migration
             $table->text('resolution_notes')->nullable();
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
-            
             $table->index(['client_id', 'status'], 'mda_client_status_idx');
             $table->index(['alert_type', 'severity'], 'mda_type_sev_idx');
             $table->index(['status', 'created_at'], 'mda_status_created_idx');

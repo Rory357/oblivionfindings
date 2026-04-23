@@ -80,11 +80,14 @@ type Props = {
     staff: Staff[];
     sites: Site[];
     clients: Client[];
+    can_manage: boolean;
 };
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
+
+const NONE = '__none__';
 
 const fmtDate = (v: string | null) =>
     v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
@@ -145,7 +148,7 @@ const alertStatusColor = (status: string) => {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites, clients }: Props) {
+export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites, clients, can_manage }: Props) {
     /* Dialog visibility states */
     const [startOpen, setStartOpen] = useState(false);
     const [checkInOpen, setCheckInOpen] = useState(false);
@@ -262,10 +265,12 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                         { label: 'Emergency', value: stats.emergency_alerts },
                     ]}
                     actions={
-                        <Button size="sm" onClick={() => setStartOpen(true)}>
-                            <Radio className="mr-1.5 h-4 w-4" />
-                            Start Session
-                        </Button>
+                        can_manage ? (
+                            <Button size="sm" onClick={() => setStartOpen(true)}>
+                                <Radio className="mr-1.5 h-4 w-4" />
+                                Start Session
+                            </Button>
+                        ) : undefined
                     }
                 />
 
@@ -316,7 +321,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                             </td>
                                             <td className="py-2.5">
                                                 <div className="flex flex-wrap gap-1.5">
-                                                    {(s.status === 'active' || s.status === 'overdue') && (
+                                                    {can_manage && (s.status === 'active' || s.status === 'overdue') && (
                                                         <>
                                                             <Button
                                                                 variant="outline"
@@ -422,7 +427,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                                 )}
                                             </div>
                                         </div>
-                                        {alert.status === 'active' && (
+                                        {can_manage && alert.status === 'active' && (
                                             <div className="mt-3 flex gap-2">
                                                 <Button
                                                     variant="outline"
@@ -448,7 +453,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                                 </Button>
                                             </div>
                                         )}
-                                        {alert.status === 'acknowledged' && (
+                                        {can_manage && alert.status === 'acknowledged' && (
                                             <div className="mt-3">
                                                 <Button
                                                     variant="outline"
@@ -508,14 +513,14 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                             <div>
                                 <Label>Site (optional)</Label>
                                 <Select
-                                    value={startForm.data.site_id}
-                                    onValueChange={(v) => startForm.setData('site_id', v)}
+                                    value={startForm.data.site_id || NONE}
+                                    onValueChange={(v) => startForm.setData('site_id', v === NONE ? '' : v)}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select site" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">None</SelectItem>
+                                        <SelectItem value={NONE}>None</SelectItem>
                                         {sites.map((s) => (
                                             <SelectItem key={s.id} value={String(s.id)}>
                                                 {s.name}
@@ -527,14 +532,14 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                             <div>
                                 <Label>Client (optional)</Label>
                                 <Select
-                                    value={startForm.data.client_id}
-                                    onValueChange={(v) => startForm.setData('client_id', v)}
+                                    value={startForm.data.client_id || NONE}
+                                    onValueChange={(v) => startForm.setData('client_id', v === NONE ? '' : v)}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select client" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">None</SelectItem>
+                                        <SelectItem value={NONE}>None</SelectItem>
                                         {clients.map((c) => (
                                             <SelectItem key={c.id} value={String(c.id)}>
                                                 {c.name}

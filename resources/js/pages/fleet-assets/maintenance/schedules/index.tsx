@@ -52,6 +52,9 @@ type Props = {
     schedules_per_vehicle: Array<{ label: string; value: number }>;
     monthly_completions: Array<{ label: string; value: number }>;
     upcoming_timeline: TimelineItem[];
+    can: {
+        manage: boolean;
+    };
 };
 
 function isDueSoon(dateStr: string | null): boolean {
@@ -93,6 +96,7 @@ export default function SchedulesIndex({
     schedules_per_vehicle,
     monthly_completions,
     upcoming_timeline,
+    can,
 }: Props) {
     const allSchedules = schedules ?? [];
     const totalCount = allSchedules.length;
@@ -178,7 +182,7 @@ export default function SchedulesIndex({
                     <FleetHero
                         title="Service Schedules"
                         description="Manage recurring service and maintenance schedules for assets."
-                        actions={
+                        actions={can.manage ? (
                             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                                 <DialogTrigger asChild>
                                     <Button><Plus className="mr-2 h-4 w-4" />Create Schedule</Button>
@@ -202,7 +206,7 @@ export default function SchedulesIndex({
                                     </form>
                                 </DialogContent>
                             </Dialog>
-                        }
+                        ) : undefined}
                     />
                     <FleetEmptyState icon={Clock} title="No service schedules" description="Set up recurring maintenance reminders to keep your fleet in top condition." />
                 </PageShell>
@@ -222,7 +226,7 @@ export default function SchedulesIndex({
                 <FleetHero
                     title="Service Schedules"
                     description="Manage recurring service and maintenance schedules for assets."
-                    actions={
+                    actions={can.manage ? (
                         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button><Plus className="mr-2 h-4 w-4" />Create Schedule</Button>
@@ -246,7 +250,7 @@ export default function SchedulesIndex({
                                 </form>
                             </DialogContent>
                         </Dialog>
-                    }
+                    ) : undefined}
                 />
 
                 {/* KPI Row */}
@@ -438,20 +442,24 @@ export default function SchedulesIndex({
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 text-xs gap-1"
-                                                disabled={markingId === schedule.id}
-                                                onClick={() => handleMarkComplete(schedule.id)}
-                                            >
-                                                {markingId === schedule.id ? (
-                                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                                ) : (
-                                                    <Check className="h-3 w-3" />
-                                                )}
-                                                Mark Complete
-                                            </Button>
+                                            {can.manage ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 text-xs gap-1"
+                                                    disabled={markingId === schedule.id}
+                                                    onClick={() => handleMarkComplete(schedule.id)}
+                                                >
+                                                    {markingId === schedule.id ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <Check className="h-3 w-3" />
+                                                    )}
+                                                    Mark Complete
+                                                </Button>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">View only</span>
+                                            )}
                                         </td>
                                     </tr>
                                 );

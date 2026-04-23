@@ -137,6 +137,10 @@ type Props = {
     }>;
     sites: Array<{ id: number; name: string }>;
     eligible_drivers: EligibleDriver[];
+    can: {
+        manage: boolean;
+        inspect: boolean;
+    };
     service_prediction: {
         predicted_days: number | null;
         avg_daily_km: number;
@@ -172,9 +176,12 @@ export default function VehicleShow({
     incidents,
     sites,
     eligible_drivers,
+    can,
     service_prediction,
     timeline,
 }: Props) {
+    const canManage = can.manage;
+    const canInspect = can.inspect;
     const assignDriverForm = useForm({ primary_driver_user_id: vehicle.primary_driver?.id ? String(vehicle.primary_driver.id) : '' });
     const assignHomeForm = useForm({ home_site_id: vehicle.home_site?.id ? String(vehicle.home_site.id) : '' });
     const [showRemoveDriverDialog, setShowRemoveDriverDialog] = useState(false);
@@ -389,31 +396,45 @@ export default function VehicleShow({
                             {vehicle.primary_driver && (
                                 <div className="flex items-center justify-between rounded border p-2 text-sm">
                                     <div><div className="font-medium">{vehicle.primary_driver.name}</div><div className="text-[10px] text-muted-foreground">{vehicle.primary_driver.email}</div></div>
-                                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowRemoveDriverDialog(true)}>Remove</Button>
+                                    {canManage && (
+                                        <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowRemoveDriverDialog(true)}>Remove</Button>
+                                    )}
                                 </div>
                             )}
-                            <form onSubmit={(e) => { e.preventDefault(); if (!assignDriverForm.data.primary_driver_user_id) return; const sel = (eligible_drivers ?? []).find((d) => String(d.id) === assignDriverForm.data.primary_driver_user_id); if (sel?.licence_expires_at && isExpired(sel.licence_expires_at)) return; router.put(`/fleet-assets/vehicles/${vehicle.id}`, { primary_driver_user_id: Number(assignDriverForm.data.primary_driver_user_id) }, { preserveScroll: true }); }} className="flex gap-2">
-                                <Select value={assignDriverForm.data.primary_driver_user_id} onValueChange={(v) => { const d = (eligible_drivers ?? []).find((d) => String(d.id) === v); if (d?.licence_expires_at && isExpired(d.licence_expires_at)) return; assignDriverForm.setData('primary_driver_user_id', v); }}>
-                                    <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue placeholder="Select driver..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {(eligible_drivers ?? []).map((driver) => { const exp = driver.licence_expires_at ? isExpired(driver.licence_expires_at) : false; return (<SelectItem key={driver.id} value={String(driver.id)} disabled={exp}><span className="flex items-center gap-1">{driver.name}{exp && <span className="text-[9px] text-red-500">(Expired)</span>}</span></SelectItem>); })}
-                                    </SelectContent>
-                                </Select>
-                                <Button type="submit" size="sm" className="h-8" disabled={assignDriverForm.processing || !assignDriverForm.data.primary_driver_user_id}>Assign</Button>
-                            </form>
+                            {canManage ? (
+                                eligible_drivers.length > 0 ? (
+                                    <form onSubmit={(e) => { e.preventDefault(); if (!assignDriverForm.data.primary_driver_user_id) return; const sel = (eligible_drivers ?? []).find((d) => String(d.id) === assignDriverForm.data.primary_driver_user_id); if (sel?.licence_expires_at && isExpired(sel.licence_expires_at)) return; router.put(`/fleet-assets/vehicles/${vehicle.id}`, { primary_driver_user_id: Number(assignDriverForm.data.primary_driver_user_id) }, { preserveScroll: true }); }} className="flex gap-2">
+                                        <Select value={assignDriverForm.data.primary_driver_user_id} onValueChange={(v) => { const d = (eligible_drivers ?? []).find((d) => String(d.id) === v); if (d?.licence_expires_at && isExpired(d.licence_expires_at)) return; assignDriverForm.setData('primary_driver_user_id', v); }}>
+                                            <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue placeholder="Select driver..." /></SelectTrigger>
+                                            <SelectContent>
+                                                {(eligible_drivers ?? []).map((driver) => { const exp = driver.licence_expires_at ? isExpired(driver.licence_expires_at) : false; return (<SelectItem key={driver.id} value={String(driver.id)} disabled={exp}><span className="flex items-center gap-1">{driver.name}{exp && <span className="text-[9px] text-red-500">(Expired)</span>}</span></SelectItem>); })}
+                                            </SelectContent>
+                                        </Select>
+                                        <Button type="submit" size="sm" className="h-8" disabled={assignDriverForm.processing || !assignDriverForm.data.primary_driver_user_id}>Assign</Button>
+                                    </form>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">No eligible drivers are available to assign yet.</p>
+                                )
+                            ) : (
+                                !vehicle.primary_driver && <p className="text-xs text-muted-foreground">No primary driver assigned.</p>
+                            )}
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2"><CardTitle className="text-sm">Home Site</CardTitle></CardHeader>
                         <CardContent className="space-y-2">
                             {vehicle.home_site && <div className="rounded border p-2 text-sm font-medium">{vehicle.home_site.name}</div>}
-                            <form onSubmit={(e) => { e.preventDefault(); if (!assignHomeForm.data.home_site_id) return; router.put(`/fleet-assets/vehicles/${vehicle.id}`, { home_site_id: Number(assignHomeForm.data.home_site_id) }, { preserveScroll: true }); }} className="flex gap-2">
-                                <Select value={assignHomeForm.data.home_site_id} onValueChange={(v) => assignHomeForm.setData('home_site_id', v)}>
-                                    <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue placeholder="Select site..." /></SelectTrigger>
-                                    <SelectContent>{(sites ?? []).map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
-                                </Select>
-                                <Button type="submit" size="sm" className="h-8" disabled={!assignHomeForm.data.home_site_id}>Set</Button>
-                            </form>
+                            {canManage ? (
+                                <form onSubmit={(e) => { e.preventDefault(); if (!assignHomeForm.data.home_site_id) return; router.put(`/fleet-assets/vehicles/${vehicle.id}`, { home_site_id: Number(assignHomeForm.data.home_site_id) }, { preserveScroll: true }); }} className="flex gap-2">
+                                    <Select value={assignHomeForm.data.home_site_id} onValueChange={(v) => assignHomeForm.setData('home_site_id', v)}>
+                                        <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue placeholder="Select site..." /></SelectTrigger>
+                                        <SelectContent>{(sites ?? []).map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <Button type="submit" size="sm" className="h-8" disabled={!assignHomeForm.data.home_site_id}>Set</Button>
+                                </form>
+                            ) : (
+                                !vehicle.home_site && <p className="text-xs text-muted-foreground">No home site assigned.</p>
+                            )}
                         </CardContent>
                     </Card>
                     <Card>
@@ -454,29 +475,40 @@ export default function VehicleShow({
                                 </div>
                                 <div className="rounded-lg border p-3">
                                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Set Due Date</p>
-                                    <form onSubmit={(e) => {
-                                        e.preventDefault();
-                                        const input = (e.target as HTMLFormElement).elements.namedItem('due') as HTMLInputElement;
-                                        if (input?.value) {
-                                            router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
-                                                inspection_due_at: input.value,
-                                                requires_inspection: true,
-                                            }, { preserveScroll: true });
-                                        }
-                                    }} className="flex gap-1.5">
-                                        <Input type="date" name="due" defaultValue={vehicle.inspection_due_at?.split('T')[0] ?? ''} className="h-8 text-xs flex-1" />
-                                        <Button type="submit" size="sm" className="h-8 text-xs">Set</Button>
-                                    </form>
+                                    {canManage ? (
+                                        <form onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const input = (e.target as HTMLFormElement).elements.namedItem('due') as HTMLInputElement;
+                                            if (input?.value) {
+                                                router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
+                                                    inspection_due_at: input.value,
+                                                    requires_inspection: true,
+                                                }, { preserveScroll: true });
+                                            }
+                                        }} className="flex gap-1.5">
+                                            <Input type="date" name="due" defaultValue={vehicle.inspection_due_at?.split('T')[0] ?? ''} className="h-8 text-xs flex-1" />
+                                            <Button type="submit" size="sm" className="h-8 text-xs">Set</Button>
+                                        </form>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">View-only for this vehicle.</p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex gap-2">
-                                <Button variant="default" size="sm" className="h-8 text-xs bg-purple-600 hover:bg-purple-700" asChild>
-                                    <Link href={`/fleet-assets/inspections/create?asset_id=${vehicle.id}&type=pre-trip`}>Start Pre-Trip Inspection</Link>
-                                </Button>
+                                {canInspect && (
+                                    <Button variant="default" size="sm" className="h-8 text-xs bg-purple-600 hover:bg-purple-700" asChild>
+                                        <Link href={`/fleet-assets/inspections/create?asset_id=${vehicle.id}&type=pre-trip`}>Start Pre-Trip Inspection</Link>
+                                    </Button>
+                                )}
                                 <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                                     <Link href={`/fleet-assets/inspections?vehicle_id=${vehicle.id}`}>View History</Link>
                                 </Button>
                             </div>
+                            {!canInspect && (
+                                <p className="text-xs text-muted-foreground">
+                                    Starting inspections requires fleet maintenance manager access.
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                     {/* Daily Check */}
@@ -617,74 +649,88 @@ export default function VehicleShow({
                                     }`}
                                 >
                                     <span className="text-sm font-medium">{item.label}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
-                                                [item.key]: !(vehicle as Record<string, unknown>)[item.key],
-                                            }, { preserveScroll: true });
-                                        }}
-                                        className={`h-7 w-12 rounded-full transition-colors ${
-                                            (vehicle as Record<string, unknown>)[item.key] ? 'bg-purple-600' : 'bg-slate-300'
-                                        }`}
-                                    >
-                                        <span
-                                            className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                                                (vehicle as Record<string, unknown>)[item.key] ? 'translate-x-6' : 'translate-x-1'
+                                    {canManage ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
+                                                    [item.key]: !(vehicle as Record<string, unknown>)[item.key],
+                                                }, { preserveScroll: true });
+                                            }}
+                                            className={`h-7 w-12 rounded-full transition-colors ${
+                                                (vehicle as Record<string, unknown>)[item.key] ? 'bg-purple-600' : 'bg-slate-300'
                                             }`}
-                                        />
-                                    </button>
+                                        >
+                                            <span
+                                                className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                                                    (vehicle as Record<string, unknown>)[item.key] ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    ) : (
+                                        <Badge variant={(vehicle as Record<string, unknown>)[item.key] ? 'default' : 'secondary'}>
+                                            {(vehicle as Record<string, unknown>)[item.key] ? 'Enabled' : 'Not set'}
+                                        </Badge>
+                                    )}
                                 </div>
                             ))}
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label className="text-sm font-medium">Seating Capacity</label>
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        const input = (e.target as HTMLFormElement).elements.namedItem('seating') as HTMLInputElement;
-                                        if (input?.value) {
-                                            router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
-                                                seating_capacity: Number(input.value),
-                                            }, { preserveScroll: true });
-                                        }
-                                    }}
-                                    className="mt-1 flex gap-2"
-                                >
-                                    <Input
-                                        type="number"
-                                        name="seating"
-                                        min="1"
-                                        max="50"
-                                        defaultValue={vehicle.seating_capacity ?? ''}
-                                        placeholder="e.g. 7"
-                                        className="h-8 text-xs w-24"
-                                    />
-                                    <Button type="submit" size="sm" className="h-8 text-xs">Set</Button>
-                                </form>
+                                {canManage ? (
+                                    <form
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const input = (e.target as HTMLFormElement).elements.namedItem('seating') as HTMLInputElement;
+                                            if (input?.value) {
+                                                router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
+                                                    seating_capacity: Number(input.value),
+                                                }, { preserveScroll: true });
+                                            }
+                                        }}
+                                        className="mt-1 flex gap-2"
+                                    >
+                                        <Input
+                                            type="number"
+                                            name="seating"
+                                            min="1"
+                                            max="50"
+                                            defaultValue={vehicle.seating_capacity ?? ''}
+                                            placeholder="e.g. 7"
+                                            className="h-8 text-xs w-24"
+                                        />
+                                        <Button type="submit" size="sm" className="h-8 text-xs">Set</Button>
+                                    </form>
+                                ) : (
+                                    <p className="mt-1 text-xs text-muted-foreground">{vehicle.seating_capacity ? `${vehicle.seating_capacity} seats` : 'Not recorded'}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm font-medium">Accessibility Notes</label>
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        const input = (e.target as HTMLFormElement).elements.namedItem('acc_notes') as HTMLTextAreaElement;
-                                        router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
-                                            accessibility_notes: input?.value ?? '',
-                                        }, { preserveScroll: true });
-                                    }}
-                                    className="mt-1 space-y-2"
-                                >
-                                    <textarea
-                                        name="acc_notes"
-                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                        rows={2}
-                                        defaultValue={vehicle.accessibility_notes ?? ''}
-                                        placeholder="Additional accessibility details..."
-                                    />
-                                    <Button type="submit" size="sm" className="h-8 text-xs">Save Notes</Button>
-                                </form>
+                                {canManage ? (
+                                    <form
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const input = (e.target as HTMLFormElement).elements.namedItem('acc_notes') as HTMLTextAreaElement;
+                                            router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
+                                                accessibility_notes: input?.value ?? '',
+                                            }, { preserveScroll: true });
+                                        }}
+                                        className="mt-1 space-y-2"
+                                    >
+                                        <textarea
+                                            name="acc_notes"
+                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            rows={2}
+                                            defaultValue={vehicle.accessibility_notes ?? ''}
+                                            placeholder="Additional accessibility details..."
+                                        />
+                                        <Button type="submit" size="sm" className="h-8 text-xs">Save Notes</Button>
+                                    </form>
+                                ) : (
+                                    <p className="mt-1 text-xs text-muted-foreground">{vehicle.accessibility_notes || 'No accessibility notes recorded.'}</p>
+                                )}
                             </div>
                         </div>
                     </CardContent>
@@ -699,18 +745,20 @@ export default function VehicleShow({
                     maxVisible={25}
                 />
 
-                <ConfirmDialog
-                    open={showRemoveDriverDialog}
-                    onClose={() => setShowRemoveDriverDialog(false)}
-                    onConfirm={() => {
-                        router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
-                            primary_driver_user_id: null,
-                        }, { preserveScroll: true });
-                    }}
-                    title="Remove Driver Assignment"
-                    description={`Are you sure you want to remove ${vehicle.primary_driver?.name ?? 'the driver'} as the primary driver for this vehicle?`}
-                    confirmText="Remove Driver"
-                />
+                {canManage && (
+                    <ConfirmDialog
+                        open={showRemoveDriverDialog}
+                        onClose={() => setShowRemoveDriverDialog(false)}
+                        onConfirm={() => {
+                            router.put(`/fleet-assets/vehicles/${vehicle.id}`, {
+                                primary_driver_user_id: null,
+                            }, { preserveScroll: true });
+                        }}
+                        title="Remove Driver Assignment"
+                        description={`Are you sure you want to remove ${vehicle.primary_driver?.name ?? 'the driver'} as the primary driver for this vehicle?`}
+                        confirmText="Remove Driver"
+                    />
+                )}
             </PageShell>
         </AppLayout>
     );

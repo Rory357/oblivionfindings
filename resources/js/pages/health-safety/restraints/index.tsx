@@ -22,6 +22,8 @@ type Props = {
     clients: Array<{ id: number; first_name: string; last_name: string }>;
     staff: Array<{ id: number; name: string }>;
     sites: Array<{ id: number; name: string }>;
+    can_create: boolean;
+    can_review: boolean;
 };
 
 const RESTRAINT_TYPES = [
@@ -78,7 +80,7 @@ function statusBadgeColor(s: string) {
     }
 }
 
-export default function RestraintsIndex({ events, plans, stats, clients, staff, sites }: Props) {
+export default function RestraintsIndex({ events, plans, stats, clients, staff, sites, can_create, can_review }: Props) {
     const [eventDialogOpen, setEventDialogOpen] = useState(false);
     const [planDialogOpen, setPlanDialogOpen] = useState(false);
     const [reviewingEvent, setReviewingEvent] = useState<any>(null);
@@ -123,7 +125,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
 
     const submitEvent = (e: React.FormEvent) => {
         e.preventDefault();
-        eventForm.post('/health-safety/restraints', {
+        eventForm.post('/health-safety/restraints/events', {
             onSuccess: () => {
                 setEventDialogOpen(false);
                 eventForm.reset();
@@ -144,7 +146,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
     const submitReview = (e: React.FormEvent) => {
         e.preventDefault();
         if (!reviewingEvent) return;
-        reviewForm.put(`/health-safety/restraints/${reviewingEvent.id}/review`, {
+        reviewForm.put(`/health-safety/restraints/events/${reviewingEvent.id}`, {
             onSuccess: () => {
                 setReviewingEvent(null);
                 reviewForm.reset();
@@ -183,14 +185,15 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
 
                     {/* Events Tab */}
                     <TabsContent value="events" className="space-y-4">
-                        <div className="flex justify-end">
-                            <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button size="sm">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Record Event
-                                    </Button>
-                                </DialogTrigger>
+                        {can_create && (
+                            <div className="flex justify-end">
+                                <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button size="sm">
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Record Event
+                                        </Button>
+                                    </DialogTrigger>
                                 <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                                     <DialogHeader>
                                         <DialogTitle>Record Restraint Event</DialogTitle>
@@ -211,10 +214,13 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                             </div>
                                             <div>
                                                 <Label>Behaviour Support Plan (optional)</Label>
-                                                <Select value={eventForm.data.behaviour_support_plan_id} onValueChange={(v) => eventForm.setData('behaviour_support_plan_id', v)}>
+                                                <Select
+                                                    value={eventForm.data.behaviour_support_plan_id || '__none__'}
+                                                    onValueChange={(v) => eventForm.setData('behaviour_support_plan_id', v === '__none__' ? '' : v)}
+                                                >
                                                     <SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="">None</SelectItem>
+                                                        <SelectItem value="__none__">None</SelectItem>
                                                         {plans.map((p: any) => (
                                                             <SelectItem key={p.id} value={String(p.id)}>{p.title}</SelectItem>
                                                         ))}
@@ -338,8 +344,9 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                         </div>
                                     </form>
                                 </DialogContent>
-                            </Dialog>
-                        </div>
+                                </Dialog>
+                            </div>
+                        )}
 
                         {/* Events Table */}
                         <Card>
@@ -389,7 +396,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                                             )}
                                                         </td>
                                                         <td className="py-2">
-                                                            {!ev.reviewed_at && (
+                                                            {!ev.reviewed_at && can_review && (
                                                                 <Button size="sm" variant="outline" onClick={() => setReviewingEvent(ev)}>
                                                                     <FileEdit className="mr-1 h-3 w-3" />
                                                                     Review
@@ -428,14 +435,15 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
 
                     {/* Plans Tab */}
                     <TabsContent value="plans" className="space-y-4">
-                        <div className="flex justify-end">
-                            <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button size="sm">
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Create Plan
-                                    </Button>
-                                </DialogTrigger>
+                        {can_create && (
+                            <div className="flex justify-end">
+                                <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button size="sm">
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Create Plan
+                                        </Button>
+                                    </DialogTrigger>
                                 <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                                     <DialogHeader>
                                         <DialogTitle>Create Behaviour Support Plan</DialogTitle>
@@ -505,8 +513,9 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                         </div>
                                     </form>
                                 </DialogContent>
-                            </Dialog>
-                        </div>
+                                </Dialog>
+                            </div>
+                        )}
 
                         {/* Plans Cards */}
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

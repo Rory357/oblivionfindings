@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 type Props = {
     stays: any[];
     stayId?: string;
-    handoverTypes: string[];
+    handoverTypes: Record<string, string>;
 };
 
 type HandoverDraft = {
@@ -131,8 +131,8 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                                     <Select value={data.handover_type} onValueChange={(v) => setData('handover_type', v)}>
                                         <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                                         <SelectContent>
-                                            {handoverTypes.map((t) => (
-                                                <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                                            {Object.entries(handoverTypes).map(([value, label]) => (
+                                                <SelectItem key={value} value={value}>{label}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>

@@ -82,6 +82,7 @@ class WorkerParticipationController extends Controller
             'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
             'staff' => User::select('id', 'name')->orderBy('name')->get(),
             'filters' => $request->only(['site_id']),
+            'can_manage' => $request->user()?->canDo('hazards.manage') ?? false,
         ]);
     }
 

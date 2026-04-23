@@ -82,6 +82,10 @@ interface Props {
         manage: boolean;
         assign: boolean;
     };
+    basePath?: string;
+    pageTitle?: string;
+    pageDescription?: string;
+    pageBreadcrumbs?: Array<{ title: string; href: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +158,20 @@ function severityIcon(severity: string) {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function AlertsIndex({ alerts, filters, stats, staff, can }: Props) {
+export default function AlertsIndex({
+    alerts,
+    filters,
+    stats,
+    staff,
+    can,
+    basePath = '/control-room/alerts',
+    pageTitle = 'Alerts',
+    pageDescription = 'Monitor and manage all control room alerts',
+    pageBreadcrumbs = [
+        { title: 'Control Room', href: '/control-room' },
+        { title: 'All Alerts', href: '/control-room/alerts' },
+    ],
+}: Props) {
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [assignDialogOpen, setAssignDialogOpen] = useState(false);
     const [assignUserId, setAssignUserId] = useState<string>('');
@@ -181,27 +198,27 @@ export default function AlertsIndex({ alerts, filters, stats, staff, can }: Prop
         (key: string, value: string) => {
             const newFilters = { ...filters, [key]: value || undefined };
             // Reset to page 1 when filtering
-            router.get('/control-room/alerts', newFilters as Record<string, string>, {
+            router.get(basePath, newFilters as Record<string, string>, {
                 preserveState: true,
                 preserveScroll: true,
             });
         },
-        [filters],
+        [basePath, filters],
     );
 
     const applyQuickFilter = useCallback(
         (preset: Record<string, string | undefined>) => {
-            router.get('/control-room/alerts', preset as Record<string, string>, {
+            router.get(basePath, preset as Record<string, string>, {
                 preserveState: true,
                 preserveScroll: true,
             });
         },
-        [],
+        [basePath],
     );
 
     const clearFilters = useCallback(() => {
-        router.get('/control-room/alerts', {}, { preserveState: true, preserveScroll: true });
-    }, []);
+        router.get(basePath, {}, { preserveState: true, preserveScroll: true });
+    }, [basePath]);
 
     const hasFilters = Object.values(filters).some((v) => v);
 
@@ -216,15 +233,13 @@ export default function AlertsIndex({ alerts, filters, stats, staff, can }: Prop
         (field: string) => {
             let dir = 'asc';
             if (currentSort === field && currentDir === 'asc') dir = 'desc';
-            applyFilter('sort', field);
-            // Need to set dir too
             const newFilters = { ...filters, sort: field, dir };
-            router.get('/control-room/alerts', newFilters as Record<string, string>, {
+            router.get(basePath, newFilters as Record<string, string>, {
                 preserveState: true,
                 preserveScroll: true,
             });
         },
-        [currentSort, currentDir, filters],
+        [basePath, currentSort, currentDir, filters],
     );
 
     function SortIcon({ field }: { field: string }) {
@@ -326,20 +341,17 @@ export default function AlertsIndex({ alerts, filters, stats, staff, can }: Prop
 
     return (
         <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: 'All Alerts', href: '#' },
-            ]}
+            breadcrumbs={pageBreadcrumbs}
         >
-            <Head title="Control Room Alerts" />
+            <Head title={pageTitle === 'Alerts' ? 'Control Room Alerts' : `${pageTitle} - Control Room`} />
 
             <div className="flex flex-col gap-4 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Alerts</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{pageTitle}</h1>
                         <p className="text-sm text-muted-foreground">
-                            Monitor and manage all control room alerts
+                            {pageDescription}
                         </p>
                     </div>
                     <Button variant="outline" size="sm" asChild>

@@ -118,8 +118,8 @@ test('governance CEO reports index loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/governance/ceo-reports')
-            ->waitForText('CEO Reports', 10)
-            ->assertSee('CEO Reports');
+            ->waitForText('CEO Board Reports', 10)
+            ->assertSee('CEO Board Reports');
     });
 });
 
@@ -128,8 +128,8 @@ test('governance CEO reports create page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/governance/ceo-reports/create')
-            ->waitForText('CEO Report', 10)
-            ->assertSee('CEO Report');
+            ->waitForText('CEO Board Report', 10)
+            ->assertSee('CEO Board Report');
     });
 });
 

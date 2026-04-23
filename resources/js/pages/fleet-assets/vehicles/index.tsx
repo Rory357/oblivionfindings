@@ -58,12 +58,16 @@ function toArray<T>(input: PaginatedOrArray<T> | null | undefined): T[] {
 type Props = {
     vehicles: PaginatedOrArray<Vehicle>;
     sites?: Array<{ id: number; name: string }>;
+    can: {
+        manage: boolean;
+    };
 };
 
-export default function VehiclesIndex({ vehicles: rawVehicles, sites }: Props) {
+export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Props) {
     const vehicles = toArray(rawVehicles);
     const paginationLinks = !Array.isArray(rawVehicles) ? rawVehicles?.links ?? [] : [];
     const paginationMeta = !Array.isArray(rawVehicles) ? rawVehicles?.meta ?? {} : {};
+    const canManage = can.manage;
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -224,26 +228,30 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites }: Props) {
                                 </div>
 
                                 {/* Select All */}
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <input
-                                        type="checkbox"
-                                        checked={filteredVehicles.length > 0 && selectedIds.length === filteredVehicles.length}
-                                        onChange={toggleSelectAll}
-                                        className="h-3.5 w-3.5 rounded border-gray-300"
-                                    />
-                                    <span>Select all</span>
-                                </div>
+                                {canManage && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <input
+                                            type="checkbox"
+                                            checked={filteredVehicles.length > 0 && selectedIds.length === filteredVehicles.length}
+                                            onChange={toggleSelectAll}
+                                            className="h-3.5 w-3.5 rounded border-gray-300"
+                                        />
+                                        <span>Select all</span>
+                                    </div>
+                                )}
 
                                 <div className="space-y-2" style={{ maxHeight: '420px', overflowY: 'auto' }}>
                                     {filteredVehicles.length > 0 ? (
                                         filteredVehicles.map((vehicle) => (
-                                            <div key={vehicle.id} className="flex items-start gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.includes(vehicle.id)}
-                                                    onChange={() => toggleSelect(vehicle.id)}
-                                                    className="mt-3.5 h-3.5 w-3.5 rounded border-gray-300"
-                                                />
+                                            <div key={vehicle.id} className={`flex items-start ${canManage ? 'gap-2' : ''}`}>
+                                                {canManage && (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.includes(vehicle.id)}
+                                                        onChange={() => toggleSelect(vehicle.id)}
+                                                        className="mt-3.5 h-3.5 w-3.5 rounded border-gray-300"
+                                                    />
+                                                )}
                                                 <Link
                                                     href={`/fleet-assets/vehicles/${vehicle.id}`}
                                                     className="flex flex-1 flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/50"
@@ -298,7 +306,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites }: Props) {
                         </div>
 
                         {/* Bulk Action Bar */}
-                        {selectedIds.length > 0 && (
+                        {canManage && selectedIds.length > 0 && (
                             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-lg border bg-background px-4 py-3 shadow-lg">
                                 <span className="text-sm font-medium">{selectedIds.length} vehicle{selectedIds.length !== 1 ? 's' : ''} selected</span>
                                 <div className="flex items-center gap-2">

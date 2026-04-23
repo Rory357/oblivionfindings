@@ -135,6 +135,10 @@ class OutingController extends Controller
                 'upcoming' => $upcoming,
             ],
             'chart_data' => $chartFormatted,
+            'can' => [
+                'manage' => (bool) $request->user()?->canDo('fleet.manage')
+                    || (bool) $request->user()?->canDo('fleet.outings.manage'),
+            ],
         ]);
     }
 
@@ -196,6 +200,10 @@ class OutingController extends Controller
             'auth_user' => [
                 'id' => $request->user()->id,
                 'name' => $request->user()->name,
+            ],
+            'can' => [
+                'manage' => (bool) $request->user()?->canDo('fleet.manage')
+                    || (bool) $request->user()?->canDo('fleet.outings.manage'),
             ],
         ]);
     }
@@ -354,6 +362,10 @@ class OutingController extends Controller
                 'created_at' => optional($outing->created_at)->toISOString(),
             ],
             'vehicle_state' => $vehicleState,
+            'can' => [
+                'manage' => (bool) $request->user()?->canDo('fleet.manage')
+                    || (bool) $request->user()?->canDo('fleet.outings.manage'),
+            ],
         ]);
     }
 

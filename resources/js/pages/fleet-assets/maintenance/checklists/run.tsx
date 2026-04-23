@@ -36,9 +36,12 @@ type Template = {
 type Props = {
     templates: Template[];
     assets: Array<{ id: number; name: string }>;
+    can: {
+        manage: boolean;
+    };
 };
 
-export default function ChecklistRun({ templates, assets }: Props) {
+export default function ChecklistRun({ templates, assets, can }: Props) {
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
     const selectedTemplate = (templates ?? []).find((t) => String(t.id) === selectedTemplateId);
 
@@ -69,6 +72,38 @@ export default function ChecklistRun({ templates, assets }: Props) {
         if (!selectedTemplateId) return;
         form.post(`/fleet-assets/maintenance/checklists/${selectedTemplateId}/run`);
     };
+
+    if (!can.manage) {
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Fleet & Assets', href: '/fleet-assets' },
+                    { title: 'Checklists', href: '/fleet-assets/maintenance/checklists' },
+                    { title: 'Run', href: '#' },
+                ]}
+            >
+                <Head title="Run Checklist" />
+                <PageShell>
+                    <FleetHero
+                        title="Run Checklist"
+                        description="Complete a checklist inspection or maintenance run."
+                        backHref="/fleet-assets/maintenance/checklists"
+                        backLabel="Back to Checklists"
+                    />
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">View-only</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                                Running checklists requires fleet maintenance manager access.
+                            </p>
+                        </CardContent>
+                    </Card>
+                </PageShell>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout

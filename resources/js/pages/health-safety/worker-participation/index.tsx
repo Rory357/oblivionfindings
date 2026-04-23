@@ -127,6 +127,7 @@ type Props = {
     sites: Array<{ id: number; name: string }>;
     staff: Array<{ id: number; name: string }>;
     committees?: Array<{ id: number; name: string }>;
+    can_manage: boolean;
 };
 
 /* ------------------------------------------------------------------ */
@@ -308,6 +309,7 @@ export default function WorkerParticipationIndex({
     sites,
     staff,
     committees = [],
+    can_manage,
 }: Props) {
     const [activeTab, setActiveTab] = useState('representatives');
     const [repOpen, setRepOpen] = useState(false);
@@ -823,10 +825,12 @@ export default function WorkerParticipationIndex({
                                             <ShieldCheck className="h-5 w-5 text-blue-600" />
                                             H&S Representatives
                                         </CardTitle>
-                                        <Button size="sm" onClick={() => setRepOpen(true)}>
-                                            <UserPlus className="mr-1.5 h-4 w-4" />
-                                            Add Representative
-                                        </Button>
+                                        {can_manage && (
+                                            <Button size="sm" onClick={() => setRepOpen(true)}>
+                                                <UserPlus className="mr-1.5 h-4 w-4" />
+                                                Add Representative
+                                            </Button>
+                                        )}
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -843,10 +847,12 @@ export default function WorkerParticipationIndex({
                                                 who represent their colleagues on H&S matters. Under HSWA, workers
                                                 can request to elect an H&S rep at any time.
                                             </p>
-                                            <Button size="sm" className="mt-4" onClick={() => setRepOpen(true)}>
-                                                <UserPlus className="mr-1.5 h-4 w-4" />
-                                                Add Your First Representative
-                                            </Button>
+                                            {can_manage && (
+                                                <Button size="sm" className="mt-4" onClick={() => setRepOpen(true)}>
+                                                    <UserPlus className="mr-1.5 h-4 w-4" />
+                                                    Add Your First Representative
+                                                </Button>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -936,19 +942,21 @@ export default function WorkerParticipationIndex({
                                             <CalendarDays className="h-5 w-5 text-amber-600" />
                                             Committee Meetings
                                         </CardTitle>
-                                        <Button
-                                            size="sm"
-                                            onClick={() => {
-                                                if (committees.length === 0) {
-                                                    setCommitteeDialogOpen(true);
-                                                } else {
-                                                    setMeetingOpen(true);
-                                                }
-                                            }}
-                                        >
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Schedule Meeting
-                                        </Button>
+                                        {can_manage && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (committees.length === 0) {
+                                                        setCommitteeDialogOpen(true);
+                                                    } else {
+                                                        setMeetingOpen(true);
+                                                    }
+                                                }}
+                                            >
+                                                <Plus className="mr-1.5 h-4 w-4" />
+                                                Schedule Meeting
+                                            </Button>
+                                        )}
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -980,10 +988,12 @@ export default function WorkerParticipationIndex({
                                                 An H&S committee is required under the HSWA to facilitate meetings
                                                 between workers and management on health and safety matters.
                                             </p>
-                                            <Button size="sm" className="mt-4" onClick={() => setCommitteeDialogOpen(true)}>
-                                                <Plus className="mr-1.5 h-4 w-4" />
-                                                Create Committee
-                                            </Button>
+                                            {can_manage && (
+                                                <Button size="sm" className="mt-4" onClick={() => setCommitteeDialogOpen(true)}>
+                                                    <Plus className="mr-1.5 h-4 w-4" />
+                                                    Create Committee
+                                                </Button>
+                                            )}
                                         </div>
                                     )}
 
@@ -1000,14 +1010,16 @@ export default function WorkerParticipationIndex({
                                                 discuss workplace health and safety issues, review incidents, and
                                                 plan improvements.
                                             </p>
-                                            <Button
-                                                size="sm"
-                                                className="mt-4"
-                                                onClick={() => setMeetingOpen(true)}
-                                            >
-                                                <Plus className="mr-1.5 h-4 w-4" />
-                                                Schedule Your First Meeting
-                                            </Button>
+                                            {can_manage && (
+                                                <Button
+                                                    size="sm"
+                                                    className="mt-4"
+                                                    onClick={() => setMeetingOpen(true)}
+                                                >
+                                                    <Plus className="mr-1.5 h-4 w-4" />
+                                                    Schedule Your First Meeting
+                                                </Button>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
@@ -1037,7 +1049,7 @@ export default function WorkerParticipationIndex({
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                {meeting.status === 'scheduled' && (
+                                                                {can_manage && meeting.status === 'scheduled' && (
                                                                     <Button
                                                                         size="sm"
                                                                         variant="ghost"
@@ -1148,7 +1160,7 @@ export default function WorkerParticipationIndex({
                                                                 </span>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                {meeting.status === 'scheduled' && (
+                                                                {can_manage && meeting.status === 'scheduled' && (
                                                                     <>
                                                                         <Button
                                                                             size="sm"
@@ -1189,7 +1201,7 @@ export default function WorkerParticipationIndex({
                                                                         </Button>
                                                                     </>
                                                                 )}
-                                                                {meeting.status === 'completed' && !meeting.minutes_document_name && (
+                                                                {can_manage && meeting.status === 'completed' && !meeting.minutes_document_name && (
                                                                     <Button
                                                                         size="sm"
                                                                         variant="outline"
@@ -1221,10 +1233,12 @@ export default function WorkerParticipationIndex({
                                             <Megaphone className="h-5 w-5 text-purple-600" />
                                             Worker Consultations
                                         </CardTitle>
-                                        <Button size="sm" onClick={() => setConsultationOpen(true)}>
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            New Consultation
-                                        </Button>
+                                        {can_manage && (
+                                            <Button size="sm" onClick={() => setConsultationOpen(true)}>
+                                                <Plus className="mr-1.5 h-4 w-4" />
+                                                New Consultation
+                                            </Button>
+                                        )}
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -1241,14 +1255,16 @@ export default function WorkerParticipationIndex({
                                                 such as hazard identification, risk assessments, and changes to
                                                 procedures or equipment.
                                             </p>
-                                            <Button
-                                                size="sm"
-                                                className="mt-4"
-                                                onClick={() => setConsultationOpen(true)}
-                                            >
-                                                <Plus className="mr-1.5 h-4 w-4" />
-                                                Record First Consultation
-                                            </Button>
+                                            {can_manage && (
+                                                <Button
+                                                    size="sm"
+                                                    className="mt-4"
+                                                    onClick={() => setConsultationOpen(true)}
+                                                >
+                                                    <Plus className="mr-1.5 h-4 w-4" />
+                                                    Record First Consultation
+                                                </Button>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
@@ -1284,14 +1300,16 @@ export default function WorkerParticipationIndex({
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                                                                    onClick={() => setEditingConsultation(c)}
-                                                                >
-                                                                    <Pencil className="h-3.5 w-3.5" />
-                                                                </Button>
+                                                                {can_manage && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                                                        onClick={() => setEditingConsultation(c)}
+                                                                    >
+                                                                        <Pencil className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                )}
                                                                 {statusBadge(c.status)}
                                                             </div>
                                                         </div>
@@ -1389,57 +1407,57 @@ export default function WorkerParticipationIndex({
                                                                 <Users className="h-3.5 w-3.5" />
                                                                 {c.workers_consulted} worker{c.workers_consulted !== 1 ? 's' : ''} consulted
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                {/* Upload document button */}
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    onClick={() => {
-                                                                        consultDocForm.reset();
-                                                                        consultDocForm.setData('type', 'document');
-                                                                        setConsultDocUploadType('document');
-                                                                        setConsultDocUploadId(c.id);
-                                                                    }}
-                                                                >
-                                                                    <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                                                    Upload Document
-                                                                </Button>
+                                                            {can_manage && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => {
+                                                                            consultDocForm.reset();
+                                                                            consultDocForm.setData('type', 'document');
+                                                                            setConsultDocUploadType('document');
+                                                                            setConsultDocUploadId(c.id);
+                                                                        }}
+                                                                    >
+                                                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                                                        Upload Document
+                                                                    </Button>
 
-                                                                {/* Workflow action buttons */}
-                                                                {c.status === 'open' && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            feedbackForm.reset();
-                                                                            setFeedbackDialogId(c.id);
-                                                                        }}
-                                                                    >
-                                                                        <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                                                                        Record Feedback
-                                                                    </Button>
-                                                                )}
-                                                                {c.status === 'feedback_received' && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            outcomeForm.reset();
-                                                                            setOutcomeDialogId(c.id);
-                                                                        }}
-                                                                    >
-                                                                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                                                                        Record Outcome
-                                                                    </Button>
-                                                                )}
-                                                                {c.status === 'actioned' && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        onClick={() => setCloseDialogId(c.id)}
-                                                                    >
-                                                                        <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                                                        Close Consultation
-                                                                    </Button>
-                                                                )}
-                                                            </div>
+                                                                    {c.status === 'open' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            onClick={() => {
+                                                                                feedbackForm.reset();
+                                                                                setFeedbackDialogId(c.id);
+                                                                            }}
+                                                                        >
+                                                                            <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                                                                            Record Feedback
+                                                                        </Button>
+                                                                    )}
+                                                                    {c.status === 'feedback_received' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            onClick={() => {
+                                                                                outcomeForm.reset();
+                                                                                setOutcomeDialogId(c.id);
+                                                                            }}
+                                                                        >
+                                                                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                                                            Record Outcome
+                                                                        </Button>
+                                                                    )}
+                                                                    {c.status === 'actioned' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            onClick={() => setCloseDialogId(c.id)}
+                                                                        >
+                                                                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                                                                            Close Consultation
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </CardContent>
                                                 </Card>

@@ -16,7 +16,7 @@ class PayrollExportController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('payroll_exports.viewAny'), 403);
+        abort_unless($auth && $this->canAccessPayrollExports($auth), 403);
 
         $filters = $request->validate([
             'status' => ['nullable', 'string'],
@@ -112,7 +112,7 @@ class PayrollExportController extends Controller
     public function create(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('payroll_exports.create'), 403);
+        abort_unless($auth && $this->canAccessPayrollExports($auth), 403);
 
         return inertia('operations/payroll-export/Create');
     }
@@ -120,7 +120,7 @@ class PayrollExportController extends Controller
     public function generate(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('payroll_exports.create'), 403);
+        abort_unless($auth && $this->canAccessPayrollExports($auth), 403);
 
         $data = $request->validate([
             'start_date' => ['required', 'date'],
@@ -143,7 +143,7 @@ class PayrollExportController extends Controller
     public function download(Request $request, $export)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('payroll_exports.view'), 403);
+        abort_unless($auth && $this->canAccessPayrollExports($auth), 403);
 
         $export = PayrollExport::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -159,7 +159,7 @@ class PayrollExportController extends Controller
     public function confirm(Request $request, $export)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('payroll_exports.confirm'), 403);
+        abort_unless($auth && $this->canAccessPayrollExports($auth), 403);
 
         $export = PayrollExport::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -168,5 +168,14 @@ class PayrollExportController extends Controller
         app(PayrollExportService::class)->confirmExport($export);
 
         return redirect()->back()->with('success', 'Payroll export confirmed.');
+    }
+
+    private function canAccessPayrollExports($auth): bool
+    {
+        return $auth->canDo('payroll_exports.viewAny')
+            || $auth->canDo('payroll_exports.create')
+            || $auth->canDo('payroll_exports.view')
+            || $auth->canDo('payroll_exports.confirm')
+            || $auth->canDo('payroll.export');
     }
 }

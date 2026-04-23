@@ -70,8 +70,8 @@ class LegalHoldController extends Controller
         $validated = $request->validate([
             'hold_type' => 'required|in:litigation,investigation,regulatory,audit,other',
             'reason' => 'required|string',
-            'holdable_type' => 'nullable|string',
-            'holdable_id' => 'nullable|integer',
+            'holdable_type' => 'nullable|required_with:holdable_id|string',
+            'holdable_id' => 'nullable|required_with:holdable_type|integer',
             'related_records' => 'nullable|array',
             'legal_authority' => 'nullable|string',
             'review_date' => 'nullable|date',

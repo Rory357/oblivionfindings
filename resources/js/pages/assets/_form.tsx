@@ -165,7 +165,7 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                                     <SelectValue placeholder="Select category type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">â€”</SelectItem>
+                                    <SelectItem value="none">None</SelectItem>
                                     {categories.map((c) => (
                                         <SelectItem key={c.id} value={String(c.id)}>
                                             {c.name}

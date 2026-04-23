@@ -15,6 +15,8 @@ use Inertia\Inertia;
 
 class EmergencyDrillController extends Controller
 {
+    private const FIRE_DRILL_TYPES = ['fire', 'fire_evacuation'];
+
     /**
      * List emergency drills with filter by site, type, status.
      */
@@ -32,7 +34,9 @@ class EmergencyDrillController extends Controller
                 });
             })
             ->when(!empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
-            ->when(!empty($filters['drill_type']), fn ($q) => $q->where('drill_type', $filters['drill_type']))
+            ->when(!empty($filters['drill_type']), function ($q) use ($filters) {
+                $this->applyDrillTypeFilter($q, $filters['drill_type']);
+            })
             ->when(!empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->orderByDesc('scheduled_at')
             ->paginate(25)
@@ -117,12 +121,14 @@ class EmergencyDrillController extends Controller
     {
         $validated = $request->validate([
             'site_id' => ['required', 'exists:sites,id'],
-            'drill_type' => ['required', 'string', 'in:fire,earthquake,lockdown,tsunami,chemical_spill,medical_emergency,other'],
+            'drill_type' => ['required', 'string', 'in:fire,fire_evacuation,earthquake,lockdown,tsunami,chemical_spill,medical_emergency,other'],
             'title' => ['required', 'string', 'max:255'],
             'scheduled_at' => ['required', 'date'],
             'scenario_description' => ['nullable', 'string', 'max:5000'],
             'conducted_by' => ['nullable', 'exists:users,id'],
         ]);
+
+        $validated['drill_type'] = $this->normalizeDrillType($validated['drill_type']);
 
         EmergencyDrill::create(array_merge($validated, [
             'status' => 'scheduled',
@@ -233,5 +239,23 @@ class EmergencyDrillController extends Controller
         $finding->update($validated);
 
         return redirect()->back()->with('success', 'Finding updated successfully.');
+    }
+
+    private function applyDrillTypeFilter($query, string $type): void
+    {
+        $normalized = $this->normalizeDrillType($type);
+
+        if ($normalized === 'fire_evacuation') {
+            $query->whereIn('drill_type', self::FIRE_DRILL_TYPES);
+
+            return;
+        }
+
+        $query->where('drill_type', $normalized);
+    }
+
+    private function normalizeDrillType(string $type): string
+    {
+        return $type === 'fire' ? 'fire_evacuation' : $type;
     }
 }

@@ -63,7 +63,7 @@ Route::middleware(['auth'])->group(function () {
 
     });
 
-    Route::middleware('permission:controlRoom.reports.view')->group(function () {
+    Route::middleware('permission:controlRoom.reports.view|controlRoom.viewAny')->group(function () {
         // Reports — main dashboard and individual metric endpoints
         Route::get('/control-room/reports', [ControlRoomReportController::class, 'index'])
             ->name('control-room.reports.index');
@@ -176,6 +176,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.integration-alerts.create-incident');
     });
 
+    Route::redirect('/control-room/sla-breaches', '/control-room/sla/breaches')
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.sla-breaches.legacy');
+
     // Live Map
     Route::get('/control-room/map', ControlRoomMapController::class)
         ->middleware('permission:controlRoom.viewAny')
@@ -190,7 +194,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/shifts', [ControlRoomShiftController::class, 'store'])
             ->name('control-room.shifts.store');
         Route::get('/control-room/shifts/{shift}/handover', [ControlRoomHandoverController::class, 'show'])
-            ->name('control-room.shifts.handover-form');
+            ->name('control-room.shifts.handover-page');
         Route::post('/control-room/shifts/{shift}/handover', [ControlRoomShiftController::class, 'handover'])
             ->name('control-room.shifts.handover');
         Route::post('/control-room/shifts/{shift}/acknowledge-handover', [ControlRoomShiftController::class, 'acknowledgeHandover'])

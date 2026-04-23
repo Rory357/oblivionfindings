@@ -12,10 +12,17 @@ type Props = {
     staff: Array<{ id: number; name: string }>;
 };
 
+const toLocalDateTimeInput = () => {
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, '0');
+
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+};
+
 export default function CreateDataBreach({ staff }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         nature_of_breach: '',
-        discovered_at: new Date().toISOString().split('T')[0],
+        discovered_at: toLocalDateTimeInput(),
         approximate_individuals_affected: '',
         likely_consequences: '',
         measures_taken: '',

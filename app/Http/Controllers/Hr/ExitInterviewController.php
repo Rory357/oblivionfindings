@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExitInterview;
 use App\Domain\Hr\Services\ExitInterviewService;
@@ -12,6 +13,8 @@ use Inertia\Inertia;
 
 class ExitInterviewController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         protected ExitInterviewService $exitInterviewService,
     ) {}
@@ -22,9 +25,10 @@ class ExitInterviewController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.exit-interviews.view'), 403);
+        abort_unless($this->canView($user), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $interviews = HrExitInterview::forTenant($user->tenant_id)
+        $interviews = HrExitInterview::forTenant($tenantId)
             ->with([
                 'employeeProfile.user:id,name',
                 'interviewer:id,name',
@@ -51,13 +55,22 @@ class ExitInterviewController extends Controller
     public function create(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.exit-interviews.manage'), 403);
+        abort_unless($this->canManage($user), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $employees = HrEmployeeProfile::forTenant($user->tenant_id)
+        $employees = HrEmployeeProfile::forTenant($tenantId)
             ->with('user:id,name')
             ->get(['id', 'user_id', 'position_title']);
 
-        $interviewers = User::where('tenant_id', $user->tenant_id)
+        $interviewerIds = HrEmployeeProfile::forTenant($tenantId)
+            ->pluck('user_id')
+            ->push($user->id)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $interviewers = User::whereIn('id', $interviewerIds)
             ->get(['id', 'name']);
 
         return Inertia::render('hr/exit-interviews/create', [
@@ -85,7 +98,8 @@ class ExitInterviewController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.exit-interviews.manage'), 403);
+        abort_unless($this->canManage($user), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
@@ -103,7 +117,7 @@ class ExitInterviewController extends Controller
         ]);
 
         $this->exitInterviewService->createExitInterview([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'created_by' => $user->id,
             ...$data,
         ]);
@@ -117,7 +131,7 @@ class ExitInterviewController extends Controller
     public function show(Request $request, HrExitInterview $exitInterview)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.exit-interviews.view'), 403);
+        abort_unless($this->canView($user), 403);
 
         $exitInterview->load([
             'employeeProfile.user:id,name',
@@ -128,7 +142,7 @@ class ExitInterviewController extends Controller
         return Inertia::render('hr/exit-interviews/show', [
             'interview' => $exitInterview,
             'can' => [
-                'manage' => $user->canDo('hr.exit-interviews.manage'),
+                'manage' => $this->canManage($user),
             ],
         ]);
     }
@@ -139,13 +153,14 @@ class ExitInterviewController extends Controller
     public function trends(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.exit-interviews.view'), 403);
+        abort_unless($this->canView($user), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $fromDate = $request->query('from', now()->subYear()->toDateString());
         $toDate = $request->query('to', now()->toDateString());
 
         $trends = $this->exitInterviewService->getExitTrends(
-            $user->tenant_id,
+            $tenantId,
             $fromDate,
             $toDate,
         );
@@ -157,5 +172,23 @@ class ExitInterviewController extends Controller
                 'to' => $toDate,
             ],
         ]);
+    }
+
+    private function canView($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.exit-interviews.view')
+            || $user->canDo('hr.exit-interviews.manage')
+            || $user->canDo('hr.onboarding.view')
+            || $user->canDo('hr.onboarding.manage')
+        );
+    }
+
+    private function canManage($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.exit-interviews.manage')
+            || $user->canDo('hr.onboarding.manage')
+        );
     }
 }

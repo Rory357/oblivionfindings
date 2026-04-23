@@ -96,6 +96,9 @@ type Props = {
         coordinates?: { lat: number; lng: number }[];
         color?: string;
     }>;
+    can: {
+        manage: boolean;
+    };
 };
 
 /* ------------------------------------------------------------------ */
@@ -155,6 +158,7 @@ export default function ResidentTrackingIndex({
     recent_alerts,
     active_outings,
     geofences,
+    can,
 }: Props) {
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'outside' | 'alerts'>('all');
@@ -270,14 +274,14 @@ export default function ResidentTrackingIndex({
                 <FleetHero
                     title="Resident Tracking"
                     subtitle="Safety command center - monitor tracked residents in real-time"
-                    actions={
+                    actions={can.manage ? (
                         <Button asChild>
                             <Link href="/fleet-assets/resident-tracking/assign">
                                 <UserPlus className="mr-2 h-4 w-4" />
                                 Assign Tracker
                             </Link>
                         </Button>
-                    }
+                    ) : undefined}
                 />
 
                 {/* KPI Row */}

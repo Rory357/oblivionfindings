@@ -4,8 +4,10 @@ namespace App\Domain\Governance\Http\Controllers;
 
 use App\Domain\Governance\Models\GovernancePolicy;
 use App\Domain\Governance\Models\PolicyAttestation;
+use App\Domain\Governance\Models\BoardMember;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class GovernancePolicyController extends Controller
@@ -19,7 +21,8 @@ class GovernancePolicyController extends Controller
             ->when($request->category, fn($q, $cat) => $q->where('category', $cat))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->orderBy('title')
-            ->paginate(20);
+            ->paginate(20)
+            ->through(fn (GovernancePolicy $policy) => $this->presentPolicyListItem($policy));
 
         return Inertia::render('Governance/Policies/Index', [
             'policies' => $policies,
@@ -59,10 +62,18 @@ class GovernancePolicyController extends Controller
         ]);
 
         $policy = GovernancePolicy::create([
-            ...$validated,
-            'version' => 1,
+            'policy_code' => $this->generatePolicyCode(),
+            'title' => $validated['title'],
+            'category' => $validated['category'],
+            'purpose' => $validated['description'] ?? null,
+            'content' => $validated['content'],
+            'version_number' => 1,
             'status' => 'draft',
+            'owner_id' => auth()->id(),
             'created_by' => auth()->id(),
+            'effective_from' => $validated['effective_date'],
+            'review_due' => $validated['review_date'],
+            'next_review_date' => $validated['review_date'],
         ]);
 
         return redirect()->route('governance.policies.show', $policy)
@@ -73,17 +84,17 @@ class GovernancePolicyController extends Controller
     {
         abort_unless(request()->user()?->canDo('governance.policies.view'), 403);
 
-        $policy->load(['attestations.user', 'approvedByUser']);
+        $policy->load(['attestations.user', 'approvedBy']);
 
         $attestationStats = [
-            'total_required' => $policy->requires_attestation ? \App\Domain\Governance\Models\BoardMember::active()->count() : 0,
-            'completed' => $policy->attestations()->where('version', $policy->version)->count(),
+            'total_required' => BoardMember::active()->count(),
+            'completed' => $policy->attestations()->where('acknowledged', true)->count(),
         ];
 
         return Inertia::render('Governance/Policies/Show', [
-            'policy' => $policy,
+            'policy' => $this->presentPolicy($policy),
             'attestationStats' => $attestationStats,
-            'canEdit' => auth()->user()->can('update', $policy),
+            'canEdit' => auth()->user()?->canDo('governance.policies.manage') ?? false,
         ]);
     }
 
@@ -92,7 +103,7 @@ class GovernancePolicyController extends Controller
         abort_unless(request()->user()?->canDo('governance.policies.manage'), 403);
 
         return Inertia::render('Governance/Policies/Edit', [
-            'policy' => $policy,
+            'policy' => $this->presentPolicy($policy),
         ]);
     }
 
@@ -110,7 +121,34 @@ class GovernancePolicyController extends Controller
             'requires_attestation' => 'boolean',
         ]);
 
-        $policy->update($validated);
+        $payload = [];
+
+        if (array_key_exists('title', $validated)) {
+            $payload['title'] = $validated['title'];
+        }
+
+        if (array_key_exists('category', $validated)) {
+            $payload['category'] = $validated['category'];
+        }
+
+        if (array_key_exists('description', $validated)) {
+            $payload['purpose'] = $validated['description'];
+        }
+
+        if (array_key_exists('content', $validated)) {
+            $payload['content'] = $validated['content'];
+        }
+
+        if (array_key_exists('review_date', $validated)) {
+            $payload['review_due'] = $validated['review_date'];
+            $payload['next_review_date'] = $validated['review_date'];
+        }
+
+        if (array_key_exists('status', $validated)) {
+            $payload['status'] = $this->normalizeStatus($validated['status']);
+        }
+
+        $policy->update($payload);
 
         return redirect()->back()->with('success', 'Policy updated.');
     }
@@ -120,9 +158,11 @@ class GovernancePolicyController extends Controller
         abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
 
         $policy->update([
-            'status' => 'active',
+            'status' => 'approved',
             'approved_by' => auth()->id(),
             'approved_at' => now(),
+            'effective_from' => $policy->effective_from ?? now()->toDateString(),
+            'next_review_date' => $policy->next_review_date ?? $policy->review_due ?? now()->addYear()->toDateString(),
         ]);
 
         return redirect()->back()->with('success', 'Policy approved and published.');
@@ -141,12 +181,11 @@ class GovernancePolicyController extends Controller
             [
                 'governance_policy_id' => $policy->id,
                 'user_id' => auth()->id(),
-                'version' => $policy->version,
             ],
             [
-                'attested_at' => now(),
+                'acknowledged' => true,
+                'acknowledged_at' => now(),
                 'notes' => $validated['notes'] ?? null,
-                'ip_address' => $request->ip(),
             ]
         );
 
@@ -162,15 +201,81 @@ class GovernancePolicyController extends Controller
             'change_summary' => 'required|string|max:500',
         ]);
 
-        $policy->update([
+        $newPolicy = $policy->createNewVersion(auth()->id());
+        $newPolicy->update([
             'content' => $validated['content'],
-            'version' => $policy->version + 1,
-            'change_summary' => $validated['change_summary'],
-            'status' => 'draft',
-            'approved_by' => null,
-            'approved_at' => null,
+            'review_due' => $policy->review_due,
+            'next_review_date' => $policy->next_review_date,
         ]);
 
-        return redirect()->back()->with('success', 'New policy version created (v' . $policy->version . ').');
+        return redirect()->route('governance.policies.show', $newPolicy)
+            ->with('success', 'New policy draft created.');
+    }
+
+    protected function presentPolicyListItem(GovernancePolicy $policy): array
+    {
+        return [
+            'id' => $policy->id,
+            'title' => $policy->title,
+            'category' => $policy->category,
+            'version' => (int) $policy->version_number,
+            'status' => $this->presentStatus($policy->status),
+            'effective_date' => $policy->effective_from?->toDateString(),
+            'review_date' => $policy->next_review_date?->toDateString() ?? $policy->review_due?->toDateString(),
+            'requires_attestation' => false,
+            'attestations_count' => $policy->attestations_count,
+        ];
+    }
+
+    protected function presentPolicy(GovernancePolicy $policy): array
+    {
+        return [
+            'id' => $policy->id,
+            'title' => $policy->title,
+            'category' => $policy->category,
+            'description' => $policy->purpose,
+            'content' => $policy->content,
+            'version' => (int) $policy->version_number,
+            'status' => $this->presentStatus($policy->status),
+            'effective_date' => $policy->effective_from?->toDateString(),
+            'review_date' => $policy->next_review_date?->toDateString() ?? $policy->review_due?->toDateString(),
+            'requires_attestation' => false,
+            'approved_by_user' => $policy->approvedBy ? ['name' => $policy->approvedBy->name] : null,
+            'approved_at' => $policy->approved_at?->toIso8601String(),
+            'attestations' => $policy->attestations->map(fn (PolicyAttestation $attestation) => [
+                'id' => $attestation->id,
+                'user' => ['id' => $attestation->user?->id, 'name' => $attestation->user?->name ?? 'Unknown'],
+                'version' => (int) $policy->version_number,
+                'attested_at' => $attestation->acknowledged_at?->toIso8601String(),
+                'notes' => $attestation->notes,
+            ])->values()->all(),
+        ];
+    }
+
+    protected function normalizeStatus(string $status): string
+    {
+        return match ($status) {
+            'active' => 'approved',
+            'archived' => 'archived',
+            default => $status,
+        };
+    }
+
+    protected function presentStatus(string $status): string
+    {
+        return match ($status) {
+            'approved' => 'active',
+            'superseded' => 'archived',
+            default => $status,
+        };
+    }
+
+    protected function generatePolicyCode(): string
+    {
+        do {
+            $code = 'POL-' . strtoupper(Str::random(6));
+        } while (GovernancePolicy::query()->where('policy_code', $code)->exists());
+
+        return $code;
     }
 }

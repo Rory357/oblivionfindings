@@ -16,6 +16,7 @@ type Props = {
     domains: FilterOption[];
     statuses: FilterOption[];
     device?: DeviceFormData;
+    prefillDomain?: string;
     isEdit?: boolean;
 };
 
@@ -47,8 +48,11 @@ const emptyDevice: DeviceFormData = {
     status: 'active', provider: '', location_description: '', notes: '',
 };
 
-export default function DeviceForm({ taxonomy, domains, statuses, device, isEdit = false }: Props) {
-    const initial = device ?? emptyDevice;
+export default function DeviceForm({ taxonomy, domains, statuses, device, prefillDomain = '', isEdit = false }: Props) {
+    const initial = device ?? {
+        ...emptyDevice,
+        domain: prefillDomain,
+    };
     const { data, setData, post, put, processing, errors } = useForm<DeviceFormData>(initial);
 
     const categories = useMemo(() => {

@@ -13,12 +13,26 @@ class ClientOnboardingWorkflowController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('onboarding.viewAny'), 403);
+        abort_unless($auth && $this->canViewWorkflows($auth), 403);
+
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'in:in_progress,completed,cancelled'],
+        ]);
+        $search = trim((string) ($filters['q'] ?? ''));
 
         $workflows = ClientOnboardingWorkflow::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->withCount(['steps', 'steps as completed_steps_count' => fn ($q) => $q->where('status', 'completed')])
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas('client', function ($clientQuery) use ($search) {
+                    $clientQuery
+                        ->where('first_name', 'like', '%'.$search.'%')
+                        ->orWhere('last_name', 'like', '%'.$search.'%');
+                });
+            })
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
@@ -33,17 +47,21 @@ class ClientOnboardingWorkflowController extends Controller
         return inertia('operations/onboarding/Index', [
             'workflows' => $workflows,
             'stats' => $stats,
+            'filters' => [
+                'q' => $filters['q'] ?? null,
+                'status' => $filters['status'] ?? null,
+            ],
         ]);
     }
 
     public function show(Request $request, $workflow)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('onboarding.view'), 403);
+        abort_unless($auth && $this->canViewWorkflows($auth), 403);
 
         $workflow = ClientOnboardingWorkflow::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['client:id,first_name,last_name', 'steps' => fn ($q) => $q->orderBy('order')])
+            ->with(['client:id,first_name,last_name', 'steps' => fn ($q) => $q->orderBy('step_order')])
             ->findOrFail($workflow);
 
         return inertia('operations/onboarding/Show', [
@@ -54,7 +72,7 @@ class ClientOnboardingWorkflowController extends Controller
     public function create(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('onboarding.create'), 403);
+        abort_unless($auth && $this->canCreateWorkflows($auth), 403);
 
         $clients = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -70,7 +88,7 @@ class ClientOnboardingWorkflowController extends Controller
     public function store(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('onboarding.create'), 403);
+        abort_unless($auth && $this->canCreateWorkflows($auth), 403);
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
@@ -108,7 +126,7 @@ class ClientOnboardingWorkflowController extends Controller
     public function updateStep(Request $request, $workflow, $step)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('onboarding.edit'), 403);
+        abort_unless($auth && $this->canManageWorkflows($auth), 403);
 
         ClientOnboardingWorkflow::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -134,7 +152,7 @@ class ClientOnboardingWorkflowController extends Controller
     public function storeForClient(Request $request, \App\Models\Client $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('onboarding.create'), 403);
+        abort_unless($auth && $this->canCreateWorkflows($auth), 403);
 
         // Check if client already has an active workflow
         $existing = $client->onboardingWorkflows()
@@ -153,7 +171,7 @@ class ClientOnboardingWorkflowController extends Controller
     public function complete(Request $request, $workflow)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('onboarding.edit'), 403);
+        abort_unless($auth && $this->canManageWorkflows($auth), 403);
 
         $workflow = ClientOnboardingWorkflow::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -167,5 +185,26 @@ class ClientOnboardingWorkflowController extends Controller
         $workflow->client->update(['status' => 'active']);
 
         return redirect()->back()->with('success', 'Onboarding workflow completed.');
+    }
+
+    private function canViewWorkflows($auth): bool
+    {
+        return $auth->canDo('onboarding.viewAny')
+            || $auth->canDo('onboarding.view')
+            || $auth->canDo('clients.viewAny');
+    }
+
+    private function canCreateWorkflows($auth): bool
+    {
+        return $auth->canDo('onboarding.create')
+            || $auth->canDo('clients.create')
+            || $auth->canDo('clients.update');
+    }
+
+    private function canManageWorkflows($auth): bool
+    {
+        return $auth->canDo('onboarding.edit')
+            || $auth->canDo('clients.create')
+            || $auth->canDo('clients.update');
     }
 }

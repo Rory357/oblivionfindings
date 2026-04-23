@@ -24,7 +24,7 @@ class GoalController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.goals.view'), 403);
+        abort_unless($this->canView($user), 403);
 
         $tenantId = $user->tenant_id ?? 1;
 
@@ -72,7 +72,7 @@ class GoalController extends Controller
                 'user_id' => $request->query('user_id'),
             ],
             'can' => [
-                'manage' => $user->canDo('hr.goals.manage'),
+                'manage' => $this->canManage($user),
             ],
         ]);
     }
@@ -84,7 +84,7 @@ class GoalController extends Controller
     public function create(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $tenantId = $user->tenant_id ?? 1;
 
@@ -136,7 +136,7 @@ class GoalController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -169,7 +169,7 @@ class GoalController extends Controller
     public function show(Request $request, HrGoal $goal)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.goals.view'), 403);
+        abort_unless($this->canView($user), 403);
 
         $goal->load([
             'user:id,name',
@@ -234,8 +234,8 @@ class GoalController extends Controller
             ],
             'users' => $users,
             'can' => [
-                'manage' => $user->canDo('hr.goals.manage'),
-                'updateProgress' => $user->canDo('hr.goals.manage') || $goal->user_id === $user->id,
+                'manage' => $this->canManage($user),
+                'updateProgress' => $this->canManage($user) || $goal->user_id === $user->id,
             ],
         ]);
     }
@@ -247,7 +247,7 @@ class GoalController extends Controller
     public function update(Request $request, HrGoal $goal)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -276,7 +276,7 @@ class GoalController extends Controller
     {
         $user = $request->user();
         abort_unless(
-            $user && ($user->canDo('hr.goals.manage') || $goal->user_id === $user->id),
+            ($user && $this->canManage($user)) || $goal->user_id === $user?->id,
             403
         );
 
@@ -301,7 +301,7 @@ class GoalController extends Controller
     public function storeKeyResult(Request $request, HrGoal $goal)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:500'],
@@ -328,7 +328,7 @@ class GoalController extends Controller
     public function updateKeyResult(Request $request, HrKeyResult $keyResult)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $data = $request->validate([
             'current_value' => ['sometimes', 'numeric', 'min:0'],
@@ -345,7 +345,7 @@ class GoalController extends Controller
     public function destroyKeyResult(Request $request, HrKeyResult $keyResult)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+        abort_unless($this->canManage($user), 403);
 
         $goal = $keyResult->goal;
         $keyResult->delete();
@@ -354,5 +354,23 @@ class GoalController extends Controller
         $this->goalService->recalculateGoalProgress($goal);
 
         return redirect()->back()->with('success', 'Key result removed.');
+    }
+
+    private function canView($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.goals.view')
+            || $user->canDo('hr.goals.manage')
+            || $user->canDo('hr.performance.view')
+            || $user->canDo('hr.performance.manage')
+        );
+    }
+
+    private function canManage($user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('hr.goals.manage')
+            || $user->canDo('hr.performance.manage')
+        );
     }
 }

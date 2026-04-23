@@ -18,6 +18,8 @@ class InspectionController extends Controller
      */
     public function index(Request $request)
     {
+        $canManage = $this->canManageMaintenance($request);
+
         $query = FleetChecklistRun::query()
             ->with(['template:id,name,type', 'asset:id,name,registration_number', 'user:id,name'])
             ->whereHas('template', function ($q) {
@@ -83,6 +85,9 @@ class InspectionController extends Controller
             'inspections' => $inspections,
             'vehicles' => $vehicles,
             'filters' => $request->only(['search', 'vehicle_id', 'result', 'date_from', 'date_to']),
+            'can' => [
+                'manage' => $canManage,
+            ],
         ]);
     }
 
@@ -91,6 +96,8 @@ class InspectionController extends Controller
      */
     public function create(Request $request)
     {
+        $canManage = $this->canManageMaintenance($request);
+
         $vehicles = Asset::query()
             ->where('category', 'vehicle')
             ->orderBy('name')
@@ -138,6 +145,9 @@ class InspectionController extends Controller
                     ->except(['odometer', 'overall_condition', 'inspection_type'])
                     ->toArray(),
             ] : null,
+            'can' => [
+                'manage' => $canManage,
+            ],
         ]);
     }
 
@@ -277,5 +287,12 @@ class InspectionController extends Controller
             ['label' => 'Brake Fluid', 'type' => 'select', 'options' => ['pass', 'fail', 'na'], 'required' => true],
             ['label' => 'Battery', 'type' => 'select', 'options' => ['pass', 'fail', 'na'], 'required' => true],
         ];
+    }
+
+    private function canManageMaintenance(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->canDo('fleet.manage') || $user?->canDo('fleet.maintenance.manage'));
     }
 }

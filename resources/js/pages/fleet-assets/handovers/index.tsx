@@ -57,6 +57,9 @@ type Props = {
         date_from?: string;
         date_to?: string;
     };
+    can: {
+        manage: boolean;
+    };
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -100,7 +103,7 @@ function fuelLabel(level: string | null) {
     return labels[level] ?? level;
 }
 
-export default function HandoverIndex({ handovers: rawHandovers, vehicles, filters }: Props) {
+export default function HandoverIndex({ handovers: rawHandovers, vehicles, filters, can }: Props) {
     const allHandovers = Array.isArray(rawHandovers) ? rawHandovers : (rawHandovers?.data ?? []);
     const paginationLinks = !Array.isArray(rawHandovers) ? rawHandovers?.links ?? [] : [];
     const paginationMeta = !Array.isArray(rawHandovers)
@@ -127,14 +130,14 @@ export default function HandoverIndex({ handovers: rawHandovers, vehicles, filte
             <PageShell>
                 <FleetHero
                     title="Shift Handovers"
-                    actions={
+                    actions={can.manage ? (
                         <Button asChild>
                             <Link href="/fleet-assets/handovers/create">
                                 <Plus className="mr-2 h-4 w-4" />
                                 New Handover
                             </Link>
                         </Button>
-                    }
+                    ) : undefined}
                 />
 
                 {/* Dark KPI Cards */}

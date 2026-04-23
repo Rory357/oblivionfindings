@@ -53,6 +53,9 @@ type Props = {
     booking_id?: number | null;
     booking?: BookingInfo | null;
     pre_trip_results?: PreTripResult | null;
+    can: {
+        manage: boolean;
+    };
 };
 
 // Standard vehicle inspection checklist
@@ -122,7 +125,7 @@ function buildInitialChecklist(): Record<string, { result: ChecklistResult; note
     return obj;
 }
 
-export default function InspectionCreate({ vehicles, preselected_asset_id, preselected_type, booking_id, booking, pre_trip_results }: Props) {
+export default function InspectionCreate({ vehicles, preselected_asset_id, preselected_type, booking_id, booking, pre_trip_results, can }: Props) {
     const { url } = usePage();
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const defaultAssetId = preselected_asset_id
@@ -161,6 +164,37 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
             preserveScroll: true,
         });
     };
+
+    if (!can.manage) {
+        return (
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'Fleet & Assets', href: '/fleet-assets' },
+                    { title: 'Inspections', href: '/fleet-assets/inspections' },
+                    { title: 'New Inspection', href: '#' },
+                ]}
+            >
+                <Head title="New Vehicle Inspection" />
+                <PageShell>
+                    <FleetHero
+                        title="New Vehicle Inspection"
+                        backHref="/fleet-assets/inspections"
+                        backLabel="Back to Inspections"
+                    />
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">View-only</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                                Creating inspections requires fleet maintenance manager access.
+                            </p>
+                        </CardContent>
+                    </Card>
+                </PageShell>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout

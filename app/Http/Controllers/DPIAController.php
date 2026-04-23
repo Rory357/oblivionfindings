@@ -44,7 +44,7 @@ class DPIAController extends Controller
             'stats' => [
                 'total' => PrivacyImpactAssessment::count(),
                 'pending_review' => PrivacyImpactAssessment::whereNull('outcome')->count(),
-                'high_risk' => PrivacyImpactAssessment::where('overall_risk_level', 'high')->count(),
+                'high_risk' => PrivacyImpactAssessment::whereIn('overall_risk_level', ['high', 'very_high'])->count(),
                 'approved' => PrivacyImpactAssessment::where('outcome', 'approved')->count(),
             ],
         ]);
@@ -69,15 +69,15 @@ class DPIAController extends Controller
             'assessment_name' => 'required|string|max:255',
             'project_or_process' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'assessment_type' => 'required|in:new_processing,change_to_existing,third_party,other',
+            'assessment_type' => 'required|in:new_project,process_change,system_upgrade,periodic_review',
             'personal_data_types' => 'nullable|array',
             'data_subjects' => 'nullable|array',
             'processing_purpose' => 'required|string',
             'legal_basis' => 'required|string',
             'identified_risks' => 'nullable|array',
-            'overall_risk_level' => 'required|in:low,medium,high,critical',
+            'overall_risk_level' => 'required|in:low,medium,high,very_high',
             'mitigation_measures' => 'nullable|array',
-            'residual_risk_level' => 'nullable|in:low,medium,high,critical',
+            'residual_risk_level' => 'nullable|in:low,medium,high,very_high',
             'review_date' => 'nullable|date',
         ]);
 
@@ -128,9 +128,9 @@ class DPIAController extends Controller
             'processing_purpose' => 'sometimes|string',
             'legal_basis' => 'sometimes|string',
             'identified_risks' => 'nullable|array',
-            'overall_risk_level' => 'sometimes|in:low,medium,high,critical',
+            'overall_risk_level' => 'sometimes|in:low,medium,high,very_high',
             'mitigation_measures' => 'nullable|array',
-            'residual_risk_level' => 'nullable|in:low,medium,high,critical',
+            'residual_risk_level' => 'nullable|in:low,medium,high,very_high',
             'review_date' => 'nullable|date',
         ]);
 
@@ -163,7 +163,7 @@ class DPIAController extends Controller
         ]);
 
         $dpia->update([
-            'outcome' => 'requires_changes',
+            'outcome' => 'requires_dpo_review',
         ]);
 
         return back()->with('success', 'DPIA sent for review.');

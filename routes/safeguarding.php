@@ -33,22 +33,23 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/safeguarding/{concern}', [SafeguardingConcernController::class, 'show'])
         ->name('safeguarding.show');
 
-    Route::middleware('permission:safeguarding.update')->group(function () {
-        Route::get('/safeguarding/{concern}/edit', [SafeguardingConcernController::class, 'edit'])
-            ->name('safeguarding.edit');
-        Route::put('/safeguarding/{concern}', [SafeguardingConcernController::class, 'update'])
-            ->name('safeguarding.update');
+    // Concern-specific management is policy-protected in the controllers so
+    // assignees can work their allocated concerns without needing the global
+    // safeguarding.update permission.
+    Route::get('/safeguarding/{concern}/edit', [SafeguardingConcernController::class, 'edit'])
+        ->name('safeguarding.edit');
+    Route::put('/safeguarding/{concern}', [SafeguardingConcernController::class, 'update'])
+        ->name('safeguarding.update');
 
-        // Workflow actions
-        Route::post('/safeguarding/{concern}/assign', [SafeguardingConcernController::class, 'assign'])
-            ->name('safeguarding.assign');
-        Route::patch('/safeguarding/{concern}/status', [SafeguardingConcernController::class, 'updateStatus'])
-            ->name('safeguarding.updateStatus');
-        Route::post('/safeguarding/{concern}/close', [SafeguardingConcernController::class, 'close'])
-            ->name('safeguarding.close');
-        Route::post('/safeguarding/{concern}/subject-informed', [SafeguardingConcernController::class, 'markSubjectInformed'])
-            ->name('safeguarding.markSubjectInformed');
-    });
+    // Workflow actions
+    Route::post('/safeguarding/{concern}/assign', [SafeguardingConcernController::class, 'assign'])
+        ->name('safeguarding.assign');
+    Route::patch('/safeguarding/{concern}/status', [SafeguardingConcernController::class, 'updateStatus'])
+        ->name('safeguarding.updateStatus');
+    Route::post('/safeguarding/{concern}/close', [SafeguardingConcernController::class, 'close'])
+        ->name('safeguarding.close');
+    Route::post('/safeguarding/{concern}/subject-informed', [SafeguardingConcernController::class, 'markSubjectInformed'])
+        ->name('safeguarding.markSubjectInformed');
 
     // Investigations (require investigate permission)
     Route::middleware('permission:safeguarding.investigate')->group(function () {
@@ -67,18 +68,14 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Risk assessments
-    Route::middleware('permission:safeguarding.update')->group(function () {
-        Route::post('/safeguarding/{concern}/risk-assessments', [SafeguardingRiskAssessmentController::class, 'store'])
-            ->name('safeguarding.riskAssessments.store');
-    });
+    Route::post('/safeguarding/{concern}/risk-assessments', [SafeguardingRiskAssessmentController::class, 'store'])
+        ->name('safeguarding.riskAssessments.store');
 
     // Action plans
-    Route::middleware('permission:safeguarding.update')->group(function () {
-        Route::post('/safeguarding/{concern}/action-plans', [SafeguardingActionPlanController::class, 'store'])
-            ->name('safeguarding.actionPlans.store');
-        Route::put('/safeguarding/{concern}/action-plans/{actionPlan}', [SafeguardingActionPlanController::class, 'update'])
-            ->name('safeguarding.actionPlans.update');
-        Route::post('/safeguarding/{concern}/action-plans/{actionPlan}/complete', [SafeguardingActionPlanController::class, 'complete'])
-            ->name('safeguarding.actionPlans.complete');
-    });
+    Route::post('/safeguarding/{concern}/action-plans', [SafeguardingActionPlanController::class, 'store'])
+        ->name('safeguarding.actionPlans.store');
+    Route::put('/safeguarding/{concern}/action-plans/{actionPlan}', [SafeguardingActionPlanController::class, 'update'])
+        ->name('safeguarding.actionPlans.update');
+    Route::post('/safeguarding/{concern}/action-plans/{actionPlan}/complete', [SafeguardingActionPlanController::class, 'complete'])
+        ->name('safeguarding.actionPlans.complete');
 });

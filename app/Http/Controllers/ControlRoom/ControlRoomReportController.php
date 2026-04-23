@@ -23,22 +23,48 @@ class ControlRoomReportController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+        abort_unless($user && $this->canViewReports($user), 403);
 
         [$from, $to, $period] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
         $reportSiteScope = $this->reportSiteScope($user, $siteId);
+        $sla = $this->reportService->slaCompliance($from, $to, $reportSiteScope);
+        $volume = $this->reportService->alertVolume($from, $to, $reportSiteScope);
+        $escalation = $this->reportService->escalationAnalysis($from, $to, $reportSiteScope);
+        $workload = $this->reportService->workloadDistribution($from, $to, $reportSiteScope);
+        $playbooks = $this->reportService->playbookPerformance($from, $to);
 
         AuditLogger::log('controlRoom.reports.view', null, ['period' => $period]);
 
         return Inertia::render('control-room/reports', [
             'period' => $period,
             'site_id' => $siteId,
-            'sla' => $this->reportService->slaCompliance($from, $to, $reportSiteScope),
-            'volume' => $this->reportService->alertVolume($from, $to, $reportSiteScope),
-            'escalation' => $this->reportService->escalationAnalysis($from, $to, $reportSiteScope),
-            'workload' => $this->reportService->workloadDistribution($from, $to, $reportSiteScope),
-            'playbooks' => $this->reportService->playbookPerformance($from, $to),
+            'sla' => $sla,
+            'volume' => $volume,
+            'escalation' => $escalation,
+            'workload' => $workload,
+            'playbooks' => $playbooks,
+            'stats' => [
+                'total_alerts' => $volume['total'],
+                'resolved_alerts' => $volume['resolved'],
+                'resolution_rate' => $volume['resolution_rate'],
+                'avg_resolution_hours' => $sla['avg_resolution_hours'],
+                'escalated_count' => $escalation['escalated'],
+                'escalation_rate' => $escalation['escalation_rate'],
+            ],
+            'by_severity' => $volume['by_severity'] ?? [],
+            'by_status' => $this->statusBreakdown($from, $to, $user, $siteId),
+            'by_source' => $volume['by_source'] ?? [],
+            'by_alert_type' => $volume['top_alert_types'] ?? [],
+            'daily_trend' => $volume['daily_trend'] ?? [],
+            'response_time_by_severity' => [],
+            'top_assignees' => collect($workload['handled_per_user'] ?? [])
+                ->map(fn (array $row) => [
+                    'user' => $row['user'],
+                    'count' => $row['alerts_handled'],
+                ])
+                ->values()
+                ->all(),
         ]);
     }
 
@@ -48,7 +74,7 @@ class ControlRoomReportController extends Controller
     public function sla(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+        abort_unless($user && $this->canViewReports($user), 403);
 
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
@@ -62,7 +88,7 @@ class ControlRoomReportController extends Controller
     public function alerts(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+        abort_unless($user && $this->canViewReports($user), 403);
 
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
@@ -76,7 +102,7 @@ class ControlRoomReportController extends Controller
     public function workload(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+        abort_unless($user && $this->canViewReports($user), 403);
 
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
@@ -90,7 +116,7 @@ class ControlRoomReportController extends Controller
     public function summary(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+        abort_unless($user && $this->canViewReports($user), 403);
 
         [$from, $to] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
@@ -118,7 +144,7 @@ class ControlRoomReportController extends Controller
     public function export(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.reports.view'), 403);
+        abort_unless($user && $this->canViewReports($user), 403);
 
         [$from, $to, $period] = $this->resolveDateRange($request);
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
@@ -205,6 +231,26 @@ class ControlRoomReportController extends Controller
     protected function alertBypassPermissions(): array
     {
         return ['reports.viewAny'];
+    }
+
+    protected function canViewReports($user): bool
+    {
+        return $user->canDo('controlRoom.reports.view') || $user->canDo('controlRoom.viewAny');
+    }
+
+    protected function statusBreakdown(Carbon $from, Carbon $to, $user, ?int $siteId): array
+    {
+        $query = ControlRoomAlert::query()
+            ->where('triggered_at', '>=', $from)
+            ->where('triggered_at', '<=', $to);
+
+        $this->applyReportAlertScope($query, $user, $siteId);
+
+        return $query
+            ->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
     }
 
     /**

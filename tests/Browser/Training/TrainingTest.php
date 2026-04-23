@@ -8,8 +8,9 @@ test('training courses page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/training/courses')
-            ->waitForText('Course', 10)
-            ->assertSee('Course');
+            ->waitForLocation('/hr/training/catalog')
+            ->waitForText('Course Catalog', 10)
+            ->assertPathIs('/hr/training/catalog');
     });
 });
 
@@ -18,8 +19,9 @@ test('training courses create page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/training/courses/create')
-            ->waitForText('Course', 10)
-            ->assertSee('Course');
+            ->waitForLocation('/hr/training/catalog?open=create')
+            ->waitForText('New Course', 10)
+            ->assertPathBeginsWith('/hr/training/catalog');
     });
 });
 
@@ -28,7 +30,8 @@ test('training matrix page loads', function () {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/training/matrix')
-            ->waitForText('Matrix', 10)
-            ->assertSee('Matrix');
+            ->waitForLocation('/hr/compliance/training')
+            ->waitForText('Training Dashboard', 10)
+            ->assertPathIs('/hr/compliance/training');
     });
 });

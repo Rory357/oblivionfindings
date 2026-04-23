@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -227,6 +228,26 @@ type ClientSiteCoverageSummary = {
     }>;
 };
 
+type ClientTab =
+    | {
+          key: TabKey;
+          label: string;
+          icon: typeof User;
+          show: boolean;
+          count?: number;
+          href?: undefined;
+      }
+    | {
+          key: string;
+          label: string;
+          icon: typeof User;
+          show: boolean;
+          count?: number;
+          href: string;
+      };
+
+type ClientNavigationTab = Extract<ClientTab, { href?: undefined }>;
+
 type Props = {
     client: {
         id: number;
@@ -316,6 +337,7 @@ type Props = {
             status: string;
         }>;
     };
+    health_summary?: HealthSummary | null;
     onboarding: {
         items: Array<{
             key: string;
@@ -435,6 +457,10 @@ function weekdayLabel(code: string) {
     return labels[code] ?? code;
 }
 
+function isClientNavigationTab(tab: ClientTab): tab is ClientNavigationTab {
+    return typeof tab.href === 'undefined';
+}
+
 function shiftTypeLabel(value?: string | null) {
     return String(value ?? 'standard').replace(/_/g, ' ');
 }
@@ -524,14 +550,7 @@ export default function ClientShow({
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
     const removePhotoForm = useForm({});
 
-    const tabs: Array<{
-        key: TabKey | string;
-        label: string;
-        icon: typeof User;
-        show: boolean;
-        count?: number;
-        href?: string;
-    }> = useMemo(
+    const tabs: ClientTab[] = useMemo(
         () => [
             { key: 'profile', label: 'Overview', icon: User, show: true },
             {
@@ -547,10 +566,11 @@ export default function ClientShow({
                 key: 'observations',
                 label: 'Observations',
                 icon: Stethoscope,
-                show:
+                show: Boolean(
                     can.record_observation ||
-                    can.record_clinical_observation ||
-                    can.record_event,
+                        can.record_clinical_observation ||
+                        can.record_event,
+                ),
             },
             {
                 key: 'care_plans',
@@ -628,7 +648,7 @@ export default function ClientShow({
                 key: 'respite',
                 label: 'Respite',
                 icon: Calendar,
-                show: !!respiteCan?.viewAny,
+                show: Boolean(respiteCan?.viewAny),
             },
             {
                 key: 'assignments',
@@ -755,7 +775,7 @@ export default function ClientShow({
             breadcrumbs={[
                 {
                     title: labels?.['client.plural'] ?? 'Clients',
-                    href: '/clients',
+                    href: '/operations/clients',
                 },
                 { title: name, href: `/operations/clients/${client.id}` },
             ]}
@@ -1029,7 +1049,7 @@ export default function ClientShow({
                                     </>
                                 );
 
-                                if (t.href) {
+                                if (!isClientNavigationTab(t)) {
                                     return (
                                         <Link key={t.key} href={t.href} className={className}>
                                             {inner}
@@ -1719,7 +1739,7 @@ export default function ClientShow({
                                 {/* Health Summary Card */}
                                 {(can.record_observation || can.record_clinical_observation || can.record_event) && health_summary && (
                                     <div className="mt-4">
-                                        <HealthSummaryCard summary={health_summary as HealthSummary} />
+                                        <HealthSummaryCard summary={health_summary} />
                                     </div>
                                 )}
 
@@ -8393,6 +8413,10 @@ function AssessmentsTab({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Delete Assessment</DialogTitle>
+                        <DialogDescription>
+                            Confirm that this assessment should be removed from
+                            the client record.
+                        </DialogDescription>
                     </DialogHeader>
                     <p className="text-sm text-muted-foreground">
                         Are you sure you want to delete this assessment? This
@@ -10258,8 +10282,12 @@ function ClientCalendarTab({
                         'meta[name="csrf-token"]',
                     ) as HTMLMetaElement | null
                 )?.content;
+                const params = new URLSearchParams({
+                    start: info.startStr,
+                    end: info.endStr,
+                });
                 const res = await fetch(
-                    `/clients/${clientId}/calendar/events?start=${info.startStr}&end=${info.endStr}`,
+                    `/clients/${clientId}/calendar/events?${params.toString()}`,
                     {
                         credentials: 'same-origin',
                         headers: {
@@ -10616,6 +10644,10 @@ function ClientCalendarTab({
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Schedule Appointment</DialogTitle>
+                        <DialogDescription>
+                            Add a new appointment or reminder to this client’s
+                            calendar.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="grid grid-cols-2 gap-3">

@@ -132,6 +132,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:privacy.viewRequests')->group(function () {
         Route::get('/privacy/dashboard', [PrivacyDashboardController::class, 'index'])
             ->name('privacy.dashboard');
+        Route::get('/privacy/reports', [PrivacyReportController::class, 'compliance'])
+            ->name('privacy.reports.index');
         Route::get('/privacy/reports/compliance', [PrivacyReportController::class, 'compliance'])
             ->name('privacy.reports.compliance');
         Route::get('/privacy/reports/export', [PrivacyReportController::class, 'export'])

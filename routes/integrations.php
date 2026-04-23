@@ -17,9 +17,9 @@ Route::middleware(['auth'])->group(function () {
     Route::redirect('/integrations/unifi', '/security-devices/integrations/unifi', 301)
         ->name('integrations.unifi.index');
 
-    // Workers module (placeholder)
+    // Legacy workers URL — the staff directory is the canonical surface.
     Route::middleware('permission:workers.viewAny')->group(function () {
-        Route::get('/workers', fn() => inertia('workers/index'))->name('workers.index');
+        Route::redirect('/workers', '/staff', 301)->name('workers.index');
     });
 });
 

@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -50,6 +51,12 @@ type Note = {
     body?: string | null;
     meta?: any;
     actor?: { id: number; name: string } | null;
+};
+
+type HandoverObservationSummary = {
+    type_label: string;
+    summary: string;
+    recorder?: string;
 };
 
 type Props = {
@@ -172,6 +179,7 @@ type Props = {
         id: number;
         status: string;
         incoming_staff_name?: string | null;
+        observations_summary?: HandoverObservationSummary[];
     } | null;
     transports: Array<{
         id: number;
@@ -634,7 +642,7 @@ export default function ShiftShow({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Shifts', href: '/shifts' },
+                { title: 'Shifts', href: '/operations/shifts' },
                 {
                     title: `${name} (${new Date(shift.starts_at).toLocaleDateString()})`,
                     href: `/operations/shifts/${shift.id}`,
@@ -649,7 +657,7 @@ export default function ShiftShow({
                     title={name}
                     description={new Date(shift.starts_at).toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     icon={<CalendarDays className="h-7 w-7 text-white" />}
-                    backHref="/shifts"
+                    backHref="/operations/shifts"
                     backLabel="All shifts"
                     stats={[
                         { label: 'Duration', value: (() => { const s = new Date(shift.starts_at).getTime(); const e = new Date(shift.ends_at).getTime(); return (Number.isNaN(s) || Number.isNaN(e) || e <= s) ? '—' : `${((e - s) / 3600000).toFixed(1)}h`; })() },
@@ -799,10 +807,10 @@ export default function ShiftShow({
                                     {handoverSummary.incoming_staff_name ? (
                                         <p className="text-xs text-muted-foreground">Incoming: {handoverSummary.incoming_staff_name}</p>
                                     ) : null}
-                                    {handoverSummary.observations_summary?.length > 0 && (
+                                    {(handoverSummary.observations_summary?.length ?? 0) > 0 && (
                                         <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
                                             <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Observations</p>
-                                            {(handoverSummary.observations_summary as Array<{type_label: string; summary: string; recorder?: string}>).map((obs: any, i: number) => (
+                                            {handoverSummary.observations_summary?.map((obs, i) => (
                                                 <p key={i} className="text-xs text-muted-foreground">
                                                     <span className="font-medium text-foreground">{obs.type_label}</span>
                                                     {obs.summary ? ` \u2014 ${obs.summary}` : ''}
@@ -2341,6 +2349,10 @@ export default function ShiftShow({
                     <DialogContent className="sm:max-w-2xl">
                         <DialogHeader>
                             <DialogTitle>Complete shift</DialogTitle>
+                            <DialogDescription>
+                                Review any outstanding tasks, capture handover
+                                details, and finish this shift.
+                            </DialogDescription>
                         </DialogHeader>
 
                         <div className="space-y-4">
@@ -2608,6 +2620,10 @@ export default function ShiftShow({
                     <DialogContent className="sm:max-w-2xl">
                         <DialogHeader>
                             <DialogTitle>Report incident</DialogTitle>
+                            <DialogDescription>
+                                Record what happened during this shift so the
+                                incident can be followed up correctly.
+                            </DialogDescription>
                         </DialogHeader>
 
                         <div className="space-y-3">

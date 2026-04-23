@@ -5,6 +5,7 @@ namespace App\Services\Operations;
 use App\Models\OpsNotification;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class OpsNotificationService
 {
@@ -20,14 +21,22 @@ class OpsNotificationService
         );
 
         // Notify org managers (users with operations management permissions)
-        $recipients = User::where('organization_id', $actor->organization_id)
+        $recipients = User::query()
             ->where('id', '!=', $actor->id)
-            ->whereIn('role', ['admin', 'manager', 'coordinator'])
-            ->get();
+            ->whereIn('role', ['admin', 'manager', 'coordinator']);
+
+        if (Schema::hasColumn('users', 'organization_id') && $actor->getAttribute('organization_id')) {
+            $recipients->where('organization_id', $actor->getAttribute('organization_id'));
+        }
+
+        $recipients = $recipients->get();
+        $organizationId = $actor->getAttribute('organization_id')
+            ?? $entity->getAttribute('organization_id')
+            ?? $related?->getAttribute('organization_id');
 
         foreach ($recipients as $recipient) {
             OpsNotification::create([
-                'organization_id' => $actor->organization_id,
+                'organization_id' => $organizationId,
                 'user_id' => $recipient->id,
                 'title' => $title,
                 'body' => $body,

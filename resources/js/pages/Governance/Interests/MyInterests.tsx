@@ -29,13 +29,14 @@ interface BoardMember {
 
 interface Props extends PageProps {
   interests: Interest[];
-  boardMember: BoardMember;
+  boardMember: BoardMember | null;
+  canDeclare: boolean;
 }
 
-export default function MyInterests({ auth, interests, boardMember }: Props) {
+export default function MyInterests({ auth, interests, boardMember, canDeclare }: Props) {
   const [showForm, setShowForm] = useState(false);
   const { data, setData, post, processing, reset } = useForm({
-    board_member_id: String(boardMember.id),
+    board_member_id: boardMember ? String(boardMember.id) : '',
     interest_type: 'professional',
     description: '',
     organization_name: '',
@@ -58,12 +59,20 @@ export default function MyInterests({ auth, interests, boardMember }: Props) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">My Interests</h1>
-          <Button onClick={() => setShowForm(!showForm)} dusk="declare-interest">
+          <Button onClick={() => setShowForm(!showForm)} dusk="declare-interest" disabled={!canDeclare}>
             <Plus className="w-4 h-4 mr-2" /> Declare Interest
           </Button>
         </div>
 
-        {showForm && (
+        {!canDeclare && (
+          <Card className="mb-6">
+            <CardContent className="p-6 text-sm text-gray-600">
+              Your account is not linked to an active board-member record yet, so personal interest declarations are unavailable.
+            </CardContent>
+          </Card>
+        )}
+
+        {showForm && canDeclare && (
           <Card className="mb-6">
             <CardHeader><CardTitle>New Declaration</CardTitle></CardHeader>
             <CardContent>
@@ -133,7 +142,7 @@ export default function MyInterests({ auth, interests, boardMember }: Props) {
             </Card>
           ))}
           {interests.length === 0 && (
-            <Card><CardContent className="p-8 text-center text-gray-500">No interests declared. Use the button above to add one.</CardContent></Card>
+            <Card><CardContent className="p-8 text-center text-gray-500">{canDeclare ? 'No interests declared. Use the button above to add one.' : 'No personal interest declarations are available for this account.'}</CardContent></Card>
           )}
         </div>
       </div>

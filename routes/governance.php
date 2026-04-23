@@ -22,6 +22,10 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard')
         ->middleware('permission:governance.view');
+
+    Route::get('/dashboard-data', fn () => redirect()->route('governance.dashboard'))
+        ->name('dashboard.legacy')
+        ->middleware('permission:governance.view');
     
     Route::get('/dashboard/data', [DashboardController::class, 'data'])
         ->name('dashboard.data')
@@ -118,11 +122,11 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/risks', [RiskRegisterController::class, 'index'])->name('risks.index');
         Route::get('/risks/create', [RiskRegisterController::class, 'create'])->name('risks.create');
         Route::get('/risks/heatmap', [RiskRegisterController::class, 'heatmap'])->name('risks.heatmap');
+        Route::get('/risks/trends', [RiskRegisterController::class, 'trends'])->name('risks.trends');
+        Route::get('/risks/committee/{committee}', [RiskRegisterController::class, 'committeeView'])->name('risks.committee');
         Route::get('/risks/{risk}', [RiskRegisterController::class, 'show'])->name('risks.show');
         
         Route::get('/risks/{risk}/edit', [RiskRegisterController::class, 'edit'])->name('risks.edit');
-        Route::get('/risks/trends', [RiskRegisterController::class, 'trends'])->name('risks.trends');
-        Route::get('/risks/committee/{committee}', [RiskRegisterController::class, 'committeeView'])->name('risks.committee');
 
         Route::middleware('permission:governance.risks.manage')->group(function () {
             Route::post('/risks', [RiskRegisterController::class, 'store'])->name('risks.store');
@@ -190,10 +194,10 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     // Budgets
     Route::middleware('permission:governance.budgets.view')->group(function () {
         Route::get('/budgets', [BudgetController::class, 'index'])->name('budgets.index');
+        Route::get('/budgets/create', [BudgetController::class, 'create'])->name('budgets.create');
         Route::get('/budgets/{budget}', [BudgetController::class, 'show'])->name('budgets.show');
 
         Route::middleware('permission:governance.budgets.create')->group(function () {
-            Route::get('/budgets/create', [BudgetController::class, 'create'])->name('budgets.create');
             Route::get('/budgets/{budget}/edit', [BudgetController::class, 'edit'])->name('budgets.edit');
             Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');
             Route::put('/budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');

@@ -6,36 +6,85 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\RecurringCharge;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class RecurringChargeController extends Controller
 {
     public function index(Request $request)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('recurring_charges.viewAny'), 403);
+        $auth = $this->authorizeBilling($request, ['recurring_charges.viewAny']);
+
+        $filters = $request->validate([
+            'q' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', 'in:active,inactive'],
+        ]);
 
         $charges = RecurringCharge::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
-            ->where('is_active', true)
-            ->orderBy('next_charge_date')
+            ->when(
+                !empty($filters['q']),
+                fn ($query) => $query->where(function ($innerQuery) use ($filters) {
+                    $search = '%' . $filters['q'] . '%';
+
+                    $innerQuery->where('name', 'like', $search)
+                        ->orWhere('description', 'like', $search)
+                        ->orWhereHas('client', function ($clientQuery) use ($search) {
+                            $clientQuery->where('first_name', 'like', $search)
+                                ->orWhere('last_name', 'like', $search);
+                        });
+                }),
+            )
+            ->when(
+                ($filters['status'] ?? null) === 'active',
+                fn ($query) => $query->where('is_active', true),
+            )
+            ->when(
+                ($filters['status'] ?? null) === 'inactive',
+                fn ($query) => $query->where('is_active', false),
+            )
+            ->orderBy('next_charge_at')
             ->paginate(20)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (RecurringCharge $charge) => [
+                'id' => $charge->id,
+                'name' => $charge->name ?: $charge->description,
+                'amount' => (float) $charge->amount,
+                'frequency' => $charge->frequency,
+                'is_active' => (bool) $charge->is_active,
+                'next_charge_date' => $charge->next_charge_at?->toDateString(),
+                'client' => $charge->client ? [
+                    'id' => $charge->client->id,
+                    'first_name' => $charge->client->first_name,
+                    'last_name' => $charge->client->last_name,
+                ] : null,
+            ]);
 
         return inertia('operations/recurring-charges/Index', [
             'charges' => $charges,
+            'filters' => $filters,
+            'stats' => [
+                'active' => RecurringCharge::query()
+                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                    ->where('is_active', true)
+                    ->count(),
+                'monthly_total' => (float) RecurringCharge::query()
+                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                    ->where('is_active', true)
+                    ->sum('amount'),
+                'next_due' => RecurringCharge::query()
+                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                    ->where('is_active', true)
+                    ->whereDate('next_charge_at', '<=', now()->addDays(7))
+                    ->count(),
+            ],
         ]);
     }
 
     public function create(Request $request)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('recurring_charges.create'), 403);
-
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+        $auth = $this->authorizeBilling($request, ['recurring_charges.create']);
+        $clients = $this->clientOptions($auth->organization_id);
 
         return inertia('operations/recurring-charges/Create', [
             'clients' => $clients,
@@ -44,8 +93,7 @@ class RecurringChargeController extends Controller
 
     public function store(Request $request)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('recurring_charges.create'), 403);
+        $auth = $this->authorizeBilling($request, ['recurring_charges.create']);
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
@@ -60,43 +108,47 @@ class RecurringChargeController extends Controller
         RecurringCharge::create([
             'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
+            'name' => $data['description'],
             'description' => $data['description'],
             'amount' => $data['amount'],
             'frequency' => $data['frequency'],
-            'next_charge_date' => $data['next_charge_date'],
+            'next_charge_at' => $data['next_charge_date'],
             'ends_at' => $data['ends_at'] ?? null,
             'is_active' => $data['is_active'] ?? true,
             'created_by' => $auth->id,
         ]);
 
-        return redirect()->back()->with('success', 'Recurring charge created.');
+        return redirect()->route('operations.recurring_charges.index')->with('success', 'Recurring charge created.');
     }
 
     public function edit(Request $request, $charge)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('recurring_charges.edit'), 403);
+        $auth = $this->authorizeBilling($request, ['recurring_charges.edit']);
 
         $charge = RecurringCharge::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->findOrFail($charge);
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+        $clients = $this->clientOptions($auth->organization_id);
 
         return inertia('operations/recurring-charges/Edit', [
-            'charge' => $charge,
+            'charge' => [
+                'id' => $charge->id,
+                'client_id' => $charge->client_id,
+                'description' => $charge->description,
+                'amount' => (string) $charge->amount,
+                'frequency' => $charge->frequency,
+                'next_charge_date' => $charge->next_charge_at?->toDateString(),
+                'is_active' => (bool) $charge->is_active,
+            ],
             'clients' => $clients,
         ]);
     }
 
     public function update(Request $request, $charge)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('recurring_charges.edit'), 403);
+        $auth = $this->authorizeBilling($request, ['recurring_charges.edit']);
 
         $charge = RecurringCharge::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -112,15 +164,23 @@ class RecurringChargeController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        if (array_key_exists('description', $data)) {
+            $data['name'] = $data['description'];
+        }
+
+        if (array_key_exists('next_charge_date', $data)) {
+            $data['next_charge_at'] = $data['next_charge_date'];
+            unset($data['next_charge_date']);
+        }
+
         $charge->update($data);
 
-        return redirect()->back()->with('success', 'Recurring charge updated.');
+        return redirect()->route('operations.recurring_charges.index')->with('success', 'Recurring charge updated.');
     }
 
     public function destroy(Request $request, $charge)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('recurring_charges.delete'), 403);
+        $auth = $this->authorizeBilling($request, ['recurring_charges.delete']);
 
         $charge = RecurringCharge::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -129,5 +189,30 @@ class RecurringChargeController extends Controller
         $charge->delete();
 
         return redirect()->back()->with('success', 'Recurring charge deleted.');
+    }
+
+    private function authorizeBilling(Request $request, array $fallbackPermissions = [])
+    {
+        $user = $request->user();
+        $permissions = array_merge(['billing.viewAny'], $fallbackPermissions);
+
+        abort_unless(
+            $user && collect($permissions)->contains(fn (string $permission) => $user->canDo($permission)),
+            403,
+        );
+
+        return $user;
+    }
+
+    private function clientOptions(?int $orgId)
+    {
+        return Client::query()
+            ->when(
+                $orgId && Schema::hasColumn('clients', 'organization_id'),
+                fn ($query) => $query->where('organization_id', $orgId),
+            )
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name']);
     }
 }

@@ -21,62 +21,77 @@ type Props = {
     today_bookings_count: number;
     today_checks_count: number;
     auth_user: { id: number; name: string };
+    can: {
+        start_inspection: boolean;
+    };
 };
-
-const QUICK_ACTIONS = [
-    {
-        label: 'Daily Vehicle Check',
-        href: '/fleet-assets/daily-check',
-        icon: CheckCircle2,
-        color: 'bg-green-500',
-    },
-    {
-        label: 'Start Inspection',
-        href: '/fleet-assets/inspections/create',
-        icon: ClipboardList,
-        color: 'bg-blue-500',
-    },
-    {
-        label: 'Log Transport',
-        href: '/fleet-assets/transports/create',
-        icon: Truck,
-        color: 'bg-orange-500',
-    },
-    {
-        label: 'Live Map',
-        href: '/fleet-assets/map',
-        icon: Map,
-        color: 'bg-cyan-500',
-    },
-    {
-        label: 'Report Incident',
-        href: '/fleet-assets/incidents/create',
-        icon: AlertTriangle,
-        color: 'bg-red-500',
-    },
-    {
-        label: 'My Trips',
-        href: '/fleet-assets/trips',
-        icon: Route,
-        color: 'bg-purple-500',
-    },
-];
 
 export default function MobileDashboard({
     assigned_vehicle,
     today_bookings_count,
     today_checks_count,
     auth_user,
+    can,
 }: Props) {
     const safeBookingsCount = today_bookings_count ?? 0;
     const safeChecksCount = today_checks_count ?? 0;
+    const quickActions = [
+        {
+            label: 'Daily Vehicle Check',
+            href: '/fleet-assets/daily-check',
+            icon: CheckCircle2,
+            color: 'bg-green-500',
+            show: true,
+        },
+        {
+            label: 'Start Inspection',
+            href: '/fleet-assets/inspections/create',
+            icon: ClipboardList,
+            color: 'bg-blue-500',
+            show: can.start_inspection,
+        },
+        {
+            label: 'Log Transport',
+            href: '/fleet-assets/transports/create',
+            icon: Truck,
+            color: 'bg-orange-500',
+            show: true,
+        },
+        {
+            label: 'Live Map',
+            href: '/fleet-assets/map',
+            icon: Map,
+            color: 'bg-cyan-500',
+            show: true,
+        },
+        {
+            label: 'Report Incident',
+            href: '/fleet-assets/incidents/create',
+            icon: AlertTriangle,
+            color: 'bg-red-500',
+            show: true,
+        },
+        {
+            label: 'My Trips',
+            href: '/fleet-assets/trips',
+            icon: Route,
+            color: 'bg-purple-500',
+            show: true,
+        },
+    ].filter((action) => action.show);
 
     return (
         <>
-            <Head title="Driver App" />
+            <Head title="Mobile Dashboard" />
             <div className="min-h-screen bg-background">
                 {/* Purple gradient header */}
                 <div className="bg-gradient-to-br from-purple-600 to-purple-800 px-4 pb-6 pt-8 text-white">
+                    <p
+                        className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-200"
+                        dusk="fleet-mobile-dashboard-heading"
+                    >
+                        Mobile Dashboard
+                    </p>
                     <p className="text-sm font-medium text-purple-200">Welcome back,</p>
                     <h1 className="text-2xl font-bold">{auth_user?.name ?? 'Driver'}</h1>
                     <p className="mt-1 text-xs text-purple-300">Oblivion Findings Fleet</p>
@@ -124,7 +139,7 @@ export default function MobileDashboard({
 
                     {/* Quick Actions */}
                     <div className="space-y-2">
-                        {QUICK_ACTIONS.map((action) => {
+                        {quickActions.map((action) => {
                             const IconComp = action.icon;
                             return (
                                 <Link

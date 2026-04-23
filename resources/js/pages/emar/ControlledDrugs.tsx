@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -525,10 +526,15 @@ export default function ControlledDrugs({
                 />
                 {/* Record CD Entry Dialog */}
                 <Dialog open={entryOpen} onOpenChange={setEntryOpen}>
-                    <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle>Record CD Entry</DialogTitle>
-                        </DialogHeader>
+                        <DialogContent className="max-w-lg">
+                            <DialogHeader>
+                                <DialogTitle>Record CD Entry</DialogTitle>
+                                <DialogDescription>
+                                    Capture a controlled drug movement with the
+                                    before-and-after balance and witness
+                                    details.
+                                </DialogDescription>
+                            </DialogHeader>
                         <form onSubmit={submitEntry} className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
@@ -800,10 +806,14 @@ export default function ControlledDrugs({
 
                 {/* Balance Check Dialog */}
                 <Dialog open={balanceOpen} onOpenChange={setBalanceOpen}>
-                    <DialogContent className="max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Balance Check</DialogTitle>
-                        </DialogHeader>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Balance Check</DialogTitle>
+                                <DialogDescription>
+                                    Compare the expected and actual controlled
+                                    drug balance and note any discrepancy.
+                                </DialogDescription>
+                            </DialogHeader>
                         <form
                             onSubmit={submitBalanceCheck}
                             className="space-y-4"
@@ -1003,12 +1013,16 @@ export default function ControlledDrugs({
 
                 {/* Report Loss Dialog */}
                 <Dialog open={lossOpen} onOpenChange={setLossOpen}>
-                    <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle>
-                                Report Controlled Drug Loss
-                            </DialogTitle>
-                        </DialogHeader>
+                        <DialogContent className="max-w-lg">
+                            <DialogHeader>
+                                <DialogTitle>
+                                    Report Controlled Drug Loss
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Record a missing or lost controlled drug
+                                    and the immediate escalation steps.
+                                </DialogDescription>
+                            </DialogHeader>
                         <form onSubmit={submitLoss} className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
@@ -1253,10 +1267,14 @@ export default function ControlledDrugs({
                     open={investigateOpen}
                     onOpenChange={setInvestigateOpen}
                 >
-                    <DialogContent className="max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Investigate Loss Report</DialogTitle>
-                        </DialogHeader>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Investigate Loss Report</DialogTitle>
+                                <DialogDescription>
+                                    Document the investigation findings for
+                                    this controlled drug loss report.
+                                </DialogDescription>
+                            </DialogHeader>
                         <form
                             onSubmit={submitInvestigate}
                             className="space-y-4"
@@ -1314,10 +1332,14 @@ export default function ControlledDrugs({
                     open={resolveLossOpen}
                     onOpenChange={setResolveLossOpen}
                 >
-                    <DialogContent className="max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Resolve Loss Report</DialogTitle>
-                        </DialogHeader>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Resolve Loss Report</DialogTitle>
+                                <DialogDescription>
+                                    Record the final outcome and closure notes
+                                    for this loss report.
+                                </DialogDescription>
+                            </DialogHeader>
                         <form
                             onSubmit={submitResolveLoss}
                             className="space-y-4"
@@ -1456,10 +1478,14 @@ export default function ControlledDrugs({
 
                 {/* Resolve Discrepancy Dialog */}
                 <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
-                    <DialogContent className="max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Resolve Discrepancy</DialogTitle>
-                        </DialogHeader>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Resolve Discrepancy</DialogTitle>
+                                <DialogDescription>
+                                    Explain how this discrepancy was resolved
+                                    and any follow-up required.
+                                </DialogDescription>
+                            </DialogHeader>
                         <form onSubmit={submitResolve} className="space-y-4">
                             <div className="space-y-1.5">
                                 <Label htmlFor="resolve-action">

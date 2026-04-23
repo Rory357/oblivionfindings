@@ -8,6 +8,8 @@ use App\Domain\Roadmap\Services\RoadmapScoringService;
 use App\Domain\Roadmap\Services\RoadmapSuggestionService;
 use App\Domain\Roadmap\Http\Requests\StoreSuggestionRequest;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class SuggestionController extends Controller
@@ -18,8 +20,12 @@ class SuggestionController extends Controller
         protected RoadmapChangeLogService $changeLogService,
     ) {}
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse|RedirectResponse
     {
+        if (! $this->shouldReturnJson($request)) {
+            return redirect()->route('roadmap.dashboard');
+        }
+
         $tenantId = $this->tenantId($request);
 
         $query = InitiativeSuggestion::query()
@@ -141,5 +147,12 @@ class SuggestionController extends Controller
         if ($tenantId !== null && $resourceTenantId !== null && $tenantId !== $resourceTenantId) {
             abort(403, 'Tenant scope mismatch.');
         }
+    }
+
+    protected function shouldReturnJson(Request $request): bool
+    {
+        return $request->expectsJson()
+            || $request->wantsJson()
+            || $request->ajax();
     }
 }

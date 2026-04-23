@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -188,6 +188,11 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
                             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                                 <DialogHeader>
                                     <DialogTitle>New Self-Administration Assessment</DialogTitle>
+                                    <DialogDescription>
+                                        Assess the client&apos;s ability to
+                                        self-administer medication and record
+                                        any support needs.
+                                    </DialogDescription>
                                 </DialogHeader>
                                 <form onSubmit={submit} className="space-y-5">
                                     {/* Client */}

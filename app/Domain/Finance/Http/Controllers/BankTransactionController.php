@@ -38,6 +38,21 @@ class BankTransactionController extends Controller
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
             ->paginate(25)
+            ->through(fn (FinBankTransaction $transaction) => [
+                'id' => $transaction->id,
+                'transaction_date' => $transaction->transaction_date?->toDateString(),
+                'amount' => (float) $transaction->amount,
+                'description' => $transaction->description,
+                'reference' => $transaction->reference,
+                'payee' => $transaction->payee,
+                'source' => $transaction->source,
+                'status' => $transaction->status,
+                'is_from_feed' => (bool) $transaction->is_from_feed,
+                'bank_account' => $transaction->bankAccount ? [
+                    'id' => $transaction->bankAccount->id,
+                    'name' => $transaction->bankAccount->name,
+                ] : null,
+            ])
             ->withQueryString();
 
         $bankAccounts = FinBankAccount::forOrganization($orgId)

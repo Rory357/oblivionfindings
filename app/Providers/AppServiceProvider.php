@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Models\AssetMaintenanceLog;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\EmergencyDrill;
 use App\Models\ClientNote;
@@ -45,6 +46,8 @@ use App\Events\FleetWanderingAlertTriggered;
 use App\Services\AuditLogger;
 use App\Services\Integration\Adapters\UnifiAdapter;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -80,6 +83,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Relation::morphMap([
+            'client' => Client::class,
+            'staff' => User::class,
+        ]);
+
         Shift::observe(ShiftObserver::class);
         ClientNote::observe(ClientNoteObserver::class);
         Site::observe(SiteObserver::class);

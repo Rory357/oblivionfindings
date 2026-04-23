@@ -86,6 +86,26 @@ export function formatTimeSince(iso: string | null): string {
     return `${days}d ago`;
 }
 
+function allLabelForPlaceholder(placeholder: string): string {
+    const key = placeholder.toLowerCase();
+
+    const labels: Record<string, string> = {
+        assignment: 'All assignments',
+        category: 'All categories',
+        domain: 'All domains',
+        'event type': 'All event types',
+        health: 'All health states',
+        processed: 'All processed states',
+        provider: 'All providers',
+        severity: 'All severity levels',
+        source: 'All sources',
+        status: 'All statuses',
+        type: 'All types',
+    };
+
+    return labels[key] ?? `All ${key}`;
+}
+
 // ── Components ────────────────────────────────────────────────────
 
 export function StatCard({ label, value, icon: Icon, variant = 'default' }: {
@@ -121,7 +141,7 @@ export function FilterSelect({ value, onChange, placeholder, options }: {
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="all">All {placeholder.toLowerCase()}s</SelectItem>
+                <SelectItem value="all">{allLabelForPlaceholder(placeholder)}</SelectItem>
                 {options.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}

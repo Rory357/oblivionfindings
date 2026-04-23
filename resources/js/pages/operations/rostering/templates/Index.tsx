@@ -31,20 +31,20 @@ export default function TemplateIndex({ templates }: Props) {
         <AppLayout
             breadcrumbs={[
                 {
-                    title: 'Roster templates',
+                    title: 'Roster Templates',
                     href: '/operations/rostering/templates',
                 },
             ]}
         >
-            <Head title="Roster templates" />
+            <Head title="Roster Templates" />
             <PageShell>
                 <PageHeader
-                    title="Roster templates"
+                    title="Roster Templates"
                     description="Reusable roster patterns for regular houses, teams, and shift structures."
                     actions={
                         <Button asChild>
                             <Link href="/operations/rostering/templates/create">
-                                Create template
+                                Create Template
                             </Link>
                         </Button>
                     }

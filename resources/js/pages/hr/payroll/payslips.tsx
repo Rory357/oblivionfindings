@@ -54,6 +54,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Payslips', href: '/hr/payroll/payslips' },
 ];
 
+const ALL_FILTER_VALUE = '__all__';
+
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Draft' },
     approved: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Approved' },
@@ -75,7 +77,7 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
     function applyFilters(key: string, value: string) {
         router.get('/hr/payroll/payslips', {
             ...filters,
-            [key]: value || undefined,
+            [key]: value && value !== ALL_FILTER_VALUE ? value : undefined,
         }, { preserveState: true });
     }
 
@@ -142,12 +144,12 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                             <div>
                                 <Label>Status</Label>
                                 <Select
-                                    value={filters.status ?? ''}
+                                    value={filters.status ?? ALL_FILTER_VALUE}
                                     onValueChange={(v) => applyFilters('status', v)}
                                 >
                                     <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">All</SelectItem>
+                                        <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
                                         <SelectItem value="draft">Draft</SelectItem>
                                         <SelectItem value="approved">Approved</SelectItem>
                                         <SelectItem value="paid">Paid</SelectItem>
@@ -157,12 +159,12 @@ export default function PayslipsIndex({ payslips, employees, filters, can }: Pro
                             <div>
                                 <Label>Employee</Label>
                                 <Select
-                                    value={filters.user_id ?? ''}
+                                    value={filters.user_id ?? ALL_FILTER_VALUE}
                                     onValueChange={(v) => applyFilters('user_id', v)}
                                 >
                                     <SelectTrigger><SelectValue placeholder="All employees" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">All</SelectItem>
+                                        <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
                                         {employees.map((emp) => (
                                             <SelectItem key={emp.id} value={String(emp.id)}>
                                                 {emp.name}

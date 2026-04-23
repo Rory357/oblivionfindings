@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, Link } from '@inertiajs/react';
+import { Head, router, Link, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
     Plus, BookOpen, GraduationCap, Calendar, Search, Filter, Users,
     CheckCircle2, ShieldCheck, Monitor, MapPin, Layers, Zap, Clock, ArrowRight, BarChart3,
 } from 'lucide-react';
-import { useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { type BreadcrumbItem } from '@/types';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
@@ -59,8 +59,25 @@ const emptyForm = {
 };
 
 export default function TrainingCatalog({ courses, categories, summary, filters, deliveryMethods, can }: Props) {
-    const [open, setOpen] = useState(false);
+    const { url } = usePage();
+    const openedFromLegacyCreateRoute = can.manage && new URL(url, 'https://oblivionfindings.test').searchParams.get('open') === 'create';
+    const [open, setOpen] = useState(openedFromLegacyCreateRoute);
     const [form, setForm] = useState(emptyForm);
+
+    useEffect(() => {
+        if (open || !openedFromLegacyCreateRoute || typeof window === 'undefined') {
+            return;
+        }
+
+        const nextUrl = new URL(window.location.href);
+
+        if (nextUrl.searchParams.get('open') !== 'create') {
+            return;
+        }
+
+        nextUrl.searchParams.delete('open');
+        window.history.replaceState(window.history.state, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+    }, [open, openedFromLegacyCreateRoute]);
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get('/hr/training/catalog', { ...filters, ...next }, { preserveState: true, preserveScroll: true });

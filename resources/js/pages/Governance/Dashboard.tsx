@@ -194,6 +194,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Governance Dashboard</p>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold text-slate-900" dusk="governance-cockpit-heading">Executive & Board Cockpit</h1>
               {isBoardMember && boardRole && (

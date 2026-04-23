@@ -102,6 +102,9 @@ type Props = {
     trips_by_day?: Array<{ label: string; value: number }>;
     top_vehicles?: Array<{ label: string; value: number }>;
     distance_trend?: number[];
+    can?: {
+        manage: boolean;
+    };
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -123,6 +126,7 @@ export default function TripsIndex({
     trips_by_day: rawTripsByDay,
     top_vehicles: rawTopVehicles,
     distance_trend: rawDistanceTrend,
+    can,
 }: Props) {
     const tripsData = rawTrips?.data ?? [];
     const meta = rawTrips?.meta ?? { current_page: 1, last_page: 1, total: 0 };
@@ -133,6 +137,7 @@ export default function TripsIndex({
     const tripsByDay = rawTripsByDay ?? [];
     const topVehicles = rawTopVehicles ?? [];
     const distanceTrend = rawDistanceTrend ?? [];
+    const canManage = can?.manage ?? false;
 
     const [expandedTrip, setExpandedTrip] = useState<number | null>(null);
     const [searchValue, setSearchValue] = useState(filters.search ?? '');
@@ -358,6 +363,7 @@ export default function TripsIndex({
                                         onToggle={() => toggleTrip(trip.id)}
                                         getPolyline={getPolylineForTrip}
                                         getCenter={getMapCenter}
+                                        canManage={canManage}
                                     />
                                 ))}
                             </tbody>
@@ -397,12 +403,14 @@ function TripRow({
     onToggle,
     getPolyline,
     getCenter,
+    canManage,
 }: {
     trip: Trip;
     expanded: boolean;
     onToggle: () => void;
     getPolyline: (trip: Trip) => { lat: number; lng: number }[];
     getCenter: (trip: Trip) => { lat: number; lng: number };
+    canManage: boolean;
 }) {
     const polyline = getPolyline(trip);
     const center = getCenter(trip);
@@ -446,22 +454,24 @@ function TripRow({
                         {trip.is_personal && (
                             <Badge className="bg-orange-500 text-white text-[10px]">Personal</Badge>
                         )}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            title={trip.is_personal ? 'Mark as business' : 'Mark as personal'}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                router.post(`/fleet-assets/trips/${trip.id}/toggle-personal`, {}, { preserveScroll: true });
-                            }}
-                        >
-                            {trip.is_personal ? (
-                                <UserX className="h-4 w-4 text-orange-500" />
-                            ) : (
-                                <User className="h-4 w-4 text-muted-foreground" />
-                            )}
-                        </Button>
+                        {canManage && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                title={trip.is_personal ? 'Mark as business' : 'Mark as personal'}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.post(`/fleet-assets/trips/${trip.id}/toggle-personal`, {}, { preserveScroll: true });
+                                }}
+                            >
+                                {trip.is_personal ? (
+                                    <UserX className="h-4 w-4 text-orange-500" />
+                                ) : (
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                )}
+                            </Button>
+                        )}
                     </div>
                 </td>
             </tr>

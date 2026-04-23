@@ -10,17 +10,26 @@ type Props = {
 };
 
 export default function ShowDataBreach({ breach }: Props) {
+    const statusLabels: Record<string, string> = {
+        discovered: 'discovered',
+        under_investigation: 'under investigation',
+        contained: 'contained',
+        notified: 'notified',
+        resolved: 'resolved',
+    };
+
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'resolved':
-            case 'closed':
-                return 'bg-green-100 text-green-800';
-            case 'investigating':
+            case 'under_investigation':
                 return 'bg-blue-100 text-blue-800';
-            case 'reported':
+            case 'discovered':
                 return 'bg-yellow-100 text-yellow-800';
             case 'contained':
                 return 'bg-orange-100 text-orange-800';
+            case 'resolved':
+                return 'bg-green-100 text-green-800';
+            case 'notified':
+                return 'bg-purple-100 text-purple-800';
             default:
                 return 'bg-slate-100 text-slate-800';
         }
@@ -64,7 +73,7 @@ export default function ShowDataBreach({ breach }: Props) {
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
                             <Badge className={getStatusColor(breach.status)}>
-                                {breach.status}
+                                {statusLabels[breach.status] ?? breach.status}
                             </Badge>
                             {icoDeadlinePassed && (
                                 <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
@@ -210,7 +219,7 @@ export default function ShowDataBreach({ breach }: Props) {
                     </CardContent>
                 </Card>
 
-                {breach.status !== 'resolved' && breach.status !== 'closed' && (
+                {breach.status !== 'resolved' && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Actions</CardTitle>

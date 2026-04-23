@@ -50,6 +50,7 @@ use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\ShiftCoverageService;
 use App\Support\ClientSafetyPayload;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 
 class ClientController extends Controller
@@ -595,7 +596,7 @@ class ClientController extends Controller
                     'capacity_outcome' => $c->capacity_outcome,
                     'best_interests_decision' => $c->best_interests_decision,
                 ]),
-            'health_summary' => app(ClinicalHealthSummaryService::class)->getSummary($client),
+            'health_summary' => $this->buildHealthSummary($client),
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
                 'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,
@@ -609,7 +610,7 @@ class ClientController extends Controller
                 'record_event' => $request->user()?->canDo('clinical.events.record') ?? false,
             ],
             'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
-            'pending_consent_requests_count' => \App\Models\ConsentRequest::forClient($client->id)->pending()->count(),
+            'pending_consent_requests_count' => $this->buildPendingConsentRequestCount($client),
             'family_notes_open_count' => \App\Models\FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
             'family_notes' => \App\Models\FamilyNote::where('client_id', $client->id)
                 ->with([
@@ -733,21 +734,7 @@ class ClientController extends Controller
                         'name' => $r->name,
                     ]),
                 ]),
-            'available_trackers' => Device::query()
-                ->where('domain', 'tracking')
-                ->whereNotIn('status', ['decommissioned', 'lost'])
-                ->whereDoesntHave('assignments', fn ($q) => $q->active())
-                ->orderBy('name')
-                ->get(['id', 'device_uid', 'name', 'status', 'health_status', 'last_seen_at', 'serial_number', 'battery_level'])
-                ->map(fn($t) => [
-                    'id' => $t->id,
-                    'name' => $t->name,
-                    'status' => $t->status,
-                    'serial' => $t->serial,
-                    'site_id' => $t->site_id,
-                    'last_seen_at' => $t->last_seen_at?->toISOString(),
-                    'battery' => $t->meta['battery'] ?? null,
-                ]),
+            'available_trackers' => $this->buildAvailableTrackers(),
             'emar_summary' => [
                 'active_medications_count' => ClientMedication::where('client_id', $client->id)
                     ->where('active', true)
@@ -949,6 +936,86 @@ class ClientController extends Controller
             str_contains($freq, 'once daily'), str_contains($freq, 'daily'), str_contains($freq, 'od') => ['08:00'],
             default => [],
         };
+    }
+
+    private function buildHealthSummary(Client $client): array
+    {
+        $emptySummary = [
+            'latest_observations' => [],
+            'recent_events' => [
+                'count' => 0,
+                'high_severity_count' => 0,
+                'items' => [],
+            ],
+            'protocol_compliance' => [
+                'rate' => 0,
+                'due_count' => 0,
+                'overdue_count' => 0,
+            ],
+        ];
+
+        foreach ([
+            'clinical_observations',
+            'clinical_events',
+            'clinical_protocols',
+            'clinical_protocol_schedules',
+        ] as $table) {
+            if (! Schema::hasTable($table)) {
+                return $emptySummary;
+            }
+        }
+
+        try {
+            return app(ClinicalHealthSummaryService::class)->getSummary($client);
+        } catch (QueryException $exception) {
+            report($exception);
+
+            return $emptySummary;
+        }
+    }
+
+    private function buildPendingConsentRequestCount(Client $client): int
+    {
+        if (! Schema::hasTable('consent_requests')) {
+            return 0;
+        }
+
+        try {
+            return \App\Models\ConsentRequest::forClient($client->id)->pending()->count();
+        } catch (QueryException $exception) {
+            report($exception);
+
+            return 0;
+        }
+    }
+
+    private function buildAvailableTrackers()
+    {
+        if (! Schema::hasTable('devices')) {
+            return collect();
+        }
+
+        try {
+            return Device::query()
+                ->where('domain', 'tracking')
+                ->whereNotIn('status', ['decommissioned', 'lost'])
+                ->whereDoesntHave('assignments', fn ($query) => $query->active())
+                ->orderBy('name')
+                ->get(['id', 'device_uid', 'name', 'status', 'health_status', 'last_seen_at', 'serial_number', 'battery_level'])
+                ->map(fn ($tracker) => [
+                    'id' => $tracker->id,
+                    'name' => $tracker->name,
+                    'status' => $tracker->status,
+                    'serial' => $tracker->serial,
+                    'site_id' => $tracker->site_id,
+                    'last_seen_at' => $tracker->last_seen_at?->toISOString(),
+                    'battery' => $tracker->meta['battery'] ?? null,
+                ]);
+        } catch (QueryException $exception) {
+            report($exception);
+
+            return collect();
+        }
     }
 
     private function buildOnboardingChecklist(Client $client): array
@@ -1549,11 +1616,31 @@ class ClientController extends Controller
     {
         $tenantId = $client->tenant_id ?? 1;
 
+        if (! Schema::hasTable('devices')) {
+            return [
+                'tracker' => null,
+                'currentLocation' => null,
+                'trackingConsent' => null,
+                'geofences' => [],
+            ];
+        }
+
         // Find the active tracking device assigned to this client.
-        $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
-            ->where('domain', 'tracking')
-            ->first();
+        try {
+            $device = app(DeviceRegistryService::class)
+                ->forClient($tenantId, $client->id)
+                ->where('domain', 'tracking')
+                ->first();
+        } catch (QueryException $exception) {
+            report($exception);
+
+            return [
+                'tracker' => null,
+                'currentLocation' => null,
+                'trackingConsent' => null,
+                'geofences' => [],
+            ];
+        }
 
         $trackerInfo = null;
         $currentLocation = null;

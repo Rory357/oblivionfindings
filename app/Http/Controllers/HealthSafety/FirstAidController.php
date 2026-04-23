@@ -53,6 +53,7 @@ class FirstAidController extends Controller
             ],
             'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
             'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'can_create' => $this->canCreate($request),
         ]);
     }
 
@@ -67,11 +68,11 @@ class FirstAidController extends Controller
             'treated_person_name' => 'required|string|max:255',
             'treated_person_type' => 'required|in:staff,client,visitor,contractor',
             'treatment_date' => 'required|date',
-            'injury_illness_type' => 'required|in:cut,burn,sprain,fall,allergic_reaction,breathing_difficulty,chest_pain,seizure,fainting,other',
+            'injury_illness_type' => 'required|in:cut,burn,bruise,sprain,fracture,fall,head_injury,eye_injury,allergic_reaction,breathing_difficulty,chest_pain,seizure,fainting,nausea,sting,choking,other',
             'injury_illness_description' => 'required|string',
             'body_part' => 'nullable|string|max:255',
             'treatment_given' => 'required|string',
-            'treatment_outcome' => 'required|in:returned_to_work,sent_home,sent_to_medical,sent_to_hospital,refused_treatment',
+            'treatment_outcome' => 'required|in:returned_to_activity,returned_to_work,sent_home,medical_centre,sent_to_medical,hospital,sent_to_hospital,ambulance_called,ongoing_monitoring,refused_treatment,other',
             'ambulance_called' => 'boolean',
             'first_aider_id' => 'required|exists:users,id',
             'first_aider_notes' => 'nullable|string',
@@ -85,5 +86,12 @@ class FirstAidController extends Controller
 
         return redirect()->route('health-safety.first-aid.index')
             ->with('success', 'First aid record created.');
+    }
+
+    private function canCreate(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->canDo('hazards.manage') || $user?->canDo('hazards.create'));
     }
 }

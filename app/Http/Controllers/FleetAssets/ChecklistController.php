@@ -13,6 +13,8 @@ class ChecklistController extends Controller
 {
     public function index(Request $request)
     {
+        $canManage = $this->canManageMaintenance($request);
+
         $templates = FleetChecklistTemplate::query()
             ->withCount('runs')
             ->orderBy('name')
@@ -46,6 +48,9 @@ class ChecklistController extends Controller
         return Inertia::render('fleet-assets/maintenance/checklists/index', [
             'templates' => $templates,
             'recent_runs' => $recentRuns,
+            'can' => [
+                'manage' => $canManage,
+            ],
         ]);
     }
 
@@ -75,6 +80,8 @@ class ChecklistController extends Controller
 
     public function runPage(Request $request)
     {
+        $canManage = $this->canManageMaintenance($request);
+
         $templates = FleetChecklistTemplate::query()
             ->where('is_active', true)
             ->orderBy('name')
@@ -96,6 +103,9 @@ class ChecklistController extends Controller
             'templates' => $templates,
             'assets' => $assets,
             'selected_template_id' => $request->input('template_id'),
+            'can' => [
+                'manage' => $canManage,
+            ],
         ]);
     }
 
@@ -136,5 +146,12 @@ class ChecklistController extends Controller
         ]);
 
         return back()->with('success', 'Checklist completed.');
+    }
+
+    private function canManageMaintenance(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->canDo('fleet.manage') || $user?->canDo('fleet.maintenance.manage'));
     }
 }

@@ -13,13 +13,13 @@ type Props = {
 };
 
 const ASSESSMENT_TYPES = [
-    { value: 'new_processing', label: 'New Processing' },
-    { value: 'change_to_existing', label: 'Change to Existing' },
-    { value: 'third_party', label: 'Third Party' },
-    { value: 'other', label: 'Other' },
+    { value: 'new_project', label: 'New Project' },
+    { value: 'process_change', label: 'Process Change' },
+    { value: 'system_upgrade', label: 'System Upgrade' },
+    { value: 'periodic_review', label: 'Periodic Review' },
 ];
 
-const RISK_LEVELS = ['low', 'medium', 'high', 'critical'] as const;
+const RISK_LEVELS = ['low', 'medium', 'high', 'very_high'] as const;
 
 const parseList = (value: string) => {
     const items = value

@@ -13,24 +13,53 @@ class QualificationMatchController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('qualifications.viewAny'), 403);
+        abort_unless($auth && $this->canAccessQualifications($auth), 403);
+
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+        $search = trim((string) ($filters['q'] ?? ''));
 
         $requirements = StaffQualificationRequirement::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('qualification_name', 'like', '%'.$search.'%')
+                        ->orWhereHas('client', fn ($clientQuery) => $clientQuery
+                            ->where('first_name', 'like', '%'.$search.'%')
+                            ->orWhere('last_name', 'like', '%'.$search.'%'));
+                });
+            })
             ->orderBy('client_id')
             ->paginate(20)
+            ->through(fn (StaffQualificationRequirement $requirement) => [
+                'id' => $requirement->id,
+                'qualification_name' => $requirement->qualification_name,
+                'is_mandatory' => (bool) $requirement->is_mandatory,
+                'match_status' => 'unmet',
+                'matched_workers' => 0,
+                'total_workers' => 0,
+                'client' => $requirement->client ? [
+                    'id' => $requirement->client->id,
+                    'first_name' => $requirement->client->first_name,
+                    'last_name' => $requirement->client->last_name,
+                ] : null,
+            ])
             ->withQueryString();
 
         return inertia('operations/qualifications/Index', [
             'requirements' => $requirements,
+            'filters' => [
+                'q' => $filters['q'] ?? null,
+            ],
         ]);
     }
 
     public function store(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('qualifications.create'), 403);
+        abort_unless($auth && $this->canAccessQualifications($auth), 403);
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
@@ -53,7 +82,7 @@ class QualificationMatchController extends Controller
     public function update(Request $request, $requirement)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('qualifications.edit'), 403);
+        abort_unless($auth && $this->canAccessQualifications($auth), 403);
 
         $requirement = StaffQualificationRequirement::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -73,7 +102,7 @@ class QualificationMatchController extends Controller
     public function destroy(Request $request, $requirement)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('qualifications.delete'), 403);
+        abort_unless($auth && $this->canAccessQualifications($auth), 403);
 
         $requirement = StaffQualificationRequirement::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -87,7 +116,7 @@ class QualificationMatchController extends Controller
     public function checkShift(Request $request, $shift)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('qualifications.viewAny'), 403);
+        abort_unless($auth && $this->canAccessQualifications($auth), 403);
 
         $shift = Shift::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -127,5 +156,14 @@ class QualificationMatchController extends Controller
             'results' => $results,
             'allMandatoryMet' => $allMandatoryMet,
         ]);
+    }
+
+    private function canAccessQualifications($auth): bool
+    {
+        return $auth->canDo('qualifications.viewAny')
+            || $auth->canDo('qualifications.create')
+            || $auth->canDo('qualifications.edit')
+            || $auth->canDo('qualifications.delete')
+            || $auth->canDo('rostering.viewAny');
     }
 }

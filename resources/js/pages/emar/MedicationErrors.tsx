@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -127,6 +128,10 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Report Medication Error</DialogTitle>
+                    <DialogDescription>
+                        Capture the medication error, severity, immediate
+                        response, and whether it should create an incident.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -360,6 +365,10 @@ function ReviewDialog({ error }: { error: any }) {
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Review Medication Error</DialogTitle>
+                    <DialogDescription>
+                        Document the investigation notes and update the current
+                        review status.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">
@@ -450,6 +459,10 @@ function ResolveDialog({ error }: { error: any }) {
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Resolve Medication Error</DialogTitle>
+                    <DialogDescription>
+                        Record the outcome and preventive actions before
+                        closing this medication error.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">

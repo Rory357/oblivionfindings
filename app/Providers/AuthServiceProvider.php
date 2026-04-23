@@ -45,22 +45,28 @@ use App\Domain\Roadmap\Policies\InitiativePolicy as RoadmapInitiativePolicy;
 use App\Domain\Roadmap\Policies\InitiativeSuggestionPolicy as RoadmapInitiativeSuggestionPolicy;
 use App\Domain\Roadmap\Policies\QuarterlyRoadmapPlanPolicy as RoadmapQuarterlyRoadmapPlanPolicy;
 use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinBankAccount;
+use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Models\FinBankReconciliation;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCreditNote;
 use App\Domain\Finance\Models\FinFixedAsset;
 use App\Domain\Finance\Models\FinGstReturn;
+use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinPaymentRun;
 use App\Domain\Finance\Models\FinPettyCashFund;
 use App\Domain\Finance\Models\FinPurchaseOrder;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Policies\FinAccountPolicy;
+use App\Domain\Finance\Policies\FinBankAccountPolicy;
+use App\Domain\Finance\Policies\FinBankTransactionPolicy;
 use App\Domain\Finance\Policies\FinBankReconciliationPolicy;
 use App\Domain\Finance\Policies\FinBillPolicy;
 use App\Domain\Finance\Policies\FinCreditNotePolicy;
 use App\Domain\Finance\Policies\FinFixedAssetPolicy;
 use App\Domain\Finance\Policies\FinGstReturnPolicy;
+use App\Domain\Finance\Policies\FinInvoicePolicy;
 use App\Domain\Finance\Policies\FinJournalPolicy;
 use App\Domain\Finance\Policies\FinPaymentRunPolicy;
 use App\Domain\Finance\Policies\FinPettyCashPolicy;
@@ -140,11 +146,14 @@ class AuthServiceProvider extends ServiceProvider
         LegalHold::class => LegalHoldPolicy::class,
         // Finance
         FinAccount::class => FinAccountPolicy::class,
+        FinBankAccount::class => FinBankAccountPolicy::class,
+        FinBankTransaction::class => FinBankTransactionPolicy::class,
         FinBankReconciliation::class => FinBankReconciliationPolicy::class,
         FinBill::class => FinBillPolicy::class,
         FinCreditNote::class => FinCreditNotePolicy::class,
         FinFixedAsset::class => FinFixedAssetPolicy::class,
         FinGstReturn::class => FinGstReturnPolicy::class,
+        FinInvoice::class => FinInvoicePolicy::class,
         FinJournal::class => FinJournalPolicy::class,
         FinPaymentRun::class => FinPaymentRunPolicy::class,
         FinPettyCashFund::class => FinPettyCashPolicy::class,

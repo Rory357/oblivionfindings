@@ -52,6 +52,9 @@ type Props = {
     recent_logs: KeyLogEntry[];
     users: UserOption[];
     vehicles: VehicleOption[];
+    can: {
+        manage: boolean;
+    };
 };
 
 function actionBadge(action: string) {
@@ -74,6 +77,7 @@ export default function KeyManagement({
     recent_logs: rawLogs,
     users,
     vehicles,
+    can,
 }: Props) {
     const current_holders = rawHolders ?? [];
     const recent_logs = rawLogs ?? [];
@@ -156,20 +160,26 @@ export default function KeyManagement({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => { resetForm(); setShowCheckout(!showCheckout); setShowReturn(false); setShowTransfer(false); }}>
-                        <LogOut className="mr-2 h-4 w-4" /> Check Out Key
-                    </Button>
-                    <Button variant="outline" onClick={() => { resetForm(); setShowReturn(!showReturn); setShowCheckout(false); setShowTransfer(false); }}>
-                        <LogIn className="mr-2 h-4 w-4" /> Return Key
-                    </Button>
-                    <Button variant="outline" onClick={() => { resetForm(); setShowTransfer(!showTransfer); setShowCheckout(false); setShowReturn(false); }}>
-                        <ArrowLeftRight className="mr-2 h-4 w-4" /> Transfer Key
-                    </Button>
-                </div>
+                {can.manage ? (
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={() => { resetForm(); setShowCheckout(!showCheckout); setShowReturn(false); setShowTransfer(false); }}>
+                            <LogOut className="mr-2 h-4 w-4" /> Check Out Key
+                        </Button>
+                        <Button variant="outline" onClick={() => { resetForm(); setShowReturn(!showReturn); setShowCheckout(false); setShowTransfer(false); }}>
+                            <LogIn className="mr-2 h-4 w-4" /> Return Key
+                        </Button>
+                        <Button variant="outline" onClick={() => { resetForm(); setShowTransfer(!showTransfer); setShowCheckout(false); setShowReturn(false); }}>
+                            <ArrowLeftRight className="mr-2 h-4 w-4" /> Transfer Key
+                        </Button>
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        Key activity is view-only for your account.
+                    </p>
+                )}
 
                 {/* Checkout Form */}
-                {showCheckout && (
+                {can.manage && showCheckout && (
                     <Card>
                         <CardHeader><CardTitle>Check Out Key</CardTitle></CardHeader>
                         <CardContent>
@@ -194,7 +204,7 @@ export default function KeyManagement({
                 )}
 
                 {/* Return Form */}
-                {showReturn && (
+                {can.manage && showReturn && (
                     <Card>
                         <CardHeader><CardTitle>Return Key</CardTitle></CardHeader>
                         <CardContent>
@@ -223,7 +233,7 @@ export default function KeyManagement({
                 )}
 
                 {/* Transfer Form */}
-                {showTransfer && (
+                {can.manage && showTransfer && (
                     <Card>
                         <CardHeader><CardTitle>Transfer Key</CardTitle></CardHeader>
                         <CardContent>

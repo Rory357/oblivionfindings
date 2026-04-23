@@ -46,12 +46,23 @@ class SafeguardingExternalReportController extends Controller
         $validated = $request->validate([
             'authority_reference' => 'nullable|string',
             'acknowledgement_received' => 'nullable|boolean',
+            'acknowledgment_received' => 'nullable|boolean',
             'acknowledged_at' => 'nullable|date',
+            'acknowledgment_date' => 'nullable|date',
             'acknowledgement_reference' => 'nullable|string',
+            'acknowledgment_reference' => 'nullable|string',
             'authority_action' => 'nullable|string',
             'authority_feedback' => 'nullable|string',
             'authority_feedback_at' => 'nullable|date',
         ]);
+
+        $validated['acknowledgement_received'] = array_key_exists('acknowledgement_received', $validated)
+            ? $validated['acknowledgement_received']
+            : ($validated['acknowledgment_received'] ?? null);
+        $validated['acknowledged_at'] = $validated['acknowledged_at'] ?? ($validated['acknowledgment_date'] ?? null);
+        $validated['acknowledgement_reference'] = $validated['acknowledgement_reference']
+            ?? ($validated['acknowledgment_reference'] ?? null);
+        unset($validated['acknowledgment_received'], $validated['acknowledgment_date'], $validated['acknowledgment_reference']);
 
         $validated['updated_by'] = auth()->id();
 

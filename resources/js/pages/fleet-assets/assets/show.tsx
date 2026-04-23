@@ -4,6 +4,14 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -55,7 +63,7 @@ type Document = {
     id: number;
     name: string;
     type: string;
-    uploaded_at: string;
+    uploaded_at: string | null;
     url: string;
 };
 
@@ -227,6 +235,50 @@ export default function AssetShow({
         imei: '',
         serial_number: '',
     });
+    const [docOpen, setDocOpen] = useState(false);
+    const [docFile, setDocFile] = useState<File | null>(null);
+    const [docTitle, setDocTitle] = useState('');
+    const [docCategory, setDocCategory] = useState('manual');
+    const [docSubmitting, setDocSubmitting] = useState(false);
+    const [docError, setDocError] = useState('');
+
+    const submitDocument = () => {
+        if (!docFile) {
+            setDocError('Choose a file.');
+            return;
+        }
+
+        if (!docTitle.trim()) {
+            setDocError('Title is required.');
+            return;
+        }
+
+        setDocSubmitting(true);
+        setDocError('');
+
+        const formData = new FormData();
+        formData.append('file', docFile);
+        formData.append('title', docTitle.trim());
+        if (docCategory) {
+            formData.append('category', docCategory);
+        }
+
+        router.post(`/assets/${asset.id}/documents`, formData, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setDocOpen(false);
+                setDocFile(null);
+                setDocTitle('');
+                setDocCategory('manual');
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors)[0];
+                setDocError(Array.isArray(firstError) ? firstError[0] : String(firstError ?? 'Upload failed.'));
+            },
+            onFinish: () => setDocSubmitting(false),
+        });
+    };
 
     const trackerMarkers = useMemo<MapMarker[]>(() => {
         const result: MapMarker[] = [];
@@ -238,7 +290,7 @@ export default function AssetShow({
                     lng: Number(t.lng),
                     title: `${t.vendor} - ${t.device_uid}`,
                     type: 'vehicle',
-                    status: t.status,
+                    status: t.status ?? undefined,
                 });
             }
         });
@@ -610,7 +662,7 @@ export default function AssetShow({
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Documents</CardTitle>
                                 {can_upload && (
-                                    <Button variant="outline" size="sm">
+                                    <Button variant="outline" size="sm" onClick={() => { setDocOpen(true); setDocError(''); }}>
                                         <Upload className="mr-2 h-4 w-4" />
                                         Upload
                                     </Button>
@@ -643,6 +695,60 @@ export default function AssetShow({
                                 )}
                             </CardContent>
                         </Card>
+
+                        <Dialog open={docOpen} onOpenChange={setDocOpen}>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Upload document</DialogTitle>
+                                    <DialogDescription>
+                                        Attach a manual, compliance record, or supporting file to this asset.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">File</label>
+                                        <Input type="file" onChange={(e) => setDocFile(e.target.files?.[0] ?? null)} />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">Title</label>
+                                        <Input
+                                            value={docTitle}
+                                            onChange={(e) => setDocTitle(e.target.value)}
+                                            placeholder="e.g. Registration certificate"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">Category</label>
+                                        <Select value={docCategory} onValueChange={setDocCategory}>
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="manual">Manual</SelectItem>
+                                                <SelectItem value="compliance">Compliance</SelectItem>
+                                                <SelectItem value="photo">Photo</SelectItem>
+                                                <SelectItem value="service">Service record</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {docError && <p className="text-sm text-destructive">{docError}</p>}
+                                </div>
+
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setDocOpen(false)} disabled={docSubmitting}>
+                                        Cancel
+                                    </Button>
+                                    <Button onClick={submitDocument} disabled={docSubmitting || !docFile || !docTitle.trim()}>
+                                        {docSubmitting ? 'Uploading...' : 'Upload'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </TabsContent>
 
                     {/* Maintenance Tab */}
@@ -912,7 +1018,9 @@ export default function AssetShow({
                                                 </div>
                                                 <div>
                                                     <div className="text-muted-foreground">Status</div>
-                                                    <Badge variant={statusVariant(t.status)}>{t.status}</Badge>
+                                                    <Badge variant={statusVariant(t.status ?? 'offline')}>
+                                                        {t.status ?? 'unknown'}
+                                                    </Badge>
                                                 </div>
                                             </div>
                                         ))}
@@ -929,7 +1037,7 @@ export default function AssetShow({
                                     <form
                                         onSubmit={(e) => {
                                             e.preventDefault();
-                                            pairForm.post(`/fleet-assets/assets/${asset.id}/pair-device`, {
+                                            pairForm.post(`/assets/${asset.id}/trackers/pair`, {
                                                 preserveScroll: true,
                                                 onSuccess: () => pairForm.reset(),
                                             });

@@ -50,19 +50,7 @@ class PortalMessageController extends Controller
                 })->filter()->values(),
             ]);
 
-        // Support workers for "new chat" picker
-        $client->load(['supportWorkers:id,name,profile_photo_path,last_seen_at,presence_status', 'keyWorker:id,name,profile_photo_path,last_seen_at,presence_status']);
-        $workers = collect();
-        if ($client->keyWorker) $workers->push($client->keyWorker);
-        foreach ($client->supportWorkers as $w) {
-            if (!$workers->contains('id', $w->id)) $workers->push($w);
-        }
-        $derivePresence = function ($u) {
-            if (!$u->last_seen_at) return 'offline';
-            if ($u->presence_status === 'online' && $u->last_seen_at->gt(now()->subMinutes(5))) return 'online';
-            if ($u->last_seen_at->gt(now()->subMinutes(15))) return 'away';
-            return 'offline';
-        };
+        $workers = $this->portalWorkersForClient($client);
 
         return inertia('portal/messages', [
             'client' => [
@@ -76,7 +64,7 @@ class PortalMessageController extends Controller
             'supportWorkers' => $workers->map(fn ($w) => [
                 'id' => $w->id,
                 'name' => $w->name,
-                'presence' => $derivePresence($w),
+                'presence' => $this->derivePresence($w),
             ])->values(),
             'currentUserId' => $user->id,
         ]);
@@ -193,18 +181,7 @@ class PortalMessageController extends Controller
                 ];
             });
 
-        $client->load(['supportWorkers:id,name,profile_photo_path,last_seen_at,presence_status', 'keyWorker:id,name,profile_photo_path,last_seen_at,presence_status']);
-        $workers = collect();
-        if ($client->keyWorker) $workers->push($client->keyWorker);
-        foreach ($client->supportWorkers as $w) {
-            if (!$workers->contains('id', $w->id)) $workers->push($w);
-        }
-        $derivePresence = function ($u) {
-            if (!$u->last_seen_at) return 'offline';
-            if ($u->presence_status === 'online' && $u->last_seen_at->gt(now()->subMinutes(5))) return 'online';
-            if ($u->last_seen_at->gt(now()->subMinutes(15))) return 'away';
-            return 'offline';
-        };
+        $workers = $this->portalWorkersForClient($client);
 
         return inertia('portal/messages', [
             'client' => [
@@ -213,7 +190,7 @@ class PortalMessageController extends Controller
                 'last_name' => $client->last_name,
             ],
             'conversations' => $allConversations->values(),
-            'supportWorkers' => $workers->map(fn ($w) => ['id' => $w->id, 'name' => $w->name, 'presence' => $derivePresence($w)])->values(),
+            'supportWorkers' => $workers->map(fn ($w) => ['id' => $w->id, 'name' => $w->name, 'presence' => $this->derivePresence($w)])->values(),
             'currentUserId' => $user->id,
             'activeConversation' => [
                 'id' => $conversation->id,
@@ -552,5 +529,59 @@ class PortalMessageController extends Controller
         ]);
 
         return redirect("/portal/clients/{$client->id}/messages/{$conversation->id}");
+    }
+
+    private function portalWorkersForClient(Client $client)
+    {
+        $client->load([
+            'supportWorkers:id,name,profile_photo_path,last_seen_at,presence_status',
+            'keyWorker:id,name,profile_photo_path,last_seen_at,presence_status',
+        ]);
+
+        $workers = collect();
+        $pushWorker = function ($worker) use ($workers): void {
+            if ($worker && ! $workers->contains('id', $worker->id)) {
+                $workers->push($worker);
+            }
+        };
+
+        $pushWorker($client->keyWorker);
+
+        foreach ($client->supportWorkers as $worker) {
+            $pushWorker($worker);
+        }
+
+        $shiftWorkers = Shift::query()
+            ->where('client_id', $client->id)
+            ->whereIn('status', ['scheduled', 'in_progress', 'completed'])
+            ->where('ends_at', '>=', now()->subDays(7))
+            ->with('staff:id,name,profile_photo_path,last_seen_at,presence_status')
+            ->orderByDesc('starts_at')
+            ->get()
+            ->pluck('staff')
+            ->filter();
+
+        foreach ($shiftWorkers as $worker) {
+            $pushWorker($worker);
+        }
+
+        return $workers->values();
+    }
+
+    private function derivePresence($user): string
+    {
+        if (! $user?->last_seen_at) {
+            return 'offline';
+        }
+
+        if ($user->presence_status === 'online' && $user->last_seen_at->gt(now()->subMinutes(5))) {
+            return 'online';
+        }
+
+        if ($user->last_seen_at->gt(now()->subMinutes(15))) {
+            return 'away';
+        }
+
+        return 'offline';
     }
 }

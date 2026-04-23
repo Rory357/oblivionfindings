@@ -59,8 +59,20 @@ const renderList = (items?: string[] | null) => {
 export default function ShowDPIA({ dpia }: Props) {
     const { auth } = usePage().props as any;
     const can = auth?.can?.privacy ?? {};
+    const riskLabels: Record<string, string> = {
+        low: 'low',
+        medium: 'medium',
+        high: 'high',
+        very_high: 'very high',
+    };
+    const outcomeLabels: Record<string, string> = {
+        approved: 'approved',
+        approved_with_conditions: 'approved with conditions',
+        requires_dpo_review: 'requires DPO review',
+        rejected: 'rejected',
+    };
 
-    const outcomeLabel = dpia.outcome ? dpia.outcome.replace(/_/g, ' ') : 'Pending review';
+    const outcomeLabel = dpia.outcome ? outcomeLabels[dpia.outcome] ?? dpia.outcome.replace(/_/g, ' ') : 'Pending review';
 
     return (
         <AppLayout breadcrumbs={[
@@ -80,10 +92,10 @@ export default function ShowDPIA({ dpia }: Props) {
                         <div className="mt-2 flex flex-wrap gap-2">
                             <Badge variant="outline">{outcomeLabel}</Badge>
                             <Badge className="border-red-200 bg-red-50 text-red-700">
-                                Risk: {dpia.overall_risk_level}
+                                Risk: {riskLabels[dpia.overall_risk_level] ?? dpia.overall_risk_level}
                             </Badge>
                             {dpia.residual_risk_level && (
-                                <Badge variant="outline">Residual: {dpia.residual_risk_level}</Badge>
+                                <Badge variant="outline">Residual: {riskLabels[dpia.residual_risk_level] ?? dpia.residual_risk_level}</Badge>
                             )}
                         </div>
                         <div className="mt-2 text-xs text-slate-500">
@@ -114,7 +126,7 @@ export default function ShowDPIA({ dpia }: Props) {
                         {dpia.description && (
                             <div className="text-sm text-slate-600 whitespace-pre-wrap">{dpia.description}</div>
                         )}
-                        <div className="text-xs text-slate-500">Assessment type: {dpia.assessment_type}</div>
+                        <div className="text-xs text-slate-500">Assessment type: {dpia.assessment_type.replace(/_/g, ' ')}</div>
                     </CardContent>
                 </Card>
 
@@ -141,10 +153,10 @@ export default function ShowDPIA({ dpia }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-sm text-slate-600">
-                                Overall risk level: <span className="font-medium">{dpia.overall_risk_level}</span>
+                                Overall risk level: <span className="font-medium">{riskLabels[dpia.overall_risk_level] ?? dpia.overall_risk_level}</span>
                             </div>
                             <div className="text-sm text-slate-600">
-                                Residual risk level: <span className="font-medium">{dpia.residual_risk_level || 'Not set'}</span>
+                                Residual risk level: <span className="font-medium">{dpia.residual_risk_level ? (riskLabels[dpia.residual_risk_level] ?? dpia.residual_risk_level) : 'Not set'}</span>
                             </div>
                             <div className="text-sm text-slate-600">
                                 Outcome: <span className="font-medium">{outcomeLabel}</span>
@@ -221,7 +233,7 @@ export default function ShowDPIA({ dpia }: Props) {
                                 }}
                             >
                                 <AlertTriangle className="mr-1 h-4 w-4" />
-                                Request Changes
+                                Request DPO Review
                             </Button>
                         </CardContent>
                     </Card>

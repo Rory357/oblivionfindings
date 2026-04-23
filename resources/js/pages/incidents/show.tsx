@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -1482,7 +1483,9 @@ export default function IncidentShow({
                                 </div>
                                 <div>
                                     <DialogTitle>Close incident #{incident.id}</DialogTitle>
-                                    <p className="text-sm text-muted-foreground mt-0.5">This action can be reversed by reopening later.</p>
+                                    <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
+                                        This action can be reversed by reopening later.
+                                    </DialogDescription>
                                 </div>
                             </div>
                         </DialogHeader>
@@ -1559,7 +1562,9 @@ export default function IncidentShow({
                                 </div>
                                 <div>
                                     <DialogTitle>Reopen incident #{incident.id}</DialogTitle>
-                                    <p className="text-sm text-muted-foreground mt-0.5">This action is recorded in the audit trail.</p>
+                                    <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
+                                        This action is recorded in the audit trail.
+                                    </DialogDescription>
                                 </div>
                             </div>
                         </DialogHeader>

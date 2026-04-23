@@ -17,6 +17,7 @@ type Props = {
 const statuses = ['draft', 'pending_review', 'complete', 'sealed'];
 
 export default function EvidencePacksIndex({ packs, filters }: Props) {
+    const ANY = '__any__';
     const [localFilters, setLocalFilters] = useState(filters || {});
 
     const applyFilter = (key: string, value: string) => {
@@ -54,10 +55,10 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                         <div className="grid gap-4 sm:grid-cols-3">
                             <div>
                                 <Label>Status</Label>
-                                <Select value={localFilters.status || ''} onValueChange={(v) => applyFilter('status', v)}>
+                                <Select value={localFilters.status || ANY} onValueChange={(v) => applyFilter('status', v === ANY ? '' : v)}>
                                     <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">All statuses</SelectItem>
+                                        <SelectItem value={ANY}>All statuses</SelectItem>
                                         {statuses.map((s) => (
                                             <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
                                         ))}

@@ -19,11 +19,14 @@ class SafeguardingActionPlanController extends Controller
 
         $validated = $request->validate([
             'action_description' => 'required|string',
-            'action_type' => 'nullable|in:immediate,short_term,long_term,preventive',
+            'action_type' => 'nullable|in:protective_measure,support_service,policy_change,training,supervision,monitoring,referral,investigation,other,immediate,short_term,long_term,preventive',
             'assigned_to_user_id' => 'required|exists:users,id',
             'due_date' => 'required|date',
             'priority' => 'nullable|integer|min:1|max:5',
         ]);
+
+        $validated['action_type'] = $this->normalizeActionType($validated['action_type'] ?? null);
+        $validated['priority'] = (int) ($validated['priority'] ?? 3);
 
         $validated['safeguarding_concern_id'] = $concern->id;
         $validated['status'] = 'pending';
@@ -75,5 +78,16 @@ class SafeguardingActionPlanController extends Controller
         ]);
 
         return back()->with('success', 'Action plan marked as completed.');
+    }
+
+    private function normalizeActionType(?string $value): ?string
+    {
+        return match ($value) {
+            'immediate' => 'protective_measure',
+            'short_term' => 'support_service',
+            'long_term' => 'monitoring',
+            'preventive' => 'policy_change',
+            default => $value,
+        };
     }
 }

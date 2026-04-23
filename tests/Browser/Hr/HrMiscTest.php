@@ -277,7 +277,7 @@ test('hr reports generate page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/reports/generate')
+            ->visit('/hr/reports/generate?report_type=headcount')
             ->waitForText('Report', 10)
             ->assertPathBeginsWith('/hr/reports');
     });

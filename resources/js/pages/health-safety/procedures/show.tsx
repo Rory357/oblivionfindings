@@ -33,6 +33,8 @@ type Props = {
         created_at: string;
     }>;
     canApprove: boolean;
+    canEdit: boolean;
+    canSubmitForReview: boolean;
 };
 
 function categoryBadge(cat: string) {
@@ -56,7 +58,7 @@ function statusBadge(status: string) {
     }
 }
 
-export default function ProcedureShow({ procedure, versions, canApprove }: Props) {
+export default function ProcedureShow({ procedure, versions, canApprove, canEdit, canSubmitForReview }: Props) {
     const approve = () => {
         router.post(`/health-safety/procedures/${procedure.id}/approve`);
     };
@@ -97,7 +99,7 @@ export default function ProcedureShow({ procedure, versions, canApprove }: Props
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {procedure.status === 'draft' && (
+                                {canSubmitForReview && (
                                     <Button size="sm" variant="outline" onClick={submitForReview}>
                                         <Clock className="mr-1.5 h-4 w-4" />
                                         Submit for Review
@@ -109,9 +111,11 @@ export default function ProcedureShow({ procedure, versions, canApprove }: Props
                                         Approve
                                     </Button>
                                 )}
-                                <Link href={`/health-safety/procedures/${procedure.id}/edit`}>
-                                    <Button size="sm" variant="outline">Edit</Button>
-                                </Link>
+                                {canEdit && (
+                                    <Link href={`/health-safety/procedures/${procedure.id}/edit`}>
+                                        <Button size="sm" variant="outline">Edit</Button>
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     </CardContent>

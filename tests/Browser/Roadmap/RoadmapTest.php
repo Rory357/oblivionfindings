@@ -7,7 +7,7 @@ test('roadmap dashboard page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/roadmap')
+            ->visit('/roadmap/dashboard')
             ->waitForText('Roadmap', 10)
             ->assertSee('Roadmap');
     });

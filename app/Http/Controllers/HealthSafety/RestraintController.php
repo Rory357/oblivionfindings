@@ -62,6 +62,8 @@ class RestraintController extends Controller
             'clients' => Client::select('id', 'first_name', 'last_name')->orderBy('last_name')->get(),
             'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
             'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'can_create' => $this->canCreate($request),
+            'can_review' => $this->canReview($request),
         ]);
     }
 
@@ -78,7 +80,7 @@ class RestraintController extends Controller
             'ended_at' => 'nullable|date|after:started_at',
             'duration_minutes' => 'nullable|integer|min:0',
             'restraint_type' => 'required|in:physical,chemical,mechanical,seclusion,environmental',
-            'severity' => 'required|in:low,medium,high',
+            'severity' => 'required|in:low,medium,high,critical',
             'trigger_description' => 'required|string',
             'de_escalation_attempted' => 'required|string',
             'restraint_description' => 'required|string',
@@ -174,5 +176,17 @@ class RestraintController extends Controller
 
         return redirect()->route('health-safety.restraints.index')
             ->with('success', 'Behaviour support plan updated.');
+    }
+
+    private function canCreate(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user?->canDo('hazards.manage') || $user?->canDo('hazards.create'));
+    }
+
+    private function canReview(Request $request): bool
+    {
+        return (bool) $request->user()?->canDo('hazards.manage');
     }
 }

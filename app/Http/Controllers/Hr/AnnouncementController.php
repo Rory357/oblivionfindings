@@ -17,7 +17,8 @@ class AnnouncementController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.view'), 403);
+        $canView = $user && ($user->canDo('hr.announcements.view') || $user->canDo('hr.announcements.manage'));
+        abort_unless($canView, 403);
 
         $announcements = HrAnnouncement::forTenant($user->tenant_id)
             ->published()
@@ -109,7 +110,8 @@ class AnnouncementController extends Controller
     public function show(Request $request, HrAnnouncement $announcement)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.view'), 403);
+        $canView = $user && ($user->canDo('hr.announcements.view') || $user->canDo('hr.announcements.manage'));
+        abort_unless($canView, 403);
 
         $announcement->load([
             'creator:id,name',

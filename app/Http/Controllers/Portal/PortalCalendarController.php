@@ -56,8 +56,8 @@ class PortalCalendarController extends Controller
             ->value('show_shift_schedule');
         $showShiftSchedule = $showShiftSchedule === null ? true : (bool) $showShiftSchedule;
 
-        $start = Carbon::parse($request->query('start', now()->startOfMonth()));
-        $end = Carbon::parse($request->query('end', now()->endOfMonth()));
+        $start = $this->parseCalendarBoundary($request->query('start'), now()->startOfMonth());
+        $end = $this->parseCalendarBoundary($request->query('end'), now()->endOfMonth());
 
         $events = collect();
 
@@ -205,5 +205,20 @@ class PortalCalendarController extends Controller
         }
 
         return response()->json($events->values());
+    }
+
+    private function parseCalendarBoundary(mixed $value, Carbon $fallback): Carbon
+    {
+        if ($value instanceof Carbon) {
+            return $value->copy();
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return $fallback->copy();
+        }
+
+        $normalized = preg_replace('/(?<=T\d{2}:\d{2}:\d{2}) (?=\d{2}:\d{2}$)/', '+', trim($value)) ?? trim($value);
+
+        return Carbon::parse($normalized);
     }
 }
