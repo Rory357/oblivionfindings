@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
     Bell,
     BellOff,
@@ -23,13 +23,23 @@ import {
     Shield,
     ShieldAlert,
     Smartphone,
+    Volume2,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type ChannelPref = { enabled: boolean; inapp: boolean; email: boolean; push: boolean };
 
+type DeliveryPrefs = {
+    dnd_enabled: boolean;
+    dnd_until: string | null;
+    desktop_notifications_enabled: boolean;
+    notification_sounds_enabled: boolean;
+    email_digest_frequency: 'instant' | 'daily' | 'weekly' | 'off';
+};
+
 type Props = {
     groups: Record<string, string[]>;
+    delivery: DeliveryPrefs;
     userPrefs: Record<string, ChannelPref>;
     roleDefaults: Record<string, ChannelPref>;
     canManageRoleDefaults: boolean;
@@ -131,6 +141,7 @@ function groupByModule(allKeys: string[]): { moduleKey: string; label: string; i
 
 export default function NotificationPreferences({
     groups,
+    delivery,
     userPrefs,
     roleDefaults,
     canManageRoleDefaults,
@@ -151,6 +162,25 @@ export default function NotificationPreferences({
         prefs: buildInitialPrefs(),
     });
 
+    // Local state for delivery prefs so each toggle updates the UI immediately.
+    // Persistence happens via router.put on each change (live save).
+    const [deliveryState, setDeliveryState] = useState<DeliveryPrefs>({
+        dnd_enabled: delivery.dnd_enabled,
+        dnd_until: delivery.dnd_until,
+        desktop_notifications_enabled: delivery.desktop_notifications_enabled,
+        notification_sounds_enabled: delivery.notification_sounds_enabled,
+        email_digest_frequency: delivery.email_digest_frequency,
+    });
+
+    const saveDelivery = (patch: Partial<DeliveryPrefs>) => {
+        const next = { ...deliveryState, ...patch };
+        setDeliveryState(next);
+        router.put('/settings/notifications/delivery', next as unknown as Record<string, unknown>, {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    };
+
     const allKeys = Object.values(groups).flat();
     const modules = useMemo(() => groupByModule(allKeys), [allKeys]);
 
@@ -160,7 +190,6 @@ export default function NotificationPreferences({
         return initial;
     });
 
-    const [doNotDisturb, setDoNotDisturb] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
 
     const enabledCount = (keys: string[]) => keys.filter((k) => data.prefs[k]?.enabled).length;
@@ -203,16 +232,16 @@ export default function NotificationPreferences({
                     </div>
 
                     {/* Description Card */}
-                    <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+                    <Card className="border-status-info/30 bg-status-info-bg/30">
                         <CardContent className="flex items-start gap-3 p-4">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-status-info-bg">
+                                <Info className="h-4 w-4 text-status-info" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                <p className="text-sm font-medium text-foreground">
                                     Configure which notifications you receive
                                 </p>
-                                <p className="mt-0.5 text-xs text-blue-700/80 dark:text-blue-300/70">
+                                <p className="mt-0.5 text-xs text-muted-foreground">
                                     Notifications marked as critical (incidents, emergencies) cannot be disabled to ensure safety compliance.
                                     Use the toggles below to customise your notification preferences per module. Each notification can be
                                     delivered via In-App, Email, or Push channels independently.
@@ -221,28 +250,111 @@ export default function NotificationPreferences({
                         </CardContent>
                     </Card>
 
-                    {/* Do Not Disturb */}
+                    {/* Delivery preferences — DND, desktop, sounds, digest frequency.
+                        Each toggle persists immediately (separate endpoint from the
+                        per-event matrix below). */}
                     <Card>
-                        <CardContent className="flex items-center justify-between gap-4 pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                                    {doNotDisturb ? (
-                                        <BellOff className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                                    ) : (
-                                        <Bell className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                                    )}
-                                </div>
-                                <div>
-                                    <div className="text-sm font-medium">Do Not Disturb</div>
-                                    <div className="text-xs text-muted-foreground">
-                                        Mute all non-critical notifications
+                        <CardHeader>
+                            <CardTitle className="text-base">Delivery Preferences</CardTitle>
+                            <CardDescription>
+                                Global delivery options that apply across every notification
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {/* Do Not Disturb */}
+                            <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                                        {deliveryState.dnd_enabled ? (
+                                            <BellOff className="h-4 w-4 text-primary" />
+                                        ) : (
+                                            <Bell className="h-4 w-4 text-primary" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-medium">Do Not Disturb</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Mute all non-critical notifications
+                                        </div>
                                     </div>
                                 </div>
+                                <Switch
+                                    checked={deliveryState.dnd_enabled}
+                                    onCheckedChange={(v) =>
+                                        saveDelivery({ dnd_enabled: Boolean(v) })
+                                    }
+                                />
                             </div>
-                            <Switch
-                                checked={doNotDisturb}
-                                onCheckedChange={setDoNotDisturb}
-                            />
+
+                            {/* Desktop notifications */}
+                            <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                    <Monitor className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <div className="text-sm font-medium">Desktop notifications</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Allow browser notifications while the app is open
+                                        </div>
+                                    </div>
+                                </div>
+                                <Switch
+                                    checked={deliveryState.desktop_notifications_enabled}
+                                    onCheckedChange={(v) =>
+                                        saveDelivery({
+                                            desktop_notifications_enabled: Boolean(v),
+                                        })
+                                    }
+                                />
+                            </div>
+
+                            {/* Notification sounds */}
+                            <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                    <Volume2 className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <div className="text-sm font-medium">Notification sounds</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Play sounds for new notifications
+                                        </div>
+                                    </div>
+                                </div>
+                                <Switch
+                                    checked={deliveryState.notification_sounds_enabled}
+                                    onCheckedChange={(v) =>
+                                        saveDelivery({
+                                            notification_sounds_enabled: Boolean(v),
+                                        })
+                                    }
+                                />
+                            </div>
+
+                            {/* Email digest */}
+                            <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                    <Mail className="h-4 w-4 text-muted-foreground" />
+                                    <div>
+                                        <div className="text-sm font-medium">Email digest</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Bundle email notifications into a summary
+                                        </div>
+                                    </div>
+                                </div>
+                                <select
+                                    value={deliveryState.email_digest_frequency}
+                                    onChange={(e) =>
+                                        saveDelivery({
+                                            email_digest_frequency:
+                                                e.target.value as DeliveryPrefs['email_digest_frequency'],
+                                        })
+                                    }
+                                    className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                    <option value="instant">Instant</option>
+                                    <option value="daily">Daily Summary</option>
+                                    <option value="weekly">Weekly Summary</option>
+                                    <option value="off">Off</option>
+                                </select>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -302,8 +414,8 @@ export default function NotificationPreferences({
                                         <CardHeader className="cursor-pointer select-none">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                                                        <Icon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                                                        <Icon className="h-4 w-4 text-primary" />
                                                     </div>
                                                     <div>
                                                         <CardTitle className="text-base">{mod.label}</CardTitle>
@@ -315,7 +427,7 @@ export default function NotificationPreferences({
                                                 <div className="flex items-center gap-2">
                                                     <Badge
                                                         variant={enabled === mod.keys.length ? 'default' : 'secondary'}
-                                                        className={enabled === mod.keys.length ? 'bg-violet-600' : ''}
+                                                        className={enabled === mod.keys.length ? 'bg-primary' : ''}
                                                     >
                                                         {enabled}/{mod.keys.length}
                                                     </Badge>
@@ -372,7 +484,7 @@ export default function NotificationPreferences({
                                                                     {friendlyName(key)}
                                                                 </span>
                                                                 {isCritical && (
-                                                                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 text-[10px] px-1.5 py-0">
+                                                                    <Badge className="bg-status-critical-bg text-status-critical hover:bg-status-critical-bg text-[10px] px-1.5 py-0">
                                                                         <ShieldAlert className="mr-0.5 h-3 w-3" />
                                                                         Critical
                                                                     </Badge>
@@ -436,7 +548,7 @@ export default function NotificationPreferences({
                     {/* Save */}
                     <div className="flex items-center justify-end gap-3">
                         {saveSuccess && (
-                            <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                            <div className="flex items-center gap-1.5 text-sm font-medium text-status-success">
                                 <CheckCircle2 className="h-4 w-4" />
                                 Preferences saved successfully
                             </div>
@@ -444,7 +556,6 @@ export default function NotificationPreferences({
                         <Button
                             disabled={processing}
                             onClick={handleSave}
-                            className="bg-violet-600 hover:bg-violet-700"
                         >
                             {processing ? 'Saving...' : 'Save Preferences'}
                         </Button>

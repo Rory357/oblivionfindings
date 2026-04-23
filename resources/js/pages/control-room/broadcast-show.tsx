@@ -71,23 +71,28 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
 const STATUS_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
     delivered: {
         icon: <CheckCircle className="h-3.5 w-3.5" />,
-        color: 'text-green-600',
+        color: 'text-status-success',
         label: 'Delivered',
     },
     sent: {
         icon: <Send className="h-3.5 w-3.5" />,
-        color: 'text-blue-600',
+        color: 'text-status-info',
         label: 'Sent',
     },
     pending: {
         icon: <Clock className="h-3.5 w-3.5" />,
-        color: 'text-yellow-600',
+        color: 'text-status-warning',
         label: 'Pending',
     },
     failed: {
         icon: <XCircle className="h-3.5 w-3.5" />,
-        color: 'text-red-600',
+        color: 'text-status-critical',
         label: 'Failed',
+    },
+    skipped: {
+        icon: <XCircle className="h-3.5 w-3.5" />,
+        color: 'text-muted-foreground',
+        label: 'Skipped',
     },
 };
 
@@ -165,20 +170,20 @@ export default function BroadcastShow({ summary, recipients }: Props) {
                                 <Users className="text-muted-foreground h-4 w-4" />
                                 <span>Total: <strong>{summary.total}</strong></span>
                             </div>
-                            <div className="flex items-center gap-2 text-green-600">
+                            <div className="flex items-center gap-2 text-status-success">
                                 <CheckCircle className="h-4 w-4" />
                                 <span>Delivered: <strong>{summary.delivered}</strong></span>
                             </div>
-                            <div className="flex items-center gap-2 text-blue-600">
+                            <div className="flex items-center gap-2 text-status-info">
                                 <Send className="h-4 w-4" />
                                 <span>Sent: <strong>{summary.sent}</strong></span>
                             </div>
-                            <div className="flex items-center gap-2 text-yellow-600">
+                            <div className="flex items-center gap-2 text-status-warning">
                                 <Clock className="h-4 w-4" />
                                 <span>Pending: <strong>{summary.pending}</strong></span>
                             </div>
                             {summary.failed > 0 && (
-                                <div className="flex items-center gap-2 text-red-600">
+                                <div className="flex items-center gap-2 text-status-critical">
                                     <XCircle className="h-4 w-4" />
                                     <span>Failed: <strong>{summary.failed}</strong></span>
                                 </div>

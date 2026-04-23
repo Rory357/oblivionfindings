@@ -27,6 +27,7 @@ class Communication extends Model
         'template_used',
         'status',
         'status_detail',
+        'force_delivery',
         'sent_at',
         'delivered_at',
         'retry_count',
@@ -38,6 +39,7 @@ class Communication extends Model
     protected $casts = [
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
+        'force_delivery' => 'boolean',
     ];
 
     public function alert(): BelongsTo

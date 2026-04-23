@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -19,6 +19,24 @@ import { cn } from '@/lib/utils';
 import { HexColorPicker } from 'react-colorful';
 import { Check, Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+interface AppearancePageProps {
+    appearance: {
+        theme: AppearanceType;
+        accent_colour: string | null;
+        font_size: number;
+        sidebar_density: 'comfortable' | 'compact';
+        reduce_motion: boolean;
+        first_day_of_week: 'monday' | 'sunday';
+        date_format: string;
+        time_format: '12' | '24';
+    };
+    orgDefaults: {
+        first_day_of_week: string;
+        date_format: string;
+        time_format: string;
+    };
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -85,21 +103,10 @@ const dateFormats = [
     { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
 ];
 
-function getLS(key: string, fallback: string): string {
-    if (typeof window === 'undefined') return fallback;
-    return localStorage.getItem(key) || fallback;
-}
-
-function getLSBool(key: string, fallback: boolean): boolean {
-    if (typeof window === 'undefined') return fallback;
-    const v = localStorage.getItem(key);
-    if (v === null) return fallback;
-    return v === 'true';
-}
-
 export default function Appearance() {
+    const page = usePage<AppearancePageProps>();
     const {
-        appearance,
+        appearance: themeSetting,
         updateAppearance,
         updateAccent,
         updateFontSize,
@@ -108,69 +115,89 @@ export default function Appearance() {
         resetAccent,
     } = useAppearance();
 
-    const [accentColour, setAccentColour] = useState(() =>
-        getLS('accentColour', DEFAULT_BRAND_HEX),
-    );
+    const server = page.props.appearance;
+
+    const form = useForm<{
+        theme: AppearanceType;
+        accent_colour: string | null;
+        font_size: number;
+        sidebar_density: 'comfortable' | 'compact';
+        reduce_motion: boolean;
+        first_day_of_week: 'monday' | 'sunday';
+        date_format: string;
+        time_format: '12' | '24';
+    }>({
+        theme: server.theme,
+        accent_colour: server.accent_colour,
+        font_size: server.font_size,
+        sidebar_density: server.sidebar_density,
+        reduce_motion: server.reduce_motion,
+        first_day_of_week: server.first_day_of_week,
+        date_format: server.date_format,
+        time_format: server.time_format,
+    });
+
     const [accentOpen, setAccentOpen] = useState(false);
     const pickerRef = useRef<HTMLDivElement | null>(null);
-
-    const [fontSize, setFontSize] = useState(() => getLS('fontSize', '14'));
-    const [sidebarDensity, setSidebarDensity] = useState<'comfortable' | 'compact'>(
-        () => getLS('sidebarDensity', 'comfortable') as 'comfortable' | 'compact',
-    );
-    const [reduceMotion, setReduceMotion] = useState(() =>
-        getLSBool('reduceMotion', false),
-    );
-
-    const [dateFormat, setDateFormat] = useState(() =>
-        getLS('dateFormat', 'DD/MM/YYYY'),
-    );
-    const [timeFormat, setTimeFormat] = useState<'12' | '24'>(
-        () => getLS('timeFormat', '12') as '12' | '24',
-    );
-    const [firstDay, setFirstDay] = useState<'monday' | 'sunday'>(
-        () => getLS('firstDayOfWeek', 'monday') as 'monday' | 'sunday',
-    );
-
     const [saved, setSaved] = useState(false);
 
-    // Live-apply callbacks wrap the hook setters so changes are visible
-    // immediately across the whole app (not just this page).
+    // Hydrate live-apply from server on first mount so hard-refresh matches
+    // persisted state even if localStorage is cleared.
+    useEffect(() => {
+        updateAppearance(server.theme);
+        if (server.accent_colour) updateAccent(server.accent_colour);
+        updateFontSize(server.font_size);
+        updateSidebarDensity(server.sidebar_density);
+        updateReduceMotion(server.reduce_motion);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Live-apply callbacks — update form data AND apply to the DOM so the
+    // change is visible immediately across the whole app. Persistence happens
+    // on Save.
+    const handleTheme = useCallback(
+        (mode: AppearanceType) => {
+            form.setData('theme', mode);
+            updateAppearance(mode);
+        },
+        [form, updateAppearance],
+    );
+
     const handleAccent = useCallback(
         (hex: string) => {
-            setAccentColour(hex);
+            form.setData('accent_colour', hex);
             updateAccent(hex);
         },
-        [updateAccent],
+        [form, updateAccent],
     );
 
     const handleResetAccent = useCallback(() => {
+        form.setData('accent_colour', null);
         resetAccent();
-        setAccentColour(DEFAULT_BRAND_HEX);
-    }, [resetAccent]);
+    }, [form, resetAccent]);
 
     const handleFontSize = useCallback(
-        (value: string) => {
-            setFontSize(value);
-            updateFontSize(parseInt(value, 10));
+        (value: number) => {
+            form.setData('font_size', value);
+            updateFontSize(value);
         },
-        [updateFontSize],
+        [form, updateFontSize],
     );
 
     const handleDensity = useCallback(
         (density: 'comfortable' | 'compact') => {
-            setSidebarDensity(density);
+            form.setData('sidebar_density', density);
             updateSidebarDensity(density);
         },
-        [updateSidebarDensity],
+        [form, updateSidebarDensity],
     );
 
     const handleReduceMotion = useCallback(
         (on: boolean) => {
-            setReduceMotion(on);
+            form.setData('reduce_motion', on);
             updateReduceMotion(on);
         },
-        [updateReduceMotion],
+        [form, updateReduceMotion],
     );
 
     // Close the accent popover on outside click.
@@ -188,14 +215,12 @@ export default function Appearance() {
         return () => window.removeEventListener('mousedown', onClick);
     }, [accentOpen]);
 
-    // Save action — writes non-live settings (regional) to localStorage.
-    // Phase 2 wires this to a real PUT /settings/appearance.
     const handleSave = useCallback(() => {
-        localStorage.setItem('dateFormat', dateFormat);
-        localStorage.setItem('timeFormat', timeFormat);
-        localStorage.setItem('firstDayOfWeek', firstDay);
-        setSaved(true);
-    }, [dateFormat, timeFormat, firstDay]);
+        form.put('/settings/appearance', {
+            preserveScroll: true,
+            onSuccess: () => setSaved(true),
+        });
+    }, [form]);
 
     useEffect(() => {
         if (saved) {
@@ -220,14 +245,12 @@ export default function Appearance() {
                     <CardContent>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                             {themeOptions.map((option) => {
-                                const isActive = appearance === option.value;
+                                const isActive = themeSetting === option.value;
                                 const Icon = option.icon;
                                 return (
                                     <button
                                         key={option.value}
-                                        onClick={() =>
-                                            updateAppearance(option.value)
-                                        }
+                                        onClick={() => handleTheme(option.value)}
                                         className={cn(
                                             'group relative flex flex-col items-center gap-3 rounded-xl border-2 p-4 transition-all',
                                             isActive
@@ -346,25 +369,26 @@ export default function Appearance() {
                                 >
                                     <span
                                         className="h-6 w-6 rounded-md border"
-                                        style={{ backgroundColor: accentColour }}
+                                        style={{ backgroundColor: form.data.accent_colour ?? DEFAULT_BRAND_HEX }}
                                     />
                                     <span className="font-mono uppercase">
-                                        {accentColour}
+                                        {form.data.accent_colour ?? 'Brand default'}
                                     </span>
                                 </button>
                                 {accentOpen && (
                                     <div className="absolute left-0 z-50 mt-2 rounded-lg border bg-popover p-3 shadow-lg">
                                         <HexColorPicker
-                                            color={accentColour}
+                                            color={form.data.accent_colour ?? DEFAULT_BRAND_HEX}
                                             onChange={handleAccent}
                                         />
                                         <input
                                             type="text"
-                                            value={accentColour}
+                                            value={form.data.accent_colour ?? ''}
                                             onChange={(e) =>
                                                 handleAccent(e.target.value)
                                             }
                                             className="mt-2 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm font-mono uppercase"
+                                            placeholder="#7c3aed"
                                         />
                                     </div>
                                 )}
@@ -397,11 +421,11 @@ export default function Appearance() {
                             <Label className="text-sm font-medium">Font Size</Label>
                             <div className="grid grid-cols-3 gap-3">
                                 {fontSizes.map((opt) => {
-                                    const isActive = fontSize === opt.value;
+                                    const isActive = form.data.font_size === opt.px;
                                     return (
                                         <button
                                             key={opt.value}
-                                            onClick={() => handleFontSize(opt.value)}
+                                            onClick={() => handleFontSize(opt.px)}
                                             className={cn(
                                                 'flex flex-col items-center gap-2 rounded-lg border-2 px-4 py-4 transition-all',
                                                 isActive
@@ -436,7 +460,7 @@ export default function Appearance() {
                             </Label>
                             <div className="grid grid-cols-2 gap-3">
                                 {(['comfortable', 'compact'] as const).map((density) => {
-                                    const isActive = sidebarDensity === density;
+                                    const isActive = form.data.sidebar_density === density;
                                     const gap =
                                         density === 'comfortable' ? 'gap-2' : 'gap-0.5';
                                     const pad =
@@ -489,7 +513,7 @@ export default function Appearance() {
                             </div>
                             <Switch
                                 id="reduce-motion"
-                                checked={reduceMotion}
+                                checked={form.data.reduce_motion}
                                 onCheckedChange={handleReduceMotion}
                             />
                         </div>
@@ -509,8 +533,8 @@ export default function Appearance() {
                             <Label htmlFor="dateFormat">Date format</Label>
                             <select
                                 id="dateFormat"
-                                value={dateFormat}
-                                onChange={(e) => setDateFormat(e.target.value)}
+                                value={form.data.date_format}
+                                onChange={(e) => form.setData('date_format', e.target.value)}
                                 className="flex h-9 max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             >
                                 {dateFormats.map((f) => (
@@ -527,10 +551,10 @@ export default function Appearance() {
                                 {(['12', '24'] as const).map((fmt) => (
                                     <button
                                         key={fmt}
-                                        onClick={() => setTimeFormat(fmt)}
+                                        onClick={() => form.setData('time_format', fmt)}
                                         className={cn(
                                             'rounded-md border px-4 py-2 text-sm font-medium transition-all',
-                                            timeFormat === fmt
+                                            form.data.time_format === fmt
                                                 ? 'border-primary bg-primary text-primary-foreground shadow-sm'
                                                 : 'border-input bg-transparent text-foreground hover:bg-muted/50',
                                         )}
@@ -552,10 +576,10 @@ export default function Appearance() {
                                 ).map((opt) => (
                                     <button
                                         key={opt.value}
-                                        onClick={() => setFirstDay(opt.value)}
+                                        onClick={() => form.setData('first_day_of_week', opt.value)}
                                         className={cn(
                                             'rounded-md border px-4 py-2 text-sm font-medium transition-all',
-                                            firstDay === opt.value
+                                            form.data.first_day_of_week === opt.value
                                                 ? 'border-primary bg-primary text-primary-foreground shadow-sm'
                                                 : 'border-input bg-transparent text-foreground hover:bg-muted/50',
                                         )}
@@ -585,7 +609,9 @@ export default function Appearance() {
 
                 {/* Save */}
                 <div className="flex items-center gap-4">
-                    <Button onClick={handleSave}>Save preferences</Button>
+                    <Button onClick={handleSave} disabled={form.processing}>
+                        {form.processing ? 'Saving…' : 'Save preferences'}
+                    </Button>
                     {saved && (
                         <span className="flex items-center gap-1.5 text-sm font-medium text-status-success">
                             <Check className="h-4 w-4" />

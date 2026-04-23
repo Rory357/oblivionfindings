@@ -1,5 +1,26 @@
+@php
+// Pull the authenticated user's appearance preferences once, so the first
+// paint respects them without a flash of default styling.
+$_authUser = auth()->user();
+$_userAccent = $_authUser?->accent_colour;
+$_userFontSize = $_authUser?->font_size ?? 14;
+$_userDensity = $_authUser?->sidebar_density ?? 'comfortable';
+$_userReduceMotion = (bool) ($_authUser?->reduce_motion ?? false);
+$_userTheme = $_authUser?->theme ?? ($appearance ?? 'system');
+
+$_htmlClasses = [];
+if ($_userTheme === 'dark') {
+    $_htmlClasses[] = 'dark';
+}
+if ($_userReduceMotion) {
+    $_htmlClasses[] = 'reduce-motion';
+}
+@endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark'=> ($appearance ?? 'system') == 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
+      @class($_htmlClasses)
+      data-density="{{ in_array($_userDensity, ['comfortable', 'compact'], true) ? $_userDensity : 'comfortable' }}"
+      style="--base-font-size: {{ (int) max(10, min(24, $_userFontSize)) }}px;{{ $_userAccent ? ' --primary: ' . e($_userAccent) . ';' : '' }}">
 
 <head>
     <meta charset="utf-8">
@@ -22,7 +43,7 @@
     {{-- Inline script to detect system dark mode preference and apply it immediately --}}
     <script>
         (function() {
-            const appearance = '{{ $appearance ?? "system" }}';
+            const appearance = '{{ $_userTheme }}';
 
             if (appearance === 'system') {
                 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;

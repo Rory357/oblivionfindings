@@ -30,6 +30,13 @@ class NotificationPreferencesController extends Controller
 
         return inertia('settings/notifications', [
             'groups' => $groups,
+            'delivery' => [
+                'dnd_enabled' => (bool) $user->dnd_enabled,
+                'dnd_until' => optional($user->dnd_until)->toISOString(),
+                'desktop_notifications_enabled' => (bool) $user->desktop_notifications_enabled,
+                'notification_sounds_enabled' => (bool) ($user->notification_sounds_enabled ?? true),
+                'email_digest_frequency' => $user->email_digest_frequency ?? 'instant',
+            ],
             'userPrefs' => $userPrefs->map(fn($p) => [
                 'enabled' => (bool) $p->enabled,
                 'inapp' => (bool) $p->channel_inapp,
@@ -82,6 +89,35 @@ class NotificationPreferencesController extends Controller
         }
 
         return redirect()->back()->with('success', 'Notification preferences updated.');
+    }
+
+    /**
+     * Persist delivery-level preferences: DND, desktop notifications, sound
+     * playback, and email digest frequency. Separate endpoint from the
+     * per-event preferences matrix so the two UIs can save independently.
+     */
+    public function updateDelivery(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $data = $request->validate([
+            'dnd_enabled' => ['nullable', 'boolean'],
+            'dnd_until' => ['nullable', 'date'],
+            'desktop_notifications_enabled' => ['nullable', 'boolean'],
+            'notification_sounds_enabled' => ['nullable', 'boolean'],
+            'email_digest_frequency' => ['nullable', 'string', 'in:instant,daily,weekly,off'],
+        ]);
+
+        $user->fill(array_intersect_key($data, array_flip([
+            'dnd_enabled',
+            'dnd_until',
+            'desktop_notifications_enabled',
+            'notification_sounds_enabled',
+            'email_digest_frequency',
+        ])))->save();
+
+        return redirect()->back()->with('success', 'Delivery preferences updated.');
     }
 
     public function roles(Request $request)

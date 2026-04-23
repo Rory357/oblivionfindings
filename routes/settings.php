@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
@@ -37,9 +38,12 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:6,1')
         ->name('user-password.update');
 
-    Route::get('settings/appearance', function () {
-        return Inertia::render('settings/appearance');
-    })->name('appearance.edit');
+    Route::get('settings/appearance', [AppearanceController::class, 'edit'])
+        ->name('appearance.edit');
+    Route::put('settings/appearance', [AppearanceController::class, 'update'])
+        ->name('appearance.update');
+    Route::post('settings/appearance/reset', [AppearanceController::class, 'reset'])
+        ->name('appearance.reset');
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
@@ -119,6 +123,8 @@ Route::middleware('auth')->group(function () {
         ->name('settings.notifications');
     Route::put('settings/notifications', [NotificationPreferencesController::class, 'update'])
         ->name('settings.notifications.update');
+    Route::put('settings/notifications/delivery', [NotificationPreferencesController::class, 'updateDelivery'])
+        ->name('settings.notifications.delivery.update');
 
     // Role defaults (admin)
     Route::get('settings/notifications/roles', [NotificationPreferencesController::class, 'roles'])
