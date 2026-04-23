@@ -21,10 +21,13 @@ import {
     Moon,
     Palette,
     RotateCcw,
+    Sparkles,
     Sun,
     Upload,
 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { HexColorPicker } from 'react-colorful';
+import { derivePalette, DEFAULT_BRAND_HEX } from '@/lib/derive-palette';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -395,6 +398,63 @@ export default function BrandingPage(props: Props) {
 
     const currentMode = previewDark ? 'dark' : 'light';
 
+    /* --- Essentials: single brand colour + radius slider ---
+     * Derives the full palette from one hex, applies live, and stores into
+     * form.data.theme.{light,dark} so the existing save flow persists every
+     * variable via the BrandingController we already have.
+     */
+    const essentialInitial = (
+        form.data.theme.light['--primary'] ??
+        form.data.theme.dark['--primary'] ??
+        DEFAULT_BRAND_HEX
+    );
+    const [brandHex, setBrandHex] = useState<string>(
+        /^#[0-9a-fA-F]{6}$/.test(essentialInitial) ? essentialInitial : DEFAULT_BRAND_HEX,
+    );
+    const [brandPickerOpen, setBrandPickerOpen] = useState(false);
+    const brandPickerRef = useRef<HTMLDivElement | null>(null);
+
+    const initialRadius = (form.data.theme.light['--radius'] ?? '0.75rem').toString();
+    const parseRem = (raw: string): number => {
+        const m = raw.match(/([\d.]+)rem/);
+        return m ? Math.round(parseFloat(m[1]) * 16) : 12;
+    };
+    const [radiusPx, setRadiusPx] = useState<number>(parseRem(initialRadius));
+
+    const handleBrandChange = useCallback(
+        (hex: string) => {
+            if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                setBrandHex(hex);
+                return;
+            }
+            setBrandHex(hex);
+
+            const palette = derivePalette(hex);
+            // Live preview — write to <html> style
+            Object.entries(palette).forEach(([k, v]) => {
+                applyVar(k, v);
+            });
+            // Persist into both form branches so save covers light + dark
+            const nextLight = { ...form.data.theme.light, ...palette } as Record<string, string>;
+            const nextDark = { ...form.data.theme.dark, ...palette } as Record<string, string>;
+            form.setData('theme', { light: nextLight, dark: nextDark });
+        },
+        [form],
+    );
+
+    const handleRadiusChange = useCallback(
+        (px: number) => {
+            setRadiusPx(px);
+            const rem = `${(px / 16).toFixed(3)}rem`;
+            applyVar('--radius', rem);
+            form.setData('theme', {
+                light: { ...form.data.theme.light, '--radius': rem },
+                dark: { ...form.data.theme.dark, '--radius': rem },
+            });
+        },
+        [form],
+    );
+
     const applyPreset = (presetName: string) => {
         const preset = PRESETS[presetName];
         if (!preset) return;
@@ -445,7 +505,7 @@ export default function BrandingPage(props: Props) {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <ImageIcon className="h-5 w-5 text-violet-600" />
+                                    <ImageIcon className="h-5 w-5 text-primary" />
                                     Company Identity
                                 </CardTitle>
                                 <CardDescription>
@@ -512,8 +572,8 @@ export default function BrandingPage(props: Props) {
                                         <div
                                             className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-colors ${
                                                 dragOver
-                                                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-500/10'
-                                                    : 'border-border hover:border-violet-400 hover:bg-muted/50'
+                                                    ? 'border-primary bg-primary/10'
+                                                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
                                             }`}
                                             onClick={() => fileInputRef.current?.click()}
                                             onDragOver={(e) => {
@@ -542,7 +602,7 @@ export default function BrandingPage(props: Props) {
                                             <p className="text-sm font-medium">Click to upload or drag and drop</p>
                                             <p className="mt-1 text-xs text-muted-foreground">PNG, JPG up to 2MB</p>
                                             {form.data.logo && (
-                                                <p className="mt-2 text-xs font-medium text-violet-600">
+                                                <p className="mt-2 text-xs font-medium text-primary">
                                                     Selected: {form.data.logo.name}
                                                 </p>
                                             )}
@@ -583,8 +643,8 @@ export default function BrandingPage(props: Props) {
                                         <div
                                             className={`relative flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
                                                 faviconDragOver
-                                                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-500/10'
-                                                    : 'border-border hover:border-violet-400'
+                                                    ? 'border-primary bg-primary/10'
+                                                    : 'border-border hover:border-primary/50'
                                             }`}
                                             onClick={() => faviconInputRef.current?.click()}
                                             onDragOver={(e) => {
@@ -624,7 +684,7 @@ export default function BrandingPage(props: Props) {
                                                 32x32px recommended. PNG, ICO, or SVG.
                                             </p>
                                             {form.data.favicon && (
-                                                <p className="text-xs font-medium text-violet-600">
+                                                <p className="text-xs font-medium text-primary">
                                                     Selected: {form.data.favicon.name}
                                                 </p>
                                             )}
@@ -644,18 +704,100 @@ export default function BrandingPage(props: Props) {
                         </Card>
 
                         {/* -------------------------------------------------------- */}
-                        {/*  Section 3: Brand Colours                                 */}
+                        {/*  Section 2a: Brand Essentials                             */}
+                        {/*                                                             */}
+                        {/*  One colour + one radius drive the whole palette. Derived */}
+                        {/*  values land in form.data.theme.{light,dark} so the       */}
+                        {/*  existing save path persists every variable.              */}
+                        {/* -------------------------------------------------------- */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Sparkles className="h-5 w-5 text-primary" />
+                                    Brand Essentials
+                                </CardTitle>
+                                <CardDescription>
+                                    Pick one brand colour — the rest of the palette is generated automatically.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="grid gap-8 lg:grid-cols-2">
+                                    <div className="space-y-3">
+                                        <Label>Brand colour</Label>
+                                        <div className="relative" ref={brandPickerRef}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBrandPickerOpen((v) => !v)}
+                                                className="flex items-center gap-3 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-sm transition-colors hover:bg-muted/50"
+                                            >
+                                                <span
+                                                    className="h-6 w-6 rounded-md border"
+                                                    style={{ backgroundColor: brandHex }}
+                                                />
+                                                <span className="font-mono uppercase">{brandHex}</span>
+                                            </button>
+                                            {brandPickerOpen && (
+                                                <div className="absolute left-0 z-50 mt-2 rounded-lg border bg-popover p-3 shadow-lg">
+                                                    <HexColorPicker
+                                                        color={brandHex}
+                                                        onChange={handleBrandChange}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={brandHex}
+                                                        onChange={(e) => handleBrandChange(e.target.value)}
+                                                        className="mt-2 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm font-mono uppercase"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Primary, accent, ring, sidebar, and chart colours are derived from this hue.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <Label htmlFor="brand_radius">Corner radius — {radiusPx}px</Label>
+                                        <input
+                                            id="brand_radius"
+                                            type="range"
+                                            min={0}
+                                            max={24}
+                                            step={1}
+                                            value={radiusPx}
+                                            onChange={(e) => handleRadiusChange(parseInt(e.target.value, 10))}
+                                            className="w-full"
+                                        />
+                                        <div className="flex items-center gap-3">
+                                            <div
+                                                className="h-10 w-full bg-primary/10 border"
+                                                style={{ borderRadius: `${radiusPx}px` }}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Controls the rounding of cards, buttons, and inputs.
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* -------------------------------------------------------- */}
+                        {/*  Section 3: Advanced Brand Colours                        */}
+                        {/*                                                             */}
+                        {/*  Individual CSS variables for admins who need to override */}
+                        {/*  what the Essentials picker derived.                      */}
                         {/* -------------------------------------------------------- */}
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <CardTitle className="flex items-center gap-2">
-                                            <Palette className="h-5 w-5 text-violet-600" />
-                                            Brand Colours
+                                            <Palette className="h-5 w-5 text-primary" />
+                                            Advanced Colours
                                         </CardTitle>
                                         <CardDescription>
-                                            Set your primary brand colours applied across the application
+                                            Fine-tune individual tokens. Changes here override the Essentials palette.
                                         </CardDescription>
                                     </div>
                                     <button
@@ -719,7 +861,7 @@ export default function BrandingPage(props: Props) {
                                                 key={preset.name}
                                                 type="button"
                                                 onClick={() => applyThemePreset(preset)}
-                                                className="flex flex-col items-center gap-2 rounded-lg border p-3 transition-all hover:border-violet-400 hover:shadow-sm"
+                                                className="flex flex-col items-center gap-2 rounded-lg border p-3 transition-all hover:border-primary/50 hover:shadow-sm"
                                             >
                                                 <div className="flex gap-1">
                                                     <div
@@ -941,7 +1083,7 @@ export default function BrandingPage(props: Props) {
                             <Button
                                 type="submit"
                                 disabled={form.processing}
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className=""
                             >
                                 Save Branding
                             </Button>
@@ -1001,7 +1143,7 @@ export default function BrandingPage(props: Props) {
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => applyPreset(name)}
-                                                className="hover:border-violet-400 hover:text-violet-600"
+                                                className="hover:border-primary/50 hover:text-primary"
                                             >
                                                 {name}
                                                 {name === 'Disability Support' && (
@@ -1080,7 +1222,7 @@ export default function BrandingPage(props: Props) {
                                     <Button
                                         type="submit"
                                         disabled={termForm.processing}
-                                        className="bg-violet-600 hover:bg-violet-700"
+                                        className=""
                                     >
                                         Save Terminology
                                     </Button>
