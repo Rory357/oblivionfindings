@@ -77,7 +77,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">New DPIA</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Document data processing risks and mitigation steps.
                     </div>
                 </div>

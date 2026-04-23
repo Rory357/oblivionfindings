@@ -65,7 +65,7 @@ const reasonLabels: Record<string, string> = {
 };
 
 function SatisfactionStars({ rating }: { rating: number | null }) {
-    if (rating === null) return <span className="text-sm text-slate-400">-</span>;
+    if (rating === null) return <span className="text-sm text-muted-foreground">-</span>;
     return (
         <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -116,7 +116,7 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Departure Reason</Label>
+                            <Label className="text-xs text-muted-foreground">Departure Reason</Label>
                             <Select
                                 value={filters.reason ?? NONE}
                                 onValueChange={(v) => onFilter({ reason: v === NONE ? null : v })}
@@ -171,7 +171,7 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                                                     : <Badge className="border-red-500/30 bg-red-500/10 text-red-400">No</Badge>
                                             }
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-muted-foreground">
                                             {interview.interviewer?.name ?? '-'}
                                         </TableCell>
                                         <TableCell>
@@ -186,7 +186,7 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                                 ))}
                                 {!interviews.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                                             No exit interviews found.
                                         </TableCell>
                                     </TableRow>

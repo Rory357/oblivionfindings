@@ -22,18 +22,18 @@ interface UserItem { id: number; name: string }
 interface Props { course: Course; users: UserItem[]; can: { manage: boolean; enroll: boolean } }
 
 const DELIVERY_LABELS: Record<string, string> = { online: 'Online', in_person: 'In Person', blended: 'Blended', self_paced: 'Self-Paced' };
-const DELIVERY_COLORS: Record<string, string> = { online: 'bg-blue-100 text-blue-700', in_person: 'bg-emerald-100 text-emerald-700', blended: 'bg-violet-100 text-violet-700', self_paced: 'bg-amber-100 text-amber-700' };
+const DELIVERY_COLORS: Record<string, string> = { online: 'bg-blue-100 text-blue-700', in_person: 'bg-emerald-100 text-emerald-700', blended: 'bg-primary/10 text-primary', self_paced: 'bg-amber-100 text-amber-700' };
 const DELIVERY_ICONS: Record<string, typeof Monitor> = { online: Monitor, in_person: MapPin, blended: Layers, self_paced: Zap };
 
 const STATUS_COLORS: Record<string, string> = {
     enrolled: 'bg-blue-100 text-blue-700', in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700',
-    withdrawn: 'bg-slate-100 text-slate-600', failed: 'bg-red-100 text-red-700', scheduled: 'bg-blue-100 text-blue-700', cancelled: 'bg-red-100 text-red-700',
+    withdrawn: 'bg-muted text-muted-foreground', failed: 'bg-red-100 text-red-700', scheduled: 'bg-blue-100 text-blue-700', cancelled: 'bg-red-100 text-red-700',
 };
 
 function formatDate(v?: string | null) { if (!v) return '\u2014'; const d = new Date(v); return isNaN(d.getTime()) ? v : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function formatCurrency(v: string | null) { if (!v) return '\u2014'; const n = parseFloat(v); return isNaN(n) ? v : new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n); }
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
+const AVATAR_COLORS = ['bg-blue-500', 'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-rose-500', 'bg-primary'];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 
@@ -106,7 +106,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                                 </div>
                             </div>
                             {can.enroll && (
-                                <Button size="sm" className="ml-4 gap-1.5 bg-white text-violet-700 hover:bg-white/90 shadow-md" onClick={() => setEnrollOpen(true)}>
+                                <Button size="sm" className="ml-4 gap-1.5 bg-white text-primary hover:bg-white/90 shadow-md" onClick={() => setEnrollOpen(true)}>
                                     <UserPlus className="h-4 w-4" />Enrol Employee
                                 </Button>
                             )}
@@ -117,8 +117,8 @@ export default function CourseDetail({ course, users, can }: Props) {
                 {/* Course Info Cards */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                        <div className="text-lg font-bold text-violet-700">{course.category || '\u2014'}</div>
-                        <div className="text-[10px] uppercase tracking-wider text-violet-500">Category</div>
+                        <div className="text-lg font-bold text-primary">{course.category || '\u2014'}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-primary">Category</div>
                     </div>
                     <div className="rounded-xl border p-3 text-center">
                         <div className="text-lg font-bold">{course.max_participants ?? 'Unlimited'}</div>
@@ -160,7 +160,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                                                 <p className="text-[11px] text-muted-foreground">{[s.location, s.facilitator].filter(Boolean).join(' \u00b7 ') || '\u2014'}</p>
                                             </div>
                                         </div>
-                                        <Badge className={`border-0 text-[10px] capitalize ${STATUS_COLORS[s.status] || 'bg-slate-100 text-slate-600'}`}>{s.status}</Badge>
+                                        <Badge className={`border-0 text-[10px] capitalize ${STATUS_COLORS[s.status] || 'bg-muted text-muted-foreground'}`}>{s.status}</Badge>
                                     </div>
                                 ))}
                             </div>
@@ -173,7 +173,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                     <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100"><Users className="h-4 w-4 text-violet-600" /></div>
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"><Users className="h-4 w-4 text-primary" /></div>
                                 Enrolments
                                 <Badge variant="secondary" className="text-[10px]">{course.enrollments?.length ?? 0}</Badge>
                             </CardTitle>
@@ -193,7 +193,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                         ) : (
                             <div className="divide-y">
                                 {course.enrollments.map(e => (
-                                    <div key={e.id} className="flex items-center justify-between px-4 py-3 hover:bg-violet-50/30 transition-colors">
+                                    <div key={e.id} className="flex items-center justify-between px-4 py-3 hover:bg-primary/10/30 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <div className={`flex h-9 w-9 items-center justify-center rounded-full text-[10px] font-bold text-white ${avatarColor(e.user.id)}`}>
                                                 {getInitials(e.user.name)}
@@ -208,7 +208,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Badge className={`border-0 text-[10px] capitalize ${STATUS_COLORS[e.status] || 'bg-slate-100 text-slate-600'}`}>{e.status}</Badge>
+                                            <Badge className={`border-0 text-[10px] capitalize ${STATUS_COLORS[e.status] || 'bg-muted text-muted-foreground'}`}>{e.status}</Badge>
                                             {can.manage && e.status !== 'completed' && e.status !== 'withdrawn' && (
                                                 <Button variant="outline" size="sm" className="gap-1 text-xs h-7" onClick={() => openComplete(e)}>
                                                     <CheckCircle2 className="h-3 w-3" />Complete
@@ -216,7 +216,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                                             )}
                                             {e.status === 'completed' && (
                                                 <a href={`/hr/training/enrollments/${e.id}/certificate`}>
-                                                    <Button variant="ghost" size="sm" className="gap-1 text-xs h-7 text-violet-600">
+                                                    <Button variant="ghost" size="sm" className="gap-1 text-xs h-7 text-primary">
                                                         <Download className="h-3 w-3" />Certificate
                                                     </Button>
                                                 </a>
@@ -257,7 +257,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                         <div className="space-y-1.5"><Label>Notes</Label><Textarea value={enrollForm.notes} onChange={e => setEnrollForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" /></div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setEnrollOpen(false)}>Cancel</Button>
-                            <Button type="submit" className="bg-violet-600 hover:bg-violet-700">Enrol</Button>
+                            <Button type="submit" className="bg-primary hover:bg-primary">Enrol</Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

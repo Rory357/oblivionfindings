@@ -133,11 +133,11 @@ export default function MeetingsCalendar({
       scheduled: 'bg-blue-100 text-blue-800 border-blue-200',
       agenda_draft: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       agenda_final: 'bg-green-100 text-green-800 border-green-200',
-      in_progress: 'bg-purple-100 text-purple-800 border-purple-200',
+      in_progress: 'bg-primary/10 text-primary border-primary',
       minutes_draft: 'bg-orange-100 text-orange-800 border-orange-200',
       minutes_approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      archived: 'bg-gray-100 text-gray-700 border-gray-200',
-    }[status] || 'bg-gray-100 text-gray-700 border-gray-200';
+      archived: 'bg-muted text-foreground border-border',
+    }[status] || 'bg-muted text-foreground border-border';
   };
 
   const meetingTypeLabel = (type: string) => {
@@ -158,8 +158,8 @@ export default function MeetingsCalendar({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Board Meeting Calendar</h1>
-              <p className="text-gray-500 mt-1">Click any date to view meetings and open records.</p>
+              <h1 className="text-3xl font-bold text-foreground">Board Meeting Calendar</h1>
+              <p className="text-muted-foreground mt-1">Click any date to view meetings and open records.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" asChild>
@@ -186,7 +186,7 @@ export default function MeetingsCalendar({
               <Button variant="outline" onClick={jumpToToday}>Today</Button>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">Filter</span>
+              <span className="text-sm text-muted-foreground">Filter</span>
               <Select value={selectedMeetingType} onValueChange={changeMeetingType}>
                 <SelectTrigger className="w-52">
                   <SelectValue />
@@ -214,7 +214,7 @@ export default function MeetingsCalendar({
               <CardContent>
                 <div className="grid grid-cols-7 gap-2 mb-2">
                   {WEEK_DAY_LABELS.map((day) => (
-                    <div key={day} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <div key={day} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {day}
                     </div>
                   ))}
@@ -231,7 +231,7 @@ export default function MeetingsCalendar({
                         onClick={() => setActiveDate(day.dateKey)}
                         className={cn(
                           'min-h-[92px] rounded-lg border p-2 text-left transition-colors',
-                          day.inMonth ? 'bg-white' : 'bg-gray-50 text-gray-400',
+                          day.inMonth ? 'bg-white' : 'bg-muted text-muted-foreground',
                           isActive && 'border-blue-500 ring-1 ring-blue-300',
                           !isActive && day.isToday && 'border-blue-300',
                           dayMeetings.length > 0 && 'border-blue-200',
@@ -258,7 +258,7 @@ export default function MeetingsCalendar({
                             </div>
                           ))}
                           {dayMeetings.length > 2 && (
-                            <div className="text-[11px] text-gray-500">+{dayMeetings.length - 2} more</div>
+                            <div className="text-[11px] text-muted-foreground">+{dayMeetings.length - 2} more</div>
                           )}
                         </div>
                       </button>
@@ -280,14 +280,14 @@ export default function MeetingsCalendar({
                       <div key={meeting.id} className="rounded-lg border p-3">
                         <div className="mb-2 flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-semibold text-gray-900">{meeting.title}</p>
-                            <p className="text-xs text-gray-500">{meetingTypeLabel(meeting.meeting_type)}</p>
+                            <p className="font-semibold text-foreground">{meeting.title}</p>
+                            <p className="text-xs text-muted-foreground">{meetingTypeLabel(meeting.meeting_type)}</p>
                           </div>
                           <Badge className={getStatusColor(meeting.status)}>
                             {meeting.status.replace('_', ' ')}
                           </Badge>
                         </div>
-                        <div className="space-y-1 text-sm text-gray-600">
+                        <div className="space-y-1 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5" />
                             {formatTime(meeting.scheduled_at)} ({meeting.duration_minutes} mins)
@@ -300,7 +300,7 @@ export default function MeetingsCalendar({
                           )}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             {meeting.chair ? `Chair: ${meeting.chair.name}` : 'Chair not assigned'}
                           </div>
                           <Button size="sm" variant="outline" asChild>
@@ -311,7 +311,7 @@ export default function MeetingsCalendar({
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-gray-500">
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                     No meetings on this date.
                     <div className="mt-2">
                       <Button size="sm" asChild>

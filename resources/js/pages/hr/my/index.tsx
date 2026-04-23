@@ -309,12 +309,12 @@ export default function MyHrIndex({
                                     <p className="text-sm font-medium text-muted-foreground">Pending Reviews</p>
                                     <p className="mt-1 text-3xl font-bold tracking-tight">{pendingReviews}</p>
                                 </div>
-                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 transition-transform group-hover:scale-110">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary dark:text-primary transition-transform group-hover:scale-110">
                                     <ClipboardList className="h-6 w-6" />
                                 </div>
                             </div>
-                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-violet-100 dark:bg-violet-900/30">
-                                <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: pendingReviews > 0 ? '100%' : '0%' }} />
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-primary/10 dark:bg-primary/30">
+                                <div className="h-full rounded-full bg-primary transition-all" style={{ width: pendingReviews > 0 ? '100%' : '0%' }} />
                             </div>
                         </div>
                     </Link>

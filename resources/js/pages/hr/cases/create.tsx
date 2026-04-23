@@ -65,7 +65,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
             case 'medium':
                 return 'text-yellow-600 bg-yellow-50';
             case 'low':
-                return 'text-slate-600 bg-slate-50';
+                return 'text-muted-foreground bg-muted';
             default:
                 return '';
         }

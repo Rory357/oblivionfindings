@@ -107,20 +107,20 @@ const formatNZD = (amount: string | number) =>
 
 const statusBadge = (status: string) => {
     const map: Record<string, string> = {
-        draft: 'bg-gray-100 text-gray-800',
+        draft: 'bg-muted text-foreground',
         posted: 'bg-green-100 text-green-800',
         reversed: 'bg-red-100 text-red-800',
     };
-    return map[status] ?? 'bg-gray-100 text-gray-800';
+    return map[status] ?? 'bg-muted text-foreground';
 };
 
 const typeBadge = (type: string) => {
     const map: Record<string, string> = {
         standard: 'bg-blue-100 text-blue-800',
         adjustment: 'bg-yellow-100 text-yellow-800',
-        opening: 'bg-purple-100 text-purple-800',
+        opening: 'bg-primary/10 text-primary',
     };
-    return map[type] ?? 'bg-gray-100 text-gray-800';
+    return map[type] ?? 'bg-muted text-foreground';
 };
 
 export default function JournalsShow({ auth, journal }: Props) {
@@ -175,7 +175,7 @@ export default function JournalsShow({ auth, journal }: Props) {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                     <div>
                         <div className="flex items-center gap-3 mb-1">
-                            <h1 className="text-3xl font-bold text-gray-900">{journal.journal_number}</h1>
+                            <h1 className="text-3xl font-bold text-foreground">{journal.journal_number}</h1>
                             <Badge className={statusBadge(journal.status)}>
                                 {journal.status.charAt(0).toUpperCase() + journal.status.slice(1)}
                             </Badge>
@@ -184,7 +184,7 @@ export default function JournalsShow({ auth, journal }: Props) {
                             </Badge>
                         </div>
                         {journal.description && (
-                            <p className="text-gray-500">{journal.description}</p>
+                            <p className="text-muted-foreground">{journal.description}</p>
                         )}
                     </div>
 
@@ -208,7 +208,7 @@ export default function JournalsShow({ auth, journal }: Props) {
                                         <DialogTitle>Reverse Journal {journal.journal_number}</DialogTitle>
                                     </DialogHeader>
                                     <div className="space-y-4 pt-4">
-                                        <p className="text-sm text-gray-600">
+                                        <p className="text-sm text-muted-foreground">
                                             This will create a new reversing journal that swaps all debits and credits.
                                             The reversing journal will be posted immediately.
                                         </p>
@@ -241,7 +241,7 @@ export default function JournalsShow({ auth, journal }: Props) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                                 <Calendar className="w-4 h-4" />
                                 Journal Date
                             </div>
@@ -257,7 +257,7 @@ export default function JournalsShow({ auth, journal }: Props) {
 
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                                 <FileText className="w-4 h-4" />
                                 Reference
                             </div>
@@ -268,13 +268,13 @@ export default function JournalsShow({ auth, journal }: Props) {
                     {journal.status === 'posted' && journal.posted_by && (
                         <Card>
                             <CardContent className="pt-6">
-                                <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                                     <User className="w-4 h-4" />
                                     Posted By
                                 </div>
                                 <p className="font-semibold">{journal.posted_by.name}</p>
                                 {journal.posted_at && (
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-muted-foreground">
                                         {new Date(journal.posted_at).toLocaleString('en-NZ')}
                                     </p>
                                 )}
@@ -285,7 +285,7 @@ export default function JournalsShow({ auth, journal }: Props) {
                     {journal.fiscal_period && (
                         <Card>
                             <CardContent className="pt-6">
-                                <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                                     <Calendar className="w-4 h-4" />
                                     Fiscal Period
                                 </div>
@@ -297,7 +297,7 @@ export default function JournalsShow({ auth, journal }: Props) {
                     {journal.created_by && (
                         <Card>
                             <CardContent className="pt-6">
-                                <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                                     <User className="w-4 h-4" />
                                     Created By
                                 </div>
@@ -346,7 +346,7 @@ export default function JournalsShow({ auth, journal }: Props) {
                                             {line.account ? (
                                                 <span>{line.account.code} - {line.account.name}</span>
                                             ) : (
-                                                <span className="text-gray-400">-</span>
+                                                <span className="text-muted-foreground">-</span>
                                             )}
                                         </TableCell>
                                         <TableCell>{line.description ?? '-'}</TableCell>

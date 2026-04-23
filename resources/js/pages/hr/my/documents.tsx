@@ -55,16 +55,16 @@ const FILE_ICONS: Record<string, { icon: typeof File; color: string; bg: string 
 
 function getFileInfo(mime?: string, name?: string) {
     const ext = (name ?? '').split('.').pop()?.toLowerCase() ?? '';
-    return FILE_ICONS[ext] ?? { icon: File, color: 'text-violet-600', bg: 'bg-violet-100' };
+    return FILE_ICONS[ext] ?? { icon: File, color: 'text-primary', bg: 'bg-primary/10' };
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
     contract: 'bg-blue-100 text-blue-700',
-    letter: 'bg-purple-100 text-purple-700',
+    letter: 'bg-primary/10 text-primary',
     policy: 'bg-emerald-100 text-emerald-700',
     certificate: 'bg-amber-100 text-amber-700',
     offer: 'bg-pink-100 text-pink-700',
-    other: 'bg-slate-100 text-slate-700',
+    other: 'bg-muted text-foreground',
 };
 
 function formatLabel(s: string) { return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
@@ -155,15 +155,15 @@ export default function MyDocuments({ documents, categories }: Props) {
                 {/* Stats Bar */}
                 <div className="grid grid-cols-3 gap-3">
                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                        <div className="text-xl font-bold text-violet-700">{stats.total}</div>
-                        <div className="text-[10px] uppercase tracking-wider text-violet-500">Total</div>
+                        <div className="text-xl font-bold text-primary">{stats.total}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-primary">Total</div>
                     </div>
                     <div className="rounded-xl border p-3 text-center">
-                        <div className={`text-xl font-bold ${stats.expiring > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{stats.expiring}</div>
+                        <div className={`text-xl font-bold ${stats.expiring > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>{stats.expiring}</div>
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Expiring</div>
                     </div>
                     <div className="rounded-xl border p-3 text-center">
-                        <div className={`text-xl font-bold ${stats.expired > 0 ? 'text-red-600' : 'text-slate-400'}`}>{stats.expired}</div>
+                        <div className={`text-xl font-bold ${stats.expired > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{stats.expired}</div>
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Expired</div>
                     </div>
                 </div>
@@ -171,7 +171,7 @@ export default function MyDocuments({ documents, categories }: Props) {
                 {/* Folder breadcrumb */}
                 {currentFolder && (
                     <div className="flex items-center gap-2 text-sm">
-                        <button onClick={() => setCurrentFolder(null)} className="text-violet-600 hover:underline">All Documents</button>
+                        <button onClick={() => setCurrentFolder(null)} className="text-primary hover:underline">All Documents</button>
                         <span className="text-muted-foreground">/</span>
                         <span className="font-medium">{currentFolder}</span>
                     </div>
@@ -207,8 +207,8 @@ export default function MyDocuments({ documents, categories }: Props) {
                 {filesInCurrentView.length === 0 && (currentFolder !== null || Object.keys(folderCounts).length === 0) ? (
                     <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
-                                <FolderOpen className="h-8 w-8 text-violet-400" />
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                <FolderOpen className="h-8 w-8 text-primary" />
                             </div>
                             <p className="font-medium">No Documents</p>
                             <p className="mt-1 text-sm text-muted-foreground">
@@ -223,13 +223,13 @@ export default function MyDocuments({ documents, categories }: Props) {
                         {currentFolder === null && Object.keys(folderCounts).length > 0 && (
                             <div>
                                 <div className="mb-2 flex items-center gap-2">
-                                    <FolderOpen className="h-4 w-4 text-violet-500" />
+                                    <FolderOpen className="h-4 w-4 text-primary" />
                                     <span className="text-sm font-semibold">Folders</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                                     {Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)).map(([folder, count]) => (
                                         <button key={folder} onClick={() => setCurrentFolder(folder)}
-                                            className="flex flex-col items-center rounded-xl border bg-white p-4 transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-violet-300">
+                                            className="flex flex-col items-center rounded-xl border bg-white p-4 transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-primary">
                                             <FolderOpen className="h-10 w-10 text-amber-500" />
                                             <span className="mt-2 text-xs font-medium">{folder}</span>
                                             <span className="text-[10px] text-muted-foreground">{count} file{count !== 1 ? 's' : ''}</span>
@@ -243,7 +243,7 @@ export default function MyDocuments({ documents, categories }: Props) {
                         {filesInCurrentView.length > 0 && (
                             <div>
                                 {currentFolder === null && Object.keys(folderCounts).length > 0 && <div className="mb-2 flex items-center gap-2">
-                                    <FileText className="h-4 w-4 text-violet-500" />
+                                    <FileText className="h-4 w-4 text-primary" />
                                     <span className="text-sm font-semibold">Unfiled Documents</span>
                                     <Badge variant="secondary" className="text-[10px]">{filesInCurrentView.length}</Badge>
                                 </div>}
@@ -265,11 +265,11 @@ export default function MyDocuments({ documents, categories }: Props) {
                                                 <div className="mt-2 flex items-center justify-center gap-1">
                                                     {expired && <Badge className="h-4 border-0 bg-red-100 px-1 text-[8px] text-red-600">Expired</Badge>}
                                                     {expiring && !expired && <Badge className="h-4 border-0 bg-amber-100 px-1 text-[8px] text-amber-600">Expiring</Badge>}
-                                                    {d.category && <Badge variant="outline" className={`h-4 border-0 px-1 text-[8px] ${CATEGORY_COLORS[d.category] || 'bg-slate-100 text-slate-600'}`}>{formatLabel(d.category)}</Badge>}
+                                                    {d.category && <Badge variant="outline" className={`h-4 border-0 px-1 text-[8px] ${CATEGORY_COLORS[d.category] || 'bg-muted text-muted-foreground'}`}>{formatLabel(d.category)}</Badge>}
                                                 </div>
                                                 {/* Hover download action */}
                                                 <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 rounded-b-xl bg-gradient-to-t from-white via-white to-transparent pb-2 pt-6 opacity-0 transition-opacity group-hover:opacity-100">
-                                                    <a href={`/hr/my/documents/${d.id}/download`} className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-violet-600 hover:bg-violet-200">
+                                                    <a href={`/hr/my/documents/${d.id}/download`} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20">
                                                         <Download className="h-3.5 w-3.5" />
                                                     </a>
                                                 </div>
@@ -289,7 +289,7 @@ export default function MyDocuments({ documents, categories }: Props) {
                                 <table className="w-full text-sm">
                                     <tbody>
                                         {Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)).map(([folder, count]) => (
-                                            <tr key={folder} className="border-b hover:bg-slate-50 cursor-pointer" onClick={() => setCurrentFolder(folder)}>
+                                            <tr key={folder} className="border-b hover:bg-muted cursor-pointer" onClick={() => setCurrentFolder(folder)}>
                                                 <td className="px-4 py-2.5" colSpan={5}>
                                                     <div className="flex items-center gap-2.5">
                                                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100">
@@ -308,7 +308,7 @@ export default function MyDocuments({ documents, categories }: Props) {
                             )}
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b bg-slate-50 text-left text-xs text-muted-foreground">
+                                    <tr className="border-b bg-muted text-left text-xs text-muted-foreground">
                                         <th className="px-4 py-2.5 font-medium">Name</th>
                                         <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Folder</th>
                                         <th className="hidden px-4 py-2.5 font-medium md:table-cell">Category</th>
@@ -324,7 +324,7 @@ export default function MyDocuments({ documents, categories }: Props) {
                                         const expired = isExpired(d.expires_at);
                                         const expiring = isExpiringSoon(d.expires_at);
                                         return (
-                                            <tr key={d.id} className="border-b last:border-0 hover:bg-slate-50">
+                                            <tr key={d.id} className="border-b last:border-0 hover:bg-muted">
                                                 <td className="px-4 py-2.5">
                                                     <div className="flex items-center gap-2.5">
                                                         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${fi.bg}`}>
@@ -335,7 +335,7 @@ export default function MyDocuments({ documents, categories }: Props) {
                                                 </td>
                                                 <td className="hidden px-4 py-2.5 text-muted-foreground sm:table-cell">{d.folder || '\u2014'}</td>
                                                 <td className="hidden px-4 py-2.5 md:table-cell">
-                                                    {d.category ? <Badge className={`border-0 text-[10px] capitalize ${CATEGORY_COLORS[d.category] ?? 'bg-slate-100 text-slate-600'}`}>{formatLabel(d.category)}</Badge> : '\u2014'}
+                                                    {d.category ? <Badge className={`border-0 text-[10px] capitalize ${CATEGORY_COLORS[d.category] ?? 'bg-muted text-muted-foreground'}`}>{formatLabel(d.category)}</Badge> : '\u2014'}
                                                 </td>
                                                 <td className="hidden px-4 py-2.5 lg:table-cell">
                                                     {d.expires_at ? (
@@ -344,8 +344,8 @@ export default function MyDocuments({ documents, categories }: Props) {
                                                 </td>
                                                 <td className="px-4 py-2.5 text-muted-foreground">{formatBytes(d.size_bytes)}</td>
                                                 <td className="px-4 py-2.5 text-right">
-                                                    <a href={`/hr/my/documents/${d.id}/download`} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-slate-100 ml-auto">
-                                                        <Download className="h-3.5 w-3.5 text-violet-600" />
+                                                    <a href={`/hr/my/documents/${d.id}/download`} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted ml-auto">
+                                                        <Download className="h-3.5 w-3.5 text-primary" />
                                                     </a>
                                                 </td>
                                             </tr>

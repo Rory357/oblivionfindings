@@ -149,7 +149,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                 <div className="flex flex-wrap items-end justify-between gap-2">
                     <div>
                         <h1 className="text-lg font-semibold">New Daily Note</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Record wellbeing observations and activities for a shift.
                         </div>
                     </div>
@@ -331,7 +331,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                     type="checkbox"
                                     checked={data.incident_occurred}
                                     onChange={(e) => setData('incident_occurred', e.target.checked)}
-                                    className="rounded border-slate-300"
+                                    className="rounded border-border"
                                 />
                                 Incident occurred
                             </label>
@@ -340,7 +340,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                     type="checkbox"
                                     checked={data.sensitive_flag}
                                     onChange={(e) => setData('sensitive_flag', e.target.checked)}
-                                    className="rounded border-slate-300"
+                                    className="rounded border-border"
                                 />
                                 Sensitive
                             </label>

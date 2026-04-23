@@ -46,8 +46,8 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Risk Heatmap</h1>
-            <p className="text-gray-500 mt-1">Visual representation of risk distribution</p>
+            <h1 className="text-3xl font-bold text-foreground">Risk Heatmap</h1>
+            <p className="text-muted-foreground mt-1">Visual representation of risk distribution</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -63,7 +63,7 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
                     {/* Header row for Impact */}
                     <div className="flex">
                       <div className="w-24"></div>
-                      <div className="flex-1 text-center text-sm font-medium text-gray-500 mb-2">
+                      <div className="flex-1 text-center text-sm font-medium text-muted-foreground mb-2">
                         IMPACT →
                       </div>
                     </div>
@@ -71,7 +71,7 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
                     {/* Matrix */}
                     <div className="flex">
                       {/* Likelihood labels */}
-                      <div className="w-24 flex flex-col justify-around text-xs text-gray-500 pr-2">
+                      <div className="w-24 flex flex-col justify-around text-xs text-muted-foreground pr-2">
                         <div className="h-12 flex items-center justify-end">
                           <span className="-rotate-90 whitespace-nowrap">LIKELIHOOD ↓</span>
                         </div>
@@ -87,7 +87,7 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
                         {/* Impact header */}
                         <div className="flex">
                           {impactLabels.map((label, i) => (
-                            <div key={i} className="flex-1 text-xs text-center text-gray-500 py-2">
+                            <div key={i} className="flex-1 text-xs text-center text-muted-foreground py-2">
                               {label}
                             </div>
                           ))}
@@ -123,19 +123,19 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
                 <div className="flex items-center justify-center gap-4 mt-6">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#16a34a' }}></div>
-                    <span className="text-sm text-gray-600">Low (1-9)</span>
+                    <span className="text-sm text-muted-foreground">Low (1-9)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ca8a04' }}></div>
-                    <span className="text-sm text-gray-600">Medium (10-14)</span>
+                    <span className="text-sm text-muted-foreground">Medium (10-14)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ea580c' }}></div>
-                    <span className="text-sm text-gray-600">High (15-19)</span>
+                    <span className="text-sm text-muted-foreground">High (15-19)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#dc2626' }}></div>
-                    <span className="text-sm text-gray-600">Critical (20-25)</span>
+                    <span className="text-sm text-muted-foreground">Critical (20-25)</span>
                   </div>
                 </div>
               </CardContent>
@@ -189,8 +189,8 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
                   <div className="space-y-2">
                     {trend.slice(-6).map((point) => (
                       <div key={point.month} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 w-16">{point.month}</span>
-                        <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                        <span className="text-xs text-muted-foreground w-16">{point.month}</span>
+                        <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-blue-500 rounded-full"
                             style={{ width: `${Math.min(100, point.new_risks * 10)}%` }}

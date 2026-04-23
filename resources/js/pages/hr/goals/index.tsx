@@ -85,20 +85,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 const NONE = '__none__';
 
 const typeBadge: Record<string, string> = {
-    company: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    company: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     team: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     individual: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
 };
 
 const statusBadge: Record<string, string> = {
-    draft: 'bg-slate-100 text-slate-600',
+    draft: 'bg-muted text-muted-foreground',
     active: 'bg-blue-100 text-blue-700',
     completed: 'bg-emerald-100 text-emerald-700',
     cancelled: 'bg-red-100 text-red-700',
 };
 
 const priorityBadge: Record<string, string> = {
-    low: 'bg-slate-100 text-slate-600',
+    low: 'bg-muted text-muted-foreground',
     medium: 'bg-amber-100 text-amber-700',
     high: 'bg-red-100 text-red-700',
 };
@@ -375,7 +375,7 @@ export default function GoalsIndex({ goals, users, analytics, cascadeTree, filte
                                 <Card>
                                     <CardHeader className="pb-2">
                                         <CardTitle className="text-sm flex items-center gap-1.5">
-                                            <Building2 className="h-4 w-4 text-purple-500" /> Company Objectives
+                                            <Building2 className="h-4 w-4 text-primary" /> Company Objectives
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-1">

@@ -82,8 +82,8 @@ type Props = {
 
 const STATUS_CONFIG: Record<string, { color: string; bgColor: string; label: string }> = {
     planned: { color: 'text-blue-700 dark:text-blue-400', bgColor: 'bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800', label: 'Planned' },
-    active: { color: 'text-purple-700 dark:text-purple-400', bgColor: 'bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-800', label: 'Active' },
-    completed: { color: 'text-slate-700 dark:text-slate-400', bgColor: 'bg-slate-50 border-slate-200 dark:bg-slate-950/30 dark:border-slate-800', label: 'Completed' },
+    active: { color: 'text-primary dark:text-primary', bgColor: 'bg-primary/10 border-primary dark:bg-primary/30 dark:border-primary/30', label: 'Active' },
+    completed: { color: 'text-foreground dark:text-muted-foreground', bgColor: 'bg-muted border-border dark:bg-muted/30 dark:border-border', label: 'Completed' },
     cancelled: { color: 'text-red-700 dark:text-red-400', bgColor: 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800', label: 'Cancelled' },
 };
 
@@ -182,7 +182,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                 <>
                                     <Button
                                         size="sm"
-                                        className="bg-purple-600 hover:bg-purple-700"
+                                        className="bg-primary hover:bg-primary"
                                         onClick={() => router.post(`/fleet-assets/outings/${safeOuting.id}/start`)}
                                         disabled={!allPreChecked}
                                         title={!allPreChecked ? 'All residents must complete their pre-departure check first' : undefined}
@@ -304,7 +304,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                         {safeOuting.asset ? (
                                             <>
                                                 <Car className="h-3.5 w-3.5 text-muted-foreground" />
-                                                <Link href={`/fleet-assets/vehicles/${safeOuting.asset.id}`} className="text-purple-600 hover:underline dark:text-purple-400">
+                                                <Link href={`/fleet-assets/vehicles/${safeOuting.asset.id}`} className="text-primary hover:underline dark:text-primary">
                                                     {safeOuting.asset.name}
                                                 </Link>
                                             </>
@@ -325,7 +325,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                 {safeOuting.booking && (
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Linked Booking</span>
-                                        <Link href={`/fleet-assets/bookings/${safeOuting.booking.id}`} className="text-purple-600 hover:underline dark:text-purple-400 text-xs">
+                                        <Link href={`/fleet-assets/bookings/${safeOuting.booking.id}`} className="text-primary hover:underline dark:text-primary text-xs">
                                             Booking #{safeOuting.booking.id}
                                         </Link>
                                     </div>
@@ -461,13 +461,13 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                                 <div className="flex flex-col items-center">
                                                     <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
                                                         step.completed
-                                                            ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
+                                                            ? 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary'
                                                             : 'bg-muted text-muted-foreground'
                                                     }`}>
                                                         <IconComp className="h-4 w-4" />
                                                     </div>
                                                     {i < timelineSteps.length - 1 && (
-                                                        <div className={`mt-1 h-8 w-0.5 ${step.completed ? 'bg-purple-300 dark:bg-purple-700' : 'bg-muted'}`} />
+                                                        <div className={`mt-1 h-8 w-0.5 ${step.completed ? 'bg-primary/20 dark:bg-primary' : 'bg-muted'}`} />
                                                     )}
                                                 </div>
                                                 <div className="pt-1">

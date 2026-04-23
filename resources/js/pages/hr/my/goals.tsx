@@ -47,15 +47,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    not_started: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Not Started' },
+    not_started: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Not Started' },
     in_progress: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'In Progress' },
     blocked: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Blocked' },
     completed: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Completed' },
-    cancelled: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Cancelled' },
+    cancelled: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Cancelled' },
 };
 
 const categoryConfig: Record<string, string> = {
-    growth: 'bg-purple-100 text-purple-800',
+    growth: 'bg-primary/10 text-primary',
     performance: 'bg-blue-100 text-blue-800',
     leadership: 'bg-amber-100 text-amber-800',
     compliance: 'bg-red-100 text-red-800',
@@ -92,7 +92,7 @@ function GoalCard({ goal }: { goal: Goal }) {
                                 <Target className="h-4 w-4 text-muted-foreground" />
                                 <CardTitle className="text-base">{goal.title}</CardTitle>
                                 <Badge variant="outline" className={sc.className}>{sc.label}</Badge>
-                                <Badge variant="outline" className={categoryConfig[goal.category] || 'bg-slate-100 text-slate-800'}>
+                                <Badge variant="outline" className={categoryConfig[goal.category] || 'bg-muted text-foreground'}>
                                     {goal.category}
                                 </Badge>
                                 {isOverdue && (

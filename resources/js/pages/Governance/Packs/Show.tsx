@@ -79,9 +79,9 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-slate-900" dusk="pack-heading">Board Pack</h1>
-            <p className="text-sm text-slate-600">{pack.meeting.title}</p>
-            <p className="text-xs text-slate-500">
+            <h1 className="text-3xl font-bold text-foreground" dusk="pack-heading">Board Pack</h1>
+            <p className="text-sm text-muted-foreground">{pack.meeting.title}</p>
+            <p className="text-xs text-muted-foreground">
               Generated {new Date(pack.generated_at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })}
             </p>
           </div>
@@ -106,8 +106,8 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
           <CardContent className="flex items-start gap-3 pt-6">
             {is_distributed ? <CheckCircle className="mt-0.5 h-6 w-6 text-green-600" /> : <Clock className="mt-0.5 h-6 w-6 text-amber-600" />}
             <div className="space-y-1">
-              <p className="font-medium text-slate-900">{is_distributed ? 'Pack distributed' : 'Pack ready for distribution'}</p>
-              <p className="text-sm text-slate-700">
+              <p className="font-medium text-foreground">{is_distributed ? 'Pack distributed' : 'Pack ready for distribution'}</p>
+              <p className="text-sm text-foreground">
                 {is_distributed
                   ? `Distributed ${new Date(pack.distributed_at!).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland' })}.`
                   : 'Generate any final papers, then distribute to the board when ready.'}
@@ -133,23 +133,23 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
                   ['Downloads', distributionStats.download_count],
                   ['Outstanding', distributionStats.outstanding_reads],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg bg-slate-50 p-4 text-center">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-                    <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
+                  <div key={label} className="rounded-lg bg-muted p-4 text-center">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="mt-2 text-3xl font-bold text-foreground">{value}</p>
                   </div>
                 ))}
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <div className="mb-1 flex items-center justify-between text-sm text-slate-600">
+                  <div className="mb-1 flex items-center justify-between text-sm text-muted-foreground">
                     <span>Read rate</span>
                     <span>{distributionStats.read_rate}%</span>
                   </div>
                   <Progress value={distributionStats.read_rate} />
                 </div>
                 <div>
-                  <div className="mb-1 flex items-center justify-between text-sm text-slate-600">
+                  <div className="mb-1 flex items-center justify-between text-sm text-muted-foreground">
                     <span>Download rate</span>
                     <span>{distributionStats.download_rate}%</span>
                   </div>
@@ -169,12 +169,12 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
             </CardHeader>
             <CardContent className="space-y-3">
               {manifestSections.map((section, index) => (
-                <div key={`${section.id}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-3">
+                <div key={`${section.id}-${index}`} className="flex items-center justify-between rounded-lg border border-border px-3 py-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-400">{index + 1}.</span>
+                    <span className="text-xs text-muted-foreground">{index + 1}.</span>
                     <div>
-                      <p className="font-medium text-slate-900">{section.title}</p>
-                      <p className="text-xs text-slate-500">{section.type}</p>
+                      <p className="font-medium text-foreground">{section.title}</p>
+                      <p className="text-xs text-muted-foreground">{section.type}</p>
                     </div>
                   </div>
                   {section.included && <CheckCircle className="h-5 w-5 text-green-600" />}
@@ -191,11 +191,11 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
           </CardHeader>
           <CardContent className="space-y-3">
             {contentSections.map((section) => (
-              <div key={section.key} className="rounded-lg border border-slate-200 p-4">
+              <div key={section.key} className="rounded-lg border border-border p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-medium text-slate-900">{section.title}</p>
-                    <p className="text-sm text-slate-600">{section.summary}</p>
+                    <p className="font-medium text-foreground">{section.title}</p>
+                    <p className="text-sm text-muted-foreground">{section.summary}</p>
                   </div>
                   <Badge variant="outline">{section.type}</Badge>
                 </div>

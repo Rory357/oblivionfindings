@@ -58,7 +58,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                 description={`Manage which support workers are assigned to ${client.first_name}.`}
                 backHref={`/operations/clients/${client.id}`}
                 actions={
-                    <Button className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={save} disabled={status === 'saving'}>
+                    <Button className="gap-1.5 bg-primary hover:bg-primary" onClick={save} disabled={status === 'saving'}>
                         {status === 'saving' ? 'Saving...' : status === 'saved' ? 'Saved!' : 'Save Changes'}
                     </Button>
                 }
@@ -74,7 +74,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                     {/* Left: Currently Assigned */}
                     <div>
                         <div className="mb-3 flex items-center gap-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <Users className="h-4 w-4" />
                             </div>
                             <h2 className="text-sm font-semibold">Assigned Workers</h2>
@@ -92,11 +92,11 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                         ) : (
                             <div className="space-y-2">
                                 {assignedWorkers.map(w => (
-                                    <Card key={w.id} className="border-violet-200 bg-violet-50/30 transition-all hover:shadow-sm">
+                                    <Card key={w.id} className="border-primary bg-primary/10/30 transition-all hover:shadow-sm">
                                         <CardContent className="flex items-center justify-between p-3">
                                             <div className="flex items-center gap-3">
-                                                <Avatar className="h-9 w-9 border-2 border-violet-200">
-                                                    <AvatarFallback className="bg-violet-200 text-xs font-bold text-violet-700">{getInitials(w.name)}</AvatarFallback>
+                                                <Avatar className="h-9 w-9 border-2 border-primary">
+                                                    <AvatarFallback className="bg-primary/20 text-xs font-bold text-primary">{getInitials(w.name)}</AvatarFallback>
                                                 </Avatar>
                                                 <div>
                                                     <div className="flex items-center gap-1.5">
@@ -152,7 +152,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                                     <button key={w.id} onClick={() => toggle(w.id)}
                                         className="flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-all hover:bg-emerald-50">
                                         <Avatar className="h-8 w-8">
-                                            <AvatarFallback className="bg-slate-100 text-xs">{getInitials(w.name)}</AvatarFallback>
+                                            <AvatarFallback className="bg-muted text-xs">{getInitials(w.name)}</AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1">
                                             <span className="text-sm font-medium">{w.name}</span>

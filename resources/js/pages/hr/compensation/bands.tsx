@@ -121,7 +121,7 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Salary Bands</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Manage salary bands by position role
                         </div>
                     </div>
@@ -140,7 +140,7 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Position Role</Label>
+                            <Label className="text-xs text-muted-foreground">Position Role</Label>
                             <Input
                                 placeholder="Filter by role..."
                                 value={filters.role || ''}
@@ -153,7 +153,7 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                                     type="checkbox"
                                     checked={filters.active_only}
                                     onChange={(e) => onFilter({ active_only: e.target.checked })}
-                                    className="rounded border-slate-300"
+                                    className="rounded border-border"
                                 />
                                 Active bands only
                             </label>
@@ -179,10 +179,10 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                                     <TableRow key={band.id}>
                                         <TableCell className="font-medium">{band.position_role}</TableCell>
                                         <TableCell>{band.band_name}</TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-muted-foreground">
                                             {formatCurrency(band.min_salary, band.currency)} - {formatCurrency(band.max_salary, band.currency)}
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-muted-foreground">
                                             {formatCurrency(band.min_hourly, band.currency)} - {formatCurrency(band.max_hourly, band.currency)}
                                         </TableCell>
                                         <TableCell className="text-sm">
@@ -203,7 +203,7 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                                 ))}
                                 {!bands.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                                             No salary bands found.
                                         </TableCell>
                                     </TableRow>

@@ -92,13 +92,13 @@ const categoryConfig: Record<string, { color: string; icon: typeof AlertTriangle
     emergency: { color: 'bg-red-100 text-red-800 border-red-200', icon: AlertTriangle },
     safety: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Shield },
     compliance: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: CheckCircle },
-    maintenance: { color: 'bg-gray-100 text-gray-800 border-gray-200', icon: Wrench },
-    investigation: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: SearchIcon },
+    maintenance: { color: 'bg-muted text-foreground border-border', icon: Wrench },
+    investigation: { color: 'bg-primary/10 text-primary border-primary', icon: SearchIcon },
 };
 
 const stepTypeColors: Record<string, string> = {
     task: 'bg-blue-100 text-blue-800',
-    decision: 'bg-purple-100 text-purple-800',
+    decision: 'bg-primary/10 text-primary',
     notification: 'bg-yellow-100 text-yellow-800',
     escalation: 'bg-red-100 text-red-800',
     evidence: 'bg-green-100 text-green-800',

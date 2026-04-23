@@ -28,7 +28,7 @@ export default function EmergencyRequestPage({ client, redirectTo }: any) {
                         <CardTitle>Emergency access required</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <div className="text-sm text-slate-600">
+                        <div className="text-sm text-muted-foreground">
                             You’re not assigned to <span className="font-medium">{client.first_name} {client.last_name}</span>.
                             If this is an emergency, you can request temporary medication access.
                         </div>
@@ -41,7 +41,7 @@ export default function EmergencyRequestPage({ client, redirectTo }: any) {
                         <div className="space-y-2">
                             <Label>Duration (minutes)</Label>
                             <Input value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="60" />
-                            <div className="text-xs text-slate-500">Default: 60 minutes</div>
+                            <div className="text-xs text-muted-foreground">Default: 60 minutes</div>
                         </div>
 
                         <div className="flex gap-2">

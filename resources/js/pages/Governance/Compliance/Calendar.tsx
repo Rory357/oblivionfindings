@@ -34,7 +34,7 @@ export default function ComplianceCalendar({ auth, events }: Props) {
       not_due: 'bg-blue-100 text-blue-800',
       due_soon: 'bg-yellow-100 text-yellow-800',
       overdue: 'bg-red-100 text-red-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+    }[status] || 'bg-muted text-foreground';
   };
 
   return (
@@ -51,8 +51,8 @@ export default function ComplianceCalendar({ auth, events }: Props) {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Compliance Calendar</h1>
-            <p className="text-gray-500 mt-1">Upcoming obligations and deadlines</p>
+            <h1 className="text-3xl font-bold text-foreground">Compliance Calendar</h1>
+            <p className="text-muted-foreground mt-1">Upcoming obligations and deadlines</p>
           </div>
 
           {/* Calendar */}
@@ -75,18 +75,18 @@ export default function ComplianceCalendar({ auth, events }: Props) {
                       >
                         <div className="flex items-center gap-4">
                           <div className="text-center min-w-[60px]">
-                            <p className="text-2xl font-bold text-gray-900">
+                            <p className="text-2xl font-bold text-foreground">
                               {new Date(event.date).getDate()}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                               {new Date(event.date).toLocaleDateString('en-NZ', { weekday: 'short' })}
                             </p>
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-900">{event.title}</p>
-                            <p className="text-sm text-gray-500">{event.framework}</p>
+                            <p className="font-semibold text-foreground">{event.title}</p>
+                            <p className="text-sm text-muted-foreground">{event.framework}</p>
                             {event.owner && (
-                              <p className="text-sm text-gray-500">Owner: {event.owner}</p>
+                              <p className="text-sm text-muted-foreground">Owner: {event.owner}</p>
                             )}
                           </div>
                         </div>
@@ -94,7 +94,7 @@ export default function ComplianceCalendar({ auth, events }: Props) {
                           <Badge className={cn(getStatusColor(event.status))}>
                             {event.status.replace('_', ' ')}
                           </Badge>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             {event.days_remaining < 0 
                               ? `${Math.abs(event.days_remaining)} days overdue`
                               : `${event.days_remaining} days remaining`

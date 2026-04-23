@@ -35,7 +35,7 @@ const statusColors: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-800',
     approved: 'bg-emerald-100 text-emerald-800',
     declined: 'bg-red-100 text-red-800',
-    cancelled: 'bg-gray-100 text-gray-600',
+    cancelled: 'bg-muted text-muted-foreground',
 };
 
 const visitTypeIcons: Record<string, { icon: typeof Calendar; label: string }> = {
@@ -108,7 +108,7 @@ export default function VisitRequests({ client, requests, filter, stats }: Props
                         <div className="text-[10px] uppercase tracking-wider text-emerald-500">Approved This Month</div>
                     </div>
                     <div className="rounded-xl border p-4 text-center">
-                        <div className="text-2xl font-bold text-slate-700">{stats.total}</div>
+                        <div className="text-2xl font-bold text-foreground">{stats.total}</div>
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Requests</div>
                     </div>
                 </div>

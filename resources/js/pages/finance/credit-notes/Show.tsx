@@ -50,14 +50,14 @@ const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
     approved: { label: 'Approved', className: 'bg-green-100 text-green-800' },
     applied: { label: 'Applied', className: 'bg-blue-100 text-blue-800' },
     cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
 };
 
 const typeConfig: Record<string, { label: string; className: string }> = {
-    payable: { label: 'Accounts Payable', className: 'bg-purple-100 text-purple-800' },
+    payable: { label: 'Accounts Payable', className: 'bg-primary/10 text-primary' },
     receivable: { label: 'Accounts Receivable', className: 'bg-teal-100 text-teal-800' },
 };
 
@@ -84,15 +84,15 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                 <div className="flex items-start justify-between mb-6">
                     <div>
                         <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-gray-900">{creditNote.credit_note_number}</h1>
-                            <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-gray-100 text-gray-800'}>
+                            <h1 className="text-3xl font-bold text-foreground">{creditNote.credit_note_number}</h1>
+                            <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-muted text-foreground'}>
                                 {statusConfig[creditNote.status]?.label ?? creditNote.status}
                             </Badge>
-                            <Badge className={typeConfig[creditNote.type]?.className ?? 'bg-gray-100 text-gray-800'}>
+                            <Badge className={typeConfig[creditNote.type]?.className ?? 'bg-muted text-foreground'}>
                                 {typeConfig[creditNote.type]?.label ?? creditNote.type}
                             </Badge>
                         </div>
-                        <p className="text-gray-500 mt-1">
+                        <p className="text-muted-foreground mt-1">
                             {creditNote.vendor?.name ?? 'Unknown'}
                         </p>
                     </div>
@@ -114,29 +114,29 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Credit Date</span>
+                                <span className="text-muted-foreground">Credit Date</span>
                                 <span className="font-medium">{formatDate(creditNote.credit_date)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Type</span>
+                                <span className="text-muted-foreground">Type</span>
                                 <span className="font-medium">{creditNote.type === 'payable' ? 'Accounts Payable' : 'Accounts Receivable'}</span>
                             </div>
                             {creditNote.approved_by && (
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Approved By</span>
+                                    <span className="text-muted-foreground">Approved By</span>
                                     <span className="font-medium">{creditNote.approved_by.name}</span>
                                 </div>
                             )}
                             {creditNote.approved_at && (
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Approved At</span>
+                                    <span className="text-muted-foreground">Approved At</span>
                                     <span className="font-medium">{formatDateTime(creditNote.approved_at)}</span>
                                 </div>
                             )}
                             {creditNote.reason && (
                                 <div className="pt-2 border-t">
-                                    <span className="text-gray-500 block mb-1">Reason</span>
-                                    <p className="text-gray-700 whitespace-pre-wrap">{creditNote.reason}</p>
+                                    <span className="text-muted-foreground block mb-1">Reason</span>
+                                    <p className="text-foreground whitespace-pre-wrap">{creditNote.reason}</p>
                                 </div>
                             )}
                         </CardContent>
@@ -149,11 +149,11 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Subtotal</span>
+                                <span className="text-muted-foreground">Subtotal</span>
                                 <span>{formatCurrency(creditNote.subtotal)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">GST</span>
+                                <span className="text-muted-foreground">GST</span>
                                 <span>{formatCurrency(creditNote.gst_amount)}</span>
                             </div>
                             <Separator />
@@ -173,24 +173,24 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                             {creditNote.journal ? (
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Journal #</span>
+                                        <span className="text-muted-foreground">Journal #</span>
                                         <Link href={`/finance/journals/${creditNote.journal.id}`} className="text-blue-600 hover:underline font-medium">
                                             {creditNote.journal.journal_number}
                                         </Link>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Status</span>
+                                        <span className="text-muted-foreground">Status</span>
                                         <Badge className="bg-green-100 text-green-800">{creditNote.journal.status}</Badge>
                                     </div>
                                     {creditNote.journal.posted_at && (
                                         <div className="flex justify-between">
-                                            <span className="text-gray-500">Posted</span>
+                                            <span className="text-muted-foreground">Posted</span>
                                             <span className="font-medium">{formatDateTime(creditNote.journal.posted_at)}</span>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-4 text-gray-400">
+                                <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
                                     <FileText className="w-8 h-8 mb-2" />
                                     <p className="text-sm">No journal posted yet</p>
                                 </div>

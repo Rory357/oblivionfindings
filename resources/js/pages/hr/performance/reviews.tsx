@@ -81,15 +81,15 @@ const getStatusColor = (status: string) => {
         case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-200';
         case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
-        case 'draft': return 'bg-slate-100 text-slate-800 border-slate-200';
-        case 'cancelled': return 'bg-slate-100 text-slate-500 border-slate-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        case 'draft': return 'bg-muted text-foreground border-border';
+        case 'cancelled': return 'bg-muted text-muted-foreground border-border';
+        default: return 'bg-muted text-foreground border-border';
     }
 };
 
 const renderRating = (rating: number | null) => {
     if (rating === null || rating === undefined) {
-        return <span className="text-slate-400">Not rated</span>;
+        return <span className="text-muted-foreground">Not rated</span>;
     }
     const stars: ReactElement[] = [];
     for (let i = 1; i <= 5; i++) {
@@ -105,7 +105,7 @@ const getRecommendationColor = (rec: string | null) => {
         case 'pass': return 'bg-green-100 text-green-800 border-green-200';
         case 'extend': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'fail': return 'bg-red-100 text-red-800 border-red-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 };
 
@@ -136,7 +136,7 @@ export default function PerformanceReviews({
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Performance Reviews</h1>
-                        <p className="mt-0.5 text-sm text-slate-500">Track and manage staff performance reviews</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">Track and manage staff performance reviews</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <Link href="/hr/performance">
@@ -183,13 +183,13 @@ export default function PerformanceReviews({
                                 <span className={`mt-1.5 block text-2xl font-bold ${stats.overdue > 0 ? 'text-red-700' : 'text-amber-900'}`}>{stats.overdue}</span>
                             </CardContent>
                         </Card>
-                        <Card className="border-l-4 border-l-slate-400 bg-slate-50/40">
+                        <Card className="border-l-4 border-l-slate-400 bg-muted/40">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-xs font-medium text-slate-600">Drafts</p>
-                                    <div className="rounded-full bg-slate-100 p-1.5"><FileEdit className="h-4 w-4 text-slate-500" /></div>
+                                    <p className="text-xs font-medium text-muted-foreground">Drafts</p>
+                                    <div className="rounded-full bg-muted p-1.5"><FileEdit className="h-4 w-4 text-muted-foreground" /></div>
                                 </div>
-                                <span className="mt-1.5 block text-2xl font-bold text-slate-800">{stats.draft}</span>
+                                <span className="mt-1.5 block text-2xl font-bold text-foreground">{stats.draft}</span>
                             </CardContent>
                         </Card>
                     </div>
@@ -247,7 +247,7 @@ export default function PerformanceReviews({
                                             {statusChartData.map((d) => (
                                                 <div key={d.status} className="flex items-center gap-2">
                                                     <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-                                                    <span className="text-slate-600 capitalize">{d.label}: <span className="font-medium text-foreground">{d.count}</span></span>
+                                                    <span className="text-muted-foreground capitalize">{d.label}: <span className="font-medium text-foreground">{d.count}</span></span>
                                                 </div>
                                             ))}
                                         </div>
@@ -265,14 +265,14 @@ export default function PerformanceReviews({
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input placeholder="Search by staff or reviewer name..." value={filters.q || ''} onChange={(e) => onFilter({ q: e.target.value })} className="pl-9" />
                             </div>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select value={filters.status ?? NONE} onValueChange={(v) => onFilter({ status: v === NONE ? null : v })}>
                                 <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
                                 <SelectContent>
@@ -306,7 +306,7 @@ export default function PerformanceReviews({
                                     <TableRow key={review.id}>
                                         <TableCell className="font-medium">{(review.staff_user ?? review.employee)?.name ?? 'Unknown'}</TableCell>
                                         <TableCell>{review.reviewer?.name ?? 'Unknown'}</TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-muted-foreground">
                                             {formatDate(review.review_period_start)} - {formatDate(review.review_period_end)}
                                         </TableCell>
                                         <TableCell>{formatDate(review.scheduled_at)}</TableCell>
@@ -321,7 +321,7 @@ export default function PerformanceReviews({
                                 ))}
                                 {!reviews.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">No performance reviews found.</TableCell>
+                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">No performance reviews found.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
@@ -362,7 +362,7 @@ export default function PerformanceReviews({
                                                 {pr.recommendation ? (
                                                     <Badge className={getRecommendationColor(pr.recommendation)}>{pr.recommendation}</Badge>
                                                 ) : (
-                                                    <span className="text-slate-400">Pending</span>
+                                                    <span className="text-muted-foreground">Pending</span>
                                                 )}
                                             </TableCell>
                                         </TableRow>

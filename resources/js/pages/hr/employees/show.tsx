@@ -69,8 +69,8 @@ interface Props {
 /* ------------------------------------------------------------------ */
 
 const AVATAR_COLORS = [
-    'bg-blue-500 text-white', 'bg-violet-500 text-white', 'bg-emerald-500 text-white', 'bg-amber-500 text-white',
-    'bg-pink-500 text-white', 'bg-cyan-500 text-white', 'bg-rose-500 text-white', 'bg-indigo-500 text-white',
+    'bg-blue-500 text-white', 'bg-primary text-white', 'bg-emerald-500 text-white', 'bg-amber-500 text-white',
+    'bg-pink-500 text-white', 'bg-cyan-500 text-white', 'bg-rose-500 text-white', 'bg-primary text-white',
 ];
 
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
@@ -94,13 +94,13 @@ function StatusBadge({ status }: { status: string }) {
         enrolled: 'border-blue-200 bg-blue-50 text-blue-700', open: 'border-blue-200 bg-blue-50 text-blue-700',
         expired: 'border-red-200 bg-red-50 text-red-700', suspended: 'border-red-200 bg-red-50 text-red-700',
         adverse: 'border-red-200 bg-red-50 text-red-700', flagged: 'border-orange-200 bg-orange-50 text-orange-700',
-        not_started: 'border-slate-200 bg-slate-50 text-slate-600', draft: 'border-slate-200 bg-slate-50 text-slate-600',
-        closed: 'border-slate-200 bg-slate-50 text-slate-600', cancelled: 'border-slate-200 bg-slate-50 text-slate-600',
+        not_started: 'border-border bg-muted text-muted-foreground', draft: 'border-border bg-muted text-muted-foreground',
+        closed: 'border-border bg-muted text-muted-foreground', cancelled: 'border-border bg-muted text-muted-foreground',
         rejected: 'border-red-200 bg-red-50 text-red-700', high: 'border-orange-200 bg-orange-50 text-orange-700',
         critical: 'border-red-200 bg-red-50 text-red-700', medium: 'border-amber-200 bg-amber-50 text-amber-700',
-        low: 'border-slate-200 bg-slate-50 text-slate-600',
+        low: 'border-border bg-muted text-muted-foreground',
     };
-    return <Badge variant="outline" className={map[status] || 'border-slate-200 bg-slate-50 text-slate-600'}>{formatLabel(status)}</Badge>;
+    return <Badge variant="outline" className={map[status] || 'border-border bg-muted text-muted-foreground'}>{formatLabel(status)}</Badge>;
 }
 
 function EmptyState({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
@@ -397,7 +397,7 @@ export default function EmployeeShow({
                                     <div className="mt-1 text-[10px] uppercase tracking-wider text-amber-600">Latest Rating</div>
                                 </div>
                                 <div className={`rounded-xl border p-3 text-center ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'bg-gradient-to-br from-red-50 to-rose-50' : ''}`}>
-                                    <div className={`text-sm font-bold ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'text-red-600' : 'text-slate-700'}`}>
+                                    <div className={`text-sm font-bold ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'text-red-600' : 'text-foreground'}`}>
                                         {performanceSummary.next_review_date ? formatDate(performanceSummary.next_review_date) : 'Not scheduled'}
                                     </div>
                                     <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">Next Review</div>
@@ -471,7 +471,7 @@ export default function EmployeeShow({
                                                     <p className="text-sm font-medium">{g.title}</p>
                                                     <div className="mt-1 flex gap-1">
                                                         {g.category && <Badge variant="outline" className="text-[9px] px-1.5 py-0">{formatLabel(g.category)}</Badge>}
-                                                        {g.competency_area && <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-violet-50 text-violet-600">{g.competency_area}</Badge>}
+                                                        {g.competency_area && <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-primary/10 text-primary">{g.competency_area}</Badge>}
                                                     </div>
                                                 </div>
                                                 <StatusBadge status={g.status} />
@@ -510,7 +510,7 @@ export default function EmployeeShow({
                                                                         </div>
                                                                         <div className="relative h-2 rounded-full bg-muted">
                                                                             <div className="absolute inset-y-0 left-0 rounded-full bg-primary/15" style={{ width: `${(target / 5) * 100}%` }} />
-                                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-emerald-500' : 'bg-violet-500'}`} style={{ width: `${(current / 5) * 100}%` }} />
+                                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${(current / 5) * 100}%` }} />
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -608,8 +608,8 @@ export default function EmployeeShow({
                                 return (
                                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                         <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                                            <div className="text-xl font-bold text-violet-700">{courseEnrollments.length}</div>
-                                            <div className="text-[10px] uppercase tracking-wider text-violet-500">Enrolments</div>
+                                            <div className="text-xl font-bold text-primary">{courseEnrollments.length}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-primary">Enrolments</div>
                                         </div>
                                         <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
                                             <div className="text-xl font-bold text-emerald-700">{completedCount}</div>
@@ -701,7 +701,7 @@ export default function EmployeeShow({
                                                         </div>
                                                         <div className="relative h-2 rounded-full bg-muted">
                                                             <div className="absolute inset-y-0 left-0 rounded-full bg-primary/15" style={{ width: `${(target / 5) * 100}%` }} />
-                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-emerald-500' : 'bg-violet-500'}`} style={{ width: `${(current / 5) * 100}%` }} />
+                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${(current / 5) * 100}%` }} />
                                                         </div>
                                                     </div>
                                                 );
@@ -769,7 +769,7 @@ export default function EmployeeShow({
                                         { label: 'Compliant', value: complianceSummary.compliant, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
                                         { label: 'Expiring Soon', value: complianceSummary.expiring_soon, cls: 'border-amber-200 bg-amber-50 text-amber-700' },
                                         { label: 'Expired', value: complianceSummary.expired, cls: 'border-red-200 bg-red-50 text-red-700' },
-                                        { label: 'Not Started', value: complianceSummary.not_started, cls: 'border-slate-200 bg-slate-50 text-slate-700' },
+                                        { label: 'Not Started', value: complianceSummary.not_started, cls: 'border-border bg-muted text-foreground' },
                                     ].map(s => (
                                         <div key={s.label} className={`rounded-lg border p-3 text-center ${s.cls}`}>
                                             <p className="text-2xl font-bold">{s.value}</p><p className="text-xs">{s.label}</p>
@@ -822,7 +822,7 @@ export default function EmployeeShow({
                             {leaveBalances.length > 0 && (
                                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                     {leaveBalances.map(lb => {
-                                        const colors: Record<string, string> = { annual: 'bg-blue-500', sick: 'bg-red-500', personal: 'bg-violet-500', bereavement: 'bg-slate-500', parental: 'bg-pink-500' };
+                                        const colors: Record<string, string> = { annual: 'bg-blue-500', sick: 'bg-red-500', personal: 'bg-primary', bereavement: 'bg-slate-500', parental: 'bg-pink-500' };
                                         return (
                                             <Card key={lb.id}><CardContent className="pt-4">
                                                 <div className="flex items-center justify-between mb-2">
@@ -983,7 +983,7 @@ export default function EmployeeShow({
                                             <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground sm:table-cell">{a.asset_tag || '\u2014'}</td>
                                             <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{a.category ? formatLabel(a.category) : '\u2014'}</td>
                                             <td className="px-4 py-3 text-muted-foreground">{formatDate(a.assigned_at)}</td>
-                                            <td className="px-4 py-3">{a.returned_at ? <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600">Returned</Badge> : <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Active</Badge>}</td>
+                                            <td className="px-4 py-3">{a.returned_at ? <Badge variant="outline" className="border-border bg-muted text-muted-foreground">Returned</Badge> : <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Active</Badge>}</td>
                                         </tr>
                                     ))}
                                 </tbody></table>

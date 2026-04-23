@@ -234,7 +234,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Pro
                                             type="checkbox"
                                             checked={filteredVehicles.length > 0 && selectedIds.length === filteredVehicles.length}
                                             onChange={toggleSelectAll}
-                                            className="h-3.5 w-3.5 rounded border-gray-300"
+                                            className="h-3.5 w-3.5 rounded border-border"
                                         />
                                         <span>Select all</span>
                                     </div>
@@ -249,7 +249,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites, can }: Pro
                                                         type="checkbox"
                                                         checked={selectedIds.includes(vehicle.id)}
                                                         onChange={() => toggleSelect(vehicle.id)}
-                                                        className="mt-3.5 h-3.5 w-3.5 rounded border-gray-300"
+                                                        className="mt-3.5 h-3.5 w-3.5 rounded border-border"
                                                     />
                                                 )}
                                                 <Link

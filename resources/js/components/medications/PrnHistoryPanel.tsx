@@ -29,7 +29,7 @@ export default function PrnHistoryPanel({ history, count24h, maxPerDay, remainin
   };
 
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <History className="h-4 w-4" />
@@ -40,16 +40,16 @@ export default function PrnHistoryPanel({ history, count24h, maxPerDay, remainin
         {/* Usage Bar */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-600">Usage</span>
+            <span className="text-muted-foreground">Usage</span>
             <span className="font-medium">
               {count24h} / {maxPerDay || 'unlimited'}
               {remainingToday !== null && remainingToday !== undefined && (
-                <span className="ml-2 text-slate-500">({remainingToday} remaining)</span>
+                <span className="ml-2 text-muted-foreground">({remainingToday} remaining)</span>
               )}
             </span>
           </div>
           {maxCount && (
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className={`h-full transition-all duration-300 ${getBarColor()}`}
                 style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -60,7 +60,7 @@ export default function PrnHistoryPanel({ history, count24h, maxPerDay, remainin
 
         {/* History List */}
         {history.length === 0 ? (
-          <div className="text-center text-sm text-slate-500">
+          <div className="text-center text-sm text-muted-foreground">
             No PRN administrations in last 24 hours
           </div>
         ) : (
@@ -68,9 +68,9 @@ export default function PrnHistoryPanel({ history, count24h, maxPerDay, remainin
             {history.map((admin) => (
               <div
                 key={admin.id}
-                className="flex items-start gap-2 rounded-md border border-slate-100 bg-slate-50 p-2"
+                className="flex items-start gap-2 rounded-md border border-border bg-muted p-2"
               >
-                <Clock className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" />
+                <Clock className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1 text-xs">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">
@@ -86,12 +86,12 @@ export default function PrnHistoryPanel({ history, count24h, maxPerDay, remainin
                     )}
                   </div>
                   {admin.reason && (
-                    <div className="mt-1 truncate text-slate-600">
+                    <div className="mt-1 truncate text-muted-foreground">
                       {admin.reason}
                     </div>
                   )}
                   {admin.administered_by && (
-                    <div className="mt-1 flex items-center gap-1 text-slate-400">
+                    <div className="mt-1 flex items-center gap-1 text-muted-foreground">
                       <User className="h-3 w-3" />
                       {admin.administered_by}
                     </div>

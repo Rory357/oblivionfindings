@@ -132,7 +132,7 @@ const deviceStatusConfig: Record<
     },
     decommissioned: {
         label: 'Retired',
-        className: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+        className: 'bg-slate-500/10 text-muted-foreground border-slate-500/20',
         icon: Ban,
     },
     in_stock: {
@@ -406,7 +406,7 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                             </div>
                             <div>
                                 <div className="text-2xl font-bold">{stats.total}</div>
-                                <div className="text-sm text-slate-400">Total devices</div>
+                                <div className="text-sm text-muted-foreground">Total devices</div>
                             </div>
                         </CardContent>
                     </Card>
@@ -419,7 +419,7 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                                 <div className="text-2xl font-bold text-emerald-400">
                                     {stats.online}
                                 </div>
-                                <div className="text-sm text-slate-400">Online</div>
+                                <div className="text-sm text-muted-foreground">Online</div>
                             </div>
                         </CardContent>
                     </Card>
@@ -432,7 +432,7 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                                 <div className="text-2xl font-bold text-red-400">
                                     {stats.offline}
                                 </div>
-                                <div className="text-sm text-slate-400">Offline / degraded</div>
+                                <div className="text-sm text-muted-foreground">Offline / degraded</div>
                             </div>
                         </CardContent>
                     </Card>
@@ -445,7 +445,7 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                                 <div className="text-2xl font-bold text-amber-400">
                                     {stats.unassigned}
                                 </div>
-                                <div className="text-sm text-slate-400">Unassigned to rooms</div>
+                                <div className="text-sm text-muted-foreground">Unassigned to rooms</div>
                             </div>
                         </CardContent>
                     </Card>

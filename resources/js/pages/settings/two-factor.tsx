@@ -112,8 +112,8 @@ export default function TwoFactor({
                             </div>
                         ) : (
                             <div className="flex flex-col items-center py-8 text-center">
-                                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-950/50">
-                                    <Shield className="h-8 w-8 text-violet-600" />
+                                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/50">
+                                    <Shield className="h-8 w-8 text-primary" />
                                 </div>
                                 <h3 className="mb-2 text-lg font-medium">
                                     Protect your account
@@ -126,7 +126,7 @@ export default function TwoFactor({
 
                                 {hasSetupData ? (
                                     <Button
-                                        className="bg-violet-600 hover:bg-violet-700"
+                                        className="bg-primary hover:bg-primary"
                                         onClick={() => setShowSetupModal(true)}
                                     >
                                         <ShieldCheck className="mr-1.5 h-4 w-4" />
@@ -141,7 +141,7 @@ export default function TwoFactor({
                                             <Button
                                                 type="submit"
                                                 disabled={processing}
-                                                className="bg-violet-600 hover:bg-violet-700"
+                                                className="bg-primary hover:bg-primary"
                                             >
                                                 <ShieldCheck className="mr-1.5 h-4 w-4" />
                                                 Enable 2FA

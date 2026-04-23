@@ -153,13 +153,13 @@ export default function SchedulesIndex({
     function timelineDotColor(type: string): string {
         if (type === 'overdue') return 'bg-red-500';
         if (type === 'soon') return 'bg-amber-500';
-        return 'bg-purple-500';
+        return 'bg-primary';
     }
 
     function timelineIndicator(type: string): string {
         if (type === 'overdue') return 'text-red-500';
         if (type === 'soon') return 'text-amber-500';
-        return 'text-purple-500';
+        return 'text-primary';
     }
 
     function timelineLabel(item: TimelineItem): string {
@@ -259,7 +259,7 @@ export default function SchedulesIndex({
                     <FleetStatCard label="OVERDUE" value={overdueCount} icon={AlertTriangle} color="red" subtitle="Past due date" />
                     <FleetStatCard label="DUE SOON" value={dueSoonCount} icon={Timer} color="amber" subtitle="Within 14 days" />
                     <FleetStatCard label="ON TRACK" value={onTrackCount} icon={CheckCircle} subtitle="Up to date" />
-                    <Card className="border bg-purple-50 dark:bg-purple-950/30 transition-shadow hover:shadow-md flex items-center justify-center">
+                    <Card className="border bg-primary/10 dark:bg-primary/30 transition-shadow hover:shadow-md flex items-center justify-center">
                         <CardContent className="p-4 flex items-center justify-center">
                             <HalfMoonGauge value={healthPct} label="Fleet Health" sublabel={`${onTrackCount} of ${totalCount} on track`} size={130} color={FLEET_COLORS.primary} />
                         </CardContent>
@@ -299,7 +299,7 @@ export default function SchedulesIndex({
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                <Activity className="h-4 w-4 text-purple-500" />
+                                <Activity className="h-4 w-4 text-primary" />
                                 Upcoming Service Timeline
                                 <span className="text-xs font-normal text-muted-foreground ml-1">(Next 30 days)</span>
                             </CardTitle>
@@ -433,7 +433,7 @@ export default function SchedulesIndex({
                                             {progressPct !== null ? (
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
-                                                        <div className="h-full rounded-full bg-purple-500" style={{ width: `${progressPct}%` }} />
+                                                        <div className="h-full rounded-full bg-primary" style={{ width: `${progressPct}%` }} />
                                                     </div>
                                                     <span className="text-[10px] text-muted-foreground tabular-nums">{progressPct}%</span>
                                                 </div>

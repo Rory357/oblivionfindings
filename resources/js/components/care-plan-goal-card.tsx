@@ -34,21 +34,21 @@ const PRIORITY_TEXT: Record<string, string> = {
     critical: 'text-red-600 dark:text-red-400',
     high: 'text-amber-600 dark:text-amber-400',
     medium: 'text-blue-600 dark:text-blue-400',
-    low: 'text-slate-500 dark:text-slate-400',
+    low: 'text-muted-foreground dark:text-muted-foreground',
 };
 
 const CATEGORY_BADGE: Record<string, string> = {
     health: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
     social: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     independence: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    skills: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    skills: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     wellbeing: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
 };
 
 const STATUS_ICON: Record<string, { icon: typeof CheckCircle2; className: string }> = {
     completed: { icon: CheckCircle2, className: 'text-emerald-500' },
     in_progress: { icon: Clock, className: 'text-blue-500' },
-    not_started: { icon: Circle, className: 'text-slate-400' },
+    not_started: { icon: Circle, className: 'text-muted-foreground' },
     on_hold: { icon: Pause, className: 'text-amber-500' },
 };
 
@@ -74,7 +74,7 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
 
     const borderColor = PRIORITY_BORDER[goal.priority] ?? PRIORITY_BORDER.medium;
     const priorityText = PRIORITY_TEXT[goal.priority] ?? PRIORITY_TEXT.medium;
-    const categoryBadge = CATEGORY_BADGE[goal.category] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300';
+    const categoryBadge = CATEGORY_BADGE[goal.category] ?? 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground';
     const statusInfo = STATUS_ICON[goal.status] ?? STATUS_ICON.not_started;
     const StatusIcon = statusInfo.icon;
     const progressColor = PROGRESS_COLOR[goal.status] ?? PROGRESS_COLOR.not_started;
@@ -168,7 +168,7 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                                 {descriptionLong && (
                                     <button
                                         onClick={() => setExpanded(!expanded)}
-                                        className="mt-0.5 flex items-center gap-0.5 text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                                        className="mt-0.5 flex items-center gap-0.5 text-[10px] text-primary dark:text-primary hover:underline"
                                     >
                                         {expanded ? (
                                             <>

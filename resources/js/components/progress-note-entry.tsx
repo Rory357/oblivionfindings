@@ -23,7 +23,7 @@ interface ProgressNoteEntryProps {
 const VISIBILITY_BADGE: Record<string, { label: string; className: string }> = {
     staff_only: {
         label: 'Staff Only',
-        className: 'bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-400',
+        className: 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground',
     },
     include_family: {
         label: 'Family Visible',
@@ -31,7 +31,7 @@ const VISIBILITY_BADGE: Record<string, { label: string; className: string }> = {
     },
     private: {
         label: 'Private',
-        className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+        className: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     },
 };
 
@@ -79,8 +79,8 @@ export function ProgressNoteEntry({ note, compact = false }: ProgressNoteEntryPr
         return (
             <div className={`flex items-center gap-2 py-1.5 px-2 rounded-md text-xs ${note.is_flagged ? 'bg-red-50 dark:bg-red-950/20 border-l-2 border-l-red-500' : ''}`}>
                 {note.author && (
-                    <div className="h-5 w-5 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                        <span className="text-[8px] font-semibold text-indigo-700 dark:text-indigo-300">
+                    <div className="h-5 w-5 shrink-0 rounded-full bg-primary/10 dark:bg-primary/40 flex items-center justify-center">
+                        <span className="text-[8px] font-semibold text-primary dark:text-primary/70">
                             {getInitials(note.author.name)}
                         </span>
                     </div>
@@ -100,8 +100,8 @@ export function ProgressNoteEntry({ note, compact = false }: ProgressNoteEntryPr
                 {/* Header: avatar, name, time, mood, badges */}
                 <div className="flex items-center gap-2 flex-wrap">
                     {note.author && (
-                        <div className="h-7 w-7 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                            <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-300">
+                        <div className="h-7 w-7 shrink-0 rounded-full bg-primary/10 dark:bg-primary/40 flex items-center justify-center">
+                            <span className="text-[10px] font-semibold text-primary dark:text-primary/70">
                                 {getInitials(note.author.name)}
                             </span>
                         </div>
@@ -129,7 +129,7 @@ export function ProgressNoteEntry({ note, compact = false }: ProgressNoteEntryPr
                             <div className="relative group">
                                 <Flag className="h-3.5 w-3.5 text-red-500" />
                                 {note.flagged_reason && (
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 rounded bg-slate-900 dark:bg-slate-100 px-2 py-1 text-[10px] text-white dark:text-slate-900 whitespace-nowrap shadow-lg">
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 rounded bg-slate-900 dark:bg-muted px-2 py-1 text-[10px] text-white dark:text-foreground whitespace-nowrap shadow-lg">
                                         {note.flagged_reason}
                                     </div>
                                 )}
@@ -140,7 +140,7 @@ export function ProgressNoteEntry({ note, compact = false }: ProgressNoteEntryPr
 
                 {/* Note type badge */}
                 {note.note_type && (
-                    <Badge className="mt-2 border-0 bg-slate-100 text-slate-600 dark:bg-slate-800/40 dark:text-slate-400 text-[10px] capitalize">
+                    <Badge className="mt-2 border-0 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground text-[10px] capitalize">
                         <MessageSquare className="h-3 w-3 mr-0.5" />
                         {note.note_type.replace(/_/g, ' ')}
                     </Badge>
@@ -154,7 +154,7 @@ export function ProgressNoteEntry({ note, compact = false }: ProgressNoteEntryPr
                     {contentLong && (
                         <button
                             onClick={() => setExpanded(!expanded)}
-                            className="mt-1 flex items-center gap-0.5 text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                            className="mt-1 flex items-center gap-0.5 text-[11px] text-primary dark:text-primary hover:underline"
                         >
                             {expanded ? (
                                 <>
@@ -173,7 +173,7 @@ export function ProgressNoteEntry({ note, compact = false }: ProgressNoteEntryPr
                 {(note.goal || note.shift) && (
                     <div className="mt-2.5 flex items-center gap-2 flex-wrap">
                         {note.goal && (
-                            <Badge className="border-0 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 text-[10px]">
+                            <Badge className="border-0 bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70 text-[10px]">
                                 Goal: {note.goal.title}
                             </Badge>
                         )}

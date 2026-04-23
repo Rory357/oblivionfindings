@@ -64,7 +64,7 @@ const resultColors: Record<string, string> = {
     pass: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
     fail: 'border-red-500/30 text-red-400 bg-red-500/10',
     partial: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
-    na: 'border-slate-500/30 text-slate-400',
+    na: 'border-slate-500/30 text-muted-foreground',
 };
 
 export default function GlobalSiteInspections({
@@ -122,7 +122,7 @@ export default function GlobalSiteInspections({
                             <ClipboardCheck className="w-5 h-5" />
                             Inspections & Maintenance
                         </h1>
-                        <p className="text-sm text-slate-400">All sites</p>
+                        <p className="text-sm text-muted-foreground">All sites</p>
                     </div>
                 </div>
 
@@ -130,25 +130,25 @@ export default function GlobalSiteInspections({
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{filteredSchedules.length}</div>
-                            <div className="text-sm text-slate-400">Schedules</div>
+                            <div className="text-sm text-muted-foreground">Schedules</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-red-500/5 border-red-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-red-400">{overdueCount}</div>
-                            <div className="text-sm text-slate-400">Overdue</div>
+                            <div className="text-sm text-muted-foreground">Overdue</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-amber-500/5 border-amber-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-amber-400">{dueSoonCount}</div>
-                            <div className="text-sm text-slate-400">Due In 7 Days</div>
+                            <div className="text-sm text-muted-foreground">Due In 7 Days</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-emerald-400">{completedPassCount}</div>
-                            <div className="text-sm text-slate-400">Passed Records</div>
+                            <div className="text-sm text-muted-foreground">Passed Records</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -242,7 +242,7 @@ export default function GlobalSiteInspections({
                     </CardHeader>
                     <CardContent>
                         {filteredSchedules.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400">No inspection schedules match your filters.</div>
+                            <div className="text-center py-8 text-muted-foreground">No inspection schedules match your filters.</div>
                         ) : (
                             <div className="space-y-2">
                                 {filteredSchedules.map((schedule) => {
@@ -251,17 +251,17 @@ export default function GlobalSiteInspections({
                                         <div key={schedule.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
                                             <div>
                                                 <div className="font-medium">{schedule.title}</div>
-                                                <div className="text-sm text-slate-400">
+                                                <div className="text-sm text-muted-foreground">
                                                     {schedule.site_name} • {schedule.inspection_type} • {schedule.frequency}
                                                 </div>
-                                                <div className="text-xs text-slate-500 mt-1">
+                                                <div className="text-xs text-muted-foreground mt-1">
                                                     {schedule.assigned_to_name ? `Assigned: ${schedule.assigned_to_name} • ` : ''}
                                                     Due: {schedule.next_due_date ?? '—'}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {!schedule.is_active && (
-                                                    <Badge variant="outline" className="border-slate-500/30 text-slate-400">
+                                                    <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
                                                         Inactive
                                                     </Badge>
                                                 )}
@@ -294,24 +294,24 @@ export default function GlobalSiteInspections({
                     </CardHeader>
                     <CardContent>
                         {filteredRecords.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400">No records match your filters.</div>
+                            <div className="text-center py-8 text-muted-foreground">No records match your filters.</div>
                         ) : (
                             <div className="space-y-2">
                                 {filteredRecords.map((record) => (
                                     <div key={record.id} className="rounded-lg border p-3 flex items-center justify-between gap-3">
                                         <div>
                                             <div className="font-medium">{record.schedule_title || 'Inspection record'}</div>
-                                            <div className="text-sm text-slate-400">
+                                            <div className="text-sm text-muted-foreground">
                                                 {record.site_name} • Due {record.due_date ?? '—'}
                                             </div>
-                                            <div className="text-xs text-slate-500 mt-1">
+                                            <div className="text-xs text-muted-foreground mt-1">
                                                 Completed: {record.completed_at ?? '—'}
                                                 {record.completed_by_name ? ` • By ${record.completed_by_name}` : ''}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {record.result && (
-                                                <Badge variant="outline" className={resultColors[record.result] || 'border-slate-500/30 text-slate-400'}>
+                                                <Badge variant="outline" className={resultColors[record.result] || 'border-slate-500/30 text-muted-foreground'}>
                                                     {record.result === 'pass' ? <CheckCircle2 className="w-3 h-3 mr-1" /> : null}
                                                     {record.result.toUpperCase()}
                                                 </Badge>

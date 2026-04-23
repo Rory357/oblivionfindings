@@ -346,18 +346,18 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
             <div className="m-4 max-w-3xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/10 mb-4">
-                        <TypeIcon className="w-8 h-8 text-indigo-400" />
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                        <TypeIcon className="w-8 h-8 text-primary" />
                     </div>
                     <h1 className="text-2xl font-semibold">Onboard New Site</h1>
-                    <p className="text-slate-400">{site.name}</p>
+                    <p className="text-muted-foreground">{site.name}</p>
                 </div>
 
                 {/* Progress */}
                 <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                         <span>Step {activeStep} of {steps.length}</span>
-                        <span className="text-slate-400">{Math.round(progress)}%</span>
+                        <span className="text-muted-foreground">{Math.round(progress)}%</span>
                     </div>
                     <Progress value={progress} />
                     <div className="flex justify-center gap-1 pt-2">
@@ -366,7 +366,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                                 key={step.key}
                                 className={`w-2 h-2 rounded-full ${
                                     idx + 1 < activeStep ? 'bg-emerald-500' :
-                                    idx + 1 === activeStep ? 'bg-indigo-500' :
+                                    idx + 1 === activeStep ? 'bg-primary' :
                                     'bg-slate-700'
                                 }`}
                             />
@@ -391,7 +391,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Rooms Step */}
                         {currentStepData.key === 'rooms' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Add rooms for this house (bedrooms, kitchen, lounge, bathroom, etc). You can assign clients to bedrooms later.</p>
+                                <p className="text-sm text-muted-foreground">Add rooms for this house (bedrooms, kitchen, lounge, bathroom, etc). You can assign clients to bedrooms later.</p>
                                 {rooms.map((room, index) => (
                                     <div key={index} className="flex gap-2">
                                         <Input
@@ -415,7 +415,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Resources Step */}
                         {currentStepData.key === 'resources' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Add bookable rooms and resources for this head office.</p>
+                                <p className="text-sm text-muted-foreground">Add bookable rooms and resources for this head office.</p>
                                 {resources.map((resource, index) => (
                                     <div key={index} className="grid gap-2 sm:grid-cols-3 p-3 rounded-lg border border">
                                         <Input
@@ -461,7 +461,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Zones Step */}
                         {currentStepData.key === 'zones' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Add areas and zones for this facility.</p>
+                                <p className="text-sm text-muted-foreground">Add areas and zones for this facility.</p>
                                 {zones.map((zone, index) => (
                                     <div key={index} className="flex gap-2">
                                         <Input
@@ -491,7 +491,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Assets Step */}
                         {currentStepData.key === 'assets' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Add initial assets and equipment for this site.</p>
+                                <p className="text-sm text-muted-foreground">Add initial assets and equipment for this site.</p>
                                 {assets.map((asset, index) => (
                                     <div key={index} className="grid gap-2 sm:grid-cols-3 p-3 rounded-lg border border">
                                         <Input
@@ -529,7 +529,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Checklists Step */}
                         {currentStepData.key === 'checklists' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Set up recurring checklists for this site.</p>
+                                <p className="text-sm text-muted-foreground">Set up recurring checklists for this site.</p>
                                 {checklistTemplates.map((template) => (
                                     <div key={template.id} className="p-3 rounded-lg border border">
                                         <div className="flex items-center gap-2 mb-2">
@@ -549,7 +549,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                                             <span className="font-medium">{template.name}</span>
                                         </div>
                                         {template.description && (
-                                            <p className="text-sm text-slate-400 ml-6">{template.description}</p>
+                                            <p className="text-sm text-muted-foreground ml-6">{template.description}</p>
                                         )}
                                         {checklistAssignments[template.id]?.enabled && (
                                             <div className="ml-6 mt-2">
@@ -586,7 +586,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Basic Step */}
                         {currentStepData.key === 'basic' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Enter the essential contact and safety information for this site.</p>
+                                <p className="text-sm text-muted-foreground">Enter the essential contact and safety information for this site.</p>
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div>
                                         <Label>Phone</Label>
@@ -657,7 +657,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Contacts Step */}
                         {currentStepData.key === 'contacts' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Add key site contacts to speed up hazard assignment and after-hours handovers.</p>
+                                <p className="text-sm text-muted-foreground">Add key site contacts to speed up hazard assignment and after-hours handovers.</p>
                                 {contacts.map((contact, index) => (
                                     <div key={index} className="grid gap-2 sm:grid-cols-2 p-3 rounded-lg border border">
                                         <Input
@@ -705,7 +705,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Documents Step */}
                         {currentStepData.key === 'documents' && (
                             <div className="space-y-6">
-                                <p className="text-sm text-slate-400">Upload key documents for this site (evacuation plans, compliance certificates, etc).</p>
+                                <p className="text-sm text-muted-foreground">Upload key documents for this site (evacuation plans, compliance certificates, etc).</p>
 
                                 {/* Upload form */}
                                 <div className="p-4 rounded-lg border border space-y-3">
@@ -768,7 +768,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                                             accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
                                             className="cursor-pointer"
                                         />
-                                        <p className="text-xs text-slate-500 mt-1">PDF, Word, Excel, or images. Max 20MB.</p>
+                                        <p className="text-xs text-muted-foreground mt-1">PDF, Word, Excel, or images. Max 20MB.</p>
                                     </div>
                                     <Button
                                         onClick={handleUploadDocument}
@@ -787,10 +787,10 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                                         {uploadedDocs.map((doc) => (
                                             <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border border bg-slate-900/30">
                                                 <div className="flex items-center gap-3 min-w-0">
-                                                    <FileText className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                                                    <FileText className="w-5 h-5 text-primary flex-shrink-0" />
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-medium truncate">{doc.title}</p>
-                                                        <p className="text-xs text-slate-500 truncate">
+                                                        <p className="text-xs text-muted-foreground truncate">
                                                             {doc.original_name}
                                                             {doc.size_bytes > 0 && ` · ${formatFileSize(doc.size_bytes)}`}
                                                             {doc.category && ` · ${doc.category}`}

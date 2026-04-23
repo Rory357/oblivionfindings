@@ -200,7 +200,7 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-purple-600">
+                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-primary">
                                     <CheckCircle className="h-4 w-4" /> Eligible
                                 </CardTitle>
                             </CardHeader>

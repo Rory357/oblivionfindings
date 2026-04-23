@@ -91,7 +91,7 @@ export function RiskMatrix({
                                                 CELL_COLORS[level],
                                                 isActive && !isBoth ? ACTIVE_RING : '',
                                                 isResidual && !isBoth ? RESIDUAL_RING : '',
-                                                isBoth ? 'ring-2 ring-offset-1 ring-purple-500' : '',
+                                                isBoth ? 'ring-2 ring-offset-1 ring-ring' : '',
                                             ].join(' ')}
                                             title={`L${l} x C${c} = ${score} (${level})`}
                                         >
@@ -124,11 +124,11 @@ export function RiskMatrix({
             {!compact && (residualLikelihood != null && residualConsequence != null) && (
                 <div className="mt-2 flex gap-4 text-[10px] text-muted-foreground">
                     <span className="flex items-center gap-1">
-                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-slate-900 dark:ring-white ring-offset-1 bg-slate-200" />
+                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-slate-900 dark:ring-white ring-offset-1 bg-muted" />
                         Inherent
                     </span>
                     <span className="flex items-center gap-1">
-                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-blue-500 ring-dashed ring-offset-1 bg-slate-200" />
+                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-blue-500 ring-dashed ring-offset-1 bg-muted" />
                         Residual
                     </span>
                 </div>

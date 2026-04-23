@@ -130,7 +130,7 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                         value={form.data.published_at}
                                         onChange={(e) => form.setData('published_at', e.target.value)}
                                     />
-                                    <p className="mt-1 text-xs text-slate-500">Leave blank to publish immediately.</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">Leave blank to publish immediately.</p>
                                 </div>
                                 <div>
                                     <Label>Expires At</Label>
@@ -139,7 +139,7 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                         value={form.data.expires_at}
                                         onChange={(e) => form.setData('expires_at', e.target.value)}
                                     />
-                                    <p className="mt-1 text-xs text-slate-500">Leave blank for no expiry.</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">Leave blank for no expiry.</p>
                                 </div>
                             </div>
 
@@ -150,7 +150,7 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                         id="is_pinned"
                                         checked={form.data.is_pinned}
                                         onChange={(e) => form.setData('is_pinned', e.target.checked)}
-                                        className="rounded border-gray-300"
+                                        className="rounded border-border"
                                     />
                                     <Label htmlFor="is_pinned">Pin this announcement</Label>
                                 </div>
@@ -160,7 +160,7 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                         id="requires_acknowledgement"
                                         checked={form.data.requires_acknowledgement}
                                         onChange={(e) => form.setData('requires_acknowledgement', e.target.checked)}
-                                        className="rounded border-gray-300"
+                                        className="rounded border-border"
                                     />
                                     <Label htmlFor="requires_acknowledgement">Require staff acknowledgement</Label>
                                 </div>

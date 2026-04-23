@@ -102,15 +102,15 @@ const txnTypeConfig: Record<string, { label: string; className: string; isInflow
     expenditure: { label: 'Expenditure', className: 'bg-red-100 text-red-800', isInflow: false },
     commitment: { label: 'Commitment', className: 'bg-amber-100 text-amber-800', isInflow: false },
     release: { label: 'Release', className: 'bg-blue-100 text-blue-800', isInflow: true },
-    transfer: { label: 'Transfer', className: 'bg-purple-100 text-purple-800', isInflow: false },
-    adjustment: { label: 'Adjustment', className: 'bg-gray-100 text-gray-800', isInflow: false },
+    transfer: { label: 'Transfer', className: 'bg-primary/10 text-primary', isInflow: false },
+    adjustment: { label: 'Adjustment', className: 'bg-muted text-foreground', isInflow: false },
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     active: { label: 'Active', className: 'border-green-300 text-green-600' },
     fully_spent: { label: 'Fully Spent', className: 'border-amber-300 text-amber-600' },
     expired: { label: 'Expired', className: 'border-red-300 text-red-600' },
-    returned: { label: 'Returned', className: 'border-gray-300 text-gray-600' },
+    returned: { label: 'Returned', className: 'border-border text-muted-foreground' },
 };
 
 export default function DonorFundShow({ fund, transactions, reports, expenseAccounts, bankAccounts }: Props) {
@@ -359,7 +359,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                             {transactions.map((txn) => {
                                                 const typeConf = txnTypeConfig[txn.type] ?? {
                                                     label: txn.type,
-                                                    className: 'bg-gray-100 text-gray-800',
+                                                    className: 'bg-muted text-foreground',
                                                     isInflow: false,
                                                 };
                                                 return (

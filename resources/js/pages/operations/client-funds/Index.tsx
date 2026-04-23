@@ -129,7 +129,7 @@ export default function ClientFundsIndex({ funds = { data: [], links: [], curren
                         return (
                             <Card key={fund.id} className="transition-all hover:border-border hover:shadow-sm">
                                 <CardContent className="flex items-center gap-4 p-4">
-                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isLow ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'}`}>
+                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isLow ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}>
                                         {isLow ? <AlertTriangle className="h-5 w-5" /> : <Wallet className="h-5 w-5" />}
                                     </div>
                                     <div className="min-w-0 flex-1">

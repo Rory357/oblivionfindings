@@ -278,9 +278,9 @@ export default function RecordAdministrationDialog({
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    <div className="rounded-md bg-slate-50 p-3">
+                    <div className="rounded-md bg-muted p-3">
                         <div className="font-medium">{medication.name}</div>
-                        <div className="text-sm text-slate-600">
+                        <div className="text-sm text-muted-foreground">
                             {medication.dosage}
                             {medication.route && ` • ${medication.route}`}
                             {medication.form && ` • ${medication.form}`}
@@ -288,7 +288,7 @@ export default function RecordAdministrationDialog({
                         {medication.is_prn && (
                             <Badge
                                 variant="outline"
-                                className="mt-2 bg-indigo-50 text-indigo-700"
+                                className="mt-2 bg-primary/10 text-primary"
                             >
                                 PRN
                             </Badge>
@@ -310,7 +310,7 @@ export default function RecordAdministrationDialog({
                             </Badge>
                         )}
                         {scheduledTime && (
-                            <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+                            <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                                 <Clock className="h-3 w-3" />
                                 Scheduled:{' '}
                                 {new Date(scheduledTime).toLocaleTimeString(
@@ -511,7 +511,7 @@ export default function RecordAdministrationDialog({
                                     Reason / Indication *
                                     {medication.is_prn &&
                                         status === 'given' && (
-                                            <span className="ml-1 text-xs text-slate-500">
+                                            <span className="ml-1 text-xs text-muted-foreground">
                                                 (PRN indication required)
                                             </span>
                                         )}
@@ -553,7 +553,7 @@ export default function RecordAdministrationDialog({
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <p className="mt-1 text-xs text-slate-500">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                     A witness is required for controlled drugs
                                 </p>
                             </div>

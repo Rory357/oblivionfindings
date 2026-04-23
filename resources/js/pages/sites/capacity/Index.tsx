@@ -56,7 +56,7 @@ function DonutChart({ percentage, size = 120 }: { percentage: number; size?: num
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={strokeWidth}
-                    className="text-slate-700"
+                    className="text-foreground"
                 />
                 <circle
                     cx={center}
@@ -73,7 +73,7 @@ function DonutChart({ percentage, size = 120 }: { percentage: number; size?: num
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-2xl font-bold">{percentage}%</span>
-                <span className="text-xs text-slate-400">occupied</span>
+                <span className="text-xs text-muted-foreground">occupied</span>
             </div>
         </div>
     );
@@ -116,7 +116,7 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                                     <Home className="w-5 h-5 text-blue-400" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-slate-400">Total Capacity</div>
+                                    <div className="text-sm text-muted-foreground">Total Capacity</div>
                                     <div className="text-2xl font-bold">{totalCapacity || '—'}</div>
                                 </div>
                             </div>
@@ -129,7 +129,7 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                                     <Users className="w-5 h-5 text-emerald-400" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-slate-400">Current Occupancy</div>
+                                    <div className="text-sm text-muted-foreground">Current Occupancy</div>
                                     <div className="text-2xl font-bold">{currentOccupancy}</div>
                                 </div>
                             </div>
@@ -138,11 +138,11 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-violet-500/10 p-2">
-                                    <UserPlus className="w-5 h-5 text-violet-400" />
+                                <div className="rounded-lg bg-primary/10 p-2">
+                                    <UserPlus className="w-5 h-5 text-primary" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-slate-400">Available Spaces</div>
+                                    <div className="text-sm text-muted-foreground">Available Spaces</div>
                                     <div className="text-2xl font-bold">{availableSpaces}</div>
                                 </div>
                             </div>
@@ -155,7 +155,7 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                                     <Clock className="w-5 h-5 text-amber-400" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-slate-400">Waitlist</div>
+                                    <div className="text-sm text-muted-foreground">Waitlist</div>
                                     <div className="text-2xl font-bold">{waitlistCount}</div>
                                 </div>
                             </div>
@@ -173,7 +173,7 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                             {totalCapacity > 0 ? (
                                 <DonutChart percentage={occupancyPercent} size={160} />
                             ) : (
-                                <div className="text-center text-slate-400">
+                                <div className="text-center text-muted-foreground">
                                     <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                     <p className="text-sm">Set total capacity to see occupancy rate</p>
                                 </div>
@@ -191,7 +191,7 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                         </CardHeader>
                         <CardContent>
                             {rooms.length === 0 ? (
-                                <div className="text-center py-8 text-slate-400">
+                                <div className="text-center py-8 text-muted-foreground">
                                     <Home className="w-10 h-10 mx-auto mb-2 opacity-50" />
                                     <p className="text-sm">No rooms configured for this site</p>
                                     <Button asChild variant="outline" size="sm" className="mt-3">
@@ -206,10 +206,10 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                                             className="flex items-center justify-between rounded-lg border p-3"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <Home className="w-4 h-4 text-slate-400" />
+                                                <Home className="w-4 h-4 text-muted-foreground" />
                                                 <div>
                                                     <div className="font-medium text-sm">{room.name}</div>
-                                                    <div className="text-xs text-slate-400">
+                                                    <div className="text-xs text-muted-foreground">
                                                         {room.assigned_client
                                                             ? `${room.assigned_client.first_name} ${room.assigned_client.last_name}`
                                                             : 'Vacant'}
@@ -223,7 +223,7 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                                                     </Badge>
                                                 ) : (
                                                     <>
-                                                        <Badge variant="outline" className="border-slate-500/30 text-slate-400">
+                                                        <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
                                                             Vacant
                                                         </Badge>
                                                         <Button variant="ghost" size="sm" className="text-xs" asChild>
@@ -249,11 +249,11 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex items-center justify-center py-12 text-slate-400">
+                        <div className="flex items-center justify-center py-12 text-muted-foreground">
                             <div className="text-center">
                                 <BarChart3 className="w-16 h-16 mx-auto mb-3 opacity-30" />
                                 <p className="text-sm">Occupancy trend chart coming soon</p>
-                                <p className="text-xs text-slate-500 mt-1">Historical occupancy data will be displayed here</p>
+                                <p className="text-xs text-muted-foreground mt-1">Historical occupancy data will be displayed here</p>
                             </div>
                         </div>
                     </CardContent>

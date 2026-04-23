@@ -105,7 +105,7 @@ const SmartMonitoring: React.FC = () => {
             <section className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/10 via-primary/5 to-background px-6 py-16 sm:px-12 sm:py-24">
                 <div className="pointer-events-none absolute inset-0">
                     <div className="absolute -top-20 -right-20 h-[400px] w-[400px] rounded-full bg-primary/20 blur-3xl" />
-                    <div className="absolute -bottom-20 -left-20 h-[300px] w-[300px] rounded-full bg-purple-500/10 blur-3xl" />
+                    <div className="absolute -bottom-20 -left-20 h-[300px] w-[300px] rounded-full bg-primary/10 blur-3xl" />
                 </div>
 
                 <div className="relative mx-auto max-w-4xl text-center">

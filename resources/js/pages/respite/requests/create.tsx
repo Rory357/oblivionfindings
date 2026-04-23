@@ -36,7 +36,7 @@ export default function RespiteRequestCreate({ clients, serviceContexts, default
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">New Booking Request</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Requests are reviewed and approved before a confirmed booking is created.
                     </div>
                 </div>

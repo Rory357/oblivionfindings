@@ -120,7 +120,7 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                             <BedDouble className="w-5 h-5" />
                             Bedrooms
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <Button onClick={() => setShowForm(true)}>
                         <Plus className="w-4 h-4 mr-1" />
@@ -133,21 +133,21 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{rooms.length}</div>
-                            <div className="text-sm text-slate-400">Total Bedrooms</div>
+                            <div className="text-sm text-muted-foreground">Total Bedrooms</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-emerald-400">{activeRooms.length}</div>
-                            <div className="text-sm text-slate-400">Active</div>
+                            <div className="text-sm text-muted-foreground">Active</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-indigo-500/5 border-indigo-500/20">
+                    <Card className="bg-primary/5 border-primary/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-indigo-400">
+                            <div className="text-2xl font-bold text-primary">
                                 {activeRooms.filter(r => r.assigned_client).length}
                             </div>
-                            <div className="text-sm text-slate-400">Occupied</div>
+                            <div className="text-sm text-muted-foreground">Occupied</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -209,7 +209,7 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                     </CardHeader>
                     <CardContent>
                         {activeRooms.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400">
+                            <div className="text-center py-8 text-muted-foreground">
                                 <BedDouble className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No bedrooms configured yet</p>
                             </div>
@@ -222,17 +222,17 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                                                 <div className="flex-1">
                                                     <div className="font-medium">{room.name}</div>
                                                     {room.assigned_client ? (
-                                                        <Badge className="mt-2 bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
+                                                        <Badge className="mt-2 bg-primary/20 text-primary/70 border-primary/30">
                                                             <User className="w-3 h-3 mr-1" />
                                                             {room.assigned_client.first_name} {room.assigned_client.last_name}
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="mt-2 text-slate-400">
+                                                        <Badge variant="outline" className="mt-2 text-muted-foreground">
                                                             Available
                                                         </Badge>
                                                     )}
                                                     {room.notes && (
-                                                        <div className="text-sm text-slate-400 mt-2">{room.notes}</div>
+                                                        <div className="text-sm text-muted-foreground mt-2">{room.notes}</div>
                                                     )}
                                                 </div>
                                                 <div className="flex gap-1 ml-2">
@@ -256,14 +256,14 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                                                                                         <div className="font-medium">
                                                                                             {entry.client.first_name} {entry.client.last_name}
                                                                                         </div>
-                                                                                        <div className="text-xs text-slate-400 mt-1">
+                                                                                        <div className="text-xs text-muted-foreground mt-1">
                                                                                             {entry.assigned_from && `From: ${entry.assigned_from}`}
                                                                                             {entry.assigned_until && ` • To: ${entry.assigned_until}`}
                                                                                         </div>
                                                                                         {entry.notes && <div className="text-xs mt-1 text-slate-300">{entry.notes}</div>}
                                                                                     </div>
                                                                                 ) : (
-                                                                                    <div className="text-slate-400">No assignment data</div>
+                                                                                    <div className="text-muted-foreground">No assignment data</div>
                                                                                 )}
                                                                             </CardContent>
                                                                         </Card>

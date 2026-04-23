@@ -52,11 +52,11 @@ const RESTRICTIVE_PRACTICE_TYPES = [
 function restraintTypeBadge(type: string) {
     switch (type) {
         case 'physical': return 'bg-red-100 text-red-800 border-red-200';
-        case 'chemical': return 'bg-purple-100 text-purple-800 border-purple-200';
+        case 'chemical': return 'bg-primary/10 text-primary border-primary';
         case 'mechanical': return 'bg-orange-100 text-orange-800 border-orange-200';
         case 'seclusion': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'environmental': return 'bg-blue-100 text-blue-800 border-blue-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -66,17 +66,17 @@ function severityBadge(s: string) {
         case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
         case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'low': return 'bg-blue-100 text-blue-800 border-blue-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
 function statusBadgeColor(s: string) {
     switch (s) {
         case 'active': return 'bg-green-100 text-green-800 border-green-200';
-        case 'draft': return 'bg-slate-100 text-slate-800 border-slate-200';
+        case 'draft': return 'bg-muted text-foreground border-border';
         case 'expired': return 'bg-red-100 text-red-800 border-red-200';
         case 'under_review': return 'bg-amber-100 text-amber-800 border-amber-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -354,7 +354,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
-                                            <tr className="border-b text-left text-xs text-slate-500">
+                                            <tr className="border-b text-left text-xs text-muted-foreground">
                                                 <th className="pb-2 font-medium">Date</th>
                                                 <th className="pb-2 font-medium">Client</th>
                                                 <th className="pb-2 font-medium">Type</th>
@@ -392,7 +392,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                                             {ev.reviewed_at ? (
                                                                 <Check className="mx-auto h-4 w-4 text-green-600" />
                                                             ) : (
-                                                                <X className="mx-auto h-4 w-4 text-slate-400" />
+                                                                <X className="mx-auto h-4 w-4 text-muted-foreground" />
                                                             )}
                                                         </td>
                                                         <td className="py-2">
@@ -408,7 +408,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                             })}
                                             {!events.data.length && (
                                                 <tr>
-                                                    <td colSpan={8} className="py-8 text-center text-slate-500">No restraint events found.</td>
+                                                    <td colSpan={8} className="py-8 text-center text-muted-foreground">No restraint events found.</td>
                                                 </tr>
                                             )}
                                         </tbody>
@@ -526,7 +526,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
                                                     <div className="font-semibold">{plan.client?.first_name} {plan.client?.last_name}</div>
-                                                    <div className="mt-0.5 text-sm font-normal text-slate-600">{plan.title}</div>
+                                                    <div className="mt-0.5 text-sm font-normal text-muted-foreground">{plan.title}</div>
                                                 </div>
                                             </div>
                                         </CardTitle>
@@ -542,14 +542,14 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                                 </Badge>
                                             )}
                                         </div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             <span className="font-medium">Review:</span>{' '}
                                             <span className={isOverdueReview(plan.review_date) ? 'font-semibold text-red-600' : ''}>
                                                 {formatDate(plan.review_date)}
                                             </span>
                                         </div>
                                         {plan.de_escalation_strategies && (
-                                            <div className="text-xs text-slate-500">
+                                            <div className="text-xs text-muted-foreground">
                                                 <span className="font-medium">De-escalation:</span>{' '}
                                                 {plan.de_escalation_strategies.length > 100
                                                     ? plan.de_escalation_strategies.slice(0, 100) + '...'
@@ -560,7 +560,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                 </Card>
                             ))}
                             {!plans.length && (
-                                <div className="col-span-full py-8 text-center text-sm text-slate-500">No behaviour support plans found.</div>
+                                <div className="col-span-full py-8 text-center text-sm text-muted-foreground">No behaviour support plans found.</div>
                             )}
                         </div>
                     </TabsContent>

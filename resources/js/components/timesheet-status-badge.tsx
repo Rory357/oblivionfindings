@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 const config: Record<string, { label: string; className: string; icon: LucideIcon }> = {
     draft: {
         label: 'Draft',
-        className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
         icon: FileEdit,
     },
     submitted: {

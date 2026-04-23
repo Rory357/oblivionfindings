@@ -67,7 +67,7 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
               : 'I am providing this response for information only; I understand my response does not by itself authorise the care action.';
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-muted">
             <Head title={`Consent request — ${client.full_name}`} />
 
             <div className="mx-auto max-w-3xl px-4 py-8">
@@ -84,7 +84,7 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                         <h1 className="text-2xl font-semibold">
                             Consent request for {client.full_name}
                         </h1>
-                        <Badge className="bg-slate-200">{request.status}</Badge>
+                        <Badge className="bg-muted">{request.status}</Badge>
                     </div>
                     {request.expires_at && (
                         <p className="mt-1 text-sm text-muted-foreground">

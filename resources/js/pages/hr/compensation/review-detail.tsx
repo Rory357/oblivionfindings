@@ -75,7 +75,7 @@ const formatCurrency = (value: string | null) => {
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'planning':
-            return 'bg-slate-100 text-slate-800 border-slate-200';
+            return 'bg-muted text-foreground border-border';
         case 'in_progress':
             return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'approved':
@@ -87,7 +87,7 @@ const getStatusColor = (status: string) => {
         case 'rejected':
             return 'bg-red-100 text-red-800 border-red-200';
         default:
-            return 'bg-slate-100 text-slate-800 border-slate-200';
+            return 'bg-muted text-foreground border-border';
     }
 };
 
@@ -245,7 +245,7 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                             </CardHeader>
                             <CardContent>
                                 {form.items.length === 0 && (
-                                    <p className="py-4 text-center text-sm text-slate-500">
+                                    <p className="py-4 text-center text-sm text-muted-foreground">
                                         No employees added yet. Click "Add Employee" to begin.
                                     </p>
                                 )}
@@ -272,7 +272,7 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                                         </div>
                                         <div>
                                             <Label className="text-xs">Change %</Label>
-                                            <Input type="number" step="0.01" value={item.change_percentage} readOnly className="bg-slate-50" />
+                                            <Input type="number" step="0.01" value={item.change_percentage} readOnly className="bg-muted" />
                                         </div>
                                         <div className="flex items-end">
                                             <Button type="button" size="sm" variant="outline" onClick={() => removeItem(idx)}>
@@ -313,7 +313,7 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                         </Link>
                         <div>
                             <h1 className="text-lg font-semibold">{review.title}</h1>
-                            <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500">
+                            <div className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
                                 <span>{getCycleLabel(review.review_cycle)}</span>
                                 <span>&middot;</span>
                                 <span>Effective {formatDate(review.effective_date)}</span>
@@ -340,20 +340,20 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 {review.budget_amount && (
                                     <div>
-                                        <span className="text-sm text-slate-500">Budget Amount</span>
+                                        <span className="text-sm text-muted-foreground">Budget Amount</span>
                                         <div className="text-lg font-semibold">{formatCurrency(review.budget_amount)}</div>
                                     </div>
                                 )}
                                 {review.creator && (
                                     <div>
-                                        <span className="text-sm text-slate-500">Created By</span>
+                                        <span className="text-sm text-muted-foreground">Created By</span>
                                         <div className="text-sm font-medium">{review.creator.name}</div>
                                     </div>
                                 )}
                             </div>
                             {review.notes && (
                                 <div className="mt-3">
-                                    <span className="text-sm text-slate-500">Notes</span>
+                                    <span className="text-sm text-muted-foreground">Notes</span>
                                     <p className="text-sm">{review.notes}</p>
                                 </div>
                             )}
@@ -391,7 +391,7 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                                                 {item.change_percentage > 0 ? '+' : ''}{item.change_percentage}%
                                             </span>
                                         </TableCell>
-                                        <TableCell className="max-w-xs truncate text-sm text-slate-600">
+                                        <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
                                             {item.justification ?? '-'}
                                         </TableCell>
                                         <TableCell>
@@ -399,14 +399,14 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                                                 {item.status}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-muted-foreground">
                                             {item.approver?.name ?? '-'}
                                         </TableCell>
                                     </TableRow>
                                 ))}
                                 {!review.items.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                                             No employees in this review.
                                         </TableCell>
                                     </TableRow>

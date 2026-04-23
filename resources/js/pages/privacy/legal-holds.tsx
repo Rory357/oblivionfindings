@@ -38,7 +38,7 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
             case 'released':
                 return 'bg-green-100 text-green-800 border-green-200';
             default:
-                return 'bg-slate-100 text-slate-800 border-slate-200';
+                return 'bg-muted text-foreground border-border';
         }
     };
 
@@ -101,7 +101,7 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search by reference or reason"
                                 value={filters.q || ''}
@@ -110,7 +110,7 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -125,7 +125,7 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Hold Type</Label>
+                            <Label className="text-xs text-muted-foreground">Hold Type</Label>
                             <Select
                                 value={filters.hold_type ?? ANY}
                                 onValueChange={(v) => onFilter({ hold_type: v === ANY ? null : v })}
@@ -152,7 +152,7 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 font-semibold">
-                                                <Scale className="h-4 w-4 text-purple-500" />
+                                                <Scale className="h-4 w-4 text-primary" />
                                                 {hold.hold_reference}
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
@@ -163,10 +163,10 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                                                     {getHoldTypeLabel(hold.hold_type)}
                                                 </Badge>
                                             </div>
-                                            <div className="mt-2 text-sm text-slate-600">
+                                            <div className="mt-2 text-sm text-muted-foreground">
                                                 {hold.reason}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Imposed: {formatDate(hold.imposed_at)}
                                                 {hold.imposed_by && ` by ${hold.imposed_by.name}`}
                                                 {hold.review_date && ` • Review: ${formatDate(hold.review_date)}`}
@@ -181,7 +181,7 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                         </Card>
                     ))}
                     {!holds.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No legal holds found.
                         </div>
                     )}

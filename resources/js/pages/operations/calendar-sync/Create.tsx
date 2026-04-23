@@ -86,7 +86,7 @@ export default function CalendarSyncCreate() {
                                     type="checkbox"
                                     checked={data.is_active}
                                     onChange={(e) => setData('is_active', e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300"
+                                    className="h-4 w-4 rounded border-border"
                                 />
                                 <Label htmlFor="is_active" className="cursor-pointer">Enable sync immediately</Label>
                             </div>

@@ -140,7 +140,7 @@ const statusBadge = (status: string) => {
             return <Badge className="bg-green-100 text-green-800 border-green-200">{status}</Badge>;
         case 'completed':
         case 'closed':
-            return <Badge className="bg-slate-100 text-slate-700 border-slate-200">{status}</Badge>;
+            return <Badge className="bg-muted text-foreground border-border">{status}</Badge>;
         case 'scheduled':
         case 'pending':
             return <Badge className="bg-blue-100 text-blue-800 border-blue-200">{status}</Badge>;
@@ -148,7 +148,7 @@ const statusBadge = (status: string) => {
         case 'open':
             return <Badge className="bg-amber-100 text-amber-800 border-amber-200">{status}</Badge>;
         case 'feedback_received':
-            return <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200">feedback received</Badge>;
+            return <Badge className="bg-primary/10 text-primary border-primary">feedback received</Badge>;
         case 'actioned':
             return <Badge className="bg-teal-100 text-teal-800 border-teal-200">actioned</Badge>;
         case 'inactive':
@@ -156,7 +156,7 @@ const statusBadge = (status: string) => {
         case 'cancelled':
             return <Badge className="bg-red-100 text-red-800 border-red-200">{status}</Badge>;
         default:
-            return <Badge className="bg-slate-100 text-slate-700 border-slate-200">{status}</Badge>;
+            return <Badge className="bg-muted text-foreground border-border">{status}</Badge>;
     }
 };
 
@@ -190,11 +190,11 @@ const consultationTypeColor: Record<string, string> = {
     hazard_identified: 'bg-red-100 text-red-800 border-red-200',
     risk_assessment: 'bg-amber-100 text-amber-800 border-amber-200',
     procedure_change: 'bg-blue-100 text-blue-800 border-blue-200',
-    policy_change: 'bg-purple-100 text-purple-800 border-purple-200',
+    policy_change: 'bg-primary/10 text-primary border-primary',
     equipment_change: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-    other: 'bg-slate-100 text-slate-700 border-slate-200',
-    general: 'bg-slate-100 text-slate-700 border-slate-200',
-    workplace_change: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    other: 'bg-muted text-foreground border-border',
+    general: 'bg-muted text-foreground border-border',
+    workplace_change: 'bg-primary/10 text-primary border-primary',
     ppe: 'bg-orange-100 text-orange-800 border-orange-200',
     training: 'bg-teal-100 text-teal-800 border-teal-200',
 };
@@ -253,7 +253,7 @@ function ConsultationProgressBar({ status }: { status: string }) {
                                         ? 'bg-green-500 text-white'
                                         : isCurrent
                                           ? 'bg-blue-500 text-white'
-                                          : 'bg-slate-200 text-slate-500'
+                                          : 'bg-muted text-muted-foreground'
                                 }`}
                             >
                                 {isCompleted ? (
@@ -273,7 +273,7 @@ function ConsultationProgressBar({ status }: { status: string }) {
                         {idx < CONSULTATION_STEPS.length - 1 && (
                             <div
                                 className={`h-0.5 flex-1 rounded-full mb-4 ${
-                                    isCompleted ? 'bg-green-400' : 'bg-slate-200'
+                                    isCompleted ? 'bg-green-400' : 'bg-muted'
                                 }`}
                             />
                         )}
@@ -292,9 +292,9 @@ const consultationTypes = [
     { value: 'hazard_identified', label: 'Hazard Identified', icon: AlertTriangle, color: 'text-red-600 bg-red-50 border-red-200' },
     { value: 'risk_assessment', label: 'Risk Assessment', icon: ShieldCheck, color: 'text-amber-600 bg-amber-50 border-amber-200' },
     { value: 'procedure_change', label: 'Procedure Change', icon: ClipboardList, color: 'text-blue-600 bg-blue-50 border-blue-200' },
-    { value: 'policy_change', label: 'Policy Change', icon: FileText, color: 'text-purple-600 bg-purple-50 border-purple-200' },
+    { value: 'policy_change', label: 'Policy Change', icon: FileText, color: 'text-primary bg-primary/10 border-primary' },
     { value: 'equipment_change', label: 'Equipment Change', icon: Building2, color: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
-    { value: 'other', label: 'Other', icon: MessageSquare, color: 'text-slate-600 bg-slate-50 border-slate-200' },
+    { value: 'other', label: 'Other', icon: MessageSquare, color: 'text-muted-foreground bg-muted border-border' },
 ] as const;
 
 /* ------------------------------------------------------------------ */
@@ -719,7 +719,7 @@ export default function WorkerParticipationIndex({
             icon: Users,
             bg: 'bg-blue-50',
             iconColor: 'text-blue-600',
-            borderColor: stats.active_reps > 0 ? 'border-blue-200' : 'border-slate-200',
+            borderColor: stats.active_reps > 0 ? 'border-blue-200' : 'border-border',
             tab: 'representatives',
         },
         {
@@ -728,7 +728,7 @@ export default function WorkerParticipationIndex({
             icon: Building2,
             bg: 'bg-green-50',
             iconColor: 'text-green-600',
-            borderColor: stats.active_committees > 0 ? 'border-green-200' : 'border-slate-200',
+            borderColor: stats.active_committees > 0 ? 'border-green-200' : 'border-border',
             tab: 'meetings',
         },
         {
@@ -737,16 +737,16 @@ export default function WorkerParticipationIndex({
             icon: CalendarDays,
             bg: 'bg-amber-50',
             iconColor: 'text-amber-600',
-            borderColor: stats.meetings_this_month > 0 ? 'border-amber-200' : 'border-slate-200',
+            borderColor: stats.meetings_this_month > 0 ? 'border-amber-200' : 'border-border',
             tab: 'meetings',
         },
         {
             label: 'Open Consultations',
             value: stats.open_consultations,
             icon: MessageSquare,
-            bg: 'bg-purple-50',
-            iconColor: 'text-purple-600',
-            borderColor: stats.open_consultations > 0 ? 'border-purple-200' : 'border-slate-200',
+            bg: 'bg-primary/10',
+            iconColor: 'text-primary',
+            borderColor: stats.open_consultations > 0 ? 'border-primary' : 'border-border',
             tab: 'consultations',
         },
     ];
@@ -835,11 +835,11 @@ export default function WorkerParticipationIndex({
                                 </CardHeader>
                                 <CardContent>
                                     {representatives.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-200 py-12 text-center">
+                                        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-12 text-center">
                                             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 mb-4">
                                                 <ShieldCheck className="h-7 w-7 text-blue-500" />
                                             </div>
-                                            <h3 className="text-sm font-semibold text-slate-800">
+                                            <h3 className="text-sm font-semibold text-foreground">
                                                 No H&S representatives yet
                                             </h3>
                                             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
@@ -908,7 +908,7 @@ export default function WorkerParticipationIndex({
                                                                         {rep.training_days}/{max} days
                                                                     </span>
                                                                 </div>
-                                                                <div className="h-1.5 w-full rounded-full bg-slate-100">
+                                                                <div className="h-1.5 w-full rounded-full bg-muted">
                                                                     <div
                                                                         className={`h-1.5 rounded-full transition-all ${
                                                                             pct >= 100
@@ -981,7 +981,7 @@ export default function WorkerParticipationIndex({
                                             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 mb-4">
                                                 <Building2 className="h-7 w-7 text-amber-600" />
                                             </div>
-                                            <h3 className="text-sm font-semibold text-slate-800">
+                                            <h3 className="text-sm font-semibold text-foreground">
                                                 You need to create an H&S Committee before scheduling meetings
                                             </h3>
                                             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
@@ -998,11 +998,11 @@ export default function WorkerParticipationIndex({
                                     )}
 
                                     {committees.length > 0 && meetings.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-200 py-12 text-center">
+                                        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-12 text-center">
                                             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 mb-4">
                                                 <CalendarDays className="h-7 w-7 text-amber-500" />
                                             </div>
-                                            <h3 className="text-sm font-semibold text-slate-800">
+                                            <h3 className="text-sm font-semibold text-foreground">
                                                 No meetings scheduled
                                             </h3>
                                             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
@@ -1091,7 +1091,7 @@ export default function WorkerParticipationIndex({
 
                                                         {/* Minutes document */}
                                                         {meeting.minutes_document_name && (
-                                                            <div className="flex items-center gap-2 rounded-lg border bg-slate-50 p-2.5 text-xs">
+                                                            <div className="flex items-center gap-2 rounded-lg border bg-muted p-2.5 text-xs">
                                                                 <FileText className="h-4 w-4 text-blue-500 shrink-0" />
                                                                 <span className="font-medium truncate flex-1">
                                                                     {meeting.minutes_document_name}
@@ -1230,7 +1230,7 @@ export default function WorkerParticipationIndex({
                                 <CardHeader>
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2 text-base">
-                                            <Megaphone className="h-5 w-5 text-purple-600" />
+                                            <Megaphone className="h-5 w-5 text-primary" />
                                             Worker Consultations
                                         </CardTitle>
                                         {can_manage && (
@@ -1243,11 +1243,11 @@ export default function WorkerParticipationIndex({
                                 </CardHeader>
                                 <CardContent>
                                     {consultations.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-200 py-12 text-center">
-                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-50 mb-4">
-                                                <Megaphone className="h-7 w-7 text-purple-500" />
+                                        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-12 text-center">
+                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-4">
+                                                <Megaphone className="h-7 w-7 text-primary" />
                                             </div>
-                                            <h3 className="text-sm font-semibold text-slate-800">
+                                            <h3 className="text-sm font-semibold text-foreground">
                                                 No consultations recorded
                                             </h3>
                                             <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
@@ -1281,7 +1281,7 @@ export default function WorkerParticipationIndex({
                                                                     <Badge
                                                                         className={
                                                                             consultationTypeColor[c.consultation_type] ??
-                                                                            'bg-slate-100 text-slate-700 border-slate-200'
+                                                                            'bg-muted text-foreground border-border'
                                                                         }
                                                                     >
                                                                         {consultationTypeLabel[c.consultation_type] ??
@@ -1319,17 +1319,17 @@ export default function WorkerParticipationIndex({
 
                                                         {/* Description */}
                                                         {c.description && (
-                                                            <div className="text-xs text-muted-foreground bg-slate-50 rounded-lg p-3">
-                                                                <span className="font-semibold text-slate-700">Description: </span>
+                                                            <div className="text-xs text-muted-foreground bg-muted rounded-lg p-3">
+                                                                <span className="font-semibold text-foreground">Description: </span>
                                                                 {c.description}
                                                             </div>
                                                         )}
 
                                                         {/* Worker feedback summary */}
                                                         {c.worker_feedback_summary && (
-                                                            <div className="text-xs bg-indigo-50 rounded-lg p-3">
-                                                                <span className="font-semibold text-indigo-700">Worker Feedback: </span>
-                                                                <span className="text-indigo-900">{c.worker_feedback_summary}</span>
+                                                            <div className="text-xs bg-primary/10 rounded-lg p-3">
+                                                                <span className="font-semibold text-primary">Worker Feedback: </span>
+                                                                <span className="text-primary">{c.worker_feedback_summary}</span>
                                                             </div>
                                                         )}
 
@@ -1356,13 +1356,13 @@ export default function WorkerParticipationIndex({
                                                                 Documents
                                                             </h4>
                                                             {!c.document_name && !c.outcome_document_name ? (
-                                                                <div className="rounded-lg border-2 border-dashed border-slate-200 p-3 text-center text-xs text-muted-foreground">
+                                                                <div className="rounded-lg border-2 border-dashed border-border p-3 text-center text-xs text-muted-foreground">
                                                                     No documents yet
                                                                 </div>
                                                             ) : (
                                                                 <div className="space-y-2">
                                                                     {c.document_name && (
-                                                                        <div className="flex items-center gap-3 rounded-lg border bg-slate-50 p-3">
+                                                                        <div className="flex items-center gap-3 rounded-lg border bg-muted p-3">
                                                                             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 shrink-0">
                                                                                 <FileText className="h-4.5 w-4.5 text-blue-600" />
                                                                             </div>
@@ -1648,7 +1648,7 @@ export default function WorkerParticipationIndex({
                                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 mb-4">
                                     <Building2 className="h-7 w-7 text-amber-600" />
                                 </div>
-                                <h3 className="text-sm font-semibold text-slate-800">
+                                <h3 className="text-sm font-semibold text-foreground">
                                     Create a committee first before scheduling a meeting
                                 </h3>
                                 <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
@@ -1782,7 +1782,7 @@ export default function WorkerParticipationIndex({
                             </div>
 
                             {meetingForm.data.agenda_items.length === 0 && (
-                                <div className="rounded-lg border-2 border-dashed border-slate-200 p-4 text-center text-sm text-muted-foreground">
+                                <div className="rounded-lg border-2 border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                                     No agenda items yet. Click "Add Item" to start building your agenda.
                                 </div>
                             )}
@@ -1791,7 +1791,7 @@ export default function WorkerParticipationIndex({
                                 {meetingForm.data.agenda_items.map((item, idx) => (
                                     <div
                                         key={idx}
-                                        className="rounded-lg border bg-slate-50/50 p-3 space-y-2"
+                                        className="rounded-lg border bg-muted/50 p-3 space-y-2"
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-medium text-muted-foreground">
@@ -1840,7 +1840,7 @@ export default function WorkerParticipationIndex({
                                     return (
                                         <label
                                             key={s.id}
-                                            className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-slate-50"
+                                            className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-muted"
                                         >
                                             <Checkbox
                                                 checked={isChecked}
@@ -1897,8 +1897,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100">
-                                <Megaphone className="h-4 w-4 text-purple-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                                <Megaphone className="h-4 w-4 text-primary" />
                             </div>
                             New Worker Consultation
                         </DialogTitle>
@@ -1933,7 +1933,7 @@ export default function WorkerParticipationIndex({
                                             className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${
                                                 isSelected
                                                     ? `${ct.color} border-current ring-1 ring-current/20`
-                                                    : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                    : 'border-border text-muted-foreground hover:border-border hover:bg-muted'
                                             }`}
                                             onClick={() =>
                                                 consultationForm.setData('consultation_type', ct.value)
@@ -2020,8 +2020,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100">
-                                <MessageSquare className="h-4 w-4 text-indigo-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                                <MessageSquare className="h-4 w-4 text-primary" />
                             </div>
                             Record Worker Feedback
                         </DialogTitle>
@@ -2049,7 +2049,7 @@ export default function WorkerParticipationIndex({
                                     return (
                                         <label
                                             key={s.id}
-                                            className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-slate-50"
+                                            className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-muted"
                                         >
                                             <Checkbox
                                                 checked={isChecked}
@@ -2162,8 +2162,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
-                                <XCircle className="h-4 w-4 text-slate-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                                <XCircle className="h-4 w-4 text-muted-foreground" />
                             </div>
                             Close Consultation
                         </DialogTitle>
@@ -2275,7 +2275,7 @@ export default function WorkerParticipationIndex({
                                             return (
                                                 <label
                                                     key={att.id}
-                                                    className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-slate-50"
+                                                    className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-muted"
                                                 >
                                                     <Checkbox
                                                         checked={isChecked}
@@ -2326,7 +2326,7 @@ export default function WorkerParticipationIndex({
                             </div>
 
                             {completeMeetingForm.data.action_items.length === 0 && (
-                                <div className="rounded-lg border-2 border-dashed border-slate-200 p-4 text-center text-sm text-muted-foreground">
+                                <div className="rounded-lg border-2 border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                                     No action items. Click "Add Action Item" to add follow-up tasks.
                                 </div>
                             )}
@@ -2335,7 +2335,7 @@ export default function WorkerParticipationIndex({
                                 {completeMeetingForm.data.action_items.map((item, idx) => (
                                     <div
                                         key={idx}
-                                        className="rounded-lg border bg-slate-50/50 p-3 space-y-2"
+                                        className="rounded-lg border bg-muted/50 p-3 space-y-2"
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-medium text-muted-foreground">
@@ -2463,7 +2463,7 @@ export default function WorkerParticipationIndex({
                                 return (
                                     <label
                                         key={s.id}
-                                        className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-slate-50"
+                                        className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-muted"
                                     >
                                         <Checkbox
                                             checked={isChecked}
@@ -2606,8 +2606,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100">
-                                <Pencil className="h-4 w-4 text-purple-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                                <Pencil className="h-4 w-4 text-primary" />
                             </div>
                             Edit Consultation
                         </DialogTitle>
@@ -2826,7 +2826,7 @@ export default function WorkerParticipationIndex({
                             </div>
 
                             {editMeetingForm.data.agenda_items.length === 0 && (
-                                <div className="rounded-lg border-2 border-dashed border-slate-200 p-4 text-center text-sm text-muted-foreground">
+                                <div className="rounded-lg border-2 border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                                     No agenda items yet. Click "Add Item" to start building your agenda.
                                 </div>
                             )}
@@ -2835,7 +2835,7 @@ export default function WorkerParticipationIndex({
                                 {editMeetingForm.data.agenda_items.map((item, idx) => (
                                     <div
                                         key={idx}
-                                        className="rounded-lg border bg-slate-50/50 p-3 space-y-2"
+                                        className="rounded-lg border bg-muted/50 p-3 space-y-2"
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-medium text-muted-foreground">

@@ -62,16 +62,16 @@ const severityIcons = {
 function WidgetCard({ title, count, severity, items, icon: Icon }: Widget & { icon: React.ElementType }) {
   if (count === 0) {
     return (
-      <Card className="border-slate-200 opacity-75">
+      <Card className="border-border opacity-75">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-600">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Icon className="h-4 w-4" />
             {title}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-slate-400">0</div>
-          <div className="text-xs text-slate-400">No items</div>
+          <div className="text-2xl font-bold text-muted-foreground">0</div>
+          <div className="text-xs text-muted-foreground">No items</div>
         </CardContent>
       </Card>
     );
@@ -112,7 +112,7 @@ function WidgetCard({ title, count, severity, items, icon: Icon }: Widget & { ic
           </div>
         ))}
         {items.length > 3 && (
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-muted-foreground">
             +{items.length - 3} more...
           </div>
         )}
@@ -135,19 +135,19 @@ function TodaySummaryCard({ summary }: { summary: TodaysSummary }) {
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded bg-white p-2 text-center">
-            <div className="text-xs text-slate-500">Scheduled</div>
-            <div className="text-lg font-bold text-slate-700">{total_scheduled}</div>
+            <div className="text-xs text-muted-foreground">Scheduled</div>
+            <div className="text-lg font-bold text-foreground">{total_scheduled}</div>
           </div>
           <div className="rounded bg-white p-2 text-center">
-            <div className="text-xs text-slate-500">Completed</div>
+            <div className="text-xs text-muted-foreground">Completed</div>
             <div className="text-lg font-bold text-green-600">{completed}</div>
           </div>
           <div className="rounded bg-white p-2 text-center">
-            <div className="text-xs text-slate-500">Remaining</div>
+            <div className="text-xs text-muted-foreground">Remaining</div>
             <div className="text-lg font-bold text-orange-600">{remaining}</div>
           </div>
           <div className="rounded bg-white p-2 text-center">
-            <div className="text-xs text-slate-500">Completion</div>
+            <div className="text-xs text-muted-foreground">Completion</div>
             <div className="text-lg font-bold text-blue-600">{completion_percentage}%</div>
           </div>
         </div>

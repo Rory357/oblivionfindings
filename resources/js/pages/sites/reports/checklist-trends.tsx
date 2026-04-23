@@ -45,7 +45,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                         <TrendingDown className="w-5 h-5 text-orange-400" />
                         Checklist Failure Trends
                     </h1>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-muted-foreground">
                         Most frequently failed checklist items over the last 3 months
                         ({dateRange.from} to {dateRange.to})
                     </p>
@@ -56,7 +56,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{failedItems.length}</div>
-                            <div className="text-sm text-slate-400">Unique Failed Items</div>
+                            <div className="text-sm text-muted-foreground">Unique Failed Items</div>
                         </CardContent>
                     </Card>
                     <Card>
@@ -64,7 +64,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                             <div className="text-2xl font-bold text-orange-400">
                                 {failedItems.reduce((sum, i) => sum + i.failure_count, 0)}
                             </div>
-                            <div className="text-sm text-slate-400">Total Failures</div>
+                            <div className="text-sm text-muted-foreground">Total Failures</div>
                         </CardContent>
                     </Card>
                     <Card>
@@ -72,7 +72,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                             <div className="text-2xl font-bold">
                                 {new Set(failedItems.map(i => i.template_id)).size}
                             </div>
-                            <div className="text-sm text-slate-400">Affected Templates</div>
+                            <div className="text-sm text-muted-foreground">Affected Templates</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -86,7 +86,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                     </CardHeader>
                     <CardContent>
                         {failedItems.length === 0 ? (
-                            <p className="text-sm text-slate-400 text-center py-8">
+                            <p className="text-sm text-muted-foreground text-center py-8">
                                 No failed checklist items found in the last 3 months.
                             </p>
                         ) : (
@@ -107,7 +107,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                                         const barWidth = Math.round((item.failure_count / maxFailures) * 100);
                                         return (
                                             <TableRow key={`${item.template_id}-${index}`}>
-                                                <TableCell className="text-slate-500">{index + 1}</TableCell>
+                                                <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                                                 <TableCell>
                                                     <Badge variant="outline">{item.template_name}</Badge>
                                                 </TableCell>
@@ -133,10 +133,10 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                                                         />
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-slate-400 text-sm">
+                                                <TableCell className="text-muted-foreground text-sm">
                                                     {new Date(item.first_failure).toLocaleDateString()}
                                                 </TableCell>
-                                                <TableCell className="text-slate-400 text-sm">
+                                                <TableCell className="text-muted-foreground text-sm">
                                                     {new Date(item.last_failure).toLocaleDateString()}
                                                 </TableCell>
                                             </TableRow>

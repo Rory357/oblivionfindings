@@ -135,7 +135,7 @@ export default function ShiftEdit({ shift, clients, staff, serviceContexts, defa
                                         </option>
                                     ))}
                             </select>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 If left blank, the shift will inherit the selected client’s service context (if set).
                             </div>
                         </div>
@@ -222,7 +222,7 @@ export default function ShiftEdit({ shift, clients, staff, serviceContexts, defa
                                 <Button type="button" variant="outline" onClick={addTask}>
                                     Add task
                                 </Button>
-                                <div className="text-xs text-slate-500">
+                                <div className="text-xs text-muted-foreground">
                                     Tip: Save to persist new tasks. Completed state can be toggled for saved tasks.
                                 </div>
                             </div>

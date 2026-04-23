@@ -67,7 +67,7 @@ function eventIcon(type: string) {
         case 'harsh_accel': return <Zap className="h-4 w-4 text-orange-500" />;
         case 'speeding': return <Gauge className="h-4 w-4 text-red-500" />;
         case 'idle': return <Timer className="h-4 w-4 text-blue-500" />;
-        default: return <AlertTriangle className="h-4 w-4 text-gray-500" />;
+        default: return <AlertTriangle className="h-4 w-4 text-muted-foreground" />;
     }
 }
 
@@ -134,7 +134,7 @@ export default function DriverScorecard({
                             {/* Trend */}
                             <div className="mt-4 flex items-center gap-2">
                                 {scoreDiff > 0 ? (
-                                    <Badge variant="default" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                                    <Badge variant="default" className="bg-primary/10 text-primary dark:bg-primary dark:text-primary/70">
                                         <TrendingUp className="mr-1 h-3 w-3" />
                                         +{scoreDiff} vs last period
                                     </Badge>
@@ -154,7 +154,7 @@ export default function DriverScorecard({
                             {/* Fleet comparison */}
                             <div className="mt-3 text-sm text-muted-foreground">
                                 Fleet average: <span className="font-medium">{fleet_avg_score}</span>
-                                {vsFleet > 0 && <span className="text-purple-600 ml-1">(+{vsFleet} above)</span>}
+                                {vsFleet > 0 && <span className="text-primary ml-1">(+{vsFleet} above)</span>}
                                 {vsFleet < 0 && <span className="text-red-600 ml-1">({vsFleet} below)</span>}
                                 {vsFleet === 0 && <span className="text-muted-foreground ml-1">(at average)</span>}
                             </div>
@@ -218,7 +218,7 @@ export default function DriverScorecard({
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Route className="h-4 w-4 text-purple-500" />
+                                    <Route className="h-4 w-4 text-primary" />
                                     Total Distance
                                 </CardTitle>
                             </CardHeader>

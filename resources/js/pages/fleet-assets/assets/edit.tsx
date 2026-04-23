@@ -115,7 +115,7 @@ export default function AssetEdit({ asset, categories, sites }: Props) {
                                 className={cn(
                                     "flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
                                     step === i + 1
-                                        ? "bg-purple-600 text-white"
+                                        ? "bg-primary text-white"
                                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                                 )}
                             >
@@ -342,7 +342,7 @@ export default function AssetEdit({ asset, categories, sites }: Props) {
                                             id="requires_inspection"
                                             checked={form.data.requires_inspection}
                                             onChange={(e) => form.setData('requires_inspection', e.target.checked)}
-                                            className="rounded border-gray-300"
+                                            className="rounded border-border"
                                         />
                                         <label htmlFor="requires_inspection" className="text-sm font-medium">Requires Inspection</label>
                                     </div>
@@ -358,7 +358,7 @@ export default function AssetEdit({ asset, categories, sites }: Props) {
                                             id="requires_maintenance"
                                             checked={form.data.requires_maintenance}
                                             onChange={(e) => form.setData('requires_maintenance', e.target.checked)}
-                                            className="rounded border-gray-300"
+                                            className="rounded border-border"
                                         />
                                         <label htmlFor="requires_maintenance" className="text-sm font-medium">Requires Maintenance</label>
                                     </div>

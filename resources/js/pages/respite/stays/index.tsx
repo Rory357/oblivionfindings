@@ -20,7 +20,7 @@ export default function RespiteStaysIndex({ stays }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Stays</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Active and past respite stays.
                     </div>
                 </div>
@@ -39,7 +39,7 @@ export default function RespiteStaysIndex({ stays }: Props) {
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <Badge variant="outline">{s.status}</Badge>
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {s.actual_start && <>Started: {formatDateTime(s.actual_start)}</>}
                                                 {s.actual_end && <> — Ended: {formatDateTime(s.actual_end)}</>}
                                             </div>
@@ -53,7 +53,7 @@ export default function RespiteStaysIndex({ stays }: Props) {
                         </Card>
                     ))}
                     {!stays.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No stays found.
                         </div>
                     )}

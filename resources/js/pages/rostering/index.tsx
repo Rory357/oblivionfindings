@@ -467,7 +467,7 @@ export default function RosteringIndex(props: Props) {
                             <CardTitle className="text-sm font-medium">This week</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            <div className="text-sm text-slate-600">{props.weekStart} → {ymd(addDays(startDate, 6))}</div>
+                            <div className="text-sm text-muted-foreground">{props.weekStart} → {ymd(addDays(startDate, 6))}</div>
                             <div className="flex flex-wrap gap-2">
                                 <Badge variant="outline">Total: {props.stats.total}</Badge>
                                 <Badge variant={props.stats.open > 0 ? 'default' : 'outline'}>Open: {props.stats.open}</Badge>
@@ -551,7 +551,7 @@ export default function RosteringIndex(props: Props) {
                                     </Select>
                                 </div>
                             ) : (
-                                <div className="text-sm text-slate-600">You’re viewing your assigned shifts.</div>
+                                <div className="text-sm text-muted-foreground">You’re viewing your assigned shifts.</div>
                             )}
                         </CardContent>
                     </Card>
@@ -823,7 +823,7 @@ export default function RosteringIndex(props: Props) {
                                                     <div className="space-y-2">
                                                         {timesheetsNeedingAttention.slice(0, 6).map((sh) => (
                                                             <Link key={sh.id} href={`/shifts/${sh.id}`} className="block">
-                                                                <div className="rounded-md border p-2 hover:bg-slate-50">
+                                                                <div className="rounded-md border p-2 hover:bg-muted">
                                                                     <div className="flex items-start justify-between gap-2">
                                                                         <div className="text-xs font-medium">
                                                                             {new Date(sh.starts_at).toLocaleDateString()} {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}
@@ -832,7 +832,7 @@ export default function RosteringIndex(props: Props) {
                                                                             <Badge variant="outline" className="text-[10px]">TS: {sh.timesheet_status}</Badge>
                                                                         ) : null}
                                                                     </div>
-                                                                    <div className="mt-1 text-xs text-slate-700">{sh.client ?? clientSingular} · {sh.staff ?? 'Staff'}</div>
+                                                                    <div className="mt-1 text-xs text-foreground">{sh.client ?? clientSingular} · {sh.staff ?? 'Staff'}</div>
                                                                 </div>
                                                             </Link>
                                                         ))}
@@ -863,7 +863,7 @@ export default function RosteringIndex(props: Props) {
                                                     <div className="space-y-2">
                                                         {shiftsWithIncidents.slice(0, 6).map((sh) => (
                                                             <Link key={sh.id} href={`/shifts/${sh.id}`} className="block">
-                                                                <div className="rounded-md border p-2 hover:bg-slate-50">
+                                                                <div className="rounded-md border p-2 hover:bg-muted">
                                                                     <div className="flex items-start justify-between gap-2">
                                                                         <div className="text-xs font-medium">
                                                                             {new Date(sh.starts_at).toLocaleDateString()} {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}
@@ -872,7 +872,7 @@ export default function RosteringIndex(props: Props) {
                                                                             {sh.incidents_count} incident{sh.incidents_count === 1 ? '' : 's'}
                                                                         </Badge>
                                                                     </div>
-                                                                    <div className="mt-1 text-xs text-slate-700">{sh.client ?? clientSingular} · {sh.staff ?? 'Staff'}</div>
+                                                                    <div className="mt-1 text-xs text-foreground">{sh.client ?? clientSingular} · {sh.staff ?? 'Staff'}</div>
                                                                 </div>
                                                             </Link>
                                                         ))}
@@ -933,7 +933,7 @@ export default function RosteringIndex(props: Props) {
                                                         <div className="grid grid-cols-[72px_repeat(7,1fr)] gap-1">
                                                             <div className="text-[10px] text-muted-foreground"></div>
                                                             {days.map((d) => (
-                                                                <div key={ymd(d)} className="text-[10px] font-medium text-slate-700">{fmtDay(d)}</div>
+                                                                <div key={ymd(d)} className="text-[10px] font-medium text-foreground">{fmtDay(d)}</div>
                                                             ))}
 
                                                             {Array.from({ length: 24 }).map((_, h) => (
@@ -947,11 +947,11 @@ export default function RosteringIndex(props: Props) {
                                                                         } : { assigned: 0, open: 0 };
                                                                         const v = coverageMode === 'assigned' ? cell.assigned : cell.open;
                                                                         const bg = coverageMode === 'assigned'
-                                                                            ? (v >= 3 ? 'bg-slate-200' : v === 2 ? 'bg-slate-100' : v === 1 ? 'bg-slate-50' : 'bg-transparent')
+                                                                            ? (v >= 3 ? 'bg-muted' : v === 2 ? 'bg-muted' : v === 1 ? 'bg-muted' : 'bg-transparent')
                                                                             : (v >= 3 ? 'bg-amber-200' : v === 2 ? 'bg-amber-100' : v === 1 ? 'bg-amber-50' : 'bg-transparent');
                                                                         return (
                                                                             <div key={`${dk}-${h}`} className={`h-7 rounded border ${bg} flex items-center justify-center`}>
-                                                                                <span className="text-[10px] text-slate-700">{v > 0 ? v : ''}</span>
+                                                                                <span className="text-[10px] text-foreground">{v > 0 ? v : ''}</span>
                                                                             </div>
                                                                         );
                                                                     })}
@@ -984,9 +984,9 @@ export default function RosteringIndex(props: Props) {
                                                 <table className="min-w-[900px] w-full border-collapse">
                                                     <thead>
                                                         <tr className="border-b">
-                                                            <th className="w-48 px-2 py-2 text-left text-xs font-medium text-slate-600">Staff</th>
+                                                            <th className="w-48 px-2 py-2 text-left text-xs font-medium text-muted-foreground">Staff</th>
                                                             {days.map((d) => (
-                                                                <th key={ymd(d)} className="px-2 py-2 text-left text-xs font-medium text-slate-600">
+                                                                <th key={ymd(d)} className="px-2 py-2 text-left text-xs font-medium text-muted-foreground">
                                                                     {fmtDay(d)}
                                                                 </th>
                                                             ))}
@@ -1003,11 +1003,11 @@ export default function RosteringIndex(props: Props) {
                                                                         <td key={key} className="px-2 py-2">
                                                                             <div className="space-y-2">
                                                                                 {items.length === 0 ? (
-                                                                                    <div className="text-xs text-slate-400">—</div>
+                                                                                    <div className="text-xs text-muted-foreground">—</div>
                                                                                 ) : (
                                                                                     items.map((sh) => (
                                                                                         <Link key={sh.id} href={`/shifts/${sh.id}`} className="block">
-                                                                                            <div className="rounded-md border p-2 hover:bg-slate-50">
+                                                                                            <div className="rounded-md border p-2 hover:bg-muted">
                                                                                                 <div className="flex items-start justify-between gap-2">
                                                                                                     <div className="text-xs font-medium">
                                                                                                         {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}
@@ -1016,7 +1016,7 @@ export default function RosteringIndex(props: Props) {
                                                                                                         {sh.status}
                                                                                                     </Badge>
                                                                                                 </div>
-                                                                                                <div className="mt-1 text-xs text-slate-700">{sh.client ?? clientSingular}</div>
+                                                                                                <div className="mt-1 text-xs text-foreground">{sh.client ?? clientSingular}</div>
 
                                                                                                 <div className="mt-1 flex flex-wrap gap-1">
                                                                                                     {sh.incidents_count > 0 && (
@@ -1058,11 +1058,11 @@ export default function RosteringIndex(props: Props) {
                                                             <div className="mb-2 text-sm font-medium">{fmtDay(d)}</div>
                                                             <div className="space-y-2">
                                                                 {items.length === 0 ? (
-                                                                    <div className="text-sm text-slate-500">No shifts.</div>
+                                                                    <div className="text-sm text-muted-foreground">No shifts.</div>
                                                                 ) : (
                                                                     items.map((sh) => (
                                                                         <Link key={sh.id} href={`/shifts/${sh.id}`} className="block">
-                                                                            <div className="rounded-md border p-3 hover:bg-slate-50">
+                                                                            <div className="rounded-md border p-3 hover:bg-muted">
                                                                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                                                                     <div className="text-sm font-medium">
                                                                                         {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)} · {sh.client}
@@ -1361,7 +1361,7 @@ export default function RosteringIndex(props: Props) {
                             <CardTitle className="text-base">Timesheets needing attention</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                                 Shifts with a linked timesheet still in draft/submitted/returned.
                             </div>
                             <div className="space-y-2">
@@ -1370,12 +1370,12 @@ export default function RosteringIndex(props: Props) {
                                     .slice(0, 8)
                                     .map((sh) => (
                                         <Link key={sh.id} href={`/shifts/${sh.id}`} className="block">
-                                            <div className="rounded-md border p-2 hover:bg-slate-50">
+                                            <div className="rounded-md border p-2 hover:bg-muted">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="text-sm font-medium">{sh.client}</div>
                                                     <Badge variant="outline">TS: {sh.timesheet_status}</Badge>
                                                 </div>
-                                                <div className="mt-1 text-xs text-slate-600">
+                                                <div className="mt-1 text-xs text-muted-foreground">
                                                     {new Date(sh.starts_at).toLocaleDateString()} · {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}
                                                     {props.canManageAny && sh.staff ? ` · ${sh.staff}` : ''}
                                                 </div>
@@ -1383,7 +1383,7 @@ export default function RosteringIndex(props: Props) {
                                         </Link>
                                     ))}
                                 {props.stats.timesheets_pending === 0 && (
-                                    <div className="text-sm text-slate-500">No pending timesheets in this week.</div>
+                                    <div className="text-sm text-muted-foreground">No pending timesheets in this week.</div>
                                 )}
                             </div>
 
@@ -1400,19 +1400,19 @@ export default function RosteringIndex(props: Props) {
                             <CardTitle className="text-base">Incidents in this roster window</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            <div className="text-sm text-slate-600">Quick jump into the shifts that have incidents linked.</div>
+                            <div className="text-sm text-muted-foreground">Quick jump into the shifts that have incidents linked.</div>
                             <div className="space-y-2">
                                 {props.shifts
                                     .filter((s) => s.incidents_count > 0)
                                     .slice(0, 8)
                                     .map((sh) => (
                                         <Link key={sh.id} href={`/shifts/${sh.id}`} className="block">
-                                            <div className="rounded-md border p-2 hover:bg-slate-50">
+                                            <div className="rounded-md border p-2 hover:bg-muted">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="text-sm font-medium">{sh.client}</div>
                                                     <Badge variant="destructive">{sh.incidents_count} incident{sh.incidents_count === 1 ? '' : 's'}</Badge>
                                                 </div>
-                                                <div className="mt-1 text-xs text-slate-600">
+                                                <div className="mt-1 text-xs text-muted-foreground">
                                                     {new Date(sh.starts_at).toLocaleDateString()} · {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}
                                                     {props.canManageAny && sh.staff ? ` · ${sh.staff}` : ''}
                                                 </div>
@@ -1420,7 +1420,7 @@ export default function RosteringIndex(props: Props) {
                                         </Link>
                                     ))}
                                 {props.stats.incidents === 0 && (
-                                    <div className="text-sm text-slate-500">No incidents linked to shifts in this week.</div>
+                                    <div className="text-sm text-muted-foreground">No incidents linked to shifts in this week.</div>
                                 )}
                             </div>
                             <div>

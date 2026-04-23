@@ -132,13 +132,13 @@ interface Props {
 }
 
 const scheduleStateColors: Record<string, string> = {
-  upcoming: 'bg-slate-100 text-slate-700 border-slate-200',
+  upcoming: 'bg-muted text-foreground border-border',
   due_soon: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   due: 'bg-blue-100 text-blue-800 border-blue-200',
   late: 'bg-orange-100 text-orange-800 border-orange-200',
   missed_auto: 'bg-red-100 text-red-800 border-red-200',
   completed: 'bg-green-100 text-green-800 border-green-200',
-  future: 'bg-slate-100 text-slate-600 border-slate-200',
+  future: 'bg-muted text-muted-foreground border-border',
 };
 
 export default function EnhancedMar() {
@@ -216,7 +216,7 @@ export default function EnhancedMar() {
   };
 
   const getStateBadgeClass = (state: string) => {
-    return scheduleStateColors[state] || 'bg-slate-100 text-slate-700 border-slate-200';
+    return scheduleStateColors[state] || 'bg-muted text-foreground border-border';
   };
 
   if (loading && !marData) {
@@ -224,7 +224,7 @@ export default function EnhancedMar() {
       <AppLayout breadcrumbs={[{ title: 'Clients', href: '/clients' }, { title: clientName, href: `/clients/${client.id}` }, { title: 'MAR', href: '#' }]}>
         <Head title={`MAR • ${clientName}`} />
         <div className="flex h-64 items-center justify-center">
-          <div className="text-slate-500">Loading MAR...</div>
+          <div className="text-muted-foreground">Loading MAR...</div>
         </div>
       </AppLayout>
     );
@@ -239,7 +239,7 @@ export default function EnhancedMar() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-xl font-semibold">Medication Administration Record</h1>
-            <p className="text-sm text-slate-500">{clientName}</p>
+            <p className="text-sm text-muted-foreground">{clientName}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => navigateDay('prev')}>
@@ -340,9 +340,9 @@ export default function EnhancedMar() {
         {/* Stats */}
         {marData?.stats && (
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
-            <Card className="border-slate-200">
+            <Card className="border-border">
               <CardContent className="py-3">
-                <div className="text-xs text-slate-500">Scheduled</div>
+                <div className="text-xs text-muted-foreground">Scheduled</div>
                 <div className="text-lg font-semibold">{marData.stats.scheduled.total}</div>
               </CardContent>
             </Card>
@@ -370,9 +370,9 @@ export default function EnhancedMar() {
                 <div className="text-lg font-semibold text-red-700">{marData.stats.scheduled.missed}</div>
               </CardContent>
             </Card>
-            <Card className="border-slate-200">
+            <Card className="border-border">
               <CardContent className="py-3">
-                <div className="text-xs text-slate-500">Completion</div>
+                <div className="text-xs text-muted-foreground">Completion</div>
                 <div className="text-lg font-semibold">{marData.stats.completion_percentage}%</div>
               </CardContent>
             </Card>
@@ -386,12 +386,12 @@ export default function EnhancedMar() {
           </CardHeader>
           <CardContent className="space-y-2">
             {marData?.scheduled.length === 0 ? (
-              <div className="text-center text-sm text-slate-500">No scheduled medications for this date</div>
+              <div className="text-center text-sm text-muted-foreground">No scheduled medications for this date</div>
             ) : (
               marData?.scheduled.map((row, idx) => (
                 <div
                   key={`${row.client_medication_id}-${row.scheduled_time}-${idx}`}
-                  className="rounded-lg border p-3 transition-colors hover:bg-slate-50"
+                  className="rounded-lg border p-3 transition-colors hover:bg-muted"
                 >
                   <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0 flex-1">
@@ -406,7 +406,7 @@ export default function EnhancedMar() {
                           </Badge>
                         )}
                         {row.is_correction && (
-                          <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
                             Correction
                           </Badge>
                         )}
@@ -422,13 +422,13 @@ export default function EnhancedMar() {
                           </Badge>
                         )}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-muted-foreground">
                         {row.scheduled_time} • {row.medication.dosage}
                         {row.medication.route && ` • ${row.medication.route}`}
                         {row.medication.form && ` • ${row.medication.form}`}
                       </div>
                       {row.administration && (
-                        <div className="mt-2 text-xs text-slate-600">
+                        <div className="mt-2 text-xs text-muted-foreground">
                           {row.administration.administered_at && (
                             <span>Given: {new Date(row.administration.administered_at).toLocaleString()}</span>
                           )}
@@ -439,7 +439,7 @@ export default function EnhancedMar() {
                             <div className="mt-1">Reason: {row.administration.reason}</div>
                           )}
                           {row.administration.is_correction && row.administration.correction_reason && (
-                            <div className="mt-1 text-purple-600">
+                            <div className="mt-1 text-primary">
                               Correction: {row.administration.correction_reason}
                             </div>
                           )}
@@ -479,13 +479,13 @@ export default function EnhancedMar() {
               {marData.prn.map((row) => (
                 <div
                   key={row.client_medication_id}
-                  className="rounded-lg border p-3 transition-colors hover:bg-slate-50"
+                  className="rounded-lg border p-3 transition-colors hover:bg-muted"
                 >
                   <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{row.medication.name}</span>
-                        <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200">
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
                           PRN
                         </Badge>
                         {row.is_over_limit && (
@@ -504,22 +504,22 @@ export default function EnhancedMar() {
                           </Badge>
                         )}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-muted-foreground">
                         {row.medication.dosage}
                         {row.medication.route && ` • ${row.medication.route}`}
                         {row.max_per_day && ` • Max: ${row.max_per_day}`}
                       </div>
                       {row.prn_reason && (
-                        <div className="mt-1 text-xs text-slate-600">
+                        <div className="mt-1 text-xs text-muted-foreground">
                           Indication: {row.prn_reason}
                         </div>
                       )}
                       <div className="mt-2 flex items-center gap-2 text-xs">
-                        <span className={row.is_over_limit ? 'text-red-600 font-medium' : 'text-slate-600'}>
+                        <span className={row.is_over_limit ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
                           Last 24h: {row.count_24h} given
                         </span>
                         {row.remaining_today !== undefined && (
-                          <span className="text-slate-500">
+                          <span className="text-muted-foreground">
                             ({row.remaining_today} remaining)
                           </span>
                         )}
@@ -555,7 +555,7 @@ export default function EnhancedMar() {
           </CardHeader>
           <CardContent className="space-y-2">
             {marData?.history.length === 0 ? (
-              <div className="text-center text-sm text-slate-500">No administrations recorded</div>
+              <div className="text-center text-sm text-muted-foreground">No administrations recorded</div>
             ) : (
               marData?.history.slice(0, 10).map((item) => (
                 <div
@@ -569,7 +569,7 @@ export default function EnhancedMar() {
                         {item.status_label.label}
                       </Badge>
                       {item.is_correction && (
-                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
                           Correction
                         </Badge>
                       )}
@@ -579,12 +579,12 @@ export default function EnhancedMar() {
                         </Badge>
                       )}
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">
+                    <div className="mt-1 text-xs text-muted-foreground">
                       {item.administered_at && new Date(item.administered_at).toLocaleString()}
                       {item.administered_by && ` • ${item.administered_by}`}
                     </div>
                     {item.reason && (
-                      <div className="mt-1 text-xs text-slate-600">{item.reason}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{item.reason}</div>
                     )}
                   </div>
                 </div>

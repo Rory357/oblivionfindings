@@ -60,7 +60,7 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
                             <History className="w-5 h-5" />
                             Credential Audit
                         </h1>
-                        <p className="text-sm text-slate-400">{credential.label}</p>
+                        <p className="text-sm text-muted-foreground">{credential.label}</p>
                     </div>
                 </div>
 
@@ -70,7 +70,7 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
                     </CardHeader>
                     <CardContent>
                         {logs.data.length === 0 ? (
-                            <div className="py-8 text-center text-slate-400">No audit entries.</div>
+                            <div className="py-8 text-center text-muted-foreground">No audit entries.</div>
                         ) : (
                             <div className="space-y-2">
                                 {logs.data.map((log) => (
@@ -80,11 +80,11 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
                                                 <Badge variant="outline">{log.action}</Badge>
                                                 <span className="text-sm text-slate-300">{log.user?.name ?? 'Unknown User'}</span>
                                             </div>
-                                            <div className="mt-1 text-xs text-slate-500">
+                                            <div className="mt-1 text-xs text-muted-foreground">
                                                 {new Date(log.created_at).toLocaleString()}
                                             </div>
                                         </div>
-                                        <div className="text-right text-xs text-slate-500">
+                                        <div className="text-right text-xs text-muted-foreground">
                                             <div>{log.ip_address || 'No IP'}</div>
                                         </div>
                                     </div>

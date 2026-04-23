@@ -63,13 +63,13 @@ const severityConfig: Record<string, { bg: string; text: string; border: string;
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock; darkBg: string; darkText: string }> = {
     open: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock, darkBg: 'dark:bg-blue-500/10', darkText: 'dark:text-blue-300' },
     triaged: { bg: 'bg-sky-100', text: 'text-sky-700', icon: Eye, darkBg: 'dark:bg-sky-500/10', darkText: 'dark:text-sky-300' },
-    investigating: { bg: 'bg-purple-100', text: 'text-purple-700', icon: Search, darkBg: 'dark:bg-purple-500/10', darkText: 'dark:text-purple-300' },
+    investigating: { bg: 'bg-primary/10', text: 'text-primary', icon: Search, darkBg: 'dark:bg-primary/10', darkText: 'dark:text-primary/70' },
     action_plan: { bg: 'bg-amber-100', text: 'text-amber-700', icon: FileEdit, darkBg: 'dark:bg-amber-500/10', darkText: 'dark:text-amber-300' },
     monitoring: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Eye, darkBg: 'dark:bg-yellow-500/10', darkText: 'dark:text-yellow-300' },
     closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2, darkBg: 'dark:bg-green-500/10', darkText: 'dark:text-green-300' },
-    referred_external: { bg: 'bg-indigo-100', text: 'text-indigo-700', icon: ExternalLink, darkBg: 'dark:bg-indigo-500/10', darkText: 'dark:text-indigo-300' },
-    no_action_required: { bg: 'bg-slate-100', text: 'text-slate-700', icon: CheckCircle2, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-slate-300' },
-    reported: { bg: 'bg-slate-100', text: 'text-slate-700', icon: Clock, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-slate-300' },
+    referred_external: { bg: 'bg-primary/10', text: 'text-primary', icon: ExternalLink, darkBg: 'dark:bg-primary/10', darkText: 'dark:text-primary/70' },
+    no_action_required: { bg: 'bg-muted', text: 'text-foreground', icon: CheckCircle2, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-muted-foreground' },
+    reported: { bg: 'bg-muted', text: 'text-foreground', icon: Clock, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-muted-foreground' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -262,7 +262,7 @@ export default function SafeguardingIndex({ filters, concerns, stats }: Props) {
                                                             {concern.status?.replace(/_/g, ' ')}
                                                         </Badge>
                                                         {concern.requires_external_referral && (
-                                                            <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300 text-[10px]">
+                                                            <Badge variant="outline" className="border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/10 dark:text-primary/70 text-[10px]">
                                                                 External Referral
                                                             </Badge>
                                                         )}

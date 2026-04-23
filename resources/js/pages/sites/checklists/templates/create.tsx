@@ -61,7 +61,7 @@ export default function CreateTemplate() {
                                         placeholder="e.g., daily_safety_check"
                                         required
                                     />
-                                    <p className="text-xs text-slate-400 mt-1">Unique identifier, no spaces</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Unique identifier, no spaces</p>
                                     {form.errors.key && <p className="text-sm text-red-400 mt-1">{form.errors.key}</p>}
                                 </div>
                                 <div>

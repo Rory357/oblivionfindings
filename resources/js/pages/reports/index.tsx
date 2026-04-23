@@ -26,8 +26,8 @@ const STAT_COLORS = {
     emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', icon: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-100 dark:ring-emerald-500/20' },
     amber: { bg: 'bg-amber-50 dark:bg-amber-500/10', icon: 'text-amber-600 dark:text-amber-400', ring: 'ring-amber-100 dark:ring-amber-500/20' },
     red: { bg: 'bg-red-50 dark:bg-red-500/10', icon: 'text-red-600 dark:text-red-400', ring: 'ring-red-100 dark:ring-red-500/20' },
-    purple: { bg: 'bg-purple-50 dark:bg-purple-500/10', icon: 'text-purple-600 dark:text-purple-400', ring: 'ring-purple-100 dark:ring-purple-500/20' },
-    slate: { bg: 'bg-slate-50 dark:bg-slate-500/10', icon: 'text-slate-600 dark:text-slate-400', ring: 'ring-slate-100 dark:ring-slate-500/20' },
+    purple: { bg: 'bg-primary/10 dark:bg-primary/10', icon: 'text-primary dark:text-primary', ring: 'ring-ring dark:ring-ring/20' },
+    slate: { bg: 'bg-muted dark:bg-slate-500/10', icon: 'text-muted-foreground dark:text-muted-foreground', ring: 'ring-slate-100 dark:ring-slate-500/20' },
 };
 
 function StatCard({ label, value, subtitle, icon: Icon, color }: { label: string; value: number | string; subtitle?: string; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {

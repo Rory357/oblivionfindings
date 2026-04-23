@@ -96,7 +96,7 @@ function statusBadge(status: string) {
         case 'pending':
             return <Badge className="bg-amber-500 text-white">Pending</Badge>;
         case 'approved':
-            return <Badge className="bg-purple-600 text-white">Approved</Badge>;
+            return <Badge className="bg-primary text-white">Approved</Badge>;
         case 'rejected':
             return <Badge className="bg-red-500 text-white">Rejected</Badge>;
         case 'paid':

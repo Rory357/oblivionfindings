@@ -53,11 +53,11 @@ const statusColors: Record<string, string> = {
     active: 'bg-blue-100 text-blue-800',
     in_progress: 'bg-yellow-100 text-yellow-800',
     completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-slate-100 text-slate-800',
+    cancelled: 'bg-muted text-foreground',
 };
 
 const milestoneIcons: Record<string, React.ReactNode> = {
-    pending: <Clock className="h-5 w-5 text-slate-400" />,
+    pending: <Clock className="h-5 w-5 text-muted-foreground" />,
     met: <CheckCircle2 className="h-5 w-5 text-green-500" />,
     not_met: <XCircle className="h-5 w-5 text-red-500" />,
 };
@@ -100,11 +100,11 @@ export default function PipShow({ pip, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">{pip.title}</h1>
-                        <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
+                        <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                             <span>{pip.employee?.name}</span>
                             <span>|</span>
                             <span>{formatDate(pip.start_date)} - {formatDate(pip.end_date)}</span>
-                            <Badge className={statusColors[pip.status] || 'bg-slate-100'} variant="outline">
+                            <Badge className={statusColors[pip.status] || 'bg-muted'} variant="outline">
                                 {pip.status.replace('_', ' ')}
                             </Badge>
                         </div>
@@ -123,31 +123,31 @@ export default function PipShow({ pip, can }: Props) {
                         <CardHeader><CardTitle className="text-base">Plan Details</CardTitle></CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div>
-                                <span className="font-medium text-slate-500">Manager:</span>{' '}
+                                <span className="font-medium text-muted-foreground">Manager:</span>{' '}
                                 {pip.manager?.name ?? '-'}
                             </div>
                             <div>
-                                <span className="font-medium text-slate-500">Review Date:</span>{' '}
+                                <span className="font-medium text-muted-foreground">Review Date:</span>{' '}
                                 {formatDate(pip.review_date)}
                             </div>
                             <div>
-                                <span className="font-medium text-slate-500">Reason:</span>
-                                <p className="mt-1 whitespace-pre-wrap text-slate-700">{pip.reason}</p>
+                                <span className="font-medium text-muted-foreground">Reason:</span>
+                                <p className="mt-1 whitespace-pre-wrap text-foreground">{pip.reason}</p>
                             </div>
                             <div>
-                                <span className="font-medium text-slate-500">Expectations:</span>
-                                <p className="mt-1 whitespace-pre-wrap text-slate-700">{pip.expectations}</p>
+                                <span className="font-medium text-muted-foreground">Expectations:</span>
+                                <p className="mt-1 whitespace-pre-wrap text-foreground">{pip.expectations}</p>
                             </div>
                             {pip.support_offered && (
                                 <div>
-                                    <span className="font-medium text-slate-500">Support Offered:</span>
-                                    <p className="mt-1 whitespace-pre-wrap text-slate-700">{pip.support_offered}</p>
+                                    <span className="font-medium text-muted-foreground">Support Offered:</span>
+                                    <p className="mt-1 whitespace-pre-wrap text-foreground">{pip.support_offered}</p>
                                 </div>
                             )}
                             {pip.consequences && (
                                 <div>
-                                    <span className="font-medium text-slate-500">Consequences:</span>
-                                    <p className="mt-1 whitespace-pre-wrap text-slate-700">{pip.consequences}</p>
+                                    <span className="font-medium text-muted-foreground">Consequences:</span>
+                                    <p className="mt-1 whitespace-pre-wrap text-foreground">{pip.consequences}</p>
                                 </div>
                             )}
                         </CardContent>
@@ -158,9 +158,9 @@ export default function PipShow({ pip, can }: Props) {
                         <CardContent className="space-y-3">
                             <div className="text-center">
                                 <div className="text-3xl font-bold">{progressPct}%</div>
-                                <div className="text-sm text-slate-500">{metMilestones} of {totalMilestones} milestones met</div>
+                                <div className="text-sm text-muted-foreground">{metMilestones} of {totalMilestones} milestones met</div>
                             </div>
-                            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
                                 <div
                                     className="h-full rounded-full bg-green-500 transition-all"
                                     style={{ width: `${progressPct}%` }}
@@ -168,10 +168,10 @@ export default function PipShow({ pip, can }: Props) {
                             </div>
                             {pip.outcome && (
                                 <div className="mt-4 rounded-lg border p-3">
-                                    <span className="text-sm font-medium text-slate-500">Outcome:</span>
+                                    <span className="text-sm font-medium text-muted-foreground">Outcome:</span>
                                     <Badge className="ml-2" variant="outline">{pip.outcome}</Badge>
                                     {pip.outcome_notes && (
-                                        <p className="mt-2 text-sm text-slate-700">{pip.outcome_notes}</p>
+                                        <p className="mt-2 text-sm text-foreground">{pip.outcome_notes}</p>
                                     )}
                                 </div>
                             )}
@@ -218,7 +218,7 @@ export default function PipShow({ pip, can }: Props) {
                     <CardHeader><CardTitle className="text-base">Milestones</CardTitle></CardHeader>
                     <CardContent>
                         {pip.milestones.length === 0 ? (
-                            <p className="text-center text-sm text-slate-400">No milestones defined</p>
+                            <p className="text-center text-sm text-muted-foreground">No milestones defined</p>
                         ) : (
                             <div className="space-y-4">
                                 {pip.milestones.map((milestone, index) => (
@@ -226,19 +226,19 @@ export default function PipShow({ pip, can }: Props) {
                                         <div className="flex flex-col items-center">
                                             {milestoneIcons[milestone.status] || milestoneIcons.pending}
                                             {index < pip.milestones.length - 1 && (
-                                                <div className="mt-1 h-full w-0.5 bg-slate-200" />
+                                                <div className="mt-1 h-full w-0.5 bg-muted" />
                                             )}
                                         </div>
                                         <div className="flex-1 pb-4">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
                                                     <div className="font-medium">{milestone.title}</div>
-                                                    <div className="text-sm text-slate-500">Due: {formatDate(milestone.due_date)}</div>
+                                                    <div className="text-sm text-muted-foreground">Due: {formatDate(milestone.due_date)}</div>
                                                     {milestone.description && (
-                                                        <p className="mt-1 text-sm text-slate-600">{milestone.description}</p>
+                                                        <p className="mt-1 text-sm text-muted-foreground">{milestone.description}</p>
                                                     )}
                                                     {milestone.reviewer_notes && (
-                                                        <p className="mt-1 text-sm italic text-slate-500">
+                                                        <p className="mt-1 text-sm italic text-muted-foreground">
                                                             Review: {milestone.reviewer_notes}
                                                             {milestone.reviewer && <> - {milestone.reviewer.name}</>}
                                                         </p>

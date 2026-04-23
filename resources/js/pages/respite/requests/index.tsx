@@ -42,7 +42,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Booking Requests</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Requests are reviewed and approved before bookings are created.
                         </div>
                     </div>
@@ -58,7 +58,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                     <div className="grid gap-4 sm:grid-cols-3">
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Submitted</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Submitted</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{stats.submitted}</div>
@@ -66,7 +66,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Approved</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Approved</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{stats.approved}</div>
@@ -74,7 +74,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Rejected</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Rejected</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{stats.rejected}</div>
@@ -89,7 +89,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search notes or funding reference"
                                 value={filters.q || ''}
@@ -97,7 +97,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -130,7 +130,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                                                     <Badge variant="outline">Funding: {r.funding_reference}</Badge>
                                                 )}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Requested: {formatDateTime(r.requested_start)} → {formatDateTime(r.requested_end)}
                                             </div>
                                         </div>
@@ -143,7 +143,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                         </Card>
                     ))}
                     {!requests.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No booking requests found.
                         </div>
                     )}

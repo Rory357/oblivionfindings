@@ -187,7 +187,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={ClipboardList}
-                                iconBg="bg-violet-100 text-violet-600"
+                                iconBg="bg-primary/10 text-primary"
                                 title="Agreement Details"
                                 description="Basic information about this service agreement."
                             />
@@ -259,7 +259,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={CalendarClock}
-                                iconBg="bg-indigo-100 text-indigo-600"
+                                iconBg="bg-primary/10 text-primary"
                                 title="Dates & Milestones"
                                 description="Key dates throughout the agreement lifecycle."
                             />
@@ -357,7 +357,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={Landmark}
-                                iconBg="bg-indigo-100 text-indigo-600"
+                                iconBg="bg-primary/10 text-primary"
                                 title="NZ Funding Details"
                                 description="Whaikaha / DSS funding type and service level details."
                             />
@@ -452,7 +452,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={PenLine}
-                                iconBg="bg-violet-100 text-violet-600"
+                                iconBg="bg-primary/10 text-primary"
                                 title="Signatories & Contacts"
                                 description="Agreement signatories and funder contact details."
                             />
@@ -497,11 +497,11 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                             <div className="space-y-4">
                                 <div className="space-y-1.5">
                                     <Label>Terms & Conditions</Label>
-                                    <Textarea className="min-h-[100px] bg-slate-50/50" value={data.terms} onChange={(e) => setData('terms', e.target.value)} placeholder="Enter the terms and conditions of this agreement..." />
+                                    <Textarea className="min-h-[100px] bg-muted/50" value={data.terms} onChange={(e) => setData('terms', e.target.value)} placeholder="Enter the terms and conditions of this agreement..." />
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label>Notes</Label>
-                                    <Textarea className="min-h-[80px] bg-slate-50/50" value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Any additional notes or context..." />
+                                    <Textarea className="min-h-[80px] bg-muted/50" value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Any additional notes or context..." />
                                 </div>
                             </div>
                         </CardContent>
@@ -519,19 +519,19 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                             <div
                                 className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors ${
                                     dragOver
-                                        ? 'border-violet-500 bg-violet-100/50'
-                                        : 'border-violet-300 bg-violet-50/50 hover:bg-violet-50'
+                                        ? 'border-primary bg-primary/10/50'
+                                        : 'border-primary bg-primary/10/50 hover:bg-primary/10'
                                 }`}
                                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                                 onDragLeave={() => setDragOver(false)}
                                 onDrop={handleFileDrop}
                                 onClick={() => document.getElementById('doc-upload-create')?.click()}
                             >
-                                <Upload className="mb-2 h-8 w-8 text-violet-400" />
-                                <p className="text-sm font-medium text-violet-700">
+                                <Upload className="mb-2 h-8 w-8 text-primary" />
+                                <p className="text-sm font-medium text-primary">
                                     {dragOver ? 'Drop files here' : 'Click or drag files to upload'}
                                 </p>
-                                <p className="mt-1 text-xs text-violet-500">PDF, Word document, or scanned image</p>
+                                <p className="mt-1 text-xs text-primary">PDF, Word document, or scanned image</p>
                                 <input
                                     id="doc-upload-create"
                                     type="file"
@@ -569,13 +569,13 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                     </Card>
 
                     {/* Submit */}
-                    <div className="flex items-center justify-between rounded-xl border bg-slate-50 p-4">
+                    <div className="flex items-center justify-between rounded-xl border bg-muted p-4">
                         <p className="text-sm text-muted-foreground">
                             {data.status === 'draft' ? 'This agreement will be saved as a draft.' : 'This agreement will be created as active.'}
                         </p>
                         <div className="flex gap-2">
                             <Button type="button" variant="outline" onClick={() => router.get(initialClientId ? `/operations/clients/${initialClientId}` : '/operations/service-agreements')}>Cancel</Button>
-                            <Button type="submit" disabled={processing} className="bg-violet-600 hover:bg-violet-700">
+                            <Button type="submit" disabled={processing} className="bg-primary hover:bg-primary">
                                 {processing ? 'Creating...' : 'Create Agreement'}
                             </Button>
                         </div>

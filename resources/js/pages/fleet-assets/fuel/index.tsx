@@ -333,7 +333,7 @@ export default function FuelIndex({
                                                     <input
                                                         id="full_tank"
                                                         type="checkbox"
-                                                        className="rounded border-gray-300"
+                                                        className="rounded border-border"
                                                         checked={form.data.full_tank}
                                                         onChange={(e) => form.setData('full_tank', e.target.checked)}
                                                     />

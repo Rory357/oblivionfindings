@@ -145,7 +145,7 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="flex items-center gap-2">
-                                    <ShieldCheck className="h-5 w-5 text-violet-600" />
+                                    <ShieldCheck className="h-5 w-5 text-primary" />
                                     SSO Group Mapping
                                 </CardTitle>
                                 <CardDescription>
@@ -168,7 +168,7 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                 </Button>
                                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                                     <DialogTrigger asChild>
-                                        <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
+                                        <Button size="sm" className="bg-primary hover:bg-primary">
                                             <Plus className="mr-1 h-4 w-4" />
                                             Add Mapping
                                         </Button>
@@ -245,7 +245,7 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                                 />
                                             </div>
                                             <DialogFooter>
-                                                <Button type="submit" disabled={form.processing} className="bg-violet-600 hover:bg-violet-700">
+                                                <Button type="submit" disabled={form.processing} className="bg-primary hover:bg-primary">
                                                     Create Mapping
                                                 </Button>
                                             </DialogFooter>

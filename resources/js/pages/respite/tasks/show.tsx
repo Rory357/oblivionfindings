@@ -16,16 +16,16 @@ type Props = {
 };
 
 const priorityColors: Record<string, string> = {
-    low: 'bg-slate-100 text-slate-800',
+    low: 'bg-muted text-foreground',
     medium: 'bg-blue-100 text-blue-800',
     high: 'bg-orange-100 text-orange-800',
     urgent: 'bg-red-100 text-red-800',
 };
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-slate-100 text-slate-800',
+    pending: 'bg-muted text-foreground',
     assigned: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-indigo-100 text-indigo-800',
+    in_progress: 'bg-primary/10 text-primary',
     completed: 'bg-green-100 text-green-800',
     submitted_for_approval: 'bg-amber-100 text-amber-800',
     approved: 'bg-green-100 text-green-800',
@@ -47,7 +47,7 @@ export default function TaskShow({ task, staff }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">{task.title}</h1>
-                        <div className="mt-1 text-sm text-slate-500">Task #{task.id}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Task #{task.id}</div>
                     </div>
                     <Link href="/respite/tasks" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                         Back to list
@@ -59,7 +59,7 @@ export default function TaskShow({ task, staff }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Task Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3 text-sm text-slate-600">
+                    <CardContent className="space-y-3 text-sm text-muted-foreground">
                         {task.description && <div className="whitespace-pre-wrap">{task.description}</div>}
                         <div className="flex flex-wrap gap-2">
                             <Badge className={priorityColors[task.priority] || ''}>{task.priority}</Badge>
@@ -74,7 +74,7 @@ export default function TaskShow({ task, staff }: Props) {
                         {task.procedure_run && (
                             <div>
                                 Procedure Run:{' '}
-                                <Link href={`/respite/procedure-runs/${task.procedure_run.id}`} className="text-indigo-500 hover:text-indigo-400">
+                                <Link href={`/respite/procedure-runs/${task.procedure_run.id}`} className="text-primary hover:text-primary">
                                     {task.procedure_run.template?.name || `Run #${task.procedure_run.id}`}
                                 </Link>
                             </div>
@@ -96,7 +96,7 @@ export default function TaskShow({ task, staff }: Props) {
                                             checked={!!item.checked}
                                             onChange={() => router.post(`${base}/update-checklist`, { index: idx, checked: !item.checked })}
                                         />
-                                        <span className={item.checked ? 'line-through text-slate-400' : ''}>{item.label || item.name || `Item ${idx + 1}`}</span>
+                                        <span className={item.checked ? 'line-through text-muted-foreground' : ''}>{item.label || item.name || `Item ${idx + 1}`}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -109,10 +109,10 @@ export default function TaskShow({ task, staff }: Props) {
                         <CardHeader>
                             <CardTitle className="text-base">Evidence</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm text-slate-600">
+                        <CardContent className="space-y-3 text-sm text-muted-foreground">
                             {task.required_evidence?.length > 0 && (
                                 <div>
-                                    <div className="font-medium text-slate-700">Required Evidence</div>
+                                    <div className="font-medium text-foreground">Required Evidence</div>
                                     <ul className="mt-1 list-disc pl-5 space-y-1">
                                         {task.required_evidence.map((e: string, i: number) => <li key={i}>{e}</li>)}
                                     </ul>
@@ -120,7 +120,7 @@ export default function TaskShow({ task, staff }: Props) {
                             )}
                             {task.evidence_collected?.length > 0 && (
                                 <div>
-                                    <div className="font-medium text-slate-700">Evidence Collected</div>
+                                    <div className="font-medium text-foreground">Evidence Collected</div>
                                     <ul className="mt-1 list-disc pl-5 space-y-1">
                                         {task.evidence_collected.map((e: string, i: number) => <li key={i}>{e}</li>)}
                                     </ul>
@@ -191,7 +191,7 @@ export default function TaskShow({ task, staff }: Props) {
                         )}
 
                         {['completed', 'approved', 'rejected'].includes(task.status) && (
-                            <div className="text-sm text-slate-500">No further actions available.</div>
+                            <div className="text-sm text-muted-foreground">No further actions available.</div>
                         )}
                     </CardContent>
                 </Card>

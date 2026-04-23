@@ -32,14 +32,14 @@ interface Props extends PageProps {
 export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }: Props) {
   const getStatusColor = (status: string) => {
     return {
-      draft: 'bg-gray-100 text-gray-800',
+      draft: 'bg-muted text-foreground',
       proposed: 'bg-blue-100 text-blue-800',
       open: 'bg-green-100 text-green-800',
-      closed: 'bg-purple-100 text-purple-800',
+      closed: 'bg-primary/10 text-primary',
       implemented: 'bg-green-100 text-green-800',
-      archived: 'bg-gray-100 text-gray-800',
+      archived: 'bg-muted text-foreground',
       cancelled: 'bg-red-100 text-red-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getOutcomeBadge = (outcome: string | null) => {
@@ -69,8 +69,8 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Resolutions</h1>
-              <p className="text-gray-500 mt-1">Board voting and decisions</p>
+              <h1 className="text-3xl font-bold text-foreground">Resolutions</h1>
+              <p className="text-muted-foreground mt-1">Board voting and decisions</p>
             </div>
             <Button asChild>
               <Link href={createResolution.url()}>New Resolution</Link>
@@ -94,8 +94,8 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
                       className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-100"
                     >
                       <div>
-                        <p className="font-medium text-gray-900">{vote.title}</p>
-                        <p className="text-sm text-gray-500">{vote.resolution_reference}</p>
+                        <p className="font-medium text-foreground">{vote.title}</p>
+                        <p className="text-sm text-muted-foreground">{vote.resolution_reference}</p>
                       </div>
                       <Button size="sm" asChild>
                         <Link href={showResolution.url({ resolution: vote.id })}>
@@ -119,11 +119,11 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
                 {resolutions.data.map((resolution) => (
                   <div
                     key={resolution.id}
-                    className="flex items-start justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors"
+                    className="flex items-start justify-between p-4 rounded-lg border hover:bg-muted transition-colors"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-gray-900">
+                        <h3 className="font-semibold text-foreground">
                           <Link
                             href={showResolution.url({ resolution: resolution.id })}
                             className="hover:text-blue-600"
@@ -136,7 +136,7 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
                         </Badge>
                         {getOutcomeBadge(resolution.outcome)}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span>{resolution.resolution_reference}</span>
                         <span>|</span>
                         <span>Threshold: {resolution.voting_threshold.replace('_', ' ')}</span>

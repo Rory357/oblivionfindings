@@ -82,7 +82,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     {[
-                        { label: 'Total Records', value: stats.totalRecords, icon: Users, color: 'violet', gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-violet-100', iconColor: 'text-violet-600', borderColor: 'hover:border-violet-300' },
+                        { label: 'Total Records', value: stats.totalRecords, icon: Users, color: 'violet', gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-primary/10', iconColor: 'text-primary', borderColor: 'hover:border-primary' },
                         { label: 'Completed This Month', value: stats.completedThisMonth, icon: CheckCircle2, color: 'emerald', gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', borderColor: 'hover:border-emerald-300' },
                         { label: 'Due Soon (60 days)', value: stats.dueSoonCount, icon: Clock, color: 'amber', gradient: 'from-amber-500/10 to-yellow-500/5', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', borderColor: 'hover:border-amber-300' },
                         { label: 'Expired', value: stats.expiredCount, icon: AlertTriangle, color: 'red', gradient: 'from-red-500/10 to-rose-500/5', iconBg: 'bg-red-100', iconColor: 'text-red-600', borderColor: 'hover:border-red-300' },
@@ -168,7 +168,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                         <CardContent className="p-0">
                             {dueSoon.length === 0 ? (
                                 <div className="flex flex-col items-center gap-2 py-12">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                                         <Calendar className="h-6 w-6 text-slate-300" />
                                     </div>
                                     <p className="text-sm text-muted-foreground">No records expiring soon</p>
@@ -206,8 +206,8 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                     <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
-                                    <TrendingUp className="h-4 w-4 text-violet-600" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                                    <TrendingUp className="h-4 w-4 text-primary" />
                                 </div>
                                 Course Renewal Pressure
                             </CardTitle>
@@ -223,14 +223,14 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                     <CardContent className="p-0">
                         {matrix.length === 0 ? (
                             <div className="flex flex-col items-center gap-2 py-12">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-50">
-                                    <GraduationCap className="h-6 w-6 text-violet-300" />
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                                    <GraduationCap className="h-6 w-6 text-primary/70" />
                                 </div>
                                 <p className="text-sm text-muted-foreground">No courses currently under renewal pressure</p>
                             </div>
                         ) : (
                             <table className="w-full text-sm">
-                                <thead className="bg-slate-50/80">
+                                <thead className="bg-muted/80">
                                     <tr>
                                         <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Course</th>
                                         <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Category</th>
@@ -239,11 +239,11 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                                 </thead>
                                 <tbody className="divide-y">
                                     {matrix.map((e) => (
-                                        <tr key={e.course_id} className="group transition-colors hover:bg-violet-50/30">
+                                        <tr key={e.course_id} className="group transition-colors hover:bg-primary/10/30">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2.5">
-                                                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100">
-                                                        <BookOpen className="h-3.5 w-3.5 text-violet-600" />
+                                                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+                                                        <BookOpen className="h-3.5 w-3.5 text-primary" />
                                                     </div>
                                                     <span className="font-medium">{e.course_name}</span>
                                                 </div>
@@ -287,7 +287,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                                                 {site.expired} expired
                                             </Badge>
                                         </div>
-                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                                             <div className={`h-full rounded-full transition-all duration-700 ${site.expired > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${pct}%` }} />
                                         </div>
                                     </div>

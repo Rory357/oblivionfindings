@@ -71,7 +71,7 @@ const getStatusColor = (status: string) => {
         case 'renewal_due':
             return 'bg-amber-100 text-amber-800 border-amber-200';
         default:
-            return 'bg-slate-100 text-slate-800 border-slate-200';
+            return 'bg-muted text-foreground border-border';
     }
 };
 
@@ -115,7 +115,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Vetting Register</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Staff background checks, DBS, and vetting records
                         </div>
                     </div>
@@ -135,7 +135,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                 <div className="grid gap-4 sm:grid-cols-4">
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Total Records</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Records</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{summary.total}</div>
@@ -143,7 +143,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Clear</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Clear</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
@@ -154,7 +154,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Expiring Soon</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Expiring Soon</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
@@ -167,7 +167,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Expired</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Expired</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Pending</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{summary.pending}</div>
@@ -188,7 +188,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Flagged</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Flagged</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-red-600">{summary.flagged}</div>
@@ -202,9 +202,9 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search by staff name or reference..."
                                     value={filters.q || ''}
@@ -215,7 +215,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? NONE}
                                 onValueChange={(v) => onFilter({ status: v === NONE ? null : v })}
@@ -254,13 +254,13 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                         <TableCell>
                                             <div className="font-medium">{check.user.name}</div>
                                             {check.user.email && (
-                                                <div className="text-xs text-slate-500">{check.user.email}</div>
+                                                <div className="text-xs text-muted-foreground">{check.user.email}</div>
                                             )}
                                         </TableCell>
                                         <TableCell className="capitalize">
                                             {check.check_type.replace(/_/g, ' ')}
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-muted-foreground">
                                             {check.reference_number || '--'}
                                         </TableCell>
                                         <TableCell>
@@ -292,7 +292,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                 ))}
                                 {!checks.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                                             No vetting records found.
                                         </TableCell>
                                     </TableRow>

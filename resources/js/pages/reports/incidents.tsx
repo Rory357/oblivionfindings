@@ -37,7 +37,7 @@ export default function IncidentReports({ clients, filters }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Incident reports</h1>
-                    <div className="mt-1 text-sm text-slate-500">Export CSV with filters</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Export CSV with filters</div>
                 </div>
 
                 <Card>

@@ -114,7 +114,7 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
 
                 {/* Resident + Tracker Info */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Card className="border bg-purple-50 dark:bg-purple-950/30">
+                    <Card className="border bg-primary/10 dark:bg-primary/30">
                         <CardContent className="flex items-center gap-4 p-4">
                             <img
                                 src={client?.photo ?? '/images/avatar-placeholder.svg'}
@@ -233,8 +233,8 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
                                 <div className="divide-y">
                                     {locations.map((loc, i) => (
                                         <div key={i} className="flex items-start gap-3 px-4 py-3">
-                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30">
-                                                <MapPin className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/30">
+                                                <MapPin className="h-4 w-4 text-primary dark:text-primary" />
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-xs text-muted-foreground">

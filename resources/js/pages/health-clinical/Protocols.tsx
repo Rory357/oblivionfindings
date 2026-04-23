@@ -209,10 +209,10 @@ export default function Protocols({
                         </p>
                     </div>
                     <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-gray-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                             Inactive
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-slate-700">
+                        <p className="mt-1 text-2xl font-bold text-foreground">
                             {stats.inactive_protocols}
                         </p>
                     </div>
@@ -233,10 +233,10 @@ export default function Protocols({
                         </p>
                     </div>
                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-fuchsia-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
                             Compliance (30d)
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-violet-700">
+                        <p className="mt-1 text-2xl font-bold text-primary">
                             {stats.compliance_rate_30d}%
                         </p>
                     </div>
@@ -421,7 +421,7 @@ export default function Protocols({
                                                     <Badge
                                                         className={protocol.is_active
                                                             ? 'bg-emerald-100 text-emerald-800'
-                                                            : 'bg-slate-100 text-slate-700'}
+                                                            : 'bg-muted text-foreground'}
                                                     >
                                                         {protocol.is_active ? 'Active' : 'Inactive'}
                                                     </Badge>

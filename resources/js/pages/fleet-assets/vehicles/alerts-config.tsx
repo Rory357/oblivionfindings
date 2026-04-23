@@ -198,7 +198,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                                     disabled={!canManage}
                                                     className="peer sr-only"
                                                 />
-                                                <div className="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring dark:bg-gray-700" />
+                                                <div className="h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring dark:bg-gray-700" />
                                             </label>
                                         </div>
                                     </div>
@@ -284,7 +284,7 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                                                         checked={rule.notify_control_room}
                                                         disabled={!canManage}
                                                         onChange={(e) => updateRule(key, 'notify_control_room', e.target.checked)}
-                                                        className="h-4 w-4 rounded border-gray-300"
+                                                        className="h-4 w-4 rounded border-border"
                                                     />
                                                     <Bell className="h-3.5 w-3.5 text-muted-foreground" />
                                                     Notify Control Room

@@ -252,7 +252,7 @@ export default function GeofenceDrawMap({ center = { lat: -36.8485, lng: 174.763
                     ]).map(({ k, I, l }) => (
                         <button key={k} type="button" onClick={() => switchMode(k)}
                             className={cn('flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
-                                mode === k ? 'bg-purple-600 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                mode === k ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                             )}>
                             <I className="h-3.5 w-3.5" /> {l}
                         </button>
@@ -271,16 +271,16 @@ export default function GeofenceDrawMap({ center = { lat: -36.8485, lng: 174.763
                 {mode === 'circle' && (
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Radius: <span className="text-purple-600 font-bold">{radius}m</span></span>
+                            <span className="text-sm font-medium">Radius: <span className="text-primary font-bold">{radius}m</span></span>
                             {Number(radius) >= 1000 && <span className="text-xs text-muted-foreground">{(Number(radius) / 1000).toFixed(1)} km</span>}
                         </div>
                         <input type="range" min="25" max="5000" step="25" value={radius} onChange={e => setRadius(e.target.value)}
-                            className="w-full h-2 bg-purple-100 rounded-full appearance-none cursor-pointer accent-purple-600" />
+                            className="w-full h-2 bg-primary/10 rounded-full appearance-none cursor-pointer accent-purple-600" />
                         <div className="flex gap-1.5">
                             {[50, 100, 200, 500, 1000, 2000].map(r => (
                                 <button key={r} type="button" onClick={() => setRadius(String(r))}
                                     className={cn('rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors',
-                                        String(r) === radius ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                                        String(r) === radius ? 'bg-primary text-white' : 'bg-primary/10 text-primary hover:bg-primary/10'
                                     )}>{r >= 1000 ? `${r / 1000}km` : `${r}m`}</button>
                             ))}
                         </div>
@@ -289,16 +289,16 @@ export default function GeofenceDrawMap({ center = { lat: -36.8485, lng: 174.763
                 {mode === 'rectangle' && (
                     <p className="text-sm text-muted-foreground">
                         {rectCorners.length === 0 && 'Click the map to place the first corner.'}
-                        {rectCorners.length === 1 && <span className="text-purple-600 font-medium">Corner 1 placed — click the opposite corner.</span>}
-                        {rectCorners.length === 4 && <span className="text-purple-600 font-medium">✓ Drag any numbered corner to resize. Click map to restart.</span>}
+                        {rectCorners.length === 1 && <span className="text-primary font-medium">Corner 1 placed — click the opposite corner.</span>}
+                        {rectCorners.length === 4 && <span className="text-primary font-medium">✓ Drag any numbered corner to resize. Click map to restart.</span>}
                     </p>
                 )}
                 {mode === 'polygon' && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
                             {polyPoints.length === 0 && 'Click the map to add vertices.'}
-                            {polyPoints.length > 0 && !polyDone && <><span className="text-purple-600 font-medium">{polyPoints.length}</span> point{polyPoints.length > 1 ? 's' : ''}{polyPoints.length < 3 ? ` — need ${3 - polyPoints.length} more` : ''}</>}
-                            {polyDone && <span className="text-purple-600 font-medium">✓ Drag any point to reshape.</span>}
+                            {polyPoints.length > 0 && !polyDone && <><span className="text-primary font-medium">{polyPoints.length}</span> point{polyPoints.length > 1 ? 's' : ''}{polyPoints.length < 3 ? ` — need ${3 - polyPoints.length} more` : ''}</>}
+                            {polyDone && <span className="text-primary font-medium">✓ Drag any point to reshape.</span>}
                         </p>
                         <div className="flex gap-1.5">
                             {polyPoints.length > 0 && !polyDone && (
@@ -307,7 +307,7 @@ export default function GeofenceDrawMap({ center = { lat: -36.8485, lng: 174.763
                                 </Button>
                             )}
                             {polyPoints.length >= 3 && !polyDone && (
-                                <Button type="button" size="sm" onClick={() => setPolyDone(true)} className="bg-purple-600 hover:bg-purple-700">
+                                <Button type="button" size="sm" onClick={() => setPolyDone(true)} className="bg-primary hover:bg-primary">
                                     <Check className="mr-1 h-3 w-3" /> Complete
                                 </Button>
                             )}
@@ -321,10 +321,10 @@ export default function GeofenceDrawMap({ center = { lat: -36.8485, lng: 174.763
 
             {/* Status */}
             <div className={cn('rounded-lg border mt-2 px-3 py-2 text-xs flex items-center justify-between',
-                status.ok ? 'bg-purple-50 border-purple-200 dark:bg-purple-950/20' : 'bg-muted/50'
+                status.ok ? 'bg-primary/10 border-primary dark:bg-primary/20' : 'bg-muted/50'
             )}>
-                <span className={status.ok ? 'text-purple-700 dark:text-purple-300' : 'text-muted-foreground'}>{status.text}</span>
-                {status.ok && <span className="text-purple-600 font-medium">✓ Ready</span>}
+                <span className={status.ok ? 'text-primary dark:text-primary/70' : 'text-muted-foreground'}>{status.text}</span>
+                {status.ok && <span className="text-primary font-medium">✓ Ready</span>}
             </div>
         </div>
     );

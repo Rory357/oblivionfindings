@@ -150,7 +150,7 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
                             <div key={u.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
                                 <div>
                                     <div className="text-sm font-medium">{u.name}</div>
-                                    <div className="text-xs text-slate-500">{u.email} - {u.relation}</div>
+                                    <div className="text-xs text-muted-foreground">{u.email} - {u.relation}</div>
                                 </div>
                                 <Button
                                     variant="destructive"
@@ -163,7 +163,7 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
                             </div>
                         ))}
                         {!portal_users.length && (
-                            <div className="text-sm text-slate-500">No portal users linked yet.</div>
+                            <div className="text-sm text-muted-foreground">No portal users linked yet.</div>
                         )}
                     </CardContent>
                 </Card>

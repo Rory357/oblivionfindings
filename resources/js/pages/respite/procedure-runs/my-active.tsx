@@ -10,7 +10,7 @@ type Props = {
 };
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-slate-100 text-slate-800',
+    pending: 'bg-muted text-foreground',
     in_progress: 'bg-blue-100 text-blue-800',
     escalated: 'bg-orange-100 text-orange-800',
 };
@@ -23,7 +23,7 @@ export default function MyActiveProcedureRuns({ runs }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">My Active Procedure Runs</h1>
-                    <div className="mt-1 text-sm text-slate-500">Procedure runs currently assigned to you.</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Procedure runs currently assigned to you.</div>
                 </div>
                 <RespiteSubnav />
 
@@ -38,11 +38,11 @@ export default function MyActiveProcedureRuns({ runs }: Props) {
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <Badge className={statusColors[r.status] || ''}>{r.status?.replace(/_/g, ' ')}</Badge>
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Progress: {r.current_step || 0}/{r.total_steps || 0} steps
                                             </div>
                                             {r.sla_deadline && (
-                                                <div className={`mt-1 text-xs ${r.sla_breached ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                                                <div className={`mt-1 text-xs ${r.sla_breached ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                                                     SLA Deadline: {formatDateTime(r.sla_deadline)}
                                                     {r.sla_breached && ' (BREACHED)'}
                                                 </div>
@@ -57,7 +57,7 @@ export default function MyActiveProcedureRuns({ runs }: Props) {
                         </Card>
                     ))}
                     {!runs.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No active procedure runs assigned to you.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No active procedure runs assigned to you.</div>
                     )}
                 </div>
             </div>

@@ -74,7 +74,7 @@ export default function PipCreate({ staff }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Create Performance Improvement Plan</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Set up a structured plan with milestones to support employee development
                     </div>
                 </div>
@@ -158,12 +158,12 @@ export default function PipCreate({ staff }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {data.milestones.length === 0 && (
-                                <p className="text-center text-sm text-slate-400">No milestones added yet. Click "Add Milestone" to begin.</p>
+                                <p className="text-center text-sm text-muted-foreground">No milestones added yet. Click "Add Milestone" to begin.</p>
                             )}
                             {data.milestones.map((milestone, index) => (
                                 <div key={index} className="rounded-lg border p-4 space-y-3">
                                     <div className="flex items-start justify-between gap-2">
-                                        <span className="text-sm font-medium text-slate-500">Milestone {index + 1}</span>
+                                        <span className="text-sm font-medium text-muted-foreground">Milestone {index + 1}</span>
                                         <Button type="button" size="sm" variant="ghost" onClick={() => removeMilestone(index)}>
                                             <Trash2 className="h-4 w-4 text-red-400" />
                                         </Button>

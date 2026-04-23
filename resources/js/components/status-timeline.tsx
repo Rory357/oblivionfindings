@@ -33,8 +33,8 @@ export function StatusTimeline({ currentStatus, statuses = DEFAULT_STATUSES }: S
                                     isCompleted
                                         ? 'border-emerald-500 bg-emerald-500'
                                         : isCurrent
-                                          ? 'border-indigo-500 bg-indigo-500'
-                                          : 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800'
+                                          ? 'border-primary bg-primary'
+                                          : 'border-border bg-white dark:border-slate-600 dark:bg-muted'
                                 }`}
                             >
                                 {isCompleted ? (
@@ -50,8 +50,8 @@ export function StatusTimeline({ currentStatus, statuses = DEFAULT_STATUSES }: S
                                     isCompleted
                                         ? 'text-emerald-600 dark:text-emerald-400'
                                         : isCurrent
-                                          ? 'text-indigo-600 dark:text-indigo-400'
-                                          : 'text-slate-400 dark:text-slate-500'
+                                          ? 'text-primary dark:text-primary'
+                                          : 'text-muted-foreground dark:text-muted-foreground'
                                 }`}
                             >
                                 {STATUS_LABELS[status] ?? status}
@@ -64,7 +64,7 @@ export function StatusTimeline({ currentStatus, statuses = DEFAULT_STATUSES }: S
                                 className={`h-0.5 flex-1 mx-1 ${
                                     currentIndex > i
                                         ? 'bg-emerald-500'
-                                        : 'bg-slate-200 dark:bg-slate-700'
+                                        : 'bg-muted dark:bg-slate-700'
                                 }`}
                             />
                         )}

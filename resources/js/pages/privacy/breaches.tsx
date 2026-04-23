@@ -51,9 +51,9 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
             case 'resolved':
                 return 'bg-green-100 text-green-800 border-green-200';
             case 'notified':
-                return 'bg-purple-100 text-purple-800 border-purple-200';
+                return 'bg-primary/10 text-primary border-primary';
             default:
-                return 'bg-slate-100 text-slate-800 border-slate-200';
+                return 'bg-muted text-foreground border-border';
         }
     };
 
@@ -109,7 +109,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search by reference or description"
                                 value={filters.q || ''}
@@ -118,7 +118,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -134,7 +134,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">ICO Notification</Label>
+                            <Label className="text-xs text-muted-foreground">ICO Notification</Label>
                             <Select
                                 value={filters.requires_notification ?? ANY}
                                 onValueChange={(v) => onFilter({ requires_notification: v === ANY ? null : v })}
@@ -178,10 +178,10 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <div className="mt-2 text-sm text-slate-600">
+                                            <div className="mt-2 text-sm text-muted-foreground">
                                                 {breach.nature_of_breach}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Discovered: {formatDate(breach.discovered_at)}
                                                 {breach.approximate_individuals_affected && ` • ~${breach.approximate_individuals_affected} individuals affected`}
                                             </div>
@@ -195,7 +195,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                         </Card>
                     ))}
                     {!breaches.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No data breaches found.
                         </div>
                     )}

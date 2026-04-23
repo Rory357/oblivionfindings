@@ -43,7 +43,7 @@ const formatDate = (value?: string | null) => {
 
 const renderList = (items?: string[] | null) => {
     if (!items || items.length === 0) {
-        return <span className="text-sm text-slate-500">None provided.</span>;
+        return <span className="text-sm text-muted-foreground">None provided.</span>;
     }
     return (
         <div className="flex flex-wrap gap-2">
@@ -98,7 +98,7 @@ export default function ShowDPIA({ dpia }: Props) {
                                 <Badge variant="outline">Residual: {riskLabels[dpia.residual_risk_level] ?? dpia.residual_risk_level}</Badge>
                             )}
                         </div>
-                        <div className="mt-2 text-xs text-slate-500">
+                        <div className="mt-2 text-xs text-muted-foreground">
                             Assessed: {formatDate(dpia.assessment_date)}
                             {dpia.assessor && ` by ${dpia.assessor.name}`}
                             {dpia.review_date && ` - Review: ${formatDate(dpia.review_date)}`}
@@ -122,11 +122,11 @@ export default function ShowDPIA({ dpia }: Props) {
                         <CardTitle className="text-base">Overview</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <div className="text-sm text-slate-600">{dpia.project_or_process}</div>
+                        <div className="text-sm text-muted-foreground">{dpia.project_or_process}</div>
                         {dpia.description && (
-                            <div className="text-sm text-slate-600 whitespace-pre-wrap">{dpia.description}</div>
+                            <div className="text-sm text-muted-foreground whitespace-pre-wrap">{dpia.description}</div>
                         )}
-                        <div className="text-xs text-slate-500">Assessment type: {dpia.assessment_type.replace(/_/g, ' ')}</div>
+                        <div className="text-xs text-muted-foreground">Assessment type: {dpia.assessment_type.replace(/_/g, ' ')}</div>
                     </CardContent>
                 </Card>
 
@@ -137,12 +137,12 @@ export default function ShowDPIA({ dpia }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <div className="text-xs text-slate-500">Processing purpose</div>
-                                <div className="text-sm text-slate-700 whitespace-pre-wrap">{dpia.processing_purpose}</div>
+                                <div className="text-xs text-muted-foreground">Processing purpose</div>
+                                <div className="text-sm text-foreground whitespace-pre-wrap">{dpia.processing_purpose}</div>
                             </div>
                             <div>
-                                <div className="text-xs text-slate-500">Legal basis</div>
-                                <div className="text-sm text-slate-700 whitespace-pre-wrap">{dpia.legal_basis}</div>
+                                <div className="text-xs text-muted-foreground">Legal basis</div>
+                                <div className="text-sm text-foreground whitespace-pre-wrap">{dpia.legal_basis}</div>
                             </div>
                         </CardContent>
                     </Card>
@@ -152,17 +152,17 @@ export default function ShowDPIA({ dpia }: Props) {
                             <CardTitle className="text-base">Risk Summary</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                                 Overall risk level: <span className="font-medium">{riskLabels[dpia.overall_risk_level] ?? dpia.overall_risk_level}</span>
                             </div>
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                                 Residual risk level: <span className="font-medium">{dpia.residual_risk_level ? (riskLabels[dpia.residual_risk_level] ?? dpia.residual_risk_level) : 'Not set'}</span>
                             </div>
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                                 Outcome: <span className="font-medium">{outcomeLabel}</span>
                             </div>
                             {dpia.approved_at && (
-                                <div className="text-xs text-slate-500">
+                                <div className="text-xs text-muted-foreground">
                                     Approved: {formatDate(dpia.approved_at)}
                                     {dpia.approved_by && ` by ${dpia.approved_by.name}`}
                                 </div>

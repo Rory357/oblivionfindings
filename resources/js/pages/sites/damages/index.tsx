@@ -80,7 +80,7 @@ const severityColors: Record<string, string> = {
 const statusColors: Record<string, string> = {
     reported: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
     assessed: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-    repair_scheduled: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+    repair_scheduled: 'bg-primary/20 text-primary/70 border-primary/30',
     repair_in_progress: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
     repaired: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     closed: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
@@ -211,7 +211,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                             <ShieldAlert className="w-5 h-5" />
                             Damage Tracking
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     {canCreate && (
                         <Button onClick={() => setCreateOpen(true)}>
@@ -226,7 +226,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{openDamages.length}</div>
-                            <div className="text-sm text-slate-400">Total Open</div>
+                            <div className="text-sm text-muted-foreground">Total Open</div>
                         </CardContent>
                     </Card>
                     <Card>
@@ -238,7 +238,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                     </Badge>
                                 ))}
                             </div>
-                            <div className="text-sm text-slate-400 mt-2">By Severity</div>
+                            <div className="text-sm text-muted-foreground mt-2">By Severity</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-amber-500/5 border-amber-500/20">
@@ -247,7 +247,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                 <DollarSign className="w-5 h-5" />
                                 {formatCurrency(totalEstimatedCost)}
                             </div>
-                            <div className="text-sm text-slate-400">Total Estimated Cost</div>
+                            <div className="text-sm text-muted-foreground">Total Estimated Cost</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -286,7 +286,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                 <Card>
                     <CardContent className="p-0">
                         {filteredDamages.length === 0 ? (
-                            <div className="text-center py-12 text-slate-400">
+                            <div className="text-center py-12 text-muted-foreground">
                                 <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No damages recorded</p>
                                 {canCreate && (
@@ -314,7 +314,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                                 <div className="flex items-center gap-2">
                                                     {damage.title}
                                                     {damage.checklist_run_id && (
-                                                        <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30 text-[10px] px-1.5 py-0">
+                                                        <Badge className="bg-primary/20 text-primary/70 border-primary/30 text-[10px] px-1.5 py-0">
                                                             <ClipboardCheck className="w-3 h-3 mr-0.5" />
                                                             Checklist
                                                         </Badge>

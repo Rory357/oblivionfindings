@@ -70,7 +70,7 @@ export function EventTimeline({ reportedAt, occurredAt, closedAt, investigations
                 label: 'Investigation started',
                 detail: `${inv.reference_number}${inv.lead_investigator_name ? ` — ${inv.lead_investigator_name}` : ''}`,
                 icon: Search,
-                color: 'bg-purple-500',
+                color: 'bg-primary',
             });
         }
         if (inv.completed_at) {
@@ -79,7 +79,7 @@ export function EventTimeline({ reportedAt, occurredAt, closedAt, investigations
                 label: 'Investigation completed',
                 detail: inv.reference_number,
                 icon: FileText,
-                color: 'bg-indigo-500',
+                color: 'bg-primary',
             });
         }
     }

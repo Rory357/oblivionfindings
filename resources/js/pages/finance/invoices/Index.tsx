@@ -59,12 +59,12 @@ const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
     sent: { label: 'Sent', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
-    viewed: { label: 'Viewed', className: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300' },
+    viewed: { label: 'Viewed', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
     paid: { label: 'Paid', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
     overdue: { label: 'Overdue', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
-    cancelled: { label: 'Cancelled', className: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
+    cancelled: { label: 'Cancelled', className: 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -151,8 +151,8 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-gray-100 p-2 dark:bg-gray-800">
-                                    <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                                <div className="rounded-lg bg-muted p-2 dark:bg-muted">
+                                    <FileText className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Drafts</p>
@@ -283,7 +283,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
                                             {formatCurrency(invoice.total_amount, invoice.currency_code)}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge className={statusConfig[invoice.status]?.className ?? 'bg-gray-100 text-gray-800'}>
+                                            <Badge className={statusConfig[invoice.status]?.className ?? 'bg-muted text-foreground'}>
                                                 {statusConfig[invoice.status]?.label ?? invoice.status}
                                             </Badge>
                                         </TableCell>

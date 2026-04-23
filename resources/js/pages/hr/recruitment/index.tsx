@@ -168,10 +168,10 @@ export default function RecruitmentIndex({ candidates, pipeline, sourceBreakdown
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <KpiCard label="Active Candidates" value={todayStats.total_active} icon={Users} color="bg-blue-500/10 text-blue-500" />
-                    <KpiCard label="New This Week" value={todayStats.new_this_week} icon={UserPlus} color="bg-indigo-500/10 text-indigo-500" />
+                    <KpiCard label="New This Week" value={todayStats.new_this_week} icon={UserPlus} color="bg-primary/10 text-primary" />
                     <KpiCard label="Interviews Today" value={todayStats.interviews_today} icon={CalendarDays} color="bg-amber-500/10 text-amber-500" />
                     <KpiCard label="Offers Pending" value={todayStats.offers_pending} icon={Send} color="bg-emerald-500/10 text-emerald-500" />
-                    <KpiCard label="Avg Days in Stage" value={todayStats.avg_days_in_stage} icon={Clock} decimals={1} color="bg-purple-500/10 text-purple-500" />
+                    <KpiCard label="Avg Days in Stage" value={todayStats.avg_days_in_stage} icon={Clock} decimals={1} color="bg-primary/10 text-primary" />
                 </div>
 
                 {/* Main Content Grid */}

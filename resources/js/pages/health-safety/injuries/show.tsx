@@ -109,9 +109,9 @@ const statusColor = (status: string) => {
             return 'bg-green-100 text-green-800';
         case 'closed':
         case 'ended':
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -126,7 +126,7 @@ const severityColor = (severity: string) => {
         case 'critical':
             return 'bg-red-100 text-red-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -213,7 +213,7 @@ export default function InjuryShow({ injury, staff }: Props) {
     const infoRow = (label: string, value: string | null | undefined) =>
         value ? (
             <div>
-                <div className="text-xs text-slate-500">{label}</div>
+                <div className="text-xs text-muted-foreground">{label}</div>
                 <div className="mt-0.5 text-sm whitespace-pre-wrap">{value}</div>
             </div>
         ) : null;
@@ -232,7 +232,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Injury #{injury.id}</h1>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             <span>{injury.user?.name ?? 'Unknown'}</span>
                             <span>{injury.site?.name}</span>
                             <Badge className={severityColor(injury.severity)}>{injury.severity}</Badge>
@@ -255,13 +255,13 @@ export default function InjuryShow({ injury, staff }: Props) {
                     <CardContent>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                             <div>
-                                <div className="text-xs text-slate-500">Date</div>
+                                <div className="text-xs text-muted-foreground">Date</div>
                                 <div className="mt-0.5 text-sm">
                                     {new Date(injury.injury_date).toLocaleDateString('en-GB')}
                                 </div>
                             </div>
                             <div>
-                                <div className="text-xs text-slate-500">Type</div>
+                                <div className="text-xs text-muted-foreground">Type</div>
                                 <div className="mt-0.5 text-sm capitalize">
                                     {injury.injury_type.replace(/_/g, ' ')}
                                 </div>
@@ -269,12 +269,12 @@ export default function InjuryShow({ injury, staff }: Props) {
                             {infoRow('Body Part', injury.body_part_affected)}
                             {infoRow('Medical Treatment', injury.medical_treatment_type?.replace(/_/g, ' '))}
                             <div>
-                                <div className="text-xs text-slate-500">Lost Time Days</div>
+                                <div className="text-xs text-muted-foreground">Lost Time Days</div>
                                 <div className="mt-0.5 text-sm">{injury.lost_time_days}</div>
                             </div>
                             {injury.acc_claim_lodged && (
                                 <div>
-                                    <div className="text-xs text-slate-500">ACC Claim</div>
+                                    <div className="text-xs text-muted-foreground">ACC Claim</div>
                                     <div className="mt-0.5 text-sm">
                                         {injury.acc_claim_number ?? 'Lodged (no number)'}
                                     </div>
@@ -283,13 +283,13 @@ export default function InjuryShow({ injury, staff }: Props) {
                         </div>
                         {injury.description && (
                             <div className="mt-4">
-                                <div className="text-xs text-slate-500">Description</div>
+                                <div className="text-xs text-muted-foreground">Description</div>
                                 <div className="mt-0.5 text-sm whitespace-pre-wrap">{injury.description}</div>
                             </div>
                         )}
                         {injury.immediate_treatment && (
                             <div className="mt-4">
-                                <div className="text-xs text-slate-500">Immediate Treatment</div>
+                                <div className="text-xs text-muted-foreground">Immediate Treatment</div>
                                 <div className="mt-0.5 text-sm whitespace-pre-wrap">
                                     {injury.immediate_treatment}
                                 </div>
@@ -397,7 +397,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                                     </div>
                                     {plan.medical_clearance_notes && (
                                         <div className="mt-2">
-                                            <div className="text-xs text-slate-500">Medical Clearance Notes</div>
+                                            <div className="text-xs text-muted-foreground">Medical Clearance Notes</div>
                                             <div className="text-sm">{plan.medical_clearance_notes}</div>
                                         </div>
                                     )}
@@ -405,7 +405,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                                     {/* Goals */}
                                     {plan.goals.length > 0 && (
                                         <div className="mt-3">
-                                            <div className="text-xs font-medium text-slate-500">Goals</div>
+                                            <div className="text-xs font-medium text-muted-foreground">Goals</div>
                                             <div className="mt-1 space-y-1">
                                                 {plan.goals.map((g) => (
                                                     <div key={g.id} className="flex items-center gap-2 text-sm">
@@ -413,14 +413,14 @@ export default function InjuryShow({ injury, staff }: Props) {
                                                             className={
                                                                 g.completed
                                                                     ? 'bg-green-100 text-green-800'
-                                                                    : 'bg-slate-100 text-slate-800'
+                                                                    : 'bg-muted text-foreground'
                                                             }
                                                         >
                                                             {g.completed ? 'Done' : 'Pending'}
                                                         </Badge>
                                                         <span>{g.description}</span>
                                                         {g.target_date && (
-                                                            <span className="text-xs text-slate-400">
+                                                            <span className="text-xs text-muted-foreground">
                                                                 (by {new Date(g.target_date).toLocaleDateString('en-GB')})
                                                             </span>
                                                         )}
@@ -433,11 +433,11 @@ export default function InjuryShow({ injury, staff }: Props) {
                                     {/* Stages */}
                                     {plan.stages.length > 0 && (
                                         <div className="mt-3">
-                                            <div className="text-xs font-medium text-slate-500">Stages</div>
+                                            <div className="text-xs font-medium text-muted-foreground">Stages</div>
                                             <div className="mt-1 overflow-x-auto">
                                                 <table className="w-full text-sm">
                                                     <thead>
-                                                        <tr className="border-b text-left text-xs text-slate-500">
+                                                        <tr className="border-b text-left text-xs text-muted-foreground">
                                                             <th className="pb-1 pr-3 font-medium">Week</th>
                                                             <th className="pb-1 pr-3 font-medium">Hours/Week</th>
                                                             <th className="pb-1 pr-3 font-medium">Duties</th>
@@ -461,7 +461,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                                 </div>
                             ))}
                             {!injury.rtw_plans.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No return to work plans created.
                                 </div>
                             )}
@@ -486,7 +486,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Date</th>
                                         <th className="pb-2 pr-4 font-medium">Assessor</th>
                                         <th className="pb-2 pr-4 font-medium">Type</th>
@@ -513,7 +513,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                                 </tbody>
                             </table>
                             {!injury.capacity_assessments.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No capacity assessments recorded.
                                 </div>
                             )}
@@ -538,7 +538,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Start Date</th>
                                         <th className="pb-2 pr-4 font-medium">End Date</th>
                                         <th className="pb-2 pr-4 font-medium">Description</th>
@@ -567,7 +567,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                                 </tbody>
                             </table>
                             {!injury.modified_duties.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No modified duties recorded.
                                 </div>
                             )}

@@ -41,7 +41,7 @@ export default function DeletionLogs({ logs, filters }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Deletion Logs</h1>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                         Audit trail of data deletion operations performed under retention policies
                     </p>
                 </div>
@@ -53,7 +53,7 @@ export default function DeletionLogs({ logs, filters }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search by reference or description"
                                 value={filters.q || ''}
@@ -61,7 +61,7 @@ export default function DeletionLogs({ logs, filters }: Props) {
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Model Type</Label>
+                            <Label className="text-xs text-muted-foreground">Model Type</Label>
                             <Select
                                 value={filters.model_type ?? ANY}
                                 onValueChange={(v) => onFilter({ model_type: v === ANY ? undefined : v })}
@@ -95,9 +95,9 @@ export default function DeletionLogs({ logs, filters }: Props) {
                                             )}
                                         </div>
                                         {log.reason && (
-                                            <p className="mt-1 text-sm text-slate-600">{log.reason}</p>
+                                            <p className="mt-1 text-sm text-muted-foreground">{log.reason}</p>
                                         )}
-                                        <div className="mt-1 text-xs text-slate-500">
+                                        <div className="mt-1 text-xs text-muted-foreground">
                                             {log.deleted_at && formatDate(log.deleted_at)}
                                             {log.deleted_by_name && ` by ${log.deleted_by_name}`}
                                             {log.policy_name && ` (Policy: ${log.policy_name})`}
@@ -108,7 +108,7 @@ export default function DeletionLogs({ logs, filters }: Props) {
                         </Card>
                     ))}
                     {logs.length === 0 && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             <Trash2 className="mx-auto mb-3 h-12 w-12 opacity-30" />
                             No deletion logs recorded yet.
                         </div>

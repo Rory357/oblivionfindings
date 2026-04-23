@@ -222,11 +222,11 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
       scheduled: 'bg-blue-100 text-blue-800',
       agenda_draft: 'bg-yellow-100 text-yellow-800',
       agenda_final: 'bg-green-100 text-green-800',
-      in_progress: 'bg-purple-100 text-purple-800',
+      in_progress: 'bg-primary/10 text-primary',
       minutes_draft: 'bg-orange-100 text-orange-800',
       minutes_approved: 'bg-green-100 text-green-800',
-      archived: 'bg-gray-100 text-gray-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+      archived: 'bg-muted text-foreground',
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getChecklistStatusColor = (status: 'done' | 'in_progress' | 'todo' | 'blocked') => {
@@ -240,9 +240,9 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
 
   const getItemTypeIcon = (type: string) => {
     switch (type) {
-      case 'decision': return <Vote className="w-4 h-4 text-purple-500" />;
+      case 'decision': return <Vote className="w-4 h-4 text-primary" />;
       case 'consent': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      default: return <FileText className="w-4 h-4 text-gray-400" />;
+      default: return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -357,12 +357,12 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900" dusk="meeting-title">{meeting.title}</h1>
+                <h1 className="text-3xl font-bold text-foreground" dusk="meeting-title">{meeting.title}</h1>
                 <Badge className={cn(getStatusColor(meeting.status))}>
                   {meeting.status.replace('_', ' ')}
                 </Badge>
               </div>
-              <div className="flex items-center gap-4 text-gray-500">
+              <div className="flex items-center gap-4 text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   {formatDate(meeting.scheduled_at)}
@@ -438,10 +438,10 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                   <div key={item.key} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-start md:justify-between" dusk={`workflow-item-${item.key}`}>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-900">{item.label}</p>
+                        <p className="font-medium text-foreground">{item.label}</p>
                         <Badge className={getChecklistStatusColor(item.status)} dusk={`workflow-status-${item.key}`}>{item.status.replace('_', ' ')}</Badge>
                       </div>
-                      <p className="text-sm text-gray-600">{item.detail}</p>
+                      <p className="text-sm text-muted-foreground">{item.detail}</p>
                       {item.blocked_by && (
                         <p className="text-xs text-red-700">Blocked by: {item.blocked_by}</p>
                       )}
@@ -461,13 +461,13 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">Chair</p>
+                <p className="text-sm text-muted-foreground">Chair</p>
                 <p className="font-semibold">{meeting.chair?.user.name || 'Not assigned'}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-gray-500">Secretary</p>
+                <p className="text-sm text-muted-foreground">Secretary</p>
                 <p className="font-semibold">{meeting.secretary?.user.name || 'Not assigned'}</p>
               </CardContent>
             </Card>
@@ -475,13 +475,13 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
               <Card key={card.key}>
                 <CardContent className="pt-6 space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm text-gray-500">{card.title}</p>
+                    <p className="text-sm text-muted-foreground">{card.title}</p>
                     <Badge className={getChecklistStatusColor(card.status === 'warning' ? 'blocked' : card.status)}>
                       {card.status.replace('_', ' ')}
                     </Badge>
                   </div>
-                  <p className="font-semibold text-gray-900">{card.value}</p>
-                  <p className="text-sm text-gray-600">{card.detail}</p>
+                  <p className="font-semibold text-foreground">{card.value}</p>
+                  <p className="text-sm text-muted-foreground">{card.detail}</p>
                   <Button variant="ghost" size="sm" className="px-0" asChild>
                     <Link href={card.href}>Open</Link>
                   </Button>
@@ -610,34 +610,34 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                 <CardContent>
                   <div className="space-y-4">
                     {agendaItems.length === 0 && (
-                      <p className="text-gray-500 text-center py-8">No agenda items yet. Add items to build the meeting agenda.</p>
+                      <p className="text-muted-foreground text-center py-8">No agenda items yet. Add items to build the meeting agenda.</p>
                     )}
                     {agendaItems.map((item) => (
                       <div
                         key={item.id}
                         className={cn(
                           "flex items-start gap-4 p-4 rounded-lg border",
-                          item.is_confidential && "bg-purple-50 border-purple-200"
+                          item.is_confidential && "bg-primary/10 border-primary"
                         )}
                       >
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-semibold text-gray-600">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center font-semibold text-muted-foreground">
                           {item.order}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             {getItemTypeIcon(item.item_type)}
-                            <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                            <h4 className="font-semibold text-foreground">{item.title}</h4>
                             {item.is_confidential && (
-                              <Badge variant="outline" className="text-purple-600 border-purple-200">
+                              <Badge variant="outline" className="text-primary border-primary">
                                 Confidential
                               </Badge>
                             )}
                             <Badge variant="outline">{item.item_type}</Badge>
                           </div>
                           {item.description && (
-                            <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+                            <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
                           )}
-                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             {item.presenter && <span>Presenter: {item.presenter.name}</span>}
                             <span>{item.duration_minutes} minutes</span>
                           </div>
@@ -731,7 +731,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                             </div>
                           ))}
                           {allBoardMembers.length === 0 && (
-                            <p className="text-gray-500 text-center py-4">No active board members found.</p>
+                            <p className="text-muted-foreground text-center py-4">No active board members found.</p>
                           )}
                         </div>
                         <div className="flex justify-end gap-2 mt-4">
@@ -747,7 +747,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                 <CardContent>
                   <div className="space-y-2">
                     {attendances.length === 0 && (
-                      <p className="text-gray-500 text-center py-8">No attendance recorded yet.</p>
+                      <p className="text-muted-foreground text-center py-8">No attendance recorded yet.</p>
                     )}
                     {attendances.map((attendance) => (
                       <div
@@ -765,7 +765,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                             {attendance.status.replace('_', ' ')}
                           </Badge>
                           {attendance.apology_reason && (
-                            <span className="text-sm text-gray-500">({attendance.apology_reason})</span>
+                            <span className="text-sm text-muted-foreground">({attendance.apology_reason})</span>
                           )}
                         </div>
                       </div>
@@ -889,7 +889,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                   {meeting.minutes ? (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 mb-4">
-                        <span className="text-sm text-gray-500">Status:</span>
+                        <span className="text-sm text-muted-foreground">Status:</span>
                         <Badge className={cn(
                           meeting.minutes.status === 'draft' && 'bg-yellow-100 text-yellow-800',
                           meeting.minutes.status === 'approved' && 'bg-green-100 text-green-800',
@@ -901,15 +901,15 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                         <div className="prose max-w-none">
                           {meeting.minutes.content_blocks.map((block: { heading: string; content: string }, idx: number) => (
                             <div key={idx} className="mb-4">
-                              <h3 className="font-semibold text-gray-900">{block.heading}</h3>
-                              <p className="text-gray-700 whitespace-pre-wrap">{block.content || <span className="text-gray-400 italic">No content yet</span>}</p>
+                              <h3 className="font-semibold text-foreground">{block.heading}</h3>
+                              <p className="text-foreground whitespace-pre-wrap">{block.content || <span className="text-muted-foreground italic">No content yet</span>}</p>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-center py-8">No minutes have been recorded for this meeting yet.</p>
+                    <p className="text-muted-foreground text-center py-8">No minutes have been recorded for this meeting yet.</p>
                   )}
                 </CardContent>
               </Card>
@@ -930,16 +930,16 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                 <CardContent>
                   <div className="space-y-2">
                     {resolutions.length === 0 && (
-                      <p className="text-gray-500 text-center py-8">No resolutions for this meeting.</p>
+                      <p className="text-muted-foreground text-center py-8">No resolutions for this meeting.</p>
                     )}
                     {resolutions.map((resolution) => (
                       <div
                         key={resolution.id}
-                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50"
+                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted"
                       >
                         <div>
                           <p className="font-medium">{resolution.title}</p>
-                          <p className="text-sm text-gray-500">{resolution.resolution_reference}</p>
+                          <p className="text-sm text-muted-foreground">{resolution.resolution_reference}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge>{resolution.status}</Badge>

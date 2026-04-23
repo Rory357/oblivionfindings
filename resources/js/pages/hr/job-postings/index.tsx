@@ -99,7 +99,7 @@ export default function JobPostingIndex({ postings, stats, filters, can }: Props
                     <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => onFilter({ status: 'draft' })}>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-slate-500/10 p-2"><FileText className="h-4 w-4 text-slate-500" /></div>
+                                <div className="rounded-lg bg-slate-500/10 p-2"><FileText className="h-4 w-4 text-muted-foreground" /></div>
                                 <div>
                                     <p className="text-2xl font-bold">{stats.draft}</p>
                                     <p className="text-xs text-muted-foreground">Draft</p>
@@ -179,7 +179,7 @@ export default function JobPostingIndex({ postings, stats, filters, can }: Props
                                                     </Badge>
                                                 )}
                                                 {posting.is_internal && (
-                                                    <Badge variant="outline" className="text-xs gap-1 border-purple-500/30 text-purple-400 bg-purple-500/10">
+                                                    <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary bg-primary/10">
                                                         <Lock className="h-3 w-3" /> Internal
                                                     </Badge>
                                                 )}

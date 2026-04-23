@@ -89,7 +89,7 @@ const STATUS_CONFIG = {
         label: 'Not Started',
         color: '#94a3b8',
         bg: 'bg-slate-500/10',
-        text: 'text-slate-500',
+        text: 'text-muted-foreground',
         border: 'border-slate-500/30',
         icon: Clock,
     },

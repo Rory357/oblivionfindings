@@ -43,7 +43,7 @@ const formatDate = (value?: string | null) => {
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'planning':
-            return 'bg-slate-100 text-slate-800 border-slate-200';
+            return 'bg-muted text-foreground border-border';
         case 'in_progress':
             return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'approved':
@@ -51,7 +51,7 @@ const getStatusColor = (status: string) => {
         case 'applied':
             return 'bg-blue-100 text-blue-800 border-blue-200';
         default:
-            return 'bg-slate-100 text-slate-800 border-slate-200';
+            return 'bg-muted text-foreground border-border';
     }
 };
 
@@ -81,7 +81,7 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Compensation Reviews</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Manage compensation review cycles and bulk salary adjustments
                         </div>
                     </div>
@@ -107,7 +107,7 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? NONE}
                                 onValueChange={(v) => onFilter({ status: v === NONE ? null : v })}
@@ -152,7 +152,7 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
                                                 {review.status.replace(/_/g, ' ')}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-600">
+                                        <TableCell className="text-sm text-muted-foreground">
                                             {review.creator?.name ?? '-'}
                                         </TableCell>
                                         <TableCell>
@@ -167,7 +167,7 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
                                 ))}
                                 {!reviews.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                                             No compensation reviews found.
                                         </TableCell>
                                     </TableRow>

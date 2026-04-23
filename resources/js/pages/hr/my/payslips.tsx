@@ -244,8 +244,8 @@ export default function MyPayslips({ payslips }: Props) {
                         </Card>
 
                         {/* Net Pay Trend */}
-                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-violet-500/40">
-                            <div className="h-1 bg-violet-500" />
+                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-primary/40">
+                            <div className="h-1 bg-primary" />
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between">
                                     <div>

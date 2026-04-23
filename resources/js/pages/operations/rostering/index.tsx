@@ -1049,7 +1049,7 @@ export default function RosteringIndex(props: Props) {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
-                                    <div className="text-sm text-slate-600">
+                                    <div className="text-sm text-muted-foreground">
                                         {props.weekStart} → {ymd(addDays(startDate, 6))}
                                     </div>
                                     <div className="flex flex-wrap gap-2">
@@ -1200,7 +1200,7 @@ export default function RosteringIndex(props: Props) {
                                 </Select>
                             </div>
                         ) : (
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                                 You are viewing your assigned shifts.
                             </div>
                         )}
@@ -1953,7 +1953,7 @@ export default function RosteringIndex(props: Props) {
                                                                                 </Badge>
                                                                             </div>
 
-                                                                            <div className="mt-2 text-xs text-slate-700">
+                                                                            <div className="mt-2 text-xs text-foreground">
                                                                                 Need{' '}
                                                                                 {
                                                                                     alert.required_staff
@@ -2311,7 +2311,7 @@ export default function RosteringIndex(props: Props) {
                                                                             </Badge>
                                                                         </div>
 
-                                                                        <div className="mt-2 text-xs text-slate-700">
+                                                                        <div className="mt-2 text-xs text-foreground">
                                                                             {
                                                                                 item.reason
                                                                             }
@@ -2661,7 +2661,7 @@ export default function RosteringIndex(props: Props) {
                                                                         href={`/operations/shifts/${sh.id}`}
                                                                         className="block"
                                                                     >
-                                                                        <div className="rounded-md border p-2 hover:bg-slate-50">
+                                                                        <div className="rounded-md border p-2 hover:bg-muted">
                                                                             <div className="flex items-start justify-between gap-2">
                                                                                 <div className="text-xs font-medium">
                                                                                     {new Date(
@@ -2688,7 +2688,7 @@ export default function RosteringIndex(props: Props) {
                                                                                     </Badge>
                                                                                 ) : null}
                                                                             </div>
-                                                                            <div className="mt-1 text-xs text-slate-700">
+                                                                            <div className="mt-1 text-xs text-foreground">
                                                                                 {sh.client ??
                                                                                     clientSingular}{' '}
                                                                                 ·{' '}
@@ -2757,7 +2757,7 @@ export default function RosteringIndex(props: Props) {
                                                                         href={`/operations/shifts/${sh.id}`}
                                                                         className="block"
                                                                     >
-                                                                        <div className="rounded-md border p-2 hover:bg-slate-50">
+                                                                        <div className="rounded-md border p-2 hover:bg-muted">
                                                                             <div className="flex items-start justify-between gap-2">
                                                                                 <div className="text-xs font-medium">
                                                                                     {new Date(
@@ -2786,7 +2786,7 @@ export default function RosteringIndex(props: Props) {
                                                                                         : 's'}
                                                                                 </Badge>
                                                                             </div>
-                                                                            <div className="mt-1 text-xs text-slate-700">
+                                                                            <div className="mt-1 text-xs text-foreground">
                                                                                 {sh.client ??
                                                                                     clientSingular}{' '}
                                                                                 ·{' '}
@@ -2885,13 +2885,13 @@ export default function RosteringIndex(props: Props) {
                                                 <table className="w-full min-w-[900px] border-collapse">
                                                     <thead>
                                                         <tr className="border-b">
-                                                            <th className="w-48 px-2 py-2 text-left text-xs font-medium text-slate-600">
+                                                            <th className="w-48 px-2 py-2 text-left text-xs font-medium text-muted-foreground">
                                                                 Staff
                                                             </th>
                                                             {days.map((d) => (
                                                                 <th
                                                                     key={ymd(d)}
-                                                                    className="px-2 py-2 text-left text-xs font-medium text-slate-600"
+                                                                    className="px-2 py-2 text-left text-xs font-medium text-muted-foreground"
                                                                 >
                                                                     {fmtDay(d)}
                                                                 </th>
@@ -2926,7 +2926,7 @@ export default function RosteringIndex(props: Props) {
                                                                                     <div className="space-y-2">
                                                                                         {items.length ===
                                                                                         0 ? (
-                                                                                            <div className="text-xs text-slate-400">
+                                                                                            <div className="text-xs text-muted-foreground">
                                                                                                 —
                                                                                             </div>
                                                                                         ) : (
@@ -2941,7 +2941,7 @@ export default function RosteringIndex(props: Props) {
                                                                                                         href={`/operations/shifts/${sh.id}`}
                                                                                                         className="block"
                                                                                                     >
-                                                                                                        <div className="rounded-md border p-2 hover:bg-slate-50">
+                                                                                                        <div className="rounded-md border p-2 hover:bg-muted">
                                                                                                             <div className="flex items-start justify-between gap-2">
                                                                                                                 <div className="text-xs font-medium">
                                                                                                                     {fmtTime(
@@ -2964,7 +2964,7 @@ export default function RosteringIndex(props: Props) {
                                                                                                                     }
                                                                                                                 </Badge>
                                                                                                             </div>
-                                                                                                            <div className="mt-1 text-xs text-slate-700">
+                                                                                                            <div className="mt-1 text-xs text-foreground">
                                                                                                                 {sh.client ??
                                                                                                                     clientSingular}
                                                                                                             </div>
@@ -3064,7 +3064,7 @@ export default function RosteringIndex(props: Props) {
                                                             <div className="space-y-2">
                                                                 {items.length ===
                                                                 0 ? (
-                                                                    <div className="text-sm text-slate-500">
+                                                                    <div className="text-sm text-muted-foreground">
                                                                         No
                                                                         shifts.
                                                                     </div>
@@ -3080,7 +3080,7 @@ export default function RosteringIndex(props: Props) {
                                                                                 href={`/operations/shifts/${sh.id}`}
                                                                                 className="block"
                                                                             >
-                                                                                <div className="rounded-md border p-3 hover:bg-slate-50">
+                                                                                <div className="rounded-md border p-3 hover:bg-muted">
                                                                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                                                                         <div className="text-sm font-medium">
                                                                                             {fmtTime(
@@ -4394,7 +4394,7 @@ export default function RosteringIndex(props: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                                 Shifts with a linked timesheet still in
                                 draft/submitted/returned.
                             </div>
@@ -4414,7 +4414,7 @@ export default function RosteringIndex(props: Props) {
                                             href={`/operations/shifts/${sh.id}`}
                                             className="block"
                                         >
-                                            <div className="rounded-md border p-2 hover:bg-slate-50">
+                                            <div className="rounded-md border p-2 hover:bg-muted">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="text-sm font-medium">
                                                         {sh.client}
@@ -4424,7 +4424,7 @@ export default function RosteringIndex(props: Props) {
                                                         {sh.timesheet_status}
                                                     </Badge>
                                                 </div>
-                                                <div className="mt-1 text-xs text-slate-600">
+                                                <div className="mt-1 text-xs text-muted-foreground">
                                                     {new Date(
                                                         sh.starts_at,
                                                     ).toLocaleDateString()}{' '}
@@ -4439,7 +4439,7 @@ export default function RosteringIndex(props: Props) {
                                         </Link>
                                     ))}
                                 {props.stats.timesheets_pending === 0 && (
-                                    <div className="text-sm text-slate-500">
+                                    <div className="text-sm text-muted-foreground">
                                         No pending timesheets in this week.
                                     </div>
                                 )}
@@ -4462,7 +4462,7 @@ export default function RosteringIndex(props: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            <div className="text-sm text-slate-600">
+                            <div className="text-sm text-muted-foreground">
                                 Quick jump into the shifts that have incidents
                                 linked.
                             </div>
@@ -4476,7 +4476,7 @@ export default function RosteringIndex(props: Props) {
                                             href={`/operations/shifts/${sh.id}`}
                                             className="block"
                                         >
-                                            <div className="rounded-md border p-2 hover:bg-slate-50">
+                                            <div className="rounded-md border p-2 hover:bg-muted">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <div className="text-sm font-medium">
                                                         {sh.client}
@@ -4490,7 +4490,7 @@ export default function RosteringIndex(props: Props) {
                                                             : 's'}
                                                     </Badge>
                                                 </div>
-                                                <div className="mt-1 text-xs text-slate-600">
+                                                <div className="mt-1 text-xs text-muted-foreground">
                                                     {new Date(
                                                         sh.starts_at,
                                                     ).toLocaleDateString()}{' '}
@@ -4505,7 +4505,7 @@ export default function RosteringIndex(props: Props) {
                                         </Link>
                                     ))}
                                 {props.stats.incidents === 0 && (
-                                    <div className="text-sm text-slate-500">
+                                    <div className="text-sm text-muted-foreground">
                                         No incidents linked to shifts in this
                                         week.
                                     </div>

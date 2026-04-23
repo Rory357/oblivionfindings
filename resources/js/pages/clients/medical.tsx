@@ -184,7 +184,7 @@ export default function ClientMedical({
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
                         <div className="text-lg font-semibold">{name}</div>
-                        <div className="text-xs text-slate-500">Medication orders & medical profile</div>
+                        <div className="text-xs text-muted-foreground">Medication orders & medical profile</div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={() => (window.location.href = `/emar/mar?client_id=${client.id}`)}>
@@ -212,7 +212,7 @@ export default function ClientMedical({
                                 <div key={d.id} className="flex items-center justify-between rounded-md border p-3">
                                     <div>
                                         <div className="text-sm font-medium">{d.title}</div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             {d.version ? `v${d.version} • ` : ''}
                                             {d.effective_date ? `Effective: ${new Date(d.effective_date).toLocaleDateString()}` : ''}
                                         </div>
@@ -222,7 +222,7 @@ export default function ClientMedical({
                                     </Button>
                                 </div>
                             ))}
-                            <div className="text-xs text-slate-500">To upload/update charts, use the Documents tab (category: Medication chart).</div>
+                            <div className="text-xs text-muted-foreground">To upload/update charts, use the Documents tab (category: Medication chart).</div>
                         </CardContent>
                     </Card>
                 )}
@@ -265,7 +265,7 @@ export default function ClientMedical({
                     Emergency contacts
                 </Button>
                 {focusSection !== 'all' && (
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-muted-foreground">
                         Tip: use “All” to see the full medical dashboard.
                     </div>
                 )}
@@ -667,7 +667,7 @@ export default function ClientMedical({
                                             )}
                                         </div>
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {[
                                             m.dosage && `Dosage: ${m.dosage}`,
                                             m.frequency &&
@@ -678,14 +678,14 @@ export default function ClientMedical({
                                             .join(' - ')}
                                     </div>
                                     {m.instructions && (
-                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
                                             {m.instructions}
                                         </div>
                                     )}
                                 </div>
                             ))}
                             {!medications.length && (
-                                <div className="text-sm text-slate-500">
+                                <div className="text-sm text-muted-foreground">
                                     No medications listed.
                                 </div>
                             )}
@@ -777,7 +777,7 @@ export default function ClientMedical({
                                         <div className="text-sm font-medium">
                                             {c.label}
                                             {c.severity ? (
-                                                <span className="ml-2 text-xs text-slate-500">
+                                                <span className="ml-2 text-xs text-muted-foreground">
                                                     ({c.severity})
                                                 </span>
                                             ) : null}
@@ -799,14 +799,14 @@ export default function ClientMedical({
                                         )}
                                     </div>
                                     {c.notes && (
-                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
                                             {c.notes}
                                         </div>
                                     )}
                                 </div>
                             ))}
                             {!conditions.length && (
-                                <div className="text-sm text-slate-500">
+                                <div className="text-sm text-muted-foreground">
                                     No conditions listed.
                                 </div>
                             )}
@@ -941,7 +941,7 @@ export default function ClientMedical({
                                             </Button>
                                         )}
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {[
                                             e.relationship &&
                                                 `Relationship: ${e.relationship}`,
@@ -952,14 +952,14 @@ export default function ClientMedical({
                                             .join(' - ')}
                                     </div>
                                     {e.notes && (
-                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
                                             {e.notes}
                                         </div>
                                     )}
                                 </div>
                             ))}
                             {!emergency_contacts.length && (
-                                <div className="text-sm text-slate-500">
+                                <div className="text-sm text-muted-foreground">
                                     No emergency contacts listed.
                                 </div>
                             )}
@@ -1268,11 +1268,11 @@ export default function ClientMedical({
                                         <div className="text-sm font-medium">
                                             {a.medication?.name || 'Medication'}
                                         </div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             {a.status}
                                         </div>
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {a.administered_at
                                             ? `Administered: ${new Date(a.administered_at).toLocaleString()}`
                                             : ''}
@@ -1290,19 +1290,19 @@ export default function ClientMedical({
                                             : ''}
                                     </div>
                                     {a.reason && a.status !== 'given' && (
-                                        <div className="mt-2 text-xs text-slate-600">
+                                        <div className="mt-2 text-xs text-muted-foreground">
                                             Reason: {a.reason}
                                         </div>
                                     )}
                                     {a.notes && (
-                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
                                             {a.notes}
                                         </div>
                                     )}
                                 </div>
                             ))}
                             {!administrations.length && (
-                                <div className="text-sm text-slate-500">
+                                <div className="text-sm text-muted-foreground">
                                     No administrations recorded yet.
                                 </div>
                             )}
@@ -1504,7 +1504,7 @@ export default function ClientMedical({
                                         <div className="text-sm font-medium">
                                             {m.name}
                                         </div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             {m.stock?.on_hand !== null &&
                                             m.stock?.on_hand !== undefined
                                                 ? `${m.stock.on_hand}${m.stock.unit ? ` ${m.stock.unit}` : ''}`
@@ -1513,19 +1513,19 @@ export default function ClientMedical({
                                     </div>
                                     {m.stock?.reorder_level !== null &&
                                         m.stock?.reorder_level !== undefined && (
-                                            <div className="mt-1 text-xs text-slate-500">
+                                            <div className="mt-1 text-xs text-muted-foreground">
                                                 Reorder at: {m.stock.reorder_level}
                                             </div>
                                         )}
                                     {m.stock?.notes && (
-                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
                                             {m.stock.notes}
                                         </div>
                                     )}
                                 </div>
                             ))}
                             {!medications.length && (
-                                <div className="text-sm text-slate-500">
+                                <div className="text-sm text-muted-foreground">
                                     No medications listed.
                                 </div>
                             )}
@@ -1549,38 +1549,38 @@ export default function ClientMedical({
                                         <div className="text-sm font-medium">
                                             {e.medication?.name || 'Medication'}
                                         </div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             {e.entry_type}
                                             {e.recorded_at
                                                 ? ` • ${new Date(e.recorded_at).toLocaleString()}`
                                                 : ''}
                                         </div>
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {e.recordedBy?.name ? `By: ${e.recordedBy.name}` : ''}
                                         {e.witnessedBy?.name ? ` • Witness: ${e.witnessedBy.name}` : ''}
                                         {e.serviceContext?.name ? ` • Context: ${e.serviceContext.name}` : ''}
                                     </div>
                                     {(e.on_hand_before !== null || e.on_hand_after !== null) && (
-                                        <div className="mt-1 text-xs text-slate-500">
+                                        <div className="mt-1 text-xs text-muted-foreground">
                                             Stock: {e.on_hand_before ?? '—'} → {e.on_hand_after ?? '—'}
                                             {e.unit ? ` ${e.unit}` : ''}
                                         </div>
                                     )}
                                     {e.reason && (
-                                        <div className="mt-2 text-xs text-slate-600">
+                                        <div className="mt-2 text-xs text-muted-foreground">
                                             Reason: {e.reason}
                                         </div>
                                     )}
                                     {e.notes && (
-                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
                                             {e.notes}
                                         </div>
                                     )}
                                 </div>
                             ))}
                             {!controlled_entries.length && (
-                                <div className="text-sm text-slate-500">
+                                <div className="text-sm text-muted-foreground">
                                     No controlled drug entries recorded yet.
                                 </div>
                             )}
@@ -1604,31 +1604,31 @@ export default function ClientMedical({
                                         <div className="text-sm font-medium">
                                             {d.medication?.name || 'Medication'}
                                         </div>
-                                        <div className={`text-xs ${d.status === 'open' ? 'text-amber-600' : 'text-slate-500'}`}>
+                                        <div className={`text-xs ${d.status === 'open' ? 'text-amber-600' : 'text-muted-foreground'}`}>
                                             {d.status}
                                             {d.reported_at
                                                 ? ` • ${new Date(d.reported_at).toLocaleString()}`
                                                 : ''}
                                         </div>
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {d.reportedBy?.name ? `Reported by: ${d.reportedBy.name}` : ''}
                                         {d.witnessedBy?.name ? ` • Witness: ${d.witnessedBy.name}` : ''}
                                         {d.serviceContext?.name ? ` • Context: ${d.serviceContext.name}` : ''}
                                     </div>
-                                    <div className="mt-2 text-xs text-slate-500">
+                                    <div className="mt-2 text-xs text-muted-foreground">
                                         Stock: {d.on_hand_before ?? '—'} → {d.on_hand_after ?? '—'}
                                         {d.difference !== null && d.difference !== undefined
                                             ? ` • Difference: ${d.difference}`
                                             : ''}
                                     </div>
                                     {d.reason && (
-                                        <div className="mt-2 text-xs text-slate-600">
+                                        <div className="mt-2 text-xs text-muted-foreground">
                                             Reason: {d.reason}
                                         </div>
                                     )}
                                     {d.status === 'closed' && (d.resolution_notes || d.resolvedBy?.name) && (
-                                        <div className="mt-2 text-xs text-slate-600">
+                                        <div className="mt-2 text-xs text-muted-foreground">
                                             Closed{d.resolvedBy?.name ? ` by ${d.resolvedBy.name}` : ''}
                                             {d.resolution_notes ? ` • ${d.resolution_notes}` : ''}
                                         </div>
@@ -1652,7 +1652,7 @@ export default function ClientMedical({
                             ))}
 
                             {!controlled_discrepancies.length && (
-                                <div className="text-sm text-slate-500">
+                                <div className="text-sm text-muted-foreground">
                                     No controlled drug discrepancies.
                                 </div>
                             )}

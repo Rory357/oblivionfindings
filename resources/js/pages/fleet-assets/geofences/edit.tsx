@@ -345,7 +345,7 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
                                         id="is_active"
                                         checked={isActive}
                                         onChange={(e) => setIsActive(e.target.checked)}
-                                        className="h-4 w-4 rounded border-gray-300"
+                                        className="h-4 w-4 rounded border-border"
                                     />
                                     <Label htmlFor="is_active">Active</Label>
                                 </div>
@@ -488,7 +488,7 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
                                                 type="checkbox"
                                                 checked={alertOnEnter}
                                                 onChange={(e) => setAlertOnEnter(e.target.checked)}
-                                                className="h-4 w-4 rounded border-gray-300"
+                                                className="h-4 w-4 rounded border-border"
                                             />
                                             Alert on Enter
                                         </label>
@@ -497,7 +497,7 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
                                                 type="checkbox"
                                                 checked={alertOnExit}
                                                 onChange={(e) => setAlertOnExit(e.target.checked)}
-                                                className="h-4 w-4 rounded border-gray-300"
+                                                className="h-4 w-4 rounded border-border"
                                             />
                                             Alert on Exit
                                         </label>
@@ -506,7 +506,7 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
                                                 type="checkbox"
                                                 checked={alertOnSpeed}
                                                 onChange={(e) => setAlertOnSpeed(e.target.checked)}
-                                                className="h-4 w-4 rounded border-gray-300"
+                                                className="h-4 w-4 rounded border-border"
                                             />
                                             Alert on Speed Violation
                                         </label>
@@ -519,7 +519,7 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
                                             type="checkbox"
                                             checked={notifyControlRoom}
                                             onChange={(e) => setNotifyControlRoom(e.target.checked)}
-                                            className="h-4 w-4 rounded border-gray-300"
+                                            className="h-4 w-4 rounded border-border"
                                         />
                                         Notify Control Room
                                     </label>

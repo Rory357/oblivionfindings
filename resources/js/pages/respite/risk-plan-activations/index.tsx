@@ -19,12 +19,12 @@ const statusColors: Record<string, string> = {
     pending_review: 'bg-amber-100 text-amber-800',
     active: 'bg-green-100 text-green-800',
     modified: 'bg-blue-100 text-blue-800',
-    suspended: 'bg-slate-100 text-slate-600',
-    completed: 'bg-slate-100 text-slate-800',
+    suspended: 'bg-muted text-muted-foreground',
+    completed: 'bg-muted text-foreground',
 };
 
 const typeColors: Record<string, string> = {
-    behaviour: 'bg-purple-100 text-purple-800',
+    behaviour: 'bg-primary/10 text-primary',
     safety: 'bg-red-100 text-red-800',
     medical: 'bg-blue-100 text-blue-800',
     mobility: 'bg-orange-100 text-orange-800',
@@ -46,7 +46,7 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Risk Plan Activations</h1>
-                        <div className="mt-1 text-sm text-slate-500">Activated risk plans for respite stays.</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Activated risk plans for respite stays.</div>
                     </div>
                     <Link href="/respite/risk-plan-activations/create">
                         <Button size="sm">New Activation</Button>
@@ -60,7 +60,7 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Plan Type</Label>
+                            <Label className="text-xs text-muted-foreground">Plan Type</Label>
                             <Select value={filters.plan_type ?? ANY} onValueChange={(v) => onFilter({ plan_type: v === ANY ? null : v })}>
                                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                                 <SelectContent>
@@ -72,7 +72,7 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select value={filters.status ?? ANY} onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}>
                                 <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
                                 <SelectContent>
@@ -95,16 +95,16 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                                         <div className="flex-1">
                                             <div className="font-semibold">{a.plan_name}</div>
                                             <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge className={typeColors[a.plan_type] || 'bg-slate-100 text-slate-800'}>{a.plan_type?.replace(/_/g, ' ')}</Badge>
+                                                <Badge className={typeColors[a.plan_type] || 'bg-muted text-foreground'}>{a.plan_type?.replace(/_/g, ' ')}</Badge>
                                                 <Badge className={statusColors[a.status] || ''}>{a.status?.replace(/_/g, ' ')}</Badge>
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Client: {a.stay?.client?.first_name} {a.stay?.client?.last_name}
                                             </div>
                                             {a.stay && (
-                                                <div className="mt-1 text-xs text-slate-400">Stay #{a.stay.id}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">Stay #{a.stay.id}</div>
                                             )}
-                                            <div className="mt-1 text-xs text-slate-400">{formatDateTime(a.created_at)}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(a.created_at)}</div>
                                         </div>
                                         <Link href={`/respite/risk-plan-activations/${a.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View
@@ -115,7 +115,7 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                         </Card>
                     ))}
                     {!activations.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">No risk plan activations found.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">No risk plan activations found.</div>
                     )}
                 </div>
 

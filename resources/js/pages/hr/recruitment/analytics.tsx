@@ -88,7 +88,7 @@ export default function RecruitmentAnalytics({ timeToHire, sourceEffectiveness, 
                     <KpiCard label="Total Candidates" value={totalCandidates} icon={Users} color="bg-blue-500/10 text-blue-500" />
                     <KpiCard label="Avg Time to Hire" value={avgTimeToHire} icon={Clock} suffix=" days" color="bg-amber-500/10 text-amber-500" />
                     <KpiCard label="Conversion Rate" value={conversionRate} icon={TrendingUp} suffix="%" color="bg-emerald-500/10 text-emerald-500" />
-                    <KpiCard label="Active Positions" value={activePositions} icon={Briefcase} color="bg-purple-500/10 text-purple-500" />
+                    <KpiCard label="Active Positions" value={activePositions} icon={Briefcase} color="bg-primary/10 text-primary" />
                 </div>
 
                 <Tabs defaultValue="overview" className="space-y-6">

@@ -106,7 +106,7 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
     const statusColors: Record<string, string> = {
         open: 'bg-blue-100 text-blue-800',
         closed: 'bg-green-100 text-green-800',
-        cancelled: 'bg-gray-100 text-gray-800',
+        cancelled: 'bg-muted text-foreground',
     };
 
     return (

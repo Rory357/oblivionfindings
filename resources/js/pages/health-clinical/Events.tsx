@@ -197,10 +197,10 @@ export default function EventRegister({
                         </p>
                     </div>
                     <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-gray-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                             Unreviewed
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-slate-700">
+                        <p className="mt-1 text-2xl font-bold text-foreground">
                             {stats.unreviewed}
                         </p>
                     </div>

@@ -99,12 +99,12 @@ export default function AssetShow() {
                         <h1 className="truncate text-xl font-semibold">{a.name}</h1>
                         <div className="mt-1 flex flex-wrap gap-2">
                             {headerBadges.map((b) => (
-                                <span key={b} className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                                <span key={b} className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">
                                     {b}
                                 </span>
                             ))}
                         </div>
-                        <div className="mt-2 text-sm text-slate-500">
+                        <div className="mt-2 text-sm text-muted-foreground">
                             {a.site ? `Site: ${a.site.name}` : 'Site: —'}
                             {a.client ? ` • Client: ${a.client.name}` : ''}
                         </div>
@@ -136,27 +136,27 @@ export default function AssetShow() {
                                         </CardHeader>
                                         <CardContent className="space-y-2 text-sm">
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Manufacturer</div>
+                                                <div className="text-muted-foreground">Manufacturer</div>
                                                 <div className="text-right">{a.manufacturer ?? '—'}</div>
                                             </div>
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Model</div>
+                                                <div className="text-muted-foreground">Model</div>
                                                 <div className="text-right">{a.model ?? '—'}</div>
                                             </div>
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Serial</div>
+                                                <div className="text-muted-foreground">Serial</div>
                                                 <div className="text-right">{a.serial_number ?? '—'}</div>
                                             </div>
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Location</div>
+                                                <div className="text-muted-foreground">Location</div>
                                                 <div className="text-right">{a.location ?? '—'}</div>
                                             </div>
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Purchase date</div>
+                                                <div className="text-muted-foreground">Purchase date</div>
                                                 <div className="text-right">{a.purchase_date ?? '—'}</div>
                                             </div>
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Warranty expires</div>
+                                                <div className="text-muted-foreground">Warranty expires</div>
                                                 <div className="text-right">{a.warranty_expires_at ?? '—'}</div>
                                             </div>
                                         </CardContent>
@@ -168,32 +168,32 @@ export default function AssetShow() {
                                         </CardHeader>
                                         <CardContent className="space-y-2 text-sm">
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Inspection required</div>
+                                                <div className="text-muted-foreground">Inspection required</div>
                                                 <div className="text-right">{a.requires_inspection ? 'Yes' : 'No'}</div>
                                             </div>
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Inspection due</div>
+                                                <div className="text-muted-foreground">Inspection due</div>
                                                 <div className="text-right">{a.inspection_due_at ?? '—'}</div>
                                             </div>
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Maintenance required</div>
+                                                <div className="text-muted-foreground">Maintenance required</div>
                                                 <div className="text-right">{a.requires_maintenance ? 'Yes' : 'No'}</div>
                                             </div>
                                             <div className="flex justify-between gap-3">
-                                                <div className="text-slate-500">Maintenance due</div>
+                                                <div className="text-muted-foreground">Maintenance due</div>
                                                 <div className="text-right">{a.maintenance_due_at ?? '—'}</div>
                                             </div>
 
                                             {a.notes ? (
                                                 <div className="pt-2">
-                                                    <div className="text-slate-500">Notes</div>
+                                                    <div className="text-muted-foreground">Notes</div>
                                                     <div className="mt-1 whitespace-pre-wrap rounded-md border p-2 text-sm">{a.notes}</div>
                                                 </div>
                                             ) : null}
 
                                             {a.description ? (
                                                 <div className="pt-2">
-                                                    <div className="text-slate-500">Description</div>
+                                                    <div className="text-muted-foreground">Description</div>
                                                     <div className="mt-1 whitespace-pre-wrap rounded-md border p-2 text-sm">{a.description}</div>
                                                 </div>
                                             ) : null}
@@ -210,7 +210,7 @@ export default function AssetShow() {
                                                     <img src={a.qr_png_url} alt="Asset QR" className="h-56 w-56" />
                                                 </div>
                                             ) : (
-                                                <div className="text-sm text-slate-500">QR code not available.</div>
+                                                <div className="text-sm text-muted-foreground">QR code not available.</div>
                                             )}
                                             <div className="flex flex-wrap gap-2">
                                                 {can?.downloadQr && a.qr_download_url ? (
@@ -224,7 +224,7 @@ export default function AssetShow() {
                                                     </a>
                                                 ) : null}
                                             </div>
-                                            <div className="text-xs text-slate-500">Scan to open this asset in Oblivion Findings.</div>
+                                            <div className="text-xs text-muted-foreground">Scan to open this asset in Oblivion Findings.</div>
                                         </CardContent>
                                     </Card>
                                 </div>
@@ -302,18 +302,18 @@ export default function AssetShow() {
                                                             <div className="text-sm font-medium">
                                                                 {i.inspected_at} • {i.result}
                                                             </div>
-                                                            <div className="text-xs text-slate-500">
+                                                            <div className="text-xs text-muted-foreground">
                                                                 {i.inspected_by ? i.inspected_by.name : '—'}
                                                             </div>
                                                         </div>
-                                                        {i.next_due_at ? <div className="mt-1 text-xs text-slate-600">Next due: {i.next_due_at}</div> : null}
+                                                        {i.next_due_at ? <div className="mt-1 text-xs text-muted-foreground">Next due: {i.next_due_at}</div> : null}
                                                         {i.notes ? (
-                                                            <div className="mt-2 whitespace-pre-wrap rounded-md bg-slate-50 p-2 text-sm">{i.notes}</div>
+                                                            <div className="mt-2 whitespace-pre-wrap rounded-md bg-muted p-2 text-sm">{i.notes}</div>
                                                         ) : null}
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-sm text-slate-500">No inspections recorded.</div>
+                                                <div className="text-sm text-muted-foreground">No inspections recorded.</div>
                                             )}
                                         </CardContent>
                                     </Card>
@@ -391,23 +391,23 @@ export default function AssetShow() {
                                                     <div key={m.id} className="rounded-md border p-3">
                                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                                             <div className="text-sm font-medium">{m.performed_at}</div>
-                                                            <div className="text-xs text-slate-500">
+                                                            <div className="text-xs text-muted-foreground">
                                                                 {m.performed_by ? m.performed_by.name : '—'}
                                                             </div>
                                                         </div>
-                                                        <div className="mt-1 text-xs text-slate-600">
+                                                        <div className="mt-1 text-xs text-muted-foreground">
                                                             {m.type ? `Type: ${m.type}` : 'Type: —'}
                                                             {m.vendor ? ` • Vendor: ${m.vendor}` : ''}
                                                             {m.cost ? ` • Cost: ${m.cost}` : ''}
                                                         </div>
-                                                        {m.next_due_at ? <div className="mt-1 text-xs text-slate-600">Next due: {m.next_due_at}</div> : null}
+                                                        {m.next_due_at ? <div className="mt-1 text-xs text-muted-foreground">Next due: {m.next_due_at}</div> : null}
                                                         {m.notes ? (
-                                                            <div className="mt-2 whitespace-pre-wrap rounded-md bg-slate-50 p-2 text-sm">{m.notes}</div>
+                                                            <div className="mt-2 whitespace-pre-wrap rounded-md bg-muted p-2 text-sm">{m.notes}</div>
                                                         ) : null}
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-sm text-slate-500">No maintenance recorded.</div>
+                                                <div className="text-sm text-muted-foreground">No maintenance recorded.</div>
                                             )}
                                         </CardContent>
                                     </Card>
@@ -496,17 +496,17 @@ export default function AssetShow() {
                                                     <div key={d.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
                                                         <div className="min-w-0">
                                                             <div className="text-sm font-medium">{d.title}</div>
-                                                            <div className="mt-1 text-xs text-slate-500">
+                                                            <div className="mt-1 text-xs text-muted-foreground">
                                                                 {d.category ? `Category: ${d.category}` : 'Category: —'}
                                                                 {d.version ? ` • Version: ${d.version}` : ''}
                                                                 {d.expiry_date ? ` • Expires: ${d.expiry_date}` : ''}
                                                             </div>
-                                                            <div className="mt-1 text-xs text-slate-500">
+                                                            <div className="mt-1 text-xs text-muted-foreground">
                                                                 {d.uploaded_by ? d.uploaded_by.name : '—'}
                                                                 {d.original_name ? ` • ${d.original_name}` : ''}
                                                             </div>
                                                             {d.notes ? (
-                                                                <div className="mt-2 whitespace-pre-wrap rounded-md bg-slate-50 p-2 text-sm">{d.notes}</div>
+                                                                <div className="mt-2 whitespace-pre-wrap rounded-md bg-muted p-2 text-sm">{d.notes}</div>
                                                             ) : null}
                                                         </div>
                                                         <div className="flex shrink-0 items-center gap-2">
@@ -528,7 +528,7 @@ export default function AssetShow() {
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-sm text-slate-500">No documents uploaded.</div>
+                                                <div className="text-sm text-muted-foreground">No documents uploaded.</div>
                                             )}
                                         </CardContent>
                                     </Card>
@@ -600,7 +600,7 @@ export default function AssetShow() {
                                                             <div className="text-sm font-medium">
                                                                 {t.vendor} â€¢ {t.device_uid}
                                                             </div>
-                                                            <div className="mt-1 text-xs text-slate-500">
+                                                            <div className="mt-1 text-xs text-muted-foreground">
                                                                 Status: {t.status}
                                                                 {t.last_seen_at ? ` â€¢ Last seen: ${t.last_seen_at}` : ''}
                                                             </div>
@@ -618,7 +618,7 @@ export default function AssetShow() {
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-sm text-slate-500">No trackers paired.</div>
+                                                <div className="text-sm text-muted-foreground">No trackers paired.</div>
                                             )}
                                         </CardContent>
                                     </Card>
@@ -628,22 +628,22 @@ export default function AssetShow() {
                                             <CardTitle className="text-base">Archived asset alert history</CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-2">
-                                            <div className="text-xs text-slate-500">
+                                            <div className="text-xs text-muted-foreground">
                                                 These legacy alert records are retained for history only. Active operational alerts now live in Fleet Alerts and Control Room.
                                             </div>
                                             {archived_alerts?.length ? (
                                                 archived_alerts.map((al: any) => (
                                                     <div key={al.id} className="rounded-md border p-3">
                                                         <div className="flex flex-wrap items-center gap-2 text-sm">
-                                                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{al.alert_type}</span>
-                                                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{al.severity}</span>
-                                                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{al.status}</span>
+                                                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{al.alert_type}</span>
+                                                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{al.severity}</span>
+                                                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{al.status}</span>
                                                         </div>
-                                                        <div className="mt-1 text-xs text-slate-500">{al.triggered_at ?? ''}</div>
+                                                        <div className="mt-1 text-xs text-muted-foreground">{al.triggered_at ?? ''}</div>
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-sm text-slate-500">No archived asset alerts.</div>
+                                                <div className="text-sm text-muted-foreground">No archived asset alerts.</div>
                                             )}
                                         </CardContent>
                                     </Card>
@@ -660,7 +660,7 @@ export default function AssetShow() {
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-sm text-slate-500">No scans recorded.</div>
+                                                <div className="text-sm text-muted-foreground">No scans recorded.</div>
                                             )}
                                         </CardContent>
                                     </Card>
@@ -677,7 +677,7 @@ export default function AssetShow() {
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="text-sm text-slate-500">No geofences configured.</div>
+                                                <div className="text-sm text-muted-foreground">No geofences configured.</div>
                                             )}
                                         </CardContent>
                                     </Card>

@@ -64,8 +64,8 @@ export default function InterestsIndex({ auth, interestsByMember, boardMembers }
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Board Interests Register</h1>
-            <p className="text-gray-500 mt-1">Declarations of interests for all board members</p>
+            <h1 className="text-2xl font-bold text-foreground">Board Interests Register</h1>
+            <p className="text-muted-foreground mt-1">Declarations of interests for all board members</p>
           </div>
           <Button onClick={() => setShowForm(!showForm)}>
             <Plus className="w-4 h-4 mr-2" /> Declare Interest
@@ -136,13 +136,13 @@ export default function InterestsIndex({ auth, interestsByMember, boardMembers }
         )}
 
         {Object.keys(interestsByMember).length === 0 ? (
-          <Card><CardContent className="p-8 text-center text-gray-500">No interests declared yet.</CardContent></Card>
+          <Card><CardContent className="p-8 text-center text-muted-foreground">No interests declared yet.</CardContent></Card>
         ) : (
           Object.entries(interestsByMember).map(([memberId, interests]) => (
             <Card key={memberId} className="mb-4">
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <User className="w-5 h-5 text-gray-400" />
+                  <User className="w-5 h-5 text-muted-foreground" />
                   <CardTitle className="text-lg">{getMemberName(memberId)}</CardTitle>
                   <Badge variant="outline">{interests.length} interest(s)</Badge>
                 </div>
@@ -155,14 +155,14 @@ export default function InterestsIndex({ auth, interestsByMember, boardMembers }
                         <div className="flex items-center gap-2">
                           <Badge variant="outline">{interest.interest_type}</Badge>
                           <span className="font-medium">{interest.nature_of_interest}</span>
-                          {interest.organization_name && <span className="text-gray-500">({interest.organization_name})</span>}
+                          {interest.organization_name && <span className="text-muted-foreground">({interest.organization_name})</span>}
                         </div>
-                        <Badge className={interest.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                        <Badge className={interest.is_active ? 'bg-green-100 text-green-800' : 'bg-muted text-foreground'}>
                           {interest.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">{interest.description}</p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">{interest.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
                         From {new Date(interest.date_from).toLocaleDateString('en-NZ')}
                         {interest.date_to ? ` to ${new Date(interest.date_to).toLocaleDateString('en-NZ')}` : ' (ongoing)'}
                       </p>

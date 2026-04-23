@@ -41,7 +41,7 @@ export default function EvaluationCreate({ auth }: PageProps) {
     <AppLayout>
       <Head title="Create Evaluation" />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Create Board Evaluation</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-6">Create Board Evaluation</h1>
         <form onSubmit={handleSubmit}>
           <Card className="mb-6">
             <CardContent className="p-6 space-y-4">

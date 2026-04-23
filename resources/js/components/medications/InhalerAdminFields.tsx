@@ -10,8 +10,8 @@ interface Props {
 
 export default function InhalerAdminFields({ form, errors, onChange }: Props) {
     return (
-        <div className="space-y-3 rounded-md border border-purple-200 bg-purple-50/50 p-3">
-            <div className="text-sm font-medium text-purple-800">Inhaler Administration</div>
+        <div className="space-y-3 rounded-md border border-primary bg-primary/10/50 p-3">
+            <div className="text-sm font-medium text-primary">Inhaler Administration</div>
 
             <div className="flex items-center space-x-2">
                 <Checkbox

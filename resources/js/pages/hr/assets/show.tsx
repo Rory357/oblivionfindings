@@ -63,7 +63,7 @@ const statusColors: Record<string, string> = {
     available: 'bg-green-100 text-green-800',
     assigned: 'bg-blue-100 text-blue-800',
     maintenance: 'bg-yellow-100 text-yellow-800',
-    retired: 'bg-slate-100 text-slate-800',
+    retired: 'bg-muted text-foreground',
 };
 
 const categoryLabels: Record<string, string> = {
@@ -146,7 +146,7 @@ export default function AssetShow({ asset, employees, can }: Props) {
                                 {asset.status}
                             </span>
                         </div>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             {categoryLabels[asset.category] || asset.category}
                             {asset.make && ` - ${asset.make}`}
                             {asset.model && ` ${asset.model}`}
@@ -179,25 +179,25 @@ export default function AssetShow({ asset, employees, can }: Props) {
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                             <div>
-                                <span className="text-slate-500">Serial Number</span>
+                                <span className="text-muted-foreground">Serial Number</span>
                                 <p className="mt-0.5 font-mono">{asset.serial_number || '-'}</p>
                             </div>
                             <div>
-                                <span className="text-slate-500">Purchase Date</span>
+                                <span className="text-muted-foreground">Purchase Date</span>
                                 <p className="mt-0.5">{formatDate(asset.purchase_date)}</p>
                             </div>
                             <div>
-                                <span className="text-slate-500">Purchase Cost</span>
+                                <span className="text-muted-foreground">Purchase Cost</span>
                                 <p className="mt-0.5">{formatCurrency(asset.purchase_cost)}</p>
                             </div>
                             <div>
-                                <span className="text-slate-500">Warranty Expiry</span>
+                                <span className="text-muted-foreground">Warranty Expiry</span>
                                 <p className="mt-0.5">{formatDate(asset.warranty_expiry)}</p>
                             </div>
                         </div>
                         {asset.notes && (
                             <div className="mt-4 text-sm">
-                                <span className="text-slate-500">Notes</span>
+                                <span className="text-muted-foreground">Notes</span>
                                 <p className="mt-0.5">{asset.notes}</p>
                             </div>
                         )}
@@ -249,7 +249,7 @@ export default function AssetShow({ asset, employees, can }: Props) {
                                 ))}
                                 {!asset.assignments?.length && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                                             No assignment history.
                                         </TableCell>
                                     </TableRow>

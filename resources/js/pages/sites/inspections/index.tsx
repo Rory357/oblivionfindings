@@ -63,7 +63,7 @@ const resultColors: Record<string, string> = {
     pass: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
     fail: 'border-red-500/30 text-red-400 bg-red-500/10',
     partial: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
-    na: 'border-slate-500/30 text-slate-400',
+    na: 'border-slate-500/30 text-muted-foreground',
 };
 
 export default function SiteInspections({ site, schedules, records }: Props) {
@@ -102,7 +102,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                             <ClipboardCheck className="w-5 h-5" />
                             Inspections & Maintenance
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <Button onClick={() => setShowForm(true)}>
                         <Plus className="w-4 h-4 mr-1" />
@@ -207,18 +207,18 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                     </CardHeader>
                     <CardContent>
                         {schedules.length === 0 ? (
-                            <p className="text-center text-slate-400 py-4">No inspection schedules</p>
+                            <p className="text-center text-muted-foreground py-4">No inspection schedules</p>
                         ) : (
                             <div className="space-y-2">
                                 {schedules.map((schedule) => (
                                     <div key={schedule.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{schedule.title}</div>
-                                            <div className="text-sm text-slate-400">
+                                            <div className="text-sm text-muted-foreground">
                                                 {schedule.inspection_type} - {frequencyLabels[schedule.frequency]}
                                             </div>
                                             {schedule.assigned_to && (
-                                                <div className="text-xs text-slate-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     Assigned: {schedule.assigned_to.name}
                                                 </div>
                                             )}
@@ -246,7 +246,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                     </CardHeader>
                     <CardContent>
                         {records.data.length === 0 ? (
-                            <p className="text-center text-slate-400 py-4">No inspection records yet</p>
+                            <p className="text-center text-muted-foreground py-4">No inspection records yet</p>
                         ) : (
                             <div className="space-y-2">
                                 {records.data.slice(0, 10).map((record) => (
@@ -254,7 +254,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                                         <div>
                                             <div className="font-medium">{record.due_date}</div>
                                             {record.findings && (
-                                                <div className="text-sm text-slate-400">{record.findings}</div>
+                                                <div className="text-sm text-muted-foreground">{record.findings}</div>
                                             )}
                                         </div>
                                         {record.result && (

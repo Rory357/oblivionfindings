@@ -110,7 +110,7 @@ const GOAL_STATUS_COLORS: Record<string, string> = {
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
-    low: 'text-slate-500',
+    low: 'text-muted-foreground',
     medium: 'text-amber-600',
     high: 'text-red-600',
 };
@@ -139,17 +139,17 @@ const SUPPORT_NEED_LABELS: Record<string, string> = {
 
 const SUPPORT_NEED_COLORS: Record<string, string> = {
     daily_living: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    personal_care: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    personal_care: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     community_access: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
     health_management: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
     communication: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
     behaviour_support: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    employment: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-    education_training: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+    employment: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
+    education_training: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     social_participation: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
     cultural_needs: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
     spiritual_needs: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-    financial_management: 'bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300',
+    financial_management: 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground',
 };
 
 function formatDate(d: string | null | undefined): string {
@@ -409,7 +409,7 @@ export default function CarePlanShow({
                 <Badge variant="outline" className="gap-1.5 border-emerald-300 bg-emerald-50 px-3 py-1 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
                     <CheckCircle2 className="h-3 w-3" /> {safeProgressStats.completed} Completed
                 </Badge>
-                <Badge variant="outline" className="gap-1.5 border-indigo-300 bg-indigo-50 px-3 py-1 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300">
+                <Badge variant="outline" className="gap-1.5 border-primary bg-primary/10 px-3 py-1 text-primary dark:border-primary/30 dark:bg-primary/30 dark:text-primary/70">
                     <Play className="h-3 w-3" /> {safeProgressStats.in_progress} In Progress
                 </Badge>
                 <Badge variant="outline" className="gap-1.5 px-3 py-1">
@@ -428,7 +428,7 @@ export default function CarePlanShow({
                             {activeNeeds.map(([key]) => (
                                 <span
                                     key={key}
-                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUPPORT_NEED_COLORS[key] ?? 'bg-slate-100 text-slate-700'}`}
+                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUPPORT_NEED_COLORS[key] ?? 'bg-muted text-foreground'}`}
                                 >
                                     {SUPPORT_NEED_LABELS[key] ?? key.replace(/_/g, ' ')}
                                 </span>
@@ -534,7 +534,7 @@ export default function CarePlanShow({
 
             {/* Add Goal Form */}
             {showGoalForm && (
-                <Card className="border-dashed border-indigo-300 bg-indigo-50/50 dark:border-indigo-800 dark:bg-indigo-950/20">
+                <Card className="border-dashed border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/20">
                     <CardContent className="p-4">
                         <form onSubmit={handleAddGoal} className="space-y-3">
                             <div className="grid gap-3 sm:grid-cols-2">
@@ -607,7 +607,7 @@ export default function CarePlanShow({
                                     {goal.status === 'completed' ? (
                                         <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                                     ) : goal.status === 'in_progress' ? (
-                                        <Circle className="h-5 w-5 text-indigo-500" />
+                                        <Circle className="h-5 w-5 text-primary" />
                                     ) : (
                                         <Circle className="h-5 w-5 text-muted-foreground/40" />
                                     )}
@@ -616,7 +616,7 @@ export default function CarePlanShow({
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium">{goal.title}</span>
                                         {goal.status !== 'completed' && (
-                                            <Button variant="outline" size="sm" className="h-6 gap-1 px-2 text-[10px] text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                            <Button variant="outline" size="sm" className="h-6 gap-1 px-2 text-[10px] text-primary border-primary hover:bg-primary/10"
                                                 onClick={() => openGoalEditor(goal)} title="Edit goal">
                                                 <Pencil className="h-3 w-3" />
                                                 Edit
@@ -667,7 +667,7 @@ export default function CarePlanShow({
                                             </Button>
                                         )}
                                         {goal.status === 'not_started' && (
-                                            <Button size="sm" variant="outline" className="h-7 gap-1 border-indigo-300 px-3 text-xs text-indigo-600 hover:bg-indigo-50"
+                                            <Button size="sm" variant="outline" className="h-7 gap-1 border-primary px-3 text-xs text-primary hover:bg-primary/10"
                                                 onClick={() => updateGoalProgress(goal.id, 10, 'in_progress')}>
                                                 Start
                                             </Button>
@@ -703,7 +703,7 @@ export default function CarePlanShow({
 
                                     {/* Quick Note Input (inline) */}
                                     {noteGoalId === goal.id && (
-                                        <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50/30 p-3">
+                                        <div className="mt-2 rounded-lg border border-primary bg-primary/10/30 p-3">
                                             <Textarea
                                                 className="min-h-[60px] bg-white text-sm"
                                                 value={quickNote}
@@ -720,7 +720,7 @@ export default function CarePlanShow({
 
                                     {/* Notes History (expandable) */}
                                     {expandedGoalNotes[goal.id] && getGoalNotes(goal.id).length > 0 && (
-                                        <div className="mt-2 space-y-1.5 rounded-lg border bg-slate-50/50 p-2.5">
+                                        <div className="mt-2 space-y-1.5 rounded-lg border bg-muted/50 p-2.5">
                                             <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Note History</p>
                                             {getGoalNotes(goal.id).map((note: any) => (
                                                 <div key={note.id} className="rounded border bg-white p-2 text-xs">
@@ -762,7 +762,7 @@ export default function CarePlanShow({
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <Label className="text-sm font-medium">Progress</Label>
-                                    <span className="text-lg font-bold tabular-nums text-indigo-600">{editProgress}%</span>
+                                    <span className="text-lg font-bold tabular-nums text-primary">{editProgress}%</span>
                                 </div>
                                 <input
                                     type="range" min={0} max={100} step={5} value={editProgress}
@@ -773,7 +773,7 @@ export default function CarePlanShow({
                                         else if (val > 0) setEditStatus('in_progress');
                                         else setEditStatus('not_started');
                                     }}
-                                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-indigo-600 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:shadow"
+                                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-indigo-600 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow"
                                 />
                                 <div className="flex justify-between text-[10px] text-muted-foreground">
                                     <span>Not Started</span>
@@ -835,7 +835,7 @@ export default function CarePlanShow({
 
             {/* Add Note Form */}
             {showNoteForm && (
-                <Card className="border-dashed border-indigo-300 bg-indigo-50/50 dark:border-indigo-800 dark:bg-indigo-950/20">
+                <Card className="border-dashed border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/20">
                     <CardContent className="p-4">
                         <form onSubmit={handleAddNote} className="space-y-3">
                             <div className="space-y-1">
@@ -957,7 +957,7 @@ export default function CarePlanShow({
                 {(reviewHistory ?? []).map((version) => (
                     <Card key={version.id}>
                         <CardContent className="flex items-center gap-4 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground">
                                 <span className="text-sm font-bold">v{version.version}</span>
                             </div>
                             <div className="min-w-0 flex-1">

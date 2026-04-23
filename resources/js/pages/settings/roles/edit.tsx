@@ -455,8 +455,8 @@ export default function RoleEdit(props: Props) {
                                                 onClick={() => toggleModule(mod.key)}
                                                 className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
                                             >
-                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-100 dark:bg-violet-900/30">
-                                                    <Icon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 dark:bg-primary/30">
+                                                    <Icon className="h-4 w-4 text-primary dark:text-primary" />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="text-sm font-semibold">{mod.label}</div>
@@ -466,7 +466,7 @@ export default function RoleEdit(props: Props) {
                                                 </div>
                                                 <Badge
                                                     variant={allSelected ? 'default' : 'secondary'}
-                                                    className={`text-xs ${allSelected ? 'bg-violet-600' : ''}`}
+                                                    className={`text-xs ${allSelected ? 'bg-primary' : ''}`}
                                                 >
                                                     {keys.length}
                                                 </Badge>

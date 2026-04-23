@@ -28,7 +28,7 @@ export default function RespiteReferralShow({ referral }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <CalendarDays className="h-5 w-5 text-slate-500" />
+                            <CalendarDays className="h-5 w-5 text-muted-foreground" />
                             {referral.client?.first_name} {referral.client?.last_name}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
@@ -46,7 +46,7 @@ export default function RespiteReferralShow({ referral }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Referral Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm text-slate-600">
+                    <CardContent className="space-y-2 text-sm text-muted-foreground">
                         <div>Referrer: {referral.referrer_name}</div>
                         <div>Contact: {referral.referrer_contact || 'Not provided'}</div>
                         <div>Reason: {referral.referral_reason}</div>
@@ -66,7 +66,7 @@ export default function RespiteReferralShow({ referral }: Props) {
                         <CardContent className="space-y-3">
                             <div className="grid gap-3 sm:grid-cols-3">
                                 <div>
-                                    <label className="text-xs text-slate-500">Status</label>
+                                    <label className="text-xs text-muted-foreground">Status</label>
                                     <select
                                         className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
                                         value={form.data.status}
@@ -78,7 +78,7 @@ export default function RespiteReferralShow({ referral }: Props) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-500">Risk Level</label>
+                                    <label className="text-xs text-muted-foreground">Risk Level</label>
                                     <select
                                         className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
                                         value={form.data.risk_level}
@@ -92,7 +92,7 @@ export default function RespiteReferralShow({ referral }: Props) {
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs text-slate-500">Triage Notes</label>
+                                <label className="text-xs text-muted-foreground">Triage Notes</label>
                                 <textarea
                                     className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
                                     rows={4}

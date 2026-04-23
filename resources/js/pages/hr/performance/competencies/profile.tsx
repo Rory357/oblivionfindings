@@ -70,7 +70,7 @@ export default function CompetencyProfile({ employee, profile, latestAssessments
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">{employee.name}</h1>
-                    <div className="mt-1 text-sm text-slate-500">Competency profile and assessment history</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Competency profile and assessment history</div>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-2">
@@ -81,7 +81,7 @@ export default function CompetencyProfile({ employee, profile, latestAssessments
                         </CardHeader>
                         <CardContent className="flex justify-center">
                             {points === 0 ? (
-                                <p className="py-8 text-sm text-slate-400">No assessments yet</p>
+                                <p className="py-8 text-sm text-muted-foreground">No assessments yet</p>
                             ) : (
                                 <svg width={300} height={300} viewBox="0 0 300 300">
                                     {/* Grid */}
@@ -171,7 +171,7 @@ export default function CompetencyProfile({ employee, profile, latestAssessments
                                 <TableBody>
                                     {latestAssessments.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center text-slate-400">No assessments</TableCell>
+                                            <TableCell colSpan={4} className="text-center text-muted-foreground">No assessments</TableCell>
                                         </TableRow>
                                     )}
                                     {latestAssessments.map((a) => (
@@ -187,7 +187,7 @@ export default function CompetencyProfile({ employee, profile, latestAssessments
                                                     <Badge variant="outline">{a.target_level}</Badge>
                                                 ) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-sm text-slate-500">{a.assessor?.name ?? '-'}</TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">{a.assessor?.name ?? '-'}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -215,7 +215,7 @@ export default function CompetencyProfile({ employee, profile, latestAssessments
                             <TableBody>
                                 {history.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-slate-400">No history</TableCell>
+                                        <TableCell colSpan={5} className="text-center text-muted-foreground">No history</TableCell>
                                     </TableRow>
                                 )}
                                 {history.map((a) => (
@@ -227,8 +227,8 @@ export default function CompetencyProfile({ employee, profile, latestAssessments
                                                 {a.proficiency_level}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-sm text-slate-500">{a.assessor?.name ?? '-'}</TableCell>
-                                        <TableCell className="text-sm text-slate-500">{a.notes || '-'}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground">{a.assessor?.name ?? '-'}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground">{a.notes || '-'}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

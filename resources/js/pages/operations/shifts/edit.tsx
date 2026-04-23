@@ -305,7 +305,7 @@ export default function ShiftEdit({
                                         </option>
                                     ))}
                             </select>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 If left blank, the shift will inherit the
                                 selected client’s service context (if set).
                             </div>
@@ -409,7 +409,7 @@ export default function ShiftEdit({
                                 </label>
                             </div>
 
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 These settings follow the shift into timesheets
                                 and reporting, so this is the right place to
                                 correct them.
@@ -468,7 +468,7 @@ export default function ShiftEdit({
                                         </label>
                                     ))}
                                 </div>
-                                <div className="text-xs text-slate-500">
+                                <div className="text-xs text-muted-foreground">
                                     Use this when the shift is intended to meet
                                     a specific house coverage role, not just
                                     general headcount.
@@ -498,13 +498,13 @@ export default function ShiftEdit({
                                         </option>
                                     ) : null}
                                 </select>
-                                <div className="text-xs text-slate-500">
+                                <div className="text-xs text-muted-foreground">
                                     Use this to update the roster pattern from
                                     this shift onward without changing completed
                                     or cancelled history.
                                 </div>
                                 {!canManageRecurring ? (
-                                    <div className="text-xs text-slate-500">
+                                    <div className="text-xs text-muted-foreground">
                                         Future-occurrence updates are limited to
                                         schedulers and managers.
                                     </div>
@@ -565,7 +565,7 @@ export default function ShiftEdit({
                                 <option value="draft">draft</option>
                                 <option value="scheduled">scheduled</option>
                             </select>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                                 Lifecycle changes now happen from the shift
                                 workspace so planning edits stay auditable.
                             </div>
@@ -643,7 +643,7 @@ export default function ShiftEdit({
                                 >
                                     Add task
                                 </Button>
-                                <div className="text-xs text-slate-500">
+                                <div className="text-xs text-muted-foreground">
                                     Tip: Save to persist new tasks. Completed
                                     state can be toggled for saved tasks.
                                 </div>

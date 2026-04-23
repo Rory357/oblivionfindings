@@ -100,21 +100,21 @@ const typeIcons: Record<string, React.ReactNode> = {
 
 const typeBadgeColors: Record<string, string> = {
     camera: 'bg-blue-100 text-blue-800 border-blue-200',
-    door: 'bg-purple-100 text-purple-800 border-purple-200',
+    door: 'bg-primary/10 text-primary border-primary',
     sensor: 'bg-cyan-100 text-cyan-800 border-cyan-200',
     alarm_panel: 'bg-red-100 text-red-800 border-red-200',
     bed_sensor: 'bg-pink-100 text-pink-800 border-pink-200',
     personal_tracker: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     vehicle_tracker: 'bg-amber-100 text-amber-800 border-amber-200',
     environmental: 'bg-teal-100 text-teal-800 border-teal-200',
-    network: 'bg-gray-100 text-gray-800 border-gray-200',
+    network: 'bg-muted text-foreground border-border',
 };
 
 function BatteryIndicator({ level }: { level: number | null }) {
     if (level === null || level === undefined) {
         return (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Battery className="h-3.5 w-3.5 text-gray-400" />
+                <Battery className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>N/A</span>
             </div>
         );

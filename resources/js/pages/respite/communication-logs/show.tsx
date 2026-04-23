@@ -36,11 +36,11 @@ export default function CommunicationLogShow({ log }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Log Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm text-slate-600">
+                    <CardContent className="space-y-2 text-sm text-muted-foreground">
                         <div>
                             Client:{' '}
                             {log.stay?.client ? (
-                                <Link href={`/respite/stays/${log.stay.id}`} className="text-indigo-500 hover:text-indigo-400">
+                                <Link href={`/respite/stays/${log.stay.id}`} className="text-primary hover:text-primary">
                                     {log.stay.client.first_name} {log.stay.client.last_name}
                                 </Link>
                             ) : (
@@ -52,7 +52,7 @@ export default function CommunicationLogShow({ log }: Props) {
                         {log.created_by && <div>Created by: {log.created_by.name || log.created_by}</div>}
                         {log.summary && (
                             <div className="mt-3">
-                                <div className="font-medium text-slate-700">Summary</div>
+                                <div className="font-medium text-foreground">Summary</div>
                                 <div className="mt-1 whitespace-pre-wrap">{log.summary}</div>
                             </div>
                         )}
@@ -74,7 +74,7 @@ export default function CommunicationLogShow({ log }: Props) {
                                 ))}
                             </div>
                         ) : (
-                            <div className="py-4 text-center text-sm text-slate-500">No participants recorded.</div>
+                            <div className="py-4 text-center text-sm text-muted-foreground">No participants recorded.</div>
                         )}
                     </CardContent>
                 </Card>
@@ -92,12 +92,12 @@ export default function CommunicationLogShow({ log }: Props) {
                                             <Badge variant="outline">{e.type}</Badge>
                                             <span className="ml-2">{e.description}</span>
                                         </div>
-                                        <div className="text-xs text-slate-500">{formatDateTime(e.added_at)}</div>
+                                        <div className="text-xs text-muted-foreground">{formatDateTime(e.added_at)}</div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="py-4 text-center text-sm text-slate-500">No evidence items.</div>
+                            <div className="py-4 text-center text-sm text-muted-foreground">No evidence items.</div>
                         )}
                     </CardContent>
                 </Card>

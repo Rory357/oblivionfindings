@@ -381,7 +381,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                             {/* Progress Bar */}
                             {progress && (
                                 <div className="space-y-2">
-                                    <div className="h-2 w-full rounded-full bg-slate-100">
+                                    <div className="h-2 w-full rounded-full bg-muted">
                                         <div
                                             className="h-full rounded-full bg-blue-500 transition-all"
                                             style={{ width: `${progress.percentage}%` }}

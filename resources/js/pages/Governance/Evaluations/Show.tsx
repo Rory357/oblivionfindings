@@ -56,10 +56,10 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
   const handleClose = () => router.post(`/governance/evaluations/${evaluation.id}/close`);
 
   const getStatusColor = (status: string) => ({
-    draft: 'bg-gray-100 text-gray-800',
+    draft: 'bg-muted text-foreground',
     active: 'bg-blue-100 text-blue-800',
     closed: 'bg-green-100 text-green-800',
-  }[status] || 'bg-gray-100 text-gray-800');
+  }[status] || 'bg-muted text-foreground');
 
   return (
     <AppLayout>
@@ -71,7 +71,7 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
               <h1 className="text-2xl font-bold" dusk="evaluation-title">{evaluation.title}</h1>
               <Badge className={cn('text-xs', getStatusColor(evaluation.status))}>{evaluation.status}</Badge>
             </div>
-            <p className="text-gray-500 mt-1">
+            <p className="text-muted-foreground mt-1">
               Period: {new Date(evaluation.period_start).toLocaleDateString('en-NZ')} - {new Date(evaluation.period_end).toLocaleDateString('en-NZ')}
             </p>
           </div>
@@ -149,9 +149,9 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
               <CardContent>
                 <div className="text-center mb-3">
                   <span className="text-3xl font-bold">{responseRate.completed}</span>
-                  <span className="text-gray-500"> / {responseRate.total}</span>
+                  <span className="text-muted-foreground"> / {responseRate.total}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className="bg-blue-600 h-2 rounded-full"
                     style={{ width: `${responseRate.total > 0 ? (responseRate.completed / responseRate.total) * 100 : 0}%` }}

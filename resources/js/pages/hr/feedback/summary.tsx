@@ -20,24 +20,24 @@ const breadcrumbs: BreadcrumbItem[] = [
 const QUESTION_COLORS: Record<string, { bar: string; bg: string; text: string }> = {
     communication: { bar: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
     teamwork: { bar: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
-    leadership: { bar: 'bg-violet-500', bg: 'bg-violet-50', text: 'text-violet-700' },
+    leadership: { bar: 'bg-primary', bg: 'bg-primary/10', text: 'text-primary' },
     technical: { bar: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700' },
     initiative: { bar: 'bg-pink-500', bg: 'bg-pink-50', text: 'text-pink-700' },
-    overall: { bar: 'bg-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-700' },
+    overall: { bar: 'bg-primary', bg: 'bg-primary/10', text: 'text-primary' },
 };
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500'];
+const AVATAR_COLORS = ['bg-blue-500', 'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500'];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 
 function ratingColor(v: number | null): string {
-    if (v === null) return 'text-slate-400';
+    if (v === null) return 'text-muted-foreground';
     if (v >= 4) return 'text-emerald-600';
     if (v >= 3) return 'text-amber-600';
     return 'text-red-600';
 }
 function ratingBarColor(v: number | null): string {
-    if (v === null) return 'bg-slate-200';
+    if (v === null) return 'bg-muted';
     if (v >= 4) return 'bg-emerald-500';
     if (v >= 3) return 'bg-amber-400';
     return 'bg-red-400';
@@ -91,8 +91,8 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                 {summary.total_reviews === 0 ? (
                     <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-16">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
-                                <MessageSquare className="h-8 w-8 text-violet-400" />
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                <MessageSquare className="h-8 w-8 text-primary" />
                             </div>
                             <p className="font-medium">No Feedback Yet</p>
                             <p className="mt-1 text-sm text-muted-foreground">No completed feedback reviews for this employee.</p>
@@ -103,7 +103,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                         {/* KPI Cards */}
                         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                             {[
-                                { label: 'Total Reviews', value: summary.total_reviews, icon: Users, gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-violet-100', iconColor: 'text-violet-600' },
+                                { label: 'Total Reviews', value: summary.total_reviews, icon: Users, gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-primary/10', iconColor: 'text-primary' },
                                 { label: 'Overall Average', value: overallAvg !== null ? overallAvg.toFixed(1) : 'N/A', icon: Star, gradient: 'from-amber-500/10 to-yellow-500/5', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
                                 { label: 'Highest Area', value: allRatings.length > 0 ? Math.max(...allRatings).toFixed(1) : 'N/A', icon: TrendingUp, gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
                                 { label: 'Total Comments', value: totalComments, icon: MessageSquare, gradient: 'from-blue-500/10 to-indigo-500/5', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
@@ -131,8 +131,8 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                         <Card className="overflow-hidden">
                             <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
-                                        <BarChart3 className="h-4 w-4 text-violet-600" />
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                                        <BarChart3 className="h-4 w-4 text-primary" />
                                     </div>
                                     Ratings by Category
                                 </CardTitle>
@@ -140,7 +140,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                             <CardContent className="space-y-5 pt-5">
                                 {questionKeys.map((key) => {
                                     const q = summary.questions[key];
-                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-slate-500', bg: 'bg-slate-50', text: 'text-slate-700' };
+                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-slate-500', bg: 'bg-muted', text: 'text-foreground' };
                                     const avg = q?.average_rating;
                                     const pct = avg !== null && avg !== undefined ? (avg / 5) * 100 : 0;
                                     return (
@@ -183,7 +183,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                                     const q = summary.questions[key];
                                     const comments = q?.comments ?? [];
                                     if (comments.length === 0) return null;
-                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-slate-500', bg: 'bg-slate-50', text: 'text-slate-700' };
+                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-slate-500', bg: 'bg-muted', text: 'text-foreground' };
                                     return (
                                         <div key={key}>
                                             <div className="mb-2 flex items-center gap-2">

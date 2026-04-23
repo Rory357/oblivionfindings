@@ -46,7 +46,7 @@ export default function EditCompliance({ auth, obligation }: { auth: any; obliga
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-3 mb-6">
                     <ShieldCheck className="w-8 h-8 text-green-600" />
-                    <h1 className="text-3xl font-bold text-gray-900">Edit Obligation</h1>
+                    <h1 className="text-3xl font-bold text-foreground">Edit Obligation</h1>
                 </div>
                 <Card>
                     <CardHeader><CardTitle>Obligation Details</CardTitle></CardHeader>

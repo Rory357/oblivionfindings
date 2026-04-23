@@ -49,7 +49,7 @@ export default function InjuryCreate({ staff, sites }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Record Injury</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Record a new workplace injury or illness
                         </div>
                     </div>

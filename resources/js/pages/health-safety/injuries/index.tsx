@@ -56,9 +56,9 @@ const statusColor = (status: string) => {
         case 'returned_to_work':
             return 'bg-green-100 text-green-800';
         case 'closed':
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -73,7 +73,7 @@ const severityColor = (severity: string) => {
         case 'critical':
             return 'bg-red-100 text-red-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -119,7 +119,7 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Worker name"
                                 value={filters.q || ''}
@@ -127,7 +127,7 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -144,7 +144,7 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Severity</Label>
+                            <Label className="text-xs text-muted-foreground">Severity</Label>
                             <Select
                                 value={filters.severity ?? ANY}
                                 onValueChange={(v) => onFilter({ severity: v === ANY ? null : v })}
@@ -168,7 +168,7 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Worker</th>
                                         <th className="pb-2 pr-4 font-medium">Date</th>
                                         <th className="pb-2 pr-4 font-medium">Type</th>
@@ -202,7 +202,7 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                                                         {inj.acc_claim_number ?? 'Lodged'}
                                                     </Badge>
                                                 ) : (
-                                                    <span className="text-xs text-slate-400">No</span>
+                                                    <span className="text-xs text-muted-foreground">No</span>
                                                 )}
                                             </td>
                                             <td className="py-2">
@@ -218,7 +218,7 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                                 </tbody>
                             </table>
                             {!injuries.data.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No injuries found.
                                 </div>
                             )}

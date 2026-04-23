@@ -178,7 +178,7 @@ export default function ChecklistRun({ templates, assets, can }: Props) {
                                                                 type="checkbox"
                                                                 checked={!!form.data.results[String(idx)]}
                                                                 onChange={(e) => handleResponseChange(idx, e.target.checked)}
-                                                                className="mt-0.5 rounded border-gray-300"
+                                                                className="mt-0.5 rounded border-border"
                                                             />
                                                             <div>
                                                                 <span className="text-sm font-medium">

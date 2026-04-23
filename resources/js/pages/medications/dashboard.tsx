@@ -137,7 +137,7 @@ export default function MedicationsDashboard() {
       <AppLayout breadcrumbs={[{ title: 'Medications', href: '/medications' }, { title: 'Dashboard', href: '#' }]}>
         <Head title="Medication Dashboard" />
         <div className="flex h-64 items-center justify-center">
-          <div className="text-slate-500">Loading dashboard...</div>
+          <div className="text-muted-foreground">Loading dashboard...</div>
         </div>
       </AppLayout>
     );
@@ -150,7 +150,7 @@ export default function MedicationsDashboard() {
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-semibold">Medication Dashboard</h1>
-          <p className="text-sm text-slate-500">Real-time medication management overview</p>
+          <p className="text-sm text-muted-foreground">Real-time medication management overview</p>
         </div>
 
         {/* Widgets */}
@@ -163,7 +163,7 @@ export default function MedicationsDashboard() {
           </CardHeader>
           <CardContent>
             {alerts.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-slate-500">
+              <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
                 <CheckCircle className="h-5 w-5 text-green-500" />
                 <span>No active alerts</span>
               </div>
@@ -172,7 +172,7 @@ export default function MedicationsDashboard() {
                 {alerts.map((alert) => (
                   <div
                     key={alert.id}
-                    className="flex items-start justify-between gap-2 rounded-md border p-3 hover:bg-slate-50"
+                    className="flex items-start justify-between gap-2 rounded-md border p-3 hover:bg-muted"
                   >
                     <div className="flex items-start gap-3">
                       <div className={`mt-0.5 ${getSeverityBadgeClass(alert.severity)}`}>
@@ -183,10 +183,10 @@ export default function MedicationsDashboard() {
                           <Badge variant="outline" className={getSeverityBadgeClass(alert.severity)}>
                             {alert.severity_info.label}
                           </Badge>
-                          <span className="text-xs text-slate-500">{alert.type_label}</span>
+                          <span className="text-xs text-muted-foreground">{alert.type_label}</span>
                         </div>
                         <div className="mt-1 text-sm">{alert.message}</div>
-                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                           {alert.client && (
                             <Link
                               href={`/clients/${alert.client.id}/mar`}

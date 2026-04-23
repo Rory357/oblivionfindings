@@ -82,7 +82,7 @@ export default function FundingIndex({ stats = {} as any, claims_by_status = {} 
                                         Used: {formatCurrency(s.total_used)}
                                     </span>
                                     <span className="flex items-center gap-1.5">
-                                        <div className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+                                        <div className="h-2.5 w-2.5 rounded-full bg-muted" />
                                         Remaining: {formatCurrency(s.total_remaining)}
                                     </span>
                                 </div>

@@ -37,7 +37,7 @@ const categories = [
     { bg: 'bg-green-50 dark:bg-green-950/40', dot: 'bg-green-500', label: 'In Progress', icon: Clock },
     { bg: 'bg-amber-50 dark:bg-amber-950/40', dot: 'bg-amber-500', label: 'Medications', icon: Pill },
     { bg: 'bg-emerald-50 dark:bg-emerald-950/40', dot: 'bg-emerald-500', label: 'Leave', icon: Palmtree },
-    { bg: 'bg-violet-50 dark:bg-violet-950/40', dot: 'bg-violet-500', label: 'Tasks', icon: ListTodo },
+    { bg: 'bg-primary/10 dark:bg-primary/40', dot: 'bg-primary', label: 'Tasks', icon: ListTodo },
 ];
 
 // ── CSRF helper ───────────────────────────────────────────────────────────────
@@ -448,7 +448,7 @@ export default function MyCalendar() {
                             <span>New Shift</span>
                         </button>
                         <button onClick={() => openCreateFromCtx('task')}>
-                            <ListTodo className="h-4 w-4 text-violet-500" />
+                            <ListTodo className="h-4 w-4 text-primary" />
                             <span>New Task</span>
                         </button>
                         <hr />

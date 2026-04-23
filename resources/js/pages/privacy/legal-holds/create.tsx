@@ -64,7 +64,7 @@ export default function CreateLegalHold() {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">New Legal Hold</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Preserve records for litigation, investigations, or regulatory matters.
                     </div>
                 </div>
@@ -73,7 +73,7 @@ export default function CreateLegalHold() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Scale className="h-5 w-5 text-purple-500" />
+                                <Scale className="h-5 w-5 text-primary" />
                                 Hold Details
                             </CardTitle>
                         </CardHeader>

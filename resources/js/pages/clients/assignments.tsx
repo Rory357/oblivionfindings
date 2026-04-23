@@ -77,11 +77,11 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                 )}
 
                 <div className="m-4 rounded-xl border p-4">
-                    <div className="text-sm text-slate-500">{labels?.['client.singular'] ?? 'Client'}</div>
+                    <div className="text-sm text-muted-foreground">{labels?.['client.singular'] ?? 'Client'}</div>
                     <div className="text-lg font-semibold">
                         {client.first_name} {client.last_name}
                     </div>
-                    <div className="text-sm text-slate-500">
+                    <div className="text-sm text-muted-foreground">
                         Status: {client.status}
                     </div>
                 </div>
@@ -92,7 +92,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                             <div className="text-lg font-semibold">
                                 Assigned support workers
                             </div>
-                            <div className="text-sm text-slate-500">
+                            <div className="text-sm text-muted-foreground">
                                 Tick workers to assign them to this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
                             </div>
                         </div>
@@ -100,7 +100,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                         <button
                             onClick={save}
                             disabled={status === 'saving'}
-                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary disabled:opacity-60"
                             type="button"
                         >
                             {status === 'saving'
@@ -127,7 +127,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                                     <span className="text-sm font-medium">
                                         {w.name}
                                     </span>
-                                    <span className="text-xs text-slate-500">
+                                    <span className="text-xs text-muted-foreground">
                                         {w.email}
                                     </span>
                                 </div>
@@ -135,7 +135,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                         ))}
 
                         {workers.length === 0 && (
-                            <div className="py-6 text-sm text-slate-500">
+                            <div className="py-6 text-sm text-muted-foreground">
                                 No support workers exist yet.
                             </div>
                         )}

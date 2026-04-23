@@ -58,7 +58,7 @@ const statusConfig: Record<string, { className: string; label: string }> = {
         label: 'Suspended',
     },
     expired: {
-        className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
         label: 'Expired',
     },
 };
@@ -115,7 +115,7 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                             <CardTitle className="text-sm font-medium text-muted-foreground">Expiring</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-slate-400">{summary.expiring}</p>
+                            <p className="text-2xl font-bold text-muted-foreground">{summary.expiring}</p>
                         </CardContent>
                     </Card>
                 </div>

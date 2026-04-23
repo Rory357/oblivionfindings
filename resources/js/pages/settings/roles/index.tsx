@@ -101,7 +101,7 @@ export default function RolesIndex(props: Props) {
                         title="Roles & Permissions"
                         description="Manage roles and their permission sets"
                     />
-                    <Button className="bg-violet-600 hover:bg-violet-700" asChild>
+                    <Button className="bg-primary hover:bg-primary" asChild>
                         <Link href="/settings/roles/create">
                             <Plus className="mr-1.5 h-4 w-4" />
                             New Role
@@ -113,8 +113,8 @@ export default function RolesIndex(props: Props) {
                 <div className="grid grid-cols-3 gap-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 py-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                                <Shield className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                <Shield className="h-5 w-5 text-primary dark:text-primary" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{stats.totalRoles}</p>
@@ -251,7 +251,7 @@ export default function RolesIndex(props: Props) {
                             <p className="mt-1 text-sm text-muted-foreground">
                                 Get started by creating your first role.
                             </p>
-                            <Button className="mt-4 bg-violet-600 hover:bg-violet-700" asChild>
+                            <Button className="mt-4 bg-primary hover:bg-primary" asChild>
                                 <Link href="/settings/roles/create">
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New Role

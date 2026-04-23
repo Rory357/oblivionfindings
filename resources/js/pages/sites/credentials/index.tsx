@@ -175,7 +175,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                 {credentials.length} credential{credentials.length !== 1 ? 's' : ''}
                             </Badge>
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <div className="flex gap-2">
                         <Button asChild variant="secondary">
@@ -193,7 +193,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                 {/* Search Bar */}
                 {credentials.length > 0 && (
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -279,7 +279,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                             <DialogTitle>Authentication Required</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
-                            <p className="text-sm text-slate-400">
+                            <p className="text-sm text-muted-foreground">
                                 Please enter your password to reveal this credential.
                             </p>
                             <Input
@@ -306,7 +306,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                 {/* Credentials List */}
                 {credentials.length === 0 ? (
                     <Card>
-                        <CardContent className="py-12 text-center text-slate-400">
+                        <CardContent className="py-12 text-center text-muted-foreground">
                             <Lock className="w-12 h-12 mx-auto mb-3 opacity-50" />
                             <p className="text-lg font-medium mb-1">No credentials stored</p>
                             <p className="text-sm">Add credentials to securely store access codes, passwords, and keys for this site.</p>
@@ -320,7 +320,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                     </Card>
                 ) : filteredCredentials.length === 0 ? (
                     <Card>
-                        <CardContent className="py-8 text-center text-slate-400">
+                        <CardContent className="py-8 text-center text-muted-foreground">
                             <Search className="w-10 h-10 mx-auto mb-3 opacity-50" />
                             <p>No credentials match &quot;{search}&quot;</p>
                         </CardContent>
@@ -343,10 +343,10 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                 )}
                                             </div>
                                             {cred.vendor && (
-                                                <div className="text-sm text-slate-400">{cred.vendor.company_name}</div>
+                                                <div className="text-sm text-muted-foreground">{cred.vendor.company_name}</div>
                                             )}
                                             {cred.last_rotated_at && (
-                                                <div className="text-xs text-slate-500 mt-1">
+                                                <div className="text-xs text-muted-foreground mt-1">
                                                     Last updated: {new Date(cred.last_rotated_at).toLocaleDateString()}
                                                 </div>
                                             )}
@@ -374,7 +374,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                 </>
                                             ) : (
                                                 <>
-                                                    <code className="bg-muted px-2 py-1 rounded text-sm text-slate-500">
+                                                    <code className="bg-muted px-2 py-1 rounded text-sm text-muted-foreground">
                                                         {cred.value_preview}
                                                     </code>
                                                     {canReveal && (

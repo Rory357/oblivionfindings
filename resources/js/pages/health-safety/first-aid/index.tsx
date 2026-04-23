@@ -240,7 +240,7 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 font-medium">Date</th>
                                         <th className="pb-2 font-medium">Person Treated</th>
                                         <th className="pb-2 font-medium">Injury / Illness</th>
@@ -268,14 +268,14 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                                                 {r.incident_id ? (
                                                     <Badge className="bg-green-100 text-green-800 border-green-200">Y</Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="text-slate-400">N</Badge>
+                                                    <Badge variant="outline" className="text-muted-foreground">N</Badge>
                                                 )}
                                             </td>
                                         </tr>
                                     ))}
                                     {!records.data.length && (
                                         <tr>
-                                            <td colSpan={7} className="py-8 text-center text-slate-500">No first aid records found.</td>
+                                            <td colSpan={7} className="py-8 text-center text-muted-foreground">No first aid records found.</td>
                                         </tr>
                                     )}
                                 </tbody>

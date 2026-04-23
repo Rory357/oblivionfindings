@@ -153,7 +153,7 @@ export default function IncidentIndex({ incidents: rawIncidents, vehicles, filte
                     <FleetStatCard label="OPEN INVESTIGATIONS" value={stats?.open_investigations ?? 0} icon={Search} color="blue" valueClassName="text-blue-400" subtitle="Under investigation" />
                     <FleetStatCard label="UNRESOLVED" value={stats?.unresolved ?? 0} icon={AlertOctagon} color="amber" valueClassName="text-amber-400" subtitle="Awaiting resolution" />
                     <FleetStatCard label="INSURANCE CLAIMS" value={stats?.insurance_claims ?? 0} icon={Shield} subtitle="Claims submitted" />
-                    <Card className="border bg-purple-50 dark:bg-purple-950/20">
+                    <Card className="border bg-primary/10 dark:bg-primary/20">
                         <CardContent className="flex items-center justify-center p-4">
                             <ProgressRing value={resolutionRate} size={80} color={FLEET_COLORS.primary} label="Resolution Rate" />
                         </CardContent>

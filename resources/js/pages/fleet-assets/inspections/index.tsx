@@ -120,7 +120,7 @@ export default function InspectionsIndex({ inspections, vehicles, filters, can }
                     <FleetStatCard label="PASSED" value={passedCount} icon={CheckCircle} color="amber" valueClassName="text-green-400" subtitle="Passed inspections" />
                     <FleetStatCard label="FAILED" value={failedCount} icon={XCircle} color="red" valueClassName="text-red-400" subtitle="Failed inspections" />
                     <FleetStatCard label="PENDING" value={0} icon={FileCheck} subtitle="Awaiting review" />
-                    <Card className="border bg-purple-50 dark:bg-purple-950/20">
+                    <Card className="border bg-primary/10 dark:bg-primary/20">
                         <CardContent className="flex items-center justify-center p-4">
                             <ProgressRing value={passRate} size={80} color={FLEET_COLORS.primary} label="Pass Rate" />
                         </CardContent>

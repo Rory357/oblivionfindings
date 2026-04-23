@@ -167,7 +167,7 @@ const statusColors: Record<string, string> = {
     ack: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     triaging: 'bg-blue-100 text-blue-800 border-blue-200',
     resolved: 'bg-green-100 text-green-800 border-green-200',
-    closed: 'bg-gray-100 text-gray-800 border-gray-200',
+    closed: 'bg-muted text-foreground border-border',
 };
 
 const DONUT_COLORS: Record<string, string> = {
@@ -798,8 +798,8 @@ export default function ControlRoomIndex({
                         { label: 'Acknowledged', value: stats.acknowledged, color: 'text-yellow-500', filter: () => applyFilter('status', 'ack') },
                         { label: 'Triaging', value: stats.triaging, color: 'text-blue-500', filter: () => applyFilter('status', 'triaging') },
                         { label: escalation_rate ? `Escalated (${escalation_rate}%)` : 'Escalated', value: stats.escalated, color: 'text-orange-500', filter: () => applyFilter('escalation_level', '1') },
-                        { label: 'Unassigned', value: stats.unassigned, color: 'text-purple-500', filter: () => applyFilter('assigned_to', 'unassigned') },
-                        { label: 'My Alerts', value: stats.my_alerts, color: 'text-indigo-500', filter: () => applyFilter('assigned_to', 'me') },
+                        { label: 'Unassigned', value: stats.unassigned, color: 'text-primary', filter: () => applyFilter('assigned_to', 'unassigned') },
+                        { label: 'My Alerts', value: stats.my_alerts, color: 'text-primary', filter: () => applyFilter('assigned_to', 'me') },
                     ].map((s) => (
                         <button
                             key={s.label}

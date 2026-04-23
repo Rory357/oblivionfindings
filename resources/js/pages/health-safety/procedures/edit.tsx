@@ -251,7 +251,7 @@ export default function ProcedureEdit({ procedure }: Props) {
                                             className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                                                 form.data.ppe_required.includes(item)
                                                     ? 'border-blue-300 bg-blue-100 text-blue-800'
-                                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                    : 'border-border bg-white text-muted-foreground hover:bg-muted'
                                             }`}
                                         >
                                             {item}

@@ -63,7 +63,7 @@ const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
     awaiting_approval: { label: 'Awaiting Approval', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' },
     approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
     partially_paid: { label: 'Partially Paid', className: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300' },
@@ -284,7 +284,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                                         <TableCell className="text-right font-medium">{formatCurrency(bill.total_amount)}</TableCell>
                                         <TableCell className="text-right">{formatCurrency(bill.amount_paid)}</TableCell>
                                         <TableCell>
-                                            <Badge className={statusConfig[bill.status]?.className ?? 'bg-gray-100 text-gray-800'}>
+                                            <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
                                                 {statusConfig[bill.status]?.label ?? bill.status}
                                             </Badge>
                                         </TableCell>

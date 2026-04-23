@@ -274,7 +274,7 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                                     id="is_all_day"
                                     checked={form.data.is_all_day}
                                     onChange={(e) => form.setData('is_all_day', e.target.checked)}
-                                    className="rounded border-gray-300"
+                                    className="rounded border-border"
                                 />
                                 <Label htmlFor="is_all_day">All Day Event</Label>
                             </div>

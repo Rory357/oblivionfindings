@@ -12,6 +12,15 @@ import {
     Sparkles,
 } from 'lucide-react';
 
+/**
+ * Intentional exception to the semantic-token rule: this recruitment
+ * pipeline badge needs 12 distinct stage colours so the Kanban stays
+ * visually scannable. The 5 severity tokens (success/warning/critical/
+ * info/neutral) would collapse too many stages onto the same tint.
+ *
+ * If we ever simplify the pipeline to ≤5 stages, collapse this to use
+ * status-tokens instead.
+ */
 export const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType; bgClass: string }> = {
     new: { label: 'New', color: 'border-blue-500/30 text-blue-400 bg-blue-500/10', bgClass: 'bg-blue-500', icon: UserPlus },
     screening: { label: 'Screening', color: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10', bgClass: 'bg-indigo-500', icon: FileText },

@@ -266,7 +266,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                         className={cn(
                                             "flex flex-col items-center rounded-xl border-2 px-3 py-5 transition-all",
                                             form.data.fuel_level === level.value
-                                                ? 'border-purple-600 bg-purple-50 shadow-md dark:bg-purple-900/20 dark:border-purple-500'
+                                                ? 'border-primary bg-primary/10 shadow-md dark:bg-primary/20 dark:border-primary'
                                                 : 'border-transparent bg-muted hover:bg-muted/80 hover:border-muted-foreground/20'
                                         )}
                                     >
@@ -301,7 +301,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                 <Label className="mb-3 block">Exterior Condition *</Label>
                                 <div className="grid grid-cols-3 gap-3">
                                     {[
-                                        { value: 'good', label: 'Good', borderColor: 'border-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-900/20', textColor: 'text-purple-700 dark:text-purple-400' },
+                                        { value: 'good', label: 'Good', borderColor: 'border-primary', bgColor: 'bg-primary/10 dark:bg-primary/20', textColor: 'text-primary dark:text-primary' },
                                         { value: 'minor_damage', label: 'Minor Damage', borderColor: 'border-amber-500', bgColor: 'bg-amber-50 dark:bg-amber-900/20', textColor: 'text-amber-700 dark:text-amber-400' },
                                         { value: 'significant_damage', label: 'Significant Damage', borderColor: 'border-red-600', bgColor: 'bg-red-50 dark:bg-red-900/20', textColor: 'text-red-700 dark:text-red-400' },
                                     ].map((opt) => (
@@ -333,7 +333,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                 <Label className="mb-3 block">Interior Condition *</Label>
                                 <div className="grid grid-cols-3 gap-3">
                                     {[
-                                        { value: 'clean', label: 'Clean', borderColor: 'border-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-900/20', textColor: 'text-purple-700 dark:text-purple-400' },
+                                        { value: 'clean', label: 'Clean', borderColor: 'border-primary', bgColor: 'bg-primary/10 dark:bg-primary/20', textColor: 'text-primary dark:text-primary' },
                                         { value: 'acceptable', label: 'Acceptable', borderColor: 'border-amber-500', bgColor: 'bg-amber-50 dark:bg-amber-900/20', textColor: 'text-amber-700 dark:text-amber-400' },
                                         { value: 'needs_cleaning', label: 'Needs Cleaning', borderColor: 'border-red-600', bgColor: 'bg-red-50 dark:bg-red-900/20', textColor: 'text-red-700 dark:text-red-400' },
                                     ].map((opt) => (
@@ -380,21 +380,21 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                         <div key={item.key} className={cn(
                                             "flex items-center justify-between rounded-xl border-2 p-4 transition-all",
                                             form.data[item.key]
-                                                ? "border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-900/10"
+                                                ? "border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/10"
                                                 : "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-900/10"
                                         )}>
                                             <div className="flex items-center gap-3">
                                                 <div className={cn(
                                                     "flex h-9 w-9 items-center justify-center rounded-lg",
                                                     form.data[item.key]
-                                                        ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                                                        ? "bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary"
                                                         : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
                                                 )}>
                                                     <IconComp className="h-4 w-4" />
                                                 </div>
                                                 <Label htmlFor={item.key} className="cursor-pointer font-medium">{item.label}</Label>
                                             </div>
-                                            <button type="button" onClick={() => form.setData(item.key, !form.data[item.key])} className={cn("h-7 w-12 rounded-full transition-colors", form.data[item.key] ? "bg-purple-600" : "bg-slate-300")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data[item.key] ? "translate-x-6" : "translate-x-1")} /></button>
+                                            <button type="button" onClick={() => form.setData(item.key, !form.data[item.key])} className={cn("h-7 w-12 rounded-full transition-colors", form.data[item.key] ? "bg-primary" : "bg-slate-300")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data[item.key] ? "translate-x-6" : "translate-x-1")} /></button>
                                         </div>
                                     );
                                 })}

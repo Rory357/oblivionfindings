@@ -76,7 +76,7 @@ export default function SiteDetailReport({
                         <Search className="w-5 h-5" />
                         Site Detail Report: {site.name}
                     </h1>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-muted-foreground">
                         {site.type === 'house' ? 'House' : site.type === 'facility' ? 'Facility' : 'Head Office'}
                         {site.region ? ` - ${site.region}` : ''}
                     </p>
@@ -94,21 +94,21 @@ export default function SiteDetailReport({
                         <div className="grid gap-4 sm:grid-cols-4">
                             <div className="text-center p-3 rounded-lg border">
                                 <div className="text-2xl font-bold text-amber-400">{hazardStats.open}</div>
-                                <div className="text-sm text-slate-400">Open</div>
+                                <div className="text-sm text-muted-foreground">Open</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
                                 <div className="text-2xl font-bold text-emerald-400">{hazardStats.closed}</div>
-                                <div className="text-sm text-slate-400">Closed</div>
+                                <div className="text-sm text-muted-foreground">Closed</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
                                 <div className="text-2xl font-bold text-red-400">{hazardStats.overdue}</div>
-                                <div className="text-sm text-slate-400">Overdue</div>
+                                <div className="text-sm text-muted-foreground">Overdue</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
                                 <div className="text-2xl font-bold">
                                     {hazardStats.avg_time_to_close !== null ? `${hazardStats.avg_time_to_close}d` : 'N/A'}
                                 </div>
-                                <div className="text-sm text-slate-400">Avg Time to Close</div>
+                                <div className="text-sm text-muted-foreground">Avg Time to Close</div>
                             </div>
                         </div>
                     </CardContent>
@@ -126,19 +126,19 @@ export default function SiteDetailReport({
                         <div className="grid gap-4 sm:grid-cols-4">
                             <div className="text-center p-3 rounded-lg border">
                                 <div className="text-2xl font-bold">{checklistStats.total_runs}</div>
-                                <div className="text-sm text-slate-400">Total Runs</div>
+                                <div className="text-sm text-muted-foreground">Total Runs</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
                                 <div className="text-2xl font-bold text-emerald-400">{checklistStats.completed_runs}</div>
-                                <div className="text-sm text-slate-400">Completed</div>
+                                <div className="text-sm text-muted-foreground">Completed</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
                                 <div className="text-2xl font-bold text-red-400">{checklistStats.overdue_runs}</div>
-                                <div className="text-sm text-slate-400">Overdue</div>
+                                <div className="text-sm text-muted-foreground">Overdue</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
                                 <div className="text-2xl font-bold text-blue-400">{checklistStats.completion_rate}%</div>
-                                <div className="text-sm text-slate-400">Completion Rate</div>
+                                <div className="text-sm text-muted-foreground">Completion Rate</div>
                             </div>
                         </div>
                     </CardContent>
@@ -149,7 +149,7 @@ export default function SiteDetailReport({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Shield className="w-4 h-4 text-purple-400" />
+                                <Shield className="w-4 h-4 text-primary" />
                                 Inspections
                             </CardTitle>
                         </CardHeader>
@@ -157,15 +157,15 @@ export default function SiteDetailReport({
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div className="text-center p-3 rounded-lg border">
                                     <div className="text-2xl font-bold">{inspectionStats.scheduled}</div>
-                                    <div className="text-sm text-slate-400">Scheduled</div>
+                                    <div className="text-sm text-muted-foreground">Scheduled</div>
                                 </div>
                                 <div className="text-center p-3 rounded-lg border">
                                     <div className="text-2xl font-bold text-emerald-400">{inspectionStats.completed}</div>
-                                    <div className="text-sm text-slate-400">Completed</div>
+                                    <div className="text-sm text-muted-foreground">Completed</div>
                                 </div>
                                 <div className="text-center p-3 rounded-lg border">
                                     <div className="text-2xl font-bold text-red-400">{inspectionStats.overdue}</div>
-                                    <div className="text-sm text-slate-400">Overdue</div>
+                                    <div className="text-sm text-muted-foreground">Overdue</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -182,11 +182,11 @@ export default function SiteDetailReport({
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="text-center p-3 rounded-lg border">
                                     <div className="text-2xl font-bold">{credentialStats.total}</div>
-                                    <div className="text-sm text-slate-400">Total</div>
+                                    <div className="text-sm text-muted-foreground">Total</div>
                                 </div>
                                 <div className="text-center p-3 rounded-lg border">
                                     <div className="text-2xl font-bold text-orange-400">{credentialStats.requiring_reauth}</div>
-                                    <div className="text-sm text-slate-400">Requiring Reauth</div>
+                                    <div className="text-sm text-muted-foreground">Requiring Reauth</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -198,7 +198,7 @@ export default function SiteDetailReport({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Clock className="w-4 h-4 text-slate-400" />
+                                <Clock className="w-4 h-4 text-muted-foreground" />
                                 Recent Audit Log
                             </CardTitle>
                         </CardHeader>
@@ -220,7 +220,7 @@ export default function SiteDetailReport({
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>{entry.event}</TableCell>
-                                            <TableCell className="text-slate-400">
+                                            <TableCell className="text-muted-foreground">
                                                 {new Date(entry.created_at).toLocaleDateString()}
                                             </TableCell>
                                         </TableRow>

@@ -52,11 +52,11 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
   };
 
   const getStatusColor = (status: string) => ({
-    not_started: 'bg-gray-100 text-gray-800',
+    not_started: 'bg-muted text-foreground',
     in_progress: 'bg-yellow-100 text-yellow-800',
     implemented: 'bg-blue-100 text-blue-800',
     embedded: 'bg-green-100 text-green-800',
-  }[status] || 'bg-gray-100 text-gray-800');
+  }[status] || 'bg-muted text-foreground');
 
   const getStatusLabel = (status: string) => ({
     not_started: 'Not Started',
@@ -78,8 +78,8 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Te Tiriti o Waitangi Framework</h1>
-            <p className="text-gray-500 mt-1">Obligations and implementation tracking across Te Tiriti principles</p>
+            <h1 className="text-2xl font-bold text-foreground">Te Tiriti o Waitangi Framework</h1>
+            <p className="text-muted-foreground mt-1">Obligations and implementation tracking across Te Tiriti principles</p>
           </div>
           <Button onClick={() => setShowForm(!showForm)}>
             <Plus className="w-4 h-4 mr-2" /> New Obligation
@@ -145,14 +145,14 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
                       <CardDescription>{stats.total} obligation(s) &middot; {stats.progress}% implemented</CardDescription>
                     </div>
                   </div>
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                  <div className="w-32 bg-muted rounded-full h-2">
                     <div className="bg-teal-600 h-2 rounded-full" style={{ width: `${stats.progress}%` }} />
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 {obligations.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No obligations recorded for this principle.</p>
+                  <p className="text-muted-foreground text-sm">No obligations recorded for this principle.</p>
                 ) : (
                   <div className="space-y-3">
                     {obligations.map(obligation => (
@@ -163,12 +163,12 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
                             {getStatusLabel(obligation.implementation_status)}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">{obligation.description}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{obligation.description}</p>
                         {obligation.evidence_notes && (
-                          <p className="text-xs text-gray-400 mt-1">Evidence: {obligation.evidence_notes}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Evidence: {obligation.evidence_notes}</p>
                         )}
                         {obligation.target_date && (
-                          <p className="text-xs text-gray-400">Target: {new Date(obligation.target_date).toLocaleDateString('en-NZ')}</p>
+                          <p className="text-xs text-muted-foreground">Target: {new Date(obligation.target_date).toLocaleDateString('en-NZ')}</p>
                         )}
                       </div>
                     ))}

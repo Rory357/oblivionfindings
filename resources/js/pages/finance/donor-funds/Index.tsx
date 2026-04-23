@@ -64,7 +64,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     active: { label: 'Active', className: 'border-green-300 text-green-600' },
     fully_spent: { label: 'Fully Spent', className: 'border-amber-300 text-amber-600' },
     expired: { label: 'Expired', className: 'border-red-300 text-red-600' },
-    returned: { label: 'Returned', className: 'border-gray-300 text-gray-600' },
+    returned: { label: 'Returned', className: 'border-border text-muted-foreground' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -248,7 +248,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                                                             Restricted
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-gray-300 text-muted-foreground">
+                                                        <Badge variant="outline" className="border-border text-muted-foreground">
                                                             Unrestricted
                                                         </Badge>
                                                     )}

@@ -52,13 +52,13 @@ const HAZARD_TYPE_ICONS: Record<string, typeof AlertTriangle> = {
 const HAZARD_TYPE_COLORS: Record<string, string> = {
     slip_trip_fall: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
     fire: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100',
-    chemical: 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100',
+    chemical: 'border-primary bg-primary/10 text-primary hover:bg-primary/10',
     electrical: 'border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100',
     manual_handling: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
     biological: 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100',
-    vehicle: 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+    vehicle: 'border-border bg-muted text-foreground hover:bg-muted',
     environmental: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100',
-    custom: 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
+    custom: 'border-border bg-muted text-foreground hover:bg-muted',
 };
 
 const SEVERITY_OPTIONS = [

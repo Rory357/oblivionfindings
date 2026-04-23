@@ -101,7 +101,7 @@ const TRANSPORT_TYPES = [
         value: 'shopping',
         label: 'Shopping',
         icon: ShoppingBag,
-        color: 'border-purple-500 bg-purple-50 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700',
+        color: 'border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary dark:border-primary',
     },
     {
         value: 'community',
@@ -125,7 +125,7 @@ const TRANSPORT_TYPES = [
         value: 'other',
         label: 'Other',
         icon: Heart,
-        color: 'border-gray-500 bg-gray-50 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-700',
+        color: 'border-gray-500 bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground dark:border-border',
     },
 ];
 
@@ -829,7 +829,7 @@ export default function TransportCreate({
                                                 className={cn(
                                                     'rounded-lg border p-4 transition-all',
                                                     isSelected
-                                                        ? 'border-purple-300 bg-purple-50/50 dark:border-purple-700 dark:bg-purple-950/20'
+                                                        ? 'border-primary bg-primary/10/50 dark:border-primary dark:bg-primary/20'
                                                         : 'border-border hover:border-muted-foreground/30',
                                                 )}
                                             >
@@ -840,7 +840,7 @@ export default function TransportCreate({
                                                         onChange={() =>
                                                             handleMedToggle(med)
                                                         }
-                                                        className="mt-1 h-4 w-4 rounded border-gray-300"
+                                                        className="mt-1 h-4 w-4 rounded border-border"
                                                     />
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex flex-wrap items-center gap-2">
@@ -975,7 +975,7 @@ export default function TransportCreate({
                                     })}
                                 </div>
                                 {selectedMedIds.size > 0 && (
-                                    <div className="mt-3 rounded-md bg-purple-50 px-3 py-2 text-sm text-purple-800 dark:bg-purple-950/30 dark:text-purple-300">
+                                    <div className="mt-3 rounded-md bg-primary/10 px-3 py-2 text-sm text-primary dark:bg-primary/30 dark:text-primary/70">
                                         {selectedMedIds.size} medication
                                         {selectedMedIds.size !== 1
                                             ? 's'

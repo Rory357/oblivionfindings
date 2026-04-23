@@ -22,7 +22,7 @@ export default function DailyNotesWithIncidents({ notes }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Notes with Incidents</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Daily notes linked to incidents.
                     </div>
                 </div>
@@ -43,7 +43,7 @@ export default function DailyNotesWithIncidents({ notes }: Props) {
                                                 {note.mood && <Badge variant="outline">{note.mood}</Badge>}
                                                 <Badge variant="outline">Incident</Badge>
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {formatDateTime(note.note_date)}
                                             </div>
                                         </div>
@@ -56,7 +56,7 @@ export default function DailyNotesWithIncidents({ notes }: Props) {
                         </Card>
                     ))}
                     {!notes.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No items found.
                         </div>
                     )}

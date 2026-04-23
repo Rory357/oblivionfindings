@@ -161,12 +161,12 @@ export default function ClientsIndex({ clients }) {
                                         {client.first_name} {client.last_name}
                                     </div>
                                     {client.nhi_number ? (
-                                        <div className="mt-0.5 text-xs font-mono text-slate-400">
+                                        <div className="mt-0.5 text-xs font-mono text-muted-foreground">
                                             NHI: {client.nhi_number}
                                         </div>
                                     ) : null}
                                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             Status: {client.status}
                                         </div>
                                         {client.onboarding ? (
@@ -190,13 +190,13 @@ export default function ClientsIndex({ clients }) {
                                             </div>
                                         ) : null}
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {siteSingular}:{' '}
                                         {client.site ? (
                                             can?.sites?.update ? (
                                                 <Link
                                                     href={`/sites/${client.site.id}/edit`}
-                                                    className="text-indigo-300 hover:text-indigo-200"
+                                                    className="text-primary/70 hover:text-primary/70"
                                                 >
                                                     {client.site.name}
                                                 </Link>
@@ -206,7 +206,7 @@ export default function ClientsIndex({ clients }) {
                                                 </span>
                                             )
                                         ) : (
-                                            <span className="text-slate-500">
+                                            <span className="text-muted-foreground">
                                                 —
                                             </span>
                                         )}
@@ -236,7 +236,7 @@ export default function ClientsIndex({ clients }) {
                     ))}
 
                     {clients.length === 0 && (
-                        <div className="rounded-md border p-4 text-sm text-slate-500">
+                        <div className="rounded-md border p-4 text-sm text-muted-foreground">
                             No{' '}
                             {labels?.['client.plural']?.toLowerCase() ??
                                 'clients'}{' '}

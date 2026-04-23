@@ -176,7 +176,7 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
                                                 className={
                                                     skill.is_active
                                                         ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                                                        : 'border-slate-500/30 text-slate-400 bg-slate-500/10'
+                                                        : 'border-slate-500/30 text-muted-foreground bg-slate-500/10'
                                                 }
                                             >
                                                 {skill.is_active ? 'Active' : 'Inactive'}

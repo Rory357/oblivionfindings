@@ -1095,7 +1095,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                 {documents.map((doc) => {
                                     const docExpired = isExpired(doc.expires_at);
-                                    const iconClass = doc.mime_type?.includes('pdf') ? 'text-red-500' : doc.mime_type?.includes('image') ? 'text-blue-500' : 'text-slate-400';
+                                    const iconClass = doc.mime_type?.includes('pdf') ? 'text-red-500' : doc.mime_type?.includes('image') ? 'text-blue-500' : 'text-muted-foreground';
                                     const IconComp = doc.mime_type?.includes('pdf') ? FileText : doc.mime_type?.includes('image') ? FileImage : File;
                                     return (
                                         <div key={doc.id} className="group relative flex flex-col items-center gap-2 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/50">

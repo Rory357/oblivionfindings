@@ -148,7 +148,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                             <Truck className="w-5 h-5" />
                             Vendors & Credentials
                         </h1>
-                        <p className="text-sm text-slate-400">{site.name}</p>
+                        <p className="text-sm text-muted-foreground">{site.name}</p>
                     </div>
                     <div className="flex gap-2">
                         <Button asChild variant="secondary">
@@ -164,7 +164,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                 {/* Search Bar */}
                 {vendors.length > 0 && (
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -288,7 +288,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                 {/* Vendors List */}
                 {vendors.length === 0 ? (
                     <Card>
-                        <CardContent className="py-12 text-center text-slate-400">
+                        <CardContent className="py-12 text-center text-muted-foreground">
                             <Truck className="w-12 h-12 mx-auto mb-3 opacity-50" />
                             <p className="text-lg font-medium mb-1">No vendors registered</p>
                             <p className="text-sm">Add your first vendor to keep track of service providers for this site.</p>
@@ -300,7 +300,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                     </Card>
                 ) : filteredVendors.length === 0 ? (
                     <Card>
-                        <CardContent className="py-8 text-center text-slate-400">
+                        <CardContent className="py-8 text-center text-muted-foreground">
                             <Search className="w-10 h-10 mx-auto mb-3 opacity-50" />
                             <p>No vendors match &quot;{search}&quot;</p>
                         </CardContent>
@@ -308,9 +308,9 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                 ) : (
                     Object.entries(groupedVendors).map(([serviceType, serviceVendors]) => (
                         <div key={serviceType}>
-                            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-2">
+                            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
                                 {serviceType}
-                                <span className="ml-2 text-xs text-slate-500">({serviceVendors.length})</span>
+                                <span className="ml-2 text-xs text-muted-foreground">({serviceVendors.length})</span>
                             </h2>
                             <div className="space-y-2">
                                 {serviceVendors.map((vendor) => (
@@ -327,15 +327,15 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                                                             </Badge>
                                                         )}
                                                         {!vendor.is_active && (
-                                                            <Badge variant="outline" className="text-slate-500">Inactive</Badge>
+                                                            <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
                                                         )}
                                                     </div>
                                                     {vendor.contact_name && (
-                                                        <div className="text-sm text-slate-400">{vendor.contact_name}</div>
+                                                        <div className="text-sm text-muted-foreground">{vendor.contact_name}</div>
                                                     )}
                                                     <div className="flex flex-wrap gap-3 mt-2 text-sm">
                                                         {vendor.phone && (
-                                                            <a href={`tel:${vendor.phone}`} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300">
+                                                            <a href={`tel:${vendor.phone}`} className="flex items-center gap-1 text-primary hover:text-primary/70">
                                                                 <Phone className="w-4 h-4" />
                                                                 {vendor.phone}
                                                             </a>
@@ -347,19 +347,19 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                                                             </a>
                                                         )}
                                                         {vendor.email && (
-                                                            <a href={`mailto:${vendor.email}`} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300">
+                                                            <a href={`mailto:${vendor.email}`} className="flex items-center gap-1 text-primary hover:text-primary/70">
                                                                 <Mail className="w-4 h-4" />
                                                                 {vendor.email}
                                                             </a>
                                                         )}
                                                     </div>
                                                     {vendor.account_number && (
-                                                        <div className="text-xs text-slate-500 mt-1">
+                                                        <div className="text-xs text-muted-foreground mt-1">
                                                             Account: {vendor.account_number}
                                                         </div>
                                                     )}
                                                     {vendor.notes && (
-                                                        <div className="text-sm text-slate-400 mt-2 whitespace-pre-wrap border-t border-slate-700/50 pt-2">
+                                                        <div className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap border-t border-slate-700/50 pt-2">
                                                             {vendor.notes}
                                                         </div>
                                                     )}

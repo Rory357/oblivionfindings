@@ -253,7 +253,7 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                                                                     <Check className="h-4 w-4" />
                                                                 </div>
                                                             ) : (
-                                                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-400">
+                                                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground">
                                                                     <X className="h-4 w-4" />
                                                                 </div>
                                                             )}

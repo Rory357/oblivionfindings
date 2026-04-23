@@ -24,17 +24,17 @@ function Row({ a, right }: { a: AssetRow; right?: string | null }) {
                         {a.name}
                     </Link>
                     {a.asset_tag ? (
-                        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">#{a.asset_tag}</span>
+                        <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">#{a.asset_tag}</span>
                     ) : null}
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{a.status}</span>
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{a.risk_level}</span>
+                    <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{a.status}</span>
+                    <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{a.risk_level}</span>
                 </div>
-                <div className="mt-1 text-xs text-slate-500">
+                <div className="mt-1 text-xs text-muted-foreground">
                     {a.site ? `Site: ${a.site.name}` : 'Site: —'}
                     {a.client ? ` • Client: ${a.client.name}` : ''}
                 </div>
             </div>
-            <div className="shrink-0 text-right text-xs text-slate-600">{right ?? ''}</div>
+            <div className="shrink-0 text-right text-xs text-muted-foreground">{right ?? ''}</div>
         </div>
     );
 }
@@ -54,7 +54,7 @@ export default function AssetsReport() {
                         {overdueInspections?.length ? (
                             overdueInspections.map((a: AssetRow) => <Row key={a.id} a={a} right={a.inspection_due_at ?? ''} />)
                         ) : (
-                            <div className="text-sm text-slate-500">None.</div>
+                            <div className="text-sm text-muted-foreground">None.</div>
                         )}
                     </CardContent>
                 </Card>
@@ -67,7 +67,7 @@ export default function AssetsReport() {
                         {overdueMaintenance?.length ? (
                             overdueMaintenance.map((a: AssetRow) => <Row key={a.id} a={a} right={a.maintenance_due_at ?? ''} />)
                         ) : (
-                            <div className="text-sm text-slate-500">None.</div>
+                            <div className="text-sm text-muted-foreground">None.</div>
                         )}
                     </CardContent>
                 </Card>
@@ -80,7 +80,7 @@ export default function AssetsReport() {
                         {expiringWarranties?.length ? (
                             expiringWarranties.map((a: AssetRow) => <Row key={a.id} a={a} right={a.warranty_expires_at ?? ''} />)
                         ) : (
-                            <div className="text-sm text-slate-500">None.</div>
+                            <div className="text-sm text-muted-foreground">None.</div>
                         )}
                     </CardContent>
                 </Card>

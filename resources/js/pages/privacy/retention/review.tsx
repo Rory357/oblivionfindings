@@ -21,7 +21,7 @@ export default function ReviewRetention({ policies }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Review Data for Retention</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Review data that may be due for archival or deletion
                         </div>
                     </div>
@@ -37,7 +37,7 @@ export default function ReviewRetention({ policies }: Props) {
                                 <CardHeader>
                                     <CardTitle className="text-base">
                                         <div className="flex items-center gap-2">
-                                            <Database className="h-5 w-5 text-purple-500" />
+                                            <Database className="h-5 w-5 text-primary" />
                                             {policy.policy_name}
                                         </div>
                                     </CardTitle>
@@ -52,7 +52,7 @@ export default function ReviewRetention({ policies }: Props) {
                                             {policy.retention_period_years} year retention
                                         </Badge>
                                     </div>
-                                    <p className="text-sm text-slate-500">
+                                    <p className="text-sm text-muted-foreground">
                                         Data review functionality will be implemented here.
                                         This will show records approaching their retention period.
                                     </p>
@@ -60,7 +60,7 @@ export default function ReviewRetention({ policies }: Props) {
                             </Card>
                         ))
                     ) : (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No active retention policies found.
                         </div>
                     )}

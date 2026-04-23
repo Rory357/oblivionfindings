@@ -11,7 +11,7 @@ interface Props extends PageProps {
 }
 
 const statusColors: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-800',
+    draft: 'bg-muted text-foreground',
     open: 'bg-blue-100 text-blue-800',
     closed: 'bg-green-100 text-green-800',
     completed: 'bg-green-100 text-green-800',
@@ -54,8 +54,8 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">{evaluation.title} Results</h1>
-                    <p className="text-gray-500 mt-1">Evaluation outcome summary and analysis</p>
+                    <h1 className="text-3xl font-bold text-foreground">{evaluation.title} Results</h1>
+                    <p className="text-muted-foreground mt-1">Evaluation outcome summary and analysis</p>
                 </div>
 
                 {/* Summary Card */}
@@ -64,12 +64,12 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-500">Type</p>
-                                    <Badge className={cn('mt-1', statusColors[evaluation.evaluation_type] || 'bg-gray-100 text-gray-800')}>
+                                    <p className="text-sm text-muted-foreground">Type</p>
+                                    <Badge className={cn('mt-1', statusColors[evaluation.evaluation_type] || 'bg-muted text-foreground')}>
                                         {typeLabels[evaluation.evaluation_type] ?? evaluation.evaluation_type}
                                     </Badge>
                                 </div>
-                                <ClipboardList className="w-8 h-8 text-gray-400" />
+                                <ClipboardList className="w-8 h-8 text-muted-foreground" />
                             </div>
                         </CardContent>
                     </Card>
@@ -77,12 +77,12 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-500">Status</p>
-                                    <Badge className={cn('mt-1', statusColors[evaluation.status] || 'bg-gray-100 text-gray-800')}>
+                                    <p className="text-sm text-muted-foreground">Status</p>
+                                    <Badge className={cn('mt-1', statusColors[evaluation.status] || 'bg-muted text-foreground')}>
                                         {evaluation.status}
                                     </Badge>
                                 </div>
-                                <CheckCircle2 className="w-8 h-8 text-gray-400" />
+                                <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
                             </div>
                         </CardContent>
                     </Card>
@@ -90,13 +90,13 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-500">Completion Rate</p>
+                                    <p className="text-sm text-muted-foreground">Completion Rate</p>
                                     <p className="text-3xl font-bold">{completionRate}%</p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-muted-foreground">
                                         {completedResponses.length} / {responses.length} responses
                                     </p>
                                 </div>
-                                <Users className="w-8 h-8 text-gray-400" />
+                                <Users className="w-8 h-8 text-muted-foreground" />
                             </div>
                         </CardContent>
                     </Card>
@@ -113,7 +113,7 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                     </CardHeader>
                     <CardContent>
                         {questions.length === 0 ? (
-                            <p className="text-center text-gray-500 py-8">No questions found.</p>
+                            <p className="text-center text-muted-foreground py-8">No questions found.</p>
                         ) : (
                             <div className="space-y-6">
                                 {questions.map((q: any, idx: number) => {
@@ -121,16 +121,16 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                                     return (
                                         <div key={q.id} className="p-4 rounded-lg border">
                                             <div className="flex items-start gap-3">
-                                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-gray-700 text-sm font-medium shrink-0">
+                                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-foreground text-sm font-medium shrink-0">
                                                     {idx + 1}
                                                 </span>
                                                 <div className="flex-1">
-                                                    <p className="font-medium text-gray-900">{q.text ?? q.question}</p>
+                                                    <p className="font-medium text-foreground">{q.text ?? q.question}</p>
                                                     {agg && (
                                                         <div className="mt-3 space-y-2">
                                                             {agg.average_score !== undefined && agg.average_score !== null && (
                                                                 <div className="flex items-center gap-3">
-                                                                    <span className="text-sm text-gray-500">Average Score:</span>
+                                                                    <span className="text-sm text-muted-foreground">Average Score:</span>
                                                                     <Badge className="bg-blue-100 text-blue-800 text-lg px-3">
                                                                         {typeof agg.average_score === 'number'
                                                                             ? agg.average_score.toFixed(1)
@@ -140,7 +140,7 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                                                             )}
                                                             {agg.distribution && (
                                                                 <div className="space-y-1">
-                                                                    <span className="text-sm text-gray-500">Distribution:</span>
+                                                                    <span className="text-sm text-muted-foreground">Distribution:</span>
                                                                     <div className="flex gap-2 flex-wrap">
                                                                         {Object.entries(agg.distribution).map(([score, count]) => (
                                                                             <Badge key={score} variant="outline">
@@ -153,7 +153,7 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                                                         </div>
                                                     )}
                                                     {!agg && (
-                                                        <p className="mt-2 text-sm text-gray-400">No aggregate data available.</p>
+                                                        <p className="mt-2 text-sm text-muted-foreground">No aggregate data available.</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -173,17 +173,17 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                     </CardHeader>
                     <CardContent>
                         {completedResponses.length === 0 ? (
-                            <p className="text-center text-gray-500 py-8">No completed responses yet.</p>
+                            <p className="text-center text-muted-foreground py-8">No completed responses yet.</p>
                         ) : (
                             <div className="space-y-2">
                                 {completedResponses.map((resp: any) => (
-                                    <div key={resp.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50">
+                                    <div key={resp.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted">
                                         <div>
-                                            <p className="font-medium text-gray-900">
+                                            <p className="font-medium text-foreground">
                                                 {resp.board_member?.user?.name ?? resp.board_member?.name ?? 'Unknown'}
                                             </p>
                                         </div>
-                                        <span className="text-sm text-gray-500">
+                                        <span className="text-sm text-muted-foreground">
                                             Submitted: {formatDate(resp.submitted_at)}
                                         </span>
                                     </div>

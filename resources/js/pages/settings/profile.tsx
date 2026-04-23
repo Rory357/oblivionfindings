@@ -222,7 +222,7 @@ export default function Profile({
 
             <SettingsLayout>
                 {/* ── Modern Profile Header ── */}
-                <div className="relative overflow-hidden rounded-xl border bg-white dark:bg-gray-950">
+                <div className="relative overflow-hidden rounded-xl border bg-white dark:bg-muted">
                     {/* Accent bar */}
                     <div className="h-1.5 w-full bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-600" />
 
@@ -230,9 +230,9 @@ export default function Profile({
                         <div className="flex items-center gap-5">
                             {/* Avatar */}
                             <div className="group relative shrink-0">
-                                <Avatar className="h-16 w-16 border-2 border-violet-100 shadow-md dark:border-violet-900">
+                                <Avatar className="h-16 w-16 border-2 border-primary/30 shadow-md dark:border-primary/30">
                                     <AvatarImage src={avatarSrc} alt={auth.user.name} />
-                                    <AvatarFallback className="bg-violet-600 text-lg font-semibold text-white">
+                                    <AvatarFallback className="bg-primary text-lg font-semibold text-white">
                                         {getInitials(auth.user.name)}
                                     </AvatarFallback>
                                 </Avatar>
@@ -255,17 +255,17 @@ export default function Profile({
                             {/* Info */}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3">
-                                    <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 truncate">
+                                    <h1 className="text-xl font-semibold tracking-tight text-foreground dark:text-foreground truncate">
                                         {auth.user.name}
                                     </h1>
                                     {roles.length > 0
                                         ? roles.map((role: string) => (
-                                              <Badge key={role} variant="secondary" className="bg-violet-100 text-violet-700 text-xs dark:bg-violet-900/50 dark:text-violet-300">
+                                              <Badge key={role} variant="secondary" className="bg-primary/10 text-primary text-xs dark:bg-primary/50 dark:text-primary/70">
                                                   {role}
                                               </Badge>
                                           ))
                                         : (
-                                              <Badge variant="secondary" className="bg-violet-100 text-violet-700 text-xs dark:bg-violet-900/50 dark:text-violet-300">
+                                              <Badge variant="secondary" className="bg-primary/10 text-primary text-xs dark:bg-primary/50 dark:text-primary/70">
                                                   Team Member
                                               </Badge>
                                           )}
@@ -322,7 +322,7 @@ export default function Profile({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <User className="h-4.5 w-4.5 text-violet-600" />
+                                    <User className="h-4.5 w-4.5 text-primary" />
                                     Personal Information
                                 </CardTitle>
                                 <CardDescription>Update your personal details</CardDescription>
@@ -427,7 +427,7 @@ export default function Profile({
                                             <div className="flex items-center gap-4 pt-2">
                                                 <Button
                                                     disabled={processing}
-                                                    className="bg-violet-600 hover:bg-violet-700"
+                                                    className="bg-primary hover:bg-primary"
                                                     data-test="update-profile-button"
                                                 >
                                                     Save changes
@@ -568,7 +568,7 @@ export default function Profile({
                                 <div className="pt-2">
                                     <Button
                                         type="submit"
-                                        className="bg-violet-600 hover:bg-violet-700"
+                                        className="bg-primary hover:bg-primary"
                                         disabled={preferencesForm.processing}
                                         data-test="save-preferences-button"
                                     >
@@ -595,7 +595,7 @@ export default function Profile({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Shield className="h-4.5 w-4.5 text-violet-600" />
+                                    <Shield className="h-4.5 w-4.5 text-primary" />
                                     Account Security
                                 </CardTitle>
                                 <CardDescription>Manage your account security</CardDescription>
@@ -604,8 +604,8 @@ export default function Profile({
                                 {/* Password */}
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-start gap-3">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950/30">
-                                            <Key className="h-4 w-4 text-violet-600" />
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                            <Key className="h-4 w-4 text-primary" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium">Password</p>
@@ -616,7 +616,7 @@ export default function Profile({
                                             </p>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-violet-600 hover:text-violet-700" asChild>
+                                    <Button variant="ghost" size="sm" className="text-primary hover:text-primary" asChild>
                                         <Link href="/settings/password">Change</Link>
                                     </Button>
                                 </div>
@@ -626,8 +626,8 @@ export default function Profile({
                                 {/* Two-Factor Auth */}
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-start gap-3">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950/30">
-                                            <Shield className="h-4 w-4 text-violet-600" />
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                            <Shield className="h-4 w-4 text-primary" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium">Two-factor authentication</p>
@@ -642,7 +642,7 @@ export default function Profile({
                                             )}
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-violet-600 hover:text-violet-700" asChild>
+                                    <Button variant="ghost" size="sm" className="text-primary hover:text-primary" asChild>
                                         <Link href="/settings/two-factor">Manage</Link>
                                     </Button>
                                 </div>
@@ -652,15 +652,15 @@ export default function Profile({
                                 {/* Active Sessions */}
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-start gap-3">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950/30">
-                                            <Activity className="h-4 w-4 text-violet-600" />
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                            <Activity className="h-4 w-4 text-primary" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium">Active sessions</p>
                                             <p className="text-xs text-muted-foreground">1 active session</p>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-violet-600 hover:text-violet-700" disabled>
+                                    <Button variant="ghost" size="sm" className="text-primary hover:text-primary" disabled>
                                         View
                                     </Button>
                                 </div>
@@ -671,7 +671,7 @@ export default function Profile({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Activity className="h-4.5 w-4.5 text-violet-600" />
+                                    <Activity className="h-4.5 w-4.5 text-primary" />
                                     Quick Stats
                                 </CardTitle>
                                 <CardDescription>Your activity summary</CardDescription>
@@ -679,25 +679,25 @@ export default function Profile({
                             <CardContent>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex flex-col items-center rounded-lg border bg-muted/30 p-4 text-center">
-                                        <Calendar className="mb-2 h-5 w-5 text-violet-500" />
-                                        <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">0</span>
+                                        <Calendar className="mb-2 h-5 w-5 text-primary" />
+                                        <span className="text-2xl font-bold text-foreground dark:text-foreground">0</span>
                                         <span className="mt-0.5 text-xs text-muted-foreground">Shifts this month</span>
                                     </div>
                                     <div className="flex flex-col items-center rounded-lg border bg-muted/30 p-4 text-center">
-                                        <FileText className="mb-2 h-5 w-5 text-violet-500" />
-                                        <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">0</span>
+                                        <FileText className="mb-2 h-5 w-5 text-primary" />
+                                        <span className="text-2xl font-bold text-foreground dark:text-foreground">0</span>
                                         <span className="mt-0.5 text-xs text-muted-foreground">Notes written</span>
                                     </div>
                                     <div className="flex flex-col items-center rounded-lg border bg-muted/30 p-4 text-center">
-                                        <Clock className="mb-2 h-5 w-5 text-violet-500" />
-                                        <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                        <Clock className="mb-2 h-5 w-5 text-primary" />
+                                        <span className="text-2xl font-bold text-foreground dark:text-foreground">
                                             {formatRelativeTime(profileData.lastLoginAt ?? profileData.updatedAt)}
                                         </span>
                                         <span className="mt-0.5 text-xs text-muted-foreground">Last login</span>
                                     </div>
                                     <div className="flex flex-col items-center rounded-lg border bg-muted/30 p-4 text-center">
-                                        <Activity className="mb-2 h-5 w-5 text-violet-500" />
-                                        <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                        <Activity className="mb-2 h-5 w-5 text-primary" />
+                                        <span className="text-2xl font-bold text-foreground dark:text-foreground">
                                             {daysSince(profileData.createdAt)}
                                         </span>
                                         <span className="mt-0.5 text-xs text-muted-foreground">Days active</span>
@@ -710,7 +710,7 @@ export default function Profile({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Shield className="h-5 w-5 text-violet-600" /> Connected Accounts
+                                    <Shield className="h-5 w-5 text-primary" /> Connected Accounts
                                 </CardTitle>
                                 <CardDescription>Link your Microsoft or Google account for single sign-on</CardDescription>
                             </CardHeader>

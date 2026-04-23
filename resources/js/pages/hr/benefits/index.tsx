@@ -67,7 +67,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusColors: Record<string, string> = {
     active: 'bg-green-100 text-green-800',
-    opted_out: 'bg-slate-100 text-slate-800',
+    opted_out: 'bg-muted text-foreground',
     suspended: 'bg-yellow-100 text-yellow-800',
     terminated: 'bg-red-100 text-red-800',
 };
@@ -130,7 +130,7 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Benefits Enrollments</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Overview of employee benefit plan enrollments
                         </div>
                     </div>
@@ -149,13 +149,13 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                         {Object.entries(summary).map(([type, data]) => (
                             <Card key={type}>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-slate-500">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">
                                         {typeLabels[type] || type}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-2xl font-bold">{data.total_enrolled}</div>
-                                    <div className="text-xs text-slate-500">active enrollments</div>
+                                    <div className="text-xs text-muted-foreground">active enrollments</div>
                                 </CardContent>
                             </Card>
                         ))}
@@ -169,7 +169,7 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status || 'all'}
                                 onValueChange={(val) => onFilter({ status: val === 'all' ? null : val })}
@@ -187,7 +187,7 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Benefit Plan</Label>
+                            <Label className="text-xs text-muted-foreground">Benefit Plan</Label>
                             <Select
                                 value={filters.plan_id || 'all'}
                                 onValueChange={(val) => onFilter({ plan_id: val === 'all' ? null : val })}
@@ -250,8 +250,8 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                                         <TableCell colSpan={7} className="py-12 text-center">
                                             <div className="flex flex-col items-center gap-2">
                                                 <ShieldCheck className="h-10 w-10 text-slate-300" />
-                                                <p className="text-sm font-medium text-slate-600">No enrollments found</p>
-                                                <p className="text-xs text-slate-400">
+                                                <p className="text-sm font-medium text-muted-foreground">No enrollments found</p>
+                                                <p className="text-xs text-muted-foreground">
                                                     {filters.status || filters.plan_id
                                                         ? 'Try adjusting your filters to see more results.'
                                                         : 'Get started by enrolling an employee in a benefit plan.'}

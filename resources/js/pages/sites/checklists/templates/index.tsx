@@ -73,7 +73,7 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
                             <ClipboardCheck className="w-5 h-5" />
                             Checklist Templates
                         </h1>
-                        <p className="text-sm text-slate-400">Manage reusable checklists for site inspections and walkthroughs</p>
+                        <p className="text-sm text-muted-foreground">Manage reusable checklists for site inspections and walkthroughs</p>
                     </div>
                     <Button asChild>
                         <Link href="/sites/checklists/templates/create">
@@ -86,7 +86,7 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
                 {/* Filters */}
                 <div className="flex gap-3">
                     <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -107,23 +107,23 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
                                 <div className="flex items-start justify-between">
                                     <div>
                                         <CardTitle className="text-base">{template.name}</CardTitle>
-                                        <p className="text-xs text-slate-400 font-mono mt-0.5">{template.key}</p>
+                                        <p className="text-xs text-muted-foreground font-mono mt-0.5">{template.key}</p>
                                     </div>
                                     {!template.is_active && (
-                                        <Badge variant="outline" className="text-slate-400">Inactive</Badge>
+                                        <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
                                     )}
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {template.description && (
-                                    <p className="text-sm text-slate-400 mb-3 line-clamp-2">{template.description}</p>
+                                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{template.description}</p>
                                 )}
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     <Badge variant="outline">{typeLabels[template.applicable_to_type]}</Badge>
-                                    <Badge variant="outline" className="text-slate-400">
+                                    <Badge variant="outline" className="text-muted-foreground">
                                         {frequencyLabels[template.frequency]}
                                     </Badge>
-                                    <Badge variant="outline" className="text-slate-400">
+                                    <Badge variant="outline" className="text-muted-foreground">
                                         <FileQuestion className="w-3 h-3 mr-1" />
                                         {template.items_count} items
                                     </Badge>
@@ -171,7 +171,7 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
 
                 {filteredTemplates.length === 0 && (
                     <Card>
-                        <CardContent className="py-12 text-center text-slate-400">
+                        <CardContent className="py-12 text-center text-muted-foreground">
                             <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
                             <p>No checklist templates found</p>
                             <p className="text-sm mt-1">Create your first template to get started</p>

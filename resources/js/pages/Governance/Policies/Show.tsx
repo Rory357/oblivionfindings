@@ -52,11 +52,11 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
   };
 
   const getStatusColor = (status: string) => ({
-    draft: 'bg-gray-100 text-gray-800',
+    draft: 'bg-muted text-foreground',
     active: 'bg-green-100 text-green-800',
     under_review: 'bg-yellow-100 text-yellow-800',
     archived: 'bg-red-100 text-red-800',
-  }[status] || 'bg-gray-100 text-gray-800');
+  }[status] || 'bg-muted text-foreground');
 
   return (
     <AppLayout>
@@ -65,13 +65,13 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">{policy.title}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{policy.title}</h1>
               <Badge variant="outline">v{policy.version}</Badge>
               <Badge className={cn('text-xs', getStatusColor(policy.status))}>
                 {policy.status.replace('_', ' ')}
               </Badge>
             </div>
-            <p className="text-gray-500 mt-1">{policy.category} policy</p>
+            <p className="text-muted-foreground mt-1">{policy.category} policy</p>
           </div>
           <div className="flex gap-2">
             {canEdit && policy.status === 'draft' && (
@@ -137,20 +137,20 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Version</span>
+                  <span className="text-muted-foreground">Version</span>
                   <span>{policy.version}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Effective Date</span>
+                  <span className="text-muted-foreground">Effective Date</span>
                   <span>{new Date(policy.effective_date).toLocaleDateString('en-NZ')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Review Date</span>
+                  <span className="text-muted-foreground">Review Date</span>
                   <span>{new Date(policy.review_date).toLocaleDateString('en-NZ')}</span>
                 </div>
                 {policy.approved_by_user && (
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Approved By</span>
+                    <span className="text-muted-foreground">Approved By</span>
                     <span>{policy.approved_by_user.name}</span>
                   </div>
                 )}
@@ -165,9 +165,9 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
                 <CardContent>
                   <div className="text-center mb-3">
                     <span className="text-3xl font-bold">{attestationStats.completed}</span>
-                    <span className="text-gray-500"> / {attestationStats.total_required}</span>
+                    <span className="text-muted-foreground"> / {attestationStats.total_required}</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-muted rounded-full h-2">
                     <div
                       className="bg-green-600 h-2 rounded-full transition-all"
                       style={{ width: `${attestationStats.total_required > 0 ? (attestationStats.completed / attestationStats.total_required) * 100 : 0}%` }}
@@ -179,7 +179,7 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
                         <div key={att.id} className="flex items-center gap-2 text-sm">
                           <CheckCircle className="w-4 h-4 text-green-500" />
                           <span>{att.user.name}</span>
-                          <span className="text-gray-400 ml-auto">{new Date(att.attested_at).toLocaleDateString('en-NZ')}</span>
+                          <span className="text-muted-foreground ml-auto">{new Date(att.attested_at).toLocaleDateString('en-NZ')}</span>
                         </div>
                       ))}
                     </div>

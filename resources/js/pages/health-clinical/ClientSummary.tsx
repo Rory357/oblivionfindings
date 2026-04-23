@@ -75,8 +75,8 @@ export default function ClientSummary({ client, summary, observation_types, even
             <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{name}</h1>
-                        <p className="mt-1 text-sm text-gray-500">Health & Clinical Summary</p>
+                        <h1 className="text-2xl font-bold text-foreground">{name}</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">Health & Clinical Summary</p>
                     </div>
                     <div className="flex gap-2">
                         <Link href={`/health-clinical/clients/${client.id}/trends`}>

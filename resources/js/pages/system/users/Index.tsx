@@ -159,11 +159,11 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
     };
 
     const getRoleBadgeColor = (level: number): string => {
-        if (level >= 90) return 'bg-purple-100 text-purple-800 border-purple-200';
+        if (level >= 90) return 'bg-primary/10 text-primary border-primary';
         if (level >= 70) return 'bg-blue-100 text-blue-800 border-blue-200';
         if (level >= 50) return 'bg-green-100 text-green-800 border-green-200';
         if (level >= 30) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-foreground border-border';
     };
 
     const getUserTypeBadge = (type: string) => {
@@ -171,8 +171,8 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
             staff: 'bg-blue-100 text-blue-800 border-blue-200',
             client: 'bg-green-100 text-green-800 border-green-200',
             next_of_kin: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-            board: 'bg-purple-100 text-purple-800 border-purple-200',
-            user: 'bg-gray-100 text-gray-800 border-gray-200',
+            board: 'bg-primary/10 text-primary border-primary',
+            user: 'bg-muted text-foreground border-border',
         };
         const labels: Record<string, string> = {
             staff: 'Staff',

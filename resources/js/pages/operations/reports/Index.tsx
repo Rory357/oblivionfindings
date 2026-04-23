@@ -31,7 +31,7 @@ export default function ReportsIndex() {
             description: `${clientSingular} activity, hours delivered, care plan progress, and goal outcomes.`,
             href: '/operations/reports/client-summary',
             icon: Users,
-            color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+            color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
         },
         {
             title: 'Staff Utilisation',
@@ -66,7 +66,7 @@ export default function ReportsIndex() {
             description: `Hours delivered vs funded by ${clientSingular.toLowerCase()}, service type, and period.`,
             href: '/operations/reports/service-hours',
             icon: PieChart,
-            color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+            color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
         },
     ];
 

@@ -20,7 +20,7 @@ export default function RespiteCalendar({ events, bookings }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">Respite Calendar</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Respite bookings and stays (module view).
                     </div>
                 </div>
@@ -30,7 +30,7 @@ export default function RespiteCalendar({ events, bookings }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Upcoming Events</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm text-slate-600">
+                    <CardContent className="space-y-2 text-sm text-muted-foreground">
                         {events.map((event) => (
                             <div key={event.id} className="rounded-md border px-3 py-2">
                                 <div className="font-medium">{event.event_type}</div>
@@ -38,7 +38,7 @@ export default function RespiteCalendar({ events, bookings }: Props) {
                             </div>
                         ))}
                         {!events.length && (
-                            <div className="text-sm text-slate-500">No calendar events yet.</div>
+                            <div className="text-sm text-muted-foreground">No calendar events yet.</div>
                         )}
                     </CardContent>
                 </Card>
@@ -48,7 +48,7 @@ export default function RespiteCalendar({ events, bookings }: Props) {
                         <CardHeader>
                             <CardTitle className="text-base">Confirmed Bookings (fallback)</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2 text-sm text-slate-600">
+                        <CardContent className="space-y-2 text-sm text-muted-foreground">
                             {bookings.map((booking) => (
                                 <div key={booking.id} className="rounded-md border px-3 py-2">
                                     <div className="font-medium">Booking #{booking.id}</div>

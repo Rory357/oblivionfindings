@@ -150,7 +150,7 @@ export default function MyPolicies({ policies }: Props) {
                                                                     {policy.title}
                                                                 </DialogTitle>
                                                             </DialogHeader>
-                                                            <div className="flex-1 h-full min-h-[60vh] bg-slate-100 rounded-lg overflow-hidden">
+                                                            <div className="flex-1 h-full min-h-[60vh] bg-muted rounded-lg overflow-hidden">
                                                                 {currentVersion.document_path ? (
                                                                     <iframe
                                                                         src={`/hr/policies/${policy.id}/download`}

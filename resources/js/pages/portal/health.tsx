@@ -209,7 +209,7 @@ export default function Health({
                                                 </div>
                                                 {condition.severity && (
                                                     <Badge
-                                                        className={`${severityColors[condition.severity.toLowerCase()] ?? 'bg-gray-100 text-gray-800'} shrink-0 border-0 capitalize`}
+                                                        className={`${severityColors[condition.severity.toLowerCase()] ?? 'bg-muted text-foreground'} shrink-0 border-0 capitalize`}
                                                     >
                                                         {condition.severity}
                                                     </Badge>

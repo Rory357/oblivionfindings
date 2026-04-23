@@ -65,9 +65,9 @@ const statusColor = (status: string) => {
         case 'in_progress':
             return 'bg-amber-100 text-amber-800';
         case 'cancelled':
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -93,7 +93,7 @@ const complianceBadge = (status: string) => {
         case 'overdue':
             return 'bg-red-100 text-red-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -155,7 +155,7 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                                                       : 'Overdue'}
                                             </Badge>
                                         </div>
-                                        <div className="mt-1 text-xs text-slate-500">
+                                        <div className="mt-1 text-xs text-muted-foreground">
                                             {site.last_drill_date
                                                 ? `Last drill: ${new Date(site.last_drill_date).toLocaleDateString('en-GB')}`
                                                 : 'No drills recorded'}
@@ -174,7 +174,7 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Title or description"
                                 value={filters.q || ''}
@@ -182,7 +182,7 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                             />
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Site</Label>
+                            <Label className="text-xs text-muted-foreground">Site</Label>
                             <Select
                                 value={filters.site_id ?? ANY}
                                 onValueChange={(v) => onFilter({ site_id: v === ANY ? null : v })}
@@ -197,7 +197,7 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Type</Label>
+                            <Label className="text-xs text-muted-foreground">Type</Label>
                             <Select
                                 value={filters.drill_type ?? ANY}
                                 onValueChange={(v) => onFilter({ drill_type: v === ANY ? null : v })}
@@ -216,7 +216,7 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -240,7 +240,7 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Site</th>
                                         <th className="pb-2 pr-4 font-medium">Type</th>
                                         <th className="pb-2 pr-4 font-medium">Date</th>
@@ -284,7 +284,7 @@ export default function DrillsIndex({ filters, stats, site_compliance, drills, s
                                 </tbody>
                             </table>
                             {!drills.data.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No drills found.
                                 </div>
                             )}

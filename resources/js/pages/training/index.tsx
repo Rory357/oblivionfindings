@@ -50,9 +50,9 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
             case 'failed':
                 return 'bg-orange-100 text-orange-800 border-orange-200';
             case 'exempted':
-                return 'bg-purple-100 text-purple-800 border-purple-200';
+                return 'bg-primary/10 text-primary border-primary';
             default:
-                return 'bg-slate-100 text-slate-800 border-slate-200';
+                return 'bg-muted text-foreground border-border';
         }
     };
 
@@ -64,7 +64,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Staff Training & Development</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Track staff training, competency assessments, and compliance
                         </div>
                     </div>
@@ -95,7 +95,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                     <div className="grid gap-4 sm:grid-cols-4">
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Valid Training</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Valid Training</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
@@ -106,7 +106,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Expiring Soon</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Expiring Soon</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
@@ -117,7 +117,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">Expired</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Expired</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                         </Card>
                         <Card>
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-slate-500">In Progress</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">In Progress</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{stats.pending}</div>
@@ -143,7 +143,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search training records"
                                 value={filters.q || ''}
@@ -153,7 +153,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
 
                         {staff.length > 0 && (
                             <div>
-                                <Label className="text-xs text-slate-500">Staff Member</Label>
+                                <Label className="text-xs text-muted-foreground">Staff Member</Label>
                                 <Select
                                     value={filters.user_id ? String(filters.user_id) : ANY}
                                     onValueChange={(v) => onFilter({ user_id: v === ANY ? null : v })}
@@ -170,7 +170,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                         )}
 
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? ANY}
                                 onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
@@ -187,7 +187,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
 
                         {courses.length > 0 && (
                             <div>
-                                <Label className="text-xs text-slate-500">Course</Label>
+                                <Label className="text-xs text-muted-foreground">Course</Label>
                                 <Select
                                     value={filters.course_id ? String(filters.course_id) : ANY}
                                     onValueChange={(v) => onFilter({ course_id: v === ANY ? null : v })}
@@ -237,12 +237,12 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                                                     </Badge>
                                                 )}
                                                 {record.status === 'exempted' && (
-                                                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
+                                                    <Badge variant="outline" className="border-primary bg-primary/10 text-primary">
                                                         Exempted
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Staff: {record.user.first_name} {record.user.last_name}
                                                 {record.enrolled_at && ` • Enrolled: ${new Date(record.enrolled_at).toLocaleDateString()}`}
                                                 {record.completed_at && ` • Completed: ${new Date(record.completed_at).toLocaleDateString()}`}
@@ -259,7 +259,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                         </Card>
                     ))}
                     {!trainingRecords.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No training records found.
                         </div>
                     )}

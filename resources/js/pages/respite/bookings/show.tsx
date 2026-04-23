@@ -47,7 +47,7 @@ export default function RespiteBookingShow({ booking }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Booking Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm text-slate-600 space-y-2">
+                    <CardContent className="text-sm text-muted-foreground space-y-2">
                         <div>Start: {formatDateTime(booking.start_at)}</div>
                         <div>End: {formatDateTime(booking.end_at)}</div>
                         <div>Hours: {hoursBetween(booking.start_at, booking.end_at)}</div>
@@ -55,7 +55,7 @@ export default function RespiteBookingShow({ booking }: Props) {
                         <div>
                             Shift:{' '}
                             {booking.shift ? (
-                                <Link href={`/shifts/${booking.shift.id}`} className="text-indigo-500 hover:text-indigo-400">
+                                <Link href={`/shifts/${booking.shift.id}`} className="text-primary hover:text-primary">
                                     View shift
                                 </Link>
                             ) : (

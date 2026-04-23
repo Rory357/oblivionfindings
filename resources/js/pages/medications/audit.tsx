@@ -76,7 +76,7 @@ function ActionBadge({ action }: { action: string }) {
             label: 'Deleted',
         },
     };
-    const c = config[a] || { class: 'bg-slate-100 text-slate-700 border-slate-200', icon: <Eye className="h-3 w-3 mr-1" />, label: action };
+    const c = config[a] || { class: 'bg-muted text-foreground border-border', icon: <Eye className="h-3 w-3 mr-1" />, label: action };
     
     return (
         <Badge variant="outline" className={cn('flex items-center w-fit', c.class)}>

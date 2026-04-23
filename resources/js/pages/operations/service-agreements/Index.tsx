@@ -223,7 +223,7 @@ export default function ServiceAgreementsIndex({
                                         <Badge variant={STATUS_VARIANTS[ag.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">{ag.status?.replace(/_/g, ' ')}</Badge>
                                         <Badge variant="outline" className="h-4 px-1.5 text-[9px]">{TYPE_LABELS[ag.agreement_type] ?? ag.agreement_type}</Badge>
                                         {ag.funding_type && (
-                                            <Badge variant="outline" className="h-4 border-indigo-200 bg-indigo-50 px-1.5 text-[9px] text-indigo-700">
+                                            <Badge variant="outline" className="h-4 border-primary bg-primary/10 px-1.5 text-[9px] text-primary">
                                                 {FUNDING_TYPE_LABELS[ag.funding_type] ?? ag.funding_type}
                                             </Badge>
                                         )}

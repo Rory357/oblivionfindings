@@ -91,11 +91,11 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     <Card>
                         <CardContent className="flex flex-wrap items-end gap-4 p-4">
                             <div>
-                                <Label className="text-xs text-slate-500">From</Label>
+                                <Label className="text-xs text-muted-foreground">From</Label>
                                 <Input type="date" name="from" defaultValue={filters.from} />
                             </div>
                             <div>
-                                <Label className="text-xs text-slate-500">To</Label>
+                                <Label className="text-xs text-muted-foreground">To</Label>
                                 <Input type="date" name="to" defaultValue={filters.to} />
                             </div>
                             <Button type="submit" size="sm">Apply</Button>
@@ -112,7 +112,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{trends.overall.total_interviews}</p>
-                                <p className="text-xs text-slate-500">Total Interviews</p>
+                                <p className="text-xs text-muted-foreground">Total Interviews</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -123,7 +123,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{trends.overall.avg_satisfaction || '-'}</p>
-                                <p className="text-xs text-slate-500">Avg Satisfaction (1-5)</p>
+                                <p className="text-xs text-muted-foreground">Avg Satisfaction (1-5)</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -134,18 +134,18 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{recommendPct}%</p>
-                                <p className="text-xs text-slate-500">Would Recommend</p>
+                                <p className="text-xs text-muted-foreground">Would Recommend</p>
                             </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-purple-500/10 p-2">
-                                <TrendingUp className="h-5 w-5 text-purple-500" />
+                            <div className="rounded-lg bg-primary/10 p-2">
+                                <TrendingUp className="h-5 w-5 text-primary" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{trends.departure_reasons.length}</p>
-                                <p className="text-xs text-slate-500">Unique Reasons</p>
+                                <p className="text-xs text-muted-foreground">Unique Reasons</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -159,7 +159,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                         </CardHeader>
                         <CardContent>
                             {trends.departure_reasons.length === 0 ? (
-                                <p className="text-sm text-slate-500">No data available.</p>
+                                <p className="text-sm text-muted-foreground">No data available.</p>
                             ) : (
                                 <div className="space-y-3">
                                     {trends.departure_reasons.map((item, idx) => {
@@ -168,9 +168,9 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                             <div key={item.reason}>
                                                 <div className="mb-1 flex items-center justify-between text-sm">
                                                     <span>{reasonLabels[item.reason] ?? item.reason}</span>
-                                                    <span className="text-slate-500">{item.count} ({pct}%)</span>
+                                                    <span className="text-muted-foreground">{item.count} ({pct}%)</span>
                                                 </div>
-                                                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                                <div className="h-2 overflow-hidden rounded-full bg-muted">
                                                     <div
                                                         className="h-full rounded-full transition-all"
                                                         style={{
@@ -194,7 +194,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                         </CardHeader>
                         <CardContent>
                             {trends.satisfaction_over_time.length === 0 ? (
-                                <p className="text-sm text-slate-500">No data available.</p>
+                                <p className="text-sm text-muted-foreground">No data available.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {trends.satisfaction_over_time.map((item) => {
@@ -203,11 +203,11 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                             <div key={item.month}>
                                                 <div className="mb-1 flex items-center justify-between text-sm">
                                                     <span>{item.month}</span>
-                                                    <span className="text-slate-500">
+                                                    <span className="text-muted-foreground">
                                                         {item.avg_satisfaction}/5 ({item.count} interviews)
                                                     </span>
                                                 </div>
-                                                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                                <div className="h-2 overflow-hidden rounded-full bg-muted">
                                                     <div
                                                         className="h-full rounded-full bg-yellow-400 transition-all"
                                                         style={{ width: `${pct}%` }}
@@ -228,7 +228,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                         </CardHeader>
                         <CardContent>
                             {trends.recommend_stats.total === 0 ? (
-                                <p className="text-sm text-slate-500">No data available.</p>
+                                <p className="text-sm text-muted-foreground">No data available.</p>
                             ) : (
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-4">
@@ -237,7 +237,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                                 <span>Yes</span>
                                                 <span className="text-emerald-500">{trends.recommend_stats.would_recommend}</span>
                                             </div>
-                                            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                                            <div className="h-3 overflow-hidden rounded-full bg-muted">
                                                 <div
                                                     className="h-full rounded-full bg-emerald-400"
                                                     style={{
@@ -253,7 +253,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                                 <span>No</span>
                                                 <span className="text-red-500">{trends.recommend_stats.would_not_recommend}</span>
                                             </div>
-                                            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                                            <div className="h-3 overflow-hidden rounded-full bg-muted">
                                                 <div
                                                     className="h-full rounded-full bg-red-400"
                                                     style={{
@@ -263,7 +263,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-center text-xs text-slate-500">
+                                    <p className="text-center text-xs text-muted-foreground">
                                         Based on {trends.recommend_stats.total} responses
                                     </p>
                                 </div>

@@ -34,11 +34,11 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
       scheduled: 'bg-blue-100 text-blue-800',
       agenda_draft: 'bg-yellow-100 text-yellow-800',
       agenda_final: 'bg-green-100 text-green-800',
-      in_progress: 'bg-purple-100 text-purple-800',
+      in_progress: 'bg-primary/10 text-primary',
       minutes_draft: 'bg-orange-100 text-orange-800',
       minutes_approved: 'bg-green-100 text-green-800',
-      archived: 'bg-gray-100 text-gray-800',
-    }[status] || 'bg-gray-100 text-gray-800';
+      archived: 'bg-muted text-foreground',
+    }[status] || 'bg-muted text-foreground';
   };
 
   const getMeetingTypeLabel = (type: string) => {
@@ -84,8 +84,8 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Board Meetings</h1>
-              <p className="text-gray-500 mt-1">Schedule and manage governance meetings</p>
+              <h1 className="text-3xl font-bold text-foreground">Board Meetings</h1>
+              <p className="text-muted-foreground mt-1">Schedule and manage governance meetings</p>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" asChild>
@@ -110,11 +110,11 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
                 {meetings.data.map((meeting) => (
                   <div
                     key={meeting.id}
-                    className="flex items-start justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors"
+                    className="flex items-start justify-between p-4 rounded-lg border hover:bg-muted transition-colors"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-lg text-gray-900">
+                        <h3 className="font-semibold text-lg text-foreground">
                           <Link 
                             href={showMeeting.url({ meeting: meeting.id })}
                             className="hover:text-blue-600"
@@ -130,7 +130,7 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
                         </Badge>
                       </div>
                       
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           {formatDate(meeting.scheduled_at)}
@@ -149,12 +149,12 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
 
                       <div className="flex items-center gap-4 mt-2 text-sm">
                         {meeting.chair && (
-                          <span className="text-gray-500">
+                          <span className="text-muted-foreground">
                             Chair: {meeting.chair.user.name}
                           </span>
                         )}
                         {meeting.secretary && (
-                          <span className="text-gray-500">
+                          <span className="text-muted-foreground">
                             Secretary: {meeting.secretary.user.name}
                           </span>
                         )}

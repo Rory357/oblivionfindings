@@ -104,7 +104,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Leave Reports</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Absenteeism trends, Bradford Factor analysis, and leave utilisation
                         </div>
                     </div>
@@ -155,7 +155,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                                                 style={{ height: `${(m.count / maxCount) * 160}px`, minHeight: m.count > 0 ? 4 : 0 }}
                                                 title={`${m.count} occurrences, ${m.total_hours}h`}
                                             />
-                                            <span className="text-xs text-slate-500">{m.label}</span>
+                                            <span className="text-xs text-muted-foreground">{m.label}</span>
                                             <span className="text-xs font-medium">{m.count}</span>
                                         </div>
                                     ))}
@@ -179,7 +179,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                                     <TableBody>
                                         {absenteeism.top_absentees.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={3} className="text-center text-slate-400">No data for this period</TableCell>
+                                                <TableCell colSpan={3} className="text-center text-muted-foreground">No data for this period</TableCell>
                                             </TableRow>
                                         )}
                                         {absenteeism.top_absentees.map((a) => (
@@ -215,7 +215,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                                     <TableBody>
                                         {bradfordFactor.employees.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="text-center text-slate-400">No data for this period</TableCell>
+                                                <TableCell colSpan={5} className="text-center text-muted-foreground">No data for this period</TableCell>
                                             </TableRow>
                                         )}
                                         {bradfordFactor.employees.map((e) => (
@@ -225,7 +225,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                                                 <TableCell className="text-right">{e.days}</TableCell>
                                                 <TableCell className="text-right font-mono">{e.factor}</TableCell>
                                                 <TableCell>
-                                                    <Badge className={riskColors[e.risk_level] || 'bg-slate-100'} variant="outline">
+                                                    <Badge className={riskColors[e.risk_level] || 'bg-muted'} variant="outline">
                                                         {e.risk_level}
                                                     </Badge>
                                                 </TableCell>
@@ -257,7 +257,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                                     <TableBody>
                                         {utilization.employees.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="text-center text-slate-400">No data for this period</TableCell>
+                                                <TableCell colSpan={5} className="text-center text-muted-foreground">No data for this period</TableCell>
                                             </TableRow>
                                         )}
                                         {utilization.employees.map((e) => (
@@ -268,13 +268,13 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                                                 <TableCell className="text-right">{e.total_remaining}h</TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
-                                                        <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
+                                                        <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
                                                             <div
                                                                 className={`h-full rounded-full ${e.overall_pct >= 90 ? 'bg-red-500' : e.overall_pct >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
                                                                 style={{ width: `${Math.min(100, e.overall_pct)}%` }}
                                                             />
                                                         </div>
-                                                        <span className="text-xs text-slate-500">{e.overall_pct}%</span>
+                                                        <span className="text-xs text-muted-foreground">{e.overall_pct}%</span>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>

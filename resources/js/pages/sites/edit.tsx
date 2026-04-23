@@ -212,17 +212,17 @@ export default function EditSite() {
                                             onClick={() => setData('type', type.value as any)}
                                             className={`cursor-pointer rounded-lg border p-4 transition-colors ${
                                                 isSelected
-                                                    ? 'border-indigo-500 bg-indigo-500/10'
-                                                    : 'border hover:border-indigo-500/50'
+                                                    ? 'border-primary bg-primary/10'
+                                                    : 'border hover:border-primary/50'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Icon className={`w-5 h-5 ${isSelected ? 'text-indigo-400' : 'text-slate-400'}`} />
-                                                <span className={`font-medium ${isSelected ? 'text-indigo-200' : ''}`}>
+                                                <Icon className={`w-5 h-5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                                                <span className={`font-medium ${isSelected ? 'text-primary/70' : ''}`}>
                                                     {type.label}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-slate-400">{type.description}</p>
+                                            <p className="text-xs text-muted-foreground">{type.description}</p>
                                         </div>
                                     );
                                 })}
@@ -440,7 +440,7 @@ export default function EditSite() {
                                     rows={3}
                                     placeholder="Gate codes, key locations, parking instructions..."
                                 />
-                                <p className="text-xs text-slate-500 mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                     This information is permission-protected
                                 </p>
                             </div>
@@ -615,7 +615,7 @@ export default function EditSite() {
                                         accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
                                         className="cursor-pointer"
                                     />
-                                    <p className="text-xs text-slate-500 mt-1">PDF, Word, Excel, or images. Max 20MB.</p>
+                                    <p className="text-xs text-muted-foreground mt-1">PDF, Word, Excel, or images. Max 20MB.</p>
                                 </div>
                                 <Button
                                     type="button"
@@ -634,10 +634,10 @@ export default function EditSite() {
                                     {uploadedDocs.map((doc) => (
                                         <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <FileText className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                                                <FileText className="w-5 h-5 text-primary flex-shrink-0" />
                                                 <div className="min-w-0">
                                                     <p className="text-sm font-medium truncate">{doc.title}</p>
-                                                    <p className="text-xs text-slate-500 truncate">
+                                                    <p className="text-xs text-muted-foreground truncate">
                                                         {doc.original_name}
                                                         {doc.size_bytes > 0 && ` · ${formatFileSize(doc.size_bytes)}`}
                                                         {doc.category && ` · ${doc.category}`}

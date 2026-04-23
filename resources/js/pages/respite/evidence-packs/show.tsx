@@ -71,12 +71,12 @@ export default function EvidencePackShow({ pack }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Pack Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm text-slate-600">
+                    <CardContent className="space-y-2 text-sm text-muted-foreground">
                         {pack.description && <div className="whitespace-pre-wrap">{pack.description}</div>}
                         <div>
                             Client:{' '}
                             {pack.stay?.client ? (
-                                <Link href={`/respite/stays/${pack.stay.id}`} className="text-indigo-500 hover:text-indigo-400">
+                                <Link href={`/respite/stays/${pack.stay.id}`} className="text-primary hover:text-primary">
                                     {pack.stay.client.first_name} {pack.stay.client.last_name}
                                 </Link>
                             ) : (
@@ -108,10 +108,10 @@ export default function EvidencePackShow({ pack }: Props) {
                                                 <span className="font-medium">{item.title}</span>
                                             </div>
                                             {item.description && (
-                                                <div className="mt-1 text-xs text-slate-500">{item.description}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">{item.description}</div>
                                             )}
                                             {item.added_at && (
-                                                <div className="mt-1 text-xs text-slate-400">{formatDateTime(item.added_at)}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(item.added_at)}</div>
                                             )}
                                         </div>
                                         {!isSealed && (
@@ -127,7 +127,7 @@ export default function EvidencePackShow({ pack }: Props) {
                                 ))}
                             </div>
                         ) : (
-                            <div className="py-4 text-center text-sm text-slate-500">No items in this pack.</div>
+                            <div className="py-4 text-center text-sm text-muted-foreground">No items in this pack.</div>
                         )}
                     </CardContent>
                 </Card>

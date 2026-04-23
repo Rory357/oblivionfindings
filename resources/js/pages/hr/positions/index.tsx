@@ -178,7 +178,7 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                         ) : (
                             <div className="overflow-hidden rounded-xl border">
                                 <table className="w-full text-sm">
-                                    <thead className="border-b bg-slate-50/5">
+                                    <thead className="border-b bg-muted/5">
                                         <tr>
                                             <th className="px-4 py-3 text-left font-medium">Title</th>
                                             <th className="px-4 py-3 text-left font-medium">Code</th>
@@ -219,7 +219,7 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                                                             {position.vacancies} open
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-slate-500/30 text-slate-400">
+                                                        <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
                                                             Filled
                                                         </Badge>
                                                     )}

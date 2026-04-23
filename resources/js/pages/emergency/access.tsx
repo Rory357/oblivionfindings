@@ -86,7 +86,7 @@ export default function EmergencyAccessPage({ query, results, activeAccesses }: 
                         <CardTitle>Emergency Access</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-sm text-slate-600">
+                        <div className="text-sm text-muted-foreground">
                             You don’t have permission to use emergency access.
                         </div>
                     </CardContent>
@@ -121,7 +121,7 @@ export default function EmergencyAccessPage({ query, results, activeAccesses }: 
                             <Button onClick={submitSearch}>Search</Button>
                         </div>
 
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-muted-foreground">
                             Tip: enter at least 2 characters.
                         </div>
                     </CardContent>
@@ -142,7 +142,7 @@ export default function EmergencyAccessPage({ query, results, activeAccesses }: 
                                         <div className="text-sm font-medium">
                                             {a.client.first_name} {a.client.last_name}
                                         </div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             Reason: {a.reason}
                                             {a.expires_at ? ` • Expires: ${new Date(a.expires_at).toLocaleString()}` : ''}
                                         </div>
@@ -173,7 +173,7 @@ export default function EmergencyAccessPage({ query, results, activeAccesses }: 
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {(results?.length ?? 0) === 0 ? (
-                            <div className="text-sm text-slate-600">No results.</div>
+                            <div className="text-sm text-muted-foreground">No results.</div>
                         ) : (
                             (results as ClientLite[]).map((c) => (
                                 <div
@@ -184,7 +184,7 @@ export default function EmergencyAccessPage({ query, results, activeAccesses }: 
                                         <div className="text-sm font-medium">
                                             {c.first_name} {c.last_name}
                                         </div>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             {c.date_of_birth ? `DOB: ${c.date_of_birth}` : ''}
                                             {c.site?.name ? ` • Site: ${c.site.name}` : ''}
                                             {c.status ? ` • Status: ${c.status}` : ''}
@@ -223,7 +223,7 @@ export default function EmergencyAccessPage({ query, results, activeAccesses }: 
                         <div className="space-y-2">
                             <Label>Duration in minutes</Label>
                             <Input value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="60" />
-                            <div className="text-xs text-slate-500">Default: 60 minutes</div>
+                            <div className="text-xs text-muted-foreground">Default: 60 minutes</div>
                         </div>
                     </div>
 

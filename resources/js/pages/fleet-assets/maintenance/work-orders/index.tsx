@@ -165,9 +165,9 @@ export default function WorkOrdersIndex({ work_orders, filters, users }: Props) 
                     <FleetStatCard label="OPEN" value={openCount} icon={Wrench} color="amber" valueClassName="text-amber-400" subtitle="Awaiting action" />
                     <FleetStatCard label="IN PROGRESS" value={inProgressCount} icon={Loader} color="blue" valueClassName="text-blue-400" subtitle="Being worked on" />
                     <FleetStatCard label="COMPLETED" value={completedCount} icon={CheckCircle} color="amber" valueClassName="text-green-400" subtitle="Done" />
-                    <Card className="border bg-purple-50 dark:bg-purple-950/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
+                    <Card className="border bg-primary/10 dark:bg-primary/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
                         <CardContent className="p-4">
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-2">PRIORITY DISTRIBUTION</p>
+                            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">PRIORITY DISTRIBUTION</p>
                             <MiniBarChart data={priorityChartData.map((d) => ({ label: d.label, value: d.value }))} height={80} />
                         </CardContent>
                     </Card>
@@ -204,7 +204,7 @@ export default function WorkOrdersIndex({ work_orders, filters, users }: Props) 
                         <thead>
                             <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
                                 <th className="px-4 py-3 text-left font-medium w-8">
-                                    <input type="checkbox" checked={safeData.length > 0 && selectedIds.length === safeData.length} onChange={toggleSelectAll} className="h-3.5 w-3.5 rounded border-gray-300" />
+                                    <input type="checkbox" checked={safeData.length > 0 && selectedIds.length === safeData.length} onChange={toggleSelectAll} className="h-3.5 w-3.5 rounded border-border" />
                                 </th>
                                 <th className="px-4 py-3 text-left font-medium">Title</th>
                                 <th className="px-4 py-3 text-left font-medium">Asset</th>
@@ -219,7 +219,7 @@ export default function WorkOrdersIndex({ work_orders, filters, users }: Props) 
                                 safeData.map((wo) => (
                                     <tr key={wo.id} className={`border-b transition-colors hover:bg-muted/30 transition-colors cursor-pointer ${PRIORITY_BORDER[wo.priority] ?? ''}`} onClick={() => router.visit(`/fleet-assets/maintenance/work-orders/${wo.id}`)}>
                                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                            <input type="checkbox" checked={selectedIds.includes(wo.id)} onChange={() => toggleSelect(wo.id)} className="h-3.5 w-3.5 rounded border-gray-300" />
+                                            <input type="checkbox" checked={selectedIds.includes(wo.id)} onChange={() => toggleSelect(wo.id)} className="h-3.5 w-3.5 rounded border-border" />
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2"><Wrench className="h-4 w-4 text-muted-foreground" /><span className="font-medium">{wo.title}</span></div>

@@ -140,10 +140,10 @@ const KUDOS_ICONS: Record<string, typeof Star> = {
 const KUDOS_COLORS: Record<string, string> = {
     teamwork: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
     innovation: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
-    leadership: 'bg-violet-500/10 text-violet-600 border-violet-500/30',
+    leadership: 'bg-primary/10 text-primary border-primary/30',
     customer_focus: 'bg-pink-500/10 text-pink-600 border-pink-500/30',
     going_above: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
-    other: 'bg-slate-500/10 text-slate-600 border-slate-500/30',
+    other: 'bg-slate-500/10 text-muted-foreground border-slate-500/30',
 };
 
 const GOAL_STATUS: Record<string, { label: string; color: string }> = {
@@ -411,8 +411,8 @@ export default function DirectoryShow({
                                     )}
                                     {employee.site && (
                                         <div className="flex items-center gap-3 rounded-lg p-3 bg-muted/30">
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
-                                                <MapPin className="h-4 w-4 text-violet-600" />
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                                                <MapPin className="h-4 w-4 text-primary" />
                                             </div>
                                             <div>
                                                 <p className="text-[10px] text-muted-foreground">Site</p>

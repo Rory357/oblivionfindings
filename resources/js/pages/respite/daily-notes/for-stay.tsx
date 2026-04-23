@@ -27,7 +27,7 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                         <h1 className="text-lg font-semibold">
                             Daily Notes for {stay.client?.first_name} {stay.client?.last_name}
                         </h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             {formatDateTime(stay.start_date)} &mdash; {formatDateTime(stay.end_date)}
                         </div>
                     </div>
@@ -49,7 +49,7 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="border-b text-left text-xs text-slate-500">
+                                        <tr className="border-b text-left text-xs text-muted-foreground">
                                             <th className="pb-2 pr-4">Date</th>
                                             <th className="pb-2 pr-4">Shift</th>
                                             <th className="pb-2 pr-4">Score</th>
@@ -85,7 +85,7 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                                                 {note.has_concerns && <Badge variant="outline">Concern</Badge>}
                                                 {note.incident_occurred && <Badge variant="outline">Incident</Badge>}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {formatDateTime(note.note_date)}
                                             </div>
                                         </div>
@@ -98,7 +98,7 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                         </Card>
                     ))}
                     {!notes.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No items found.
                         </div>
                     )}

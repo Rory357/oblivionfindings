@@ -104,17 +104,17 @@ export default function CreateSite() {
                                             onClick={() => setData('type', type.value as any)}
                                             className={`cursor-pointer rounded-lg border p-4 transition-colors ${
                                                 isSelected
-                                                    ? 'border-indigo-500 bg-indigo-500/10'
-                                                    : 'border hover:border-indigo-500/50'
+                                                    ? 'border-primary bg-primary/10'
+                                                    : 'border hover:border-primary/50'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Icon className={`w-5 h-5 ${isSelected ? 'text-indigo-400' : 'text-slate-400'}`} />
-                                                <span className={`font-medium ${isSelected ? 'text-indigo-200' : ''}`}>
+                                                <Icon className={`w-5 h-5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                                                <span className={`font-medium ${isSelected ? 'text-primary/70' : ''}`}>
                                                     {type.label}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-slate-400">{type.description}</p>
+                                            <p className="text-xs text-muted-foreground">{type.description}</p>
                                         </div>
                                     );
                                 })}
@@ -332,7 +332,7 @@ export default function CreateSite() {
                                     rows={3}
                                     placeholder="Gate codes, key locations, parking instructions..."
                                 />
-                                <p className="text-xs text-slate-500 mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                     This information is permission-protected
                                 </p>
                             </div>

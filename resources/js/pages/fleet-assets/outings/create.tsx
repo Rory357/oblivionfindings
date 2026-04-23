@@ -85,7 +85,7 @@ const PURPOSE_TYPES = [
     { value: 'medical', label: 'Medical', icon: Stethoscope, color: 'border-red-500 bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700' },
     { value: 'social', label: 'Social', icon: Users, color: 'border-green-500 bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700' },
     { value: 'recreational', label: 'Recreational', icon: Sun, color: 'border-orange-500 bg-orange-50 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700' },
-    { value: 'shopping', label: 'Shopping', icon: ShoppingBag, color: 'border-purple-500 bg-purple-50 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700' },
+    { value: 'shopping', label: 'Shopping', icon: ShoppingBag, color: 'border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary dark:border-primary' },
 ];
 
 export default function OutingCreate({ clients, vehicles, drivers, auth_user, can }: Props) {
@@ -301,15 +301,15 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                             className={cn(
                                 "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all",
                                 step === s.num
-                                    ? "bg-purple-600 text-white shadow-md"
+                                    ? "bg-primary text-white shadow-md"
                                     : step > s.num
-                                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                                        ? "bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary"
                                         : "bg-muted text-muted-foreground"
                             )}
                         >
                             <span className={cn(
                                 "flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
-                                step === s.num ? "bg-white text-purple-600" : step > s.num ? "bg-purple-600 text-white" : "bg-muted-foreground/20"
+                                step === s.num ? "bg-white text-primary" : step > s.num ? "bg-primary text-white" : "bg-muted-foreground/20"
                             )}>
                                 {step > s.num ? <Check className="h-3.5 w-3.5" /> : s.num}
                             </span>
@@ -431,14 +431,14 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                                         className={cn(
                                                             "flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all",
                                                             isSelected
-                                                                ? "border-purple-500 bg-purple-50 shadow-md dark:bg-purple-900/20 dark:border-purple-600"
+                                                                ? "border-primary bg-primary/10 shadow-md dark:bg-primary/20 dark:border-primary"
                                                                 : "border-transparent bg-muted/30 hover:bg-muted/60 hover:border-muted-foreground/20"
                                                         )}
                                                     >
                                                         <div className={cn(
                                                             "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-all",
                                                             isSelected
-                                                                ? "border-purple-600 bg-purple-600 text-white"
+                                                                ? "border-primary bg-primary text-white"
                                                                 : "border-muted-foreground/30"
                                                         )}>
                                                             {isSelected && <Check className="h-3.5 w-3.5" />}
@@ -477,16 +477,16 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
 
                             {/* Care needs summary */}
                             {selectedResidents.length > 0 && Object.values(combinedNeeds).some(Boolean) && (
-                                <Card className="border-purple-200 dark:border-purple-800">
+                                <Card className="border-primary dark:border-primary/30">
                                     <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm text-purple-700 dark:text-purple-400">Care Needs Summary</CardTitle>
+                                        <CardTitle className="text-sm text-primary dark:text-primary">Care Needs Summary</CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="flex flex-wrap gap-2">
-                                            {combinedNeeds.wheelchair_ramp && <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">Wheelchair Ramp Required</Badge>}
-                                            {combinedNeeds.hoist && <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">Hoist Required</Badge>}
-                                            {combinedNeeds.child_seat && <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">Child Seat Required</Badge>}
-                                            {combinedNeeds.medical_storage && <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">Medical Storage Required</Badge>}
+                                            {combinedNeeds.wheelchair_ramp && <Badge className="bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary">Wheelchair Ramp Required</Badge>}
+                                            {combinedNeeds.hoist && <Badge className="bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary">Hoist Required</Badge>}
+                                            {combinedNeeds.child_seat && <Badge className="bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary">Child Seat Required</Badge>}
+                                            {combinedNeeds.medical_storage && <Badge className="bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary">Medical Storage Required</Badge>}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -538,11 +538,11 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                             {stops.map((stop, index) => (
                                                 <div
                                                     key={stop.id}
-                                                    className="rounded-xl border-2 border-purple-200 bg-purple-50/30 p-4 dark:border-purple-800 dark:bg-purple-950/20"
+                                                    className="rounded-xl border-2 border-primary bg-primary/10/30 p-4 dark:border-primary/30 dark:bg-primary/20"
                                                 >
                                                     <div className="flex items-start gap-3">
                                                         {/* Stop Number */}
-                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-600 text-sm font-bold text-white">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
                                                             {index + 1}
                                                         </div>
 
@@ -585,7 +585,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                                                                     className={cn(
                                                                                         "rounded-full px-2.5 py-1 text-xs font-medium transition-all",
                                                                                         isAtStop
-                                                                                            ? "bg-purple-600 text-white"
+                                                                                            ? "bg-primary text-white"
                                                                                             : "bg-muted text-muted-foreground hover:bg-muted/80"
                                                                                     )}
                                                                                 >
@@ -656,21 +656,21 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
 
                             {/* Route Estimates */}
                             {stops.length >= 2 && (
-                                <Card className="border-purple-200 dark:border-purple-800">
+                                <Card className="border-primary dark:border-primary/30">
                                     <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm text-purple-700 dark:text-purple-400">Route Estimate</CardTitle>
+                                        <CardTitle className="text-sm text-primary dark:text-primary">Route Estimate</CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="flex items-center gap-2">
-                                                <Navigation className="h-4 w-4 text-purple-600" />
+                                                <Navigation className="h-4 w-4 text-primary" />
                                                 <div>
                                                     <p className="text-lg font-bold">{routeEstimates.totalDistanceKm} km</p>
                                                     <p className="text-xs text-muted-foreground">Estimated Distance</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Clock className="h-4 w-4 text-purple-600" />
+                                                <Clock className="h-4 w-4 text-primary" />
                                                 <div>
                                                     <p className="text-lg font-bold">{routeEstimates.totalMinutes} min</p>
                                                     <p className="text-xs text-muted-foreground">Estimated Travel Time</p>
@@ -805,7 +805,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                             </Card>
 
                             {/* Summary card */}
-                            <Card className="border-purple-200 dark:border-purple-800">
+                            <Card className="border-primary dark:border-primary/30">
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm">Outing Summary</CardTitle>
                                 </CardHeader>

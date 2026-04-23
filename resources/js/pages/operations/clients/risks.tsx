@@ -56,7 +56,7 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Risk register</h1>
-                        <div className="mt-1 text-sm text-slate-500">{name}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">{name}</div>
                     </div>
                     <Link href={`/operations/clients/${client.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                         Back to {(labels?.['client.singular'] ?? 'Client').toLowerCase()}
@@ -126,7 +126,7 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <div className="font-semibold">{r.label}</div>
-                                            <div className="mt-1 text-xs text-slate-500">
+                                            <div className="mt-1 text-xs text-muted-foreground">
                                                 {r.severity} • {r.active ? 'active' : 'inactive'}
                                                 {r.review_date ? <span className="ml-2">• review: {r.review_date}</span> : null}
                                             </div>
@@ -155,7 +155,7 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                             <CardContent className="space-y-2 text-sm">
                                 {r.controls ? (
                                     <div>
-                                        <div className="text-xs text-slate-500">Controls</div>
+                                        <div className="text-xs text-muted-foreground">Controls</div>
                                         <div className="whitespace-pre-wrap">{r.controls}</div>
                                     </div>
                                 ) : null}
@@ -219,7 +219,7 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                             </CardContent>
                         </Card>
                     ))}
-                    {!risks.length && <div className="text-sm text-slate-500">No risks recorded.</div>}
+                    {!risks.length && <div className="text-sm text-muted-foreground">No risks recorded.</div>}
                 </div>
             </div>
         </AppLayout>

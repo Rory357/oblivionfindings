@@ -239,7 +239,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                                     {transactions.map((txn) => {
                                         const typeConf = txnTypeConfig[txn.transaction_type] ?? {
                                             label: txn.transaction_type,
-                                            className: 'bg-gray-100 text-gray-800',
+                                            className: 'bg-muted text-foreground',
                                         };
                                         return (
                                             <TableRow key={txn.id}>

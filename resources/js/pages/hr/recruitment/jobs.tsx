@@ -295,7 +295,7 @@ export default function RecruitmentJobs({
                     <KpiCard label="Open Requisitions" value={summary.open_requisitions} icon={BriefcaseBusiness} color="bg-blue-500/10 text-blue-500" />
                     <KpiCard label="Active Candidates" value={summary.active_candidates} icon={UserCheck} color="bg-emerald-500/10 text-emerald-500" />
                     <KpiCard label="Stale Candidates" value={summary.stale_candidates} icon={AlertTriangle} color="bg-amber-500/10 text-amber-500" />
-                    <KpiCard label="Offers In Flight" value={summary.offers_in_flight} icon={Clock3} color="bg-purple-500/10 text-purple-500" />
+                    <KpiCard label="Offers In Flight" value={summary.offers_in_flight} icon={Clock3} color="bg-primary/10 text-primary" />
                     <KpiCard label="Total Hired" value={summary.hired_candidates} icon={CheckCircle2} color="bg-green-500/10 text-green-500" />
                 </div>
 

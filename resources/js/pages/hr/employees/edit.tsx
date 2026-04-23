@@ -218,7 +218,7 @@ export default function EmployeeEdit({ profile, sites, departments, employmentTy
                                             id="is_active"
                                             checked={form.data.is_active}
                                             onChange={(e) => form.setData('is_active', e.target.checked)}
-                                            className="h-4 w-4 rounded border-gray-300"
+                                            className="h-4 w-4 rounded border-border"
                                         />
                                         <Label htmlFor="is_active">Active Employee</Label>
                                     </div>

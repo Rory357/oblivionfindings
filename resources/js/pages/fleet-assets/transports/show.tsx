@@ -151,12 +151,12 @@ const TRANSPORT_TYPE_BANNER: Record<string, string> = {
         'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200',
     social: 'bg-green-50 border-green-200 text-green-900 dark:bg-green-950/30 dark:border-green-800 dark:text-green-200',
     shopping:
-        'bg-purple-50 border-purple-200 text-purple-900 dark:bg-purple-950/30 dark:border-purple-800 dark:text-purple-200',
+        'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
     community:
         'bg-teal-50 border-teal-200 text-teal-900 dark:bg-teal-950/30 dark:border-teal-800 dark:text-teal-200',
     respite:
         'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-950/30 dark:border-orange-800 dark:text-orange-200',
-    other: 'bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-950/30 dark:border-gray-800 dark:text-gray-200',
+    other: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
 };
 
 function statusVariant(
@@ -650,7 +650,7 @@ export default function TransportShow({
                     )}
 
                 {(care_needs ?? []).length > 0 && (
-                    <Card className="border bg-purple-50 dark:bg-purple-950/30">
+                    <Card className="border bg-primary/10 dark:bg-primary/30">
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <User className="h-4 w-4" />

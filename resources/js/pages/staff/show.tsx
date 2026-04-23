@@ -226,7 +226,7 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
                     <Card className="border-l-4 border-l-purple-500">
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Truck className="h-4 w-4 text-purple-600" />
+                                <Truck className="h-4 w-4 text-primary" />
                                 Fleet &amp; Driving
                             </CardTitle>
                         </CardHeader>
@@ -287,7 +287,7 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
                                     <div className="text-[10px] text-muted-foreground">Trips (30d)</div>
                                 </div>
                                 <div className="rounded-md border p-3 text-center">
-                                    <Car className="mx-auto h-4 w-4 text-purple-500 mb-1" />
+                                    <Car className="mx-auto h-4 w-4 text-primary mb-1" />
                                     <div className="text-lg font-bold">{fleet.stats.distance_km_30d} <span className="text-xs font-normal text-muted-foreground">km</span></div>
                                     <div className="text-[10px] text-muted-foreground">Distance (30d)</div>
                                 </div>

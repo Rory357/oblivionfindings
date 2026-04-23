@@ -80,10 +80,10 @@ const categories = [
         bg: 'bg-amber-50 dark:bg-amber-950/40',
     },
     {
-        dot: 'bg-purple-500',
+        dot: 'bg-primary',
         label: 'Specialist',
         icon: Heart,
-        bg: 'bg-purple-50 dark:bg-purple-950/40',
+        bg: 'bg-primary/10 dark:bg-primary/40',
     },
     {
         dot: 'bg-pink-500',
@@ -112,7 +112,7 @@ const statusColors: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800',
     approved: 'bg-emerald-100 text-emerald-800',
     declined: 'bg-red-100 text-red-800',
-    cancelled: 'bg-gray-100 text-gray-600',
+    cancelled: 'bg-muted text-muted-foreground',
 };
 
 const calendarStyles = `

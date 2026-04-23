@@ -90,7 +90,7 @@ const severityConfig: Record<string, { bg: string; text: string }> = {
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
     open: { bg: 'bg-red-100', text: 'text-red-700', icon: AlertTriangle },
     in_progress: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
-    mitigated: { bg: 'bg-purple-100', text: 'text-purple-700', icon: CheckCircle2 },
+    mitigated: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2 },
     closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
 };
 
@@ -130,7 +130,7 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                         </div>
                         <div>
                             <h1 className="text-lg font-semibold">Hazards - {site.name}</h1>
-                            <div className="text-sm text-slate-500">Hazard register for this site</div>
+                            <div className="text-sm text-muted-foreground">Hazard register for this site</div>
                         </div>
                     </div>
                     <Link href={`/sites/${site.id}/hazards/create`}>
@@ -145,34 +145,34 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div className="rounded-lg border bg-white p-3">
                         <div className="text-2xl font-bold">{openCount}</div>
-                        <div className="text-xs text-slate-500">Open hazards</div>
+                        <div className="text-xs text-muted-foreground">Open hazards</div>
                     </div>
                     <div className="rounded-lg border bg-white p-3">
-                        <div className={`text-2xl font-bold ${criticalCount > 0 ? 'text-red-600' : 'text-slate-600'}`}>{criticalCount}</div>
-                        <div className="text-xs text-slate-500">Critical / Extreme</div>
+                        <div className={`text-2xl font-bold ${criticalCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{criticalCount}</div>
+                        <div className="text-xs text-muted-foreground">Critical / Extreme</div>
                     </div>
                     <div className="rounded-lg border bg-white p-3">
-                        <div className={`text-2xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-slate-600'}`}>{overdueCount}</div>
-                        <div className="text-xs text-slate-500">Overdue</div>
+                        <div className={`text-2xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{overdueCount}</div>
+                        <div className="text-xs text-muted-foreground">Overdue</div>
                     </div>
                     <div className="rounded-lg border bg-white p-3">
                         <div className="text-2xl font-bold text-emerald-600">{closedCount}</div>
-                        <div className="text-xs text-slate-500">Closed</div>
+                        <div className="text-xs text-muted-foreground">Closed</div>
                     </div>
                 </div>
 
                 {/* Filters */}
                 <Card>
                     <CardContent className="pt-4">
-                        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
                             <Filter className="h-4 w-4" />
                             Filters
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                             <div className="sm:col-span-2">
-                                <Label className="text-xs text-slate-500">Search</Label>
+                                <Label className="text-xs text-muted-foreground">Search</Label>
                                 <div className="relative">
-                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         placeholder="Reference, type, description..."
                                         className="pl-9"
@@ -183,7 +183,7 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                             </div>
 
                             <div>
-                                <Label className="text-xs text-slate-500">Status</Label>
+                                <Label className="text-xs text-muted-foreground">Status</Label>
                                 <Select
                                     value={filters.status ?? ANY}
                                     onValueChange={(v) => onFilter({ status: v === ANY ? undefined : v })}
@@ -200,7 +200,7 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                             </div>
 
                             <div>
-                                <Label className="text-xs text-slate-500">Severity</Label>
+                                <Label className="text-xs text-muted-foreground">Severity</Label>
                                 <Select
                                     value={filters.severity ?? ANY}
                                     onValueChange={(v) => onFilter({ severity: v === ANY ? undefined : v })}
@@ -216,7 +216,7 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                             </div>
 
                             <div>
-                                <Label className="text-xs text-slate-500">Risk Rating</Label>
+                                <Label className="text-xs text-muted-foreground">Risk Rating</Label>
                                 <Select
                                     value={filters.risk_rating ?? ANY}
                                     onValueChange={(v) => onFilter({ risk_rating: v === ANY ? undefined : v })}
@@ -285,9 +285,9 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                                                 )}
                                             </div>
                                             {preview && (
-                                                <p className="mt-1 text-sm text-slate-600 line-clamp-1">{preview}</p>
+                                                <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{preview}</p>
                                             )}
-                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                                 <span className="flex items-center gap-1">
                                                     <User className="h-3 w-3" />
                                                     {hazard.reported_by.name}
@@ -297,7 +297,7 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                                                     {formatDateTime(hazard.created_at)}
                                                 </span>
                                                 {hazard.assigned_to && (
-                                                    <span className="text-slate-400">Assigned to {hazard.assigned_to.name}</span>
+                                                    <span className="text-muted-foreground">Assigned to {hazard.assigned_to.name}</span>
                                                 )}
                                             </div>
                                         </div>
@@ -308,7 +308,7 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                                 <div className="absolute right-2 top-2.5 z-10" onClick={(e) => e.stopPropagation()}>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+                                            <button className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground transition-colors">
                                                 <MoreVertical className="h-4 w-4" />
                                             </button>
                                         </DropdownMenuTrigger>
@@ -346,8 +346,8 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                     {!data.length && (
                         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
                             <AlertTriangle className="h-10 w-10 text-slate-300" />
-                            <div className="mt-2 text-sm font-medium text-slate-500">No hazards logged</div>
-                            <div className="text-xs text-slate-400">Log a hazard to get started</div>
+                            <div className="mt-2 text-sm font-medium text-muted-foreground">No hazards logged</div>
+                            <div className="text-xs text-muted-foreground">Log a hazard to get started</div>
                         </div>
                     )}
                 </div>

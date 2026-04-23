@@ -53,8 +53,8 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-                    <p className="text-gray-500 mt-1">Committee risk oversight</p>
+                    <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+                    <p className="text-muted-foreground mt-1">Committee risk oversight</p>
                 </div>
 
                 <div className="space-y-3">
@@ -64,7 +64,7 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-semibold text-gray-900">{risk.title}</span>
+                                            <span className="font-semibold text-foreground">{risk.title}</span>
                                             <Badge variant="outline">{risk.risk_reference}</Badge>
                                             {risk.category && (
                                                 <Badge variant="secondary" className="capitalize">
@@ -73,11 +73,11 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
                                             )}
                                         </div>
                                         {risk.mitigation_strategy && (
-                                            <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                                                 {risk.mitigation_strategy}
                                             </p>
                                         )}
-                                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1">
                                                 <Calendar className="w-3 h-3" />
                                                 Next review: {formatDate(risk.next_review_date)}
@@ -87,7 +87,7 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
                                                     {risk.within_appetite ? (
                                                         <CheckCircle2 className="w-3 h-3 text-green-500" />
                                                     ) : (
-                                                        <AlertTriangle className="w-3 h-3 text-purple-500" />
+                                                        <AlertTriangle className="w-3 h-3 text-primary" />
                                                     )}
                                                     {risk.within_appetite ? 'Within appetite' : 'Above appetite'}
                                                 </span>
@@ -102,7 +102,7 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
                         </Card>
                     ))}
                     {sorted.length === 0 && (
-                        <div className="py-12 text-center text-sm text-gray-500">
+                        <div className="py-12 text-center text-sm text-muted-foreground">
                             No risks assigned to this committee.
                         </div>
                     )}

@@ -31,7 +31,7 @@ type Props = {
 };
 
 const severityColors: Record<string, string> = {
-    low: 'bg-slate-500/20 text-slate-400',
+    low: 'bg-slate-500/20 text-muted-foreground',
     medium: 'bg-yellow-500/20 text-yellow-400',
     high: 'bg-orange-500/20 text-orange-400',
     critical: 'bg-red-500/20 text-red-400',
@@ -74,7 +74,7 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                         <AlertTriangle className="w-5 h-5 text-red-400" />
                         Overdue Corrective Actions
                     </h1>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-muted-foreground">
                         Hazards past their due date that remain open
                     </p>
                 </div>
@@ -84,7 +84,7 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                     <Card className="bg-red-500/5 border-red-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-red-400">{overdueActions.length}</div>
-                            <div className="text-sm text-slate-400">Total Overdue</div>
+                            <div className="text-sm text-muted-foreground">Total Overdue</div>
                         </CardContent>
                     </Card>
                     <Card>
@@ -92,7 +92,7 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                             <div className="text-2xl font-bold text-orange-400">
                                 {overdueActions.filter(a => a.severity === 'critical' || a.severity === 'high').length}
                             </div>
-                            <div className="text-sm text-slate-400">High/Critical</div>
+                            <div className="text-sm text-muted-foreground">High/Critical</div>
                         </CardContent>
                     </Card>
                     <Card>
@@ -100,7 +100,7 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                             <div className="text-2xl font-bold">
                                 {overdueActions.filter(a => !a.assigned_to).length}
                             </div>
-                            <div className="text-sm text-slate-400">Unassigned</div>
+                            <div className="text-sm text-muted-foreground">Unassigned</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -163,7 +163,7 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                     </CardHeader>
                     <CardContent>
                         {overdueActions.length === 0 ? (
-                            <p className="text-sm text-slate-400 text-center py-8">No overdue corrective actions found.</p>
+                            <p className="text-sm text-muted-foreground text-center py-8">No overdue corrective actions found.</p>
                         ) : (
                             <Table>
                                 <TableHeader>
@@ -195,10 +195,10 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                                             </TableCell>
                                             <TableCell>
                                                 {action.assigned_to?.name || (
-                                                    <span className="text-slate-500">Unassigned</span>
+                                                    <span className="text-muted-foreground">Unassigned</span>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-slate-400">
+                                            <TableCell className="text-muted-foreground">
                                                 {new Date(action.due_date).toLocaleDateString()}
                                             </TableCell>
                                             <TableCell>

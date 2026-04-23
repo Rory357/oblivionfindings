@@ -48,7 +48,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const priorityConfig: Record<string, { className: string; label: string; icon: React.ComponentType<any> }> = {
     low: {
-        className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
         label: 'Low',
         icon: Info,
     },
@@ -109,7 +109,7 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Priority</Label>
+                            <Label className="text-xs text-muted-foreground">Priority</Label>
                             <Select
                                 value={filters.priority ?? NONE}
                                 onValueChange={(v) => onFilter({ priority: v === NONE ? null : v })}
@@ -159,10 +159,10 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <p className="mb-3 line-clamp-3 text-sm text-slate-600">
+                                            <p className="mb-3 line-clamp-3 text-sm text-muted-foreground">
                                                 {announcement.content}
                                             </p>
-                                            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                                            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                                                 <span>By {announcement.creator?.name ?? 'Unknown'}</span>
                                                 <span>Published {formatDate(announcement.published_at)}</span>
                                                 {announcement.expires_at && (
@@ -201,7 +201,7 @@ export default function AnnouncementsIndex({ announcements, acknowledgedIds, fil
 
                     {!announcements.data.length && (
                         <Card>
-                            <CardContent className="py-12 text-center text-sm text-slate-500">
+                            <CardContent className="py-12 text-center text-sm text-muted-foreground">
                                 No announcements found.
                             </CardContent>
                         </Card>

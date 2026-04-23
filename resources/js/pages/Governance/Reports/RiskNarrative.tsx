@@ -65,8 +65,8 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Risk Narrative Report</h1>
-                    <p className="text-gray-500 mt-1">Detailed narrative view of all active risks</p>
+                    <h1 className="text-3xl font-bold text-foreground">Risk Narrative Report</h1>
+                    <p className="text-muted-foreground mt-1">Detailed narrative view of all active risks</p>
                 </div>
 
                 {/* Summary Stats */}
@@ -93,14 +93,14 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-purple-200">
+                    <Card className="border-primary">
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-purple-600">Above Appetite</p>
-                                    <p className="text-3xl font-bold text-purple-600">{summary.above_appetite}</p>
+                                    <p className="text-sm text-primary">Above Appetite</p>
+                                    <p className="text-3xl font-bold text-primary">{summary.above_appetite}</p>
                                 </div>
-                                <TrendingUp className="w-8 h-8 text-purple-500" />
+                                <TrendingUp className="w-8 h-8 text-primary" />
                             </div>
                         </CardContent>
                     </Card>
@@ -108,10 +108,10 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-500">Total Active</p>
+                                    <p className="text-sm text-muted-foreground">Total Active</p>
                                     <p className="text-3xl font-bold">{summary.total_active}</p>
                                 </div>
-                                <Shield className="w-8 h-8 text-gray-400" />
+                                <Shield className="w-8 h-8 text-muted-foreground" />
                             </div>
                         </CardContent>
                     </Card>
@@ -131,13 +131,13 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                                                 {risk.severity}
                                             </Badge>
                                             {!risk.within_appetite && (
-                                                <Badge className="bg-purple-100 text-purple-800">Above Appetite</Badge>
+                                                <Badge className="bg-primary/10 text-primary">Above Appetite</Badge>
                                             )}
                                         </CardTitle>
                                         <CardDescription className="capitalize mt-1">{risk.category?.replace(/_/g, ' ')}</CardDescription>
                                     </div>
                                     <div className="text-right shrink-0">
-                                        <div className="text-sm text-gray-500">Residual Score</div>
+                                        <div className="text-sm text-muted-foreground">Residual Score</div>
                                         <div className="text-2xl font-bold">{risk.residual_score}</div>
                                     </div>
                                 </div>
@@ -146,19 +146,19 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                                 <div className="space-y-4">
                                     {risk.description && (
                                         <div>
-                                            <p className="text-sm font-medium text-gray-700 mb-1">Description</p>
-                                            <p className="text-sm text-gray-600">{risk.description}</p>
+                                            <p className="text-sm font-medium text-foreground mb-1">Description</p>
+                                            <p className="text-sm text-muted-foreground">{risk.description}</p>
                                         </div>
                                     )}
 
                                     {risk.mitigation_strategy && (
                                         <div>
-                                            <p className="text-sm font-medium text-gray-700 mb-1">Mitigation Strategy</p>
-                                            <p className="text-sm text-gray-600">{risk.mitigation_strategy}</p>
+                                            <p className="text-sm font-medium text-foreground mb-1">Mitigation Strategy</p>
+                                            <p className="text-sm text-muted-foreground">{risk.mitigation_strategy}</p>
                                         </div>
                                     )}
 
-                                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                         <span>Inherent: <strong>{risk.inherent_score}</strong></span>
                                         <span>Residual: <strong>{risk.residual_score}</strong></span>
                                         <span>Control Effectiveness: <strong className="capitalize">{risk.control_effectiveness}</strong></span>
@@ -176,7 +176,7 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                         </Card>
                     ))}
                     {risks.length === 0 && (
-                        <div className="py-12 text-center text-sm text-gray-500">No active risks found.</div>
+                        <div className="py-12 text-center text-sm text-muted-foreground">No active risks found.</div>
                     )}
                 </div>
             </div>

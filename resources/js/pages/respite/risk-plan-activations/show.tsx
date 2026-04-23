@@ -18,12 +18,12 @@ const statusColors: Record<string, string> = {
     pending_review: 'bg-amber-100 text-amber-800',
     active: 'bg-green-100 text-green-800',
     modified: 'bg-blue-100 text-blue-800',
-    suspended: 'bg-slate-100 text-slate-600',
-    completed: 'bg-slate-100 text-slate-800',
+    suspended: 'bg-muted text-muted-foreground',
+    completed: 'bg-muted text-foreground',
 };
 
 const typeColors: Record<string, string> = {
-    behaviour: 'bg-purple-100 text-purple-800',
+    behaviour: 'bg-primary/10 text-primary',
     safety: 'bg-red-100 text-red-800',
     medical: 'bg-blue-100 text-blue-800',
     mobility: 'bg-orange-100 text-orange-800',
@@ -45,7 +45,7 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">{activation.plan_name}</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             {activation.stay?.client?.first_name} {activation.stay?.client?.last_name}
                         </div>
                     </div>
@@ -59,7 +59,7 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
                     <CardHeader>
                         <CardTitle className="text-base">Plan Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3 text-sm text-slate-600">
+                    <CardContent className="space-y-3 text-sm text-muted-foreground">
                         <div className="flex flex-wrap gap-2">
                             <Badge className={typeColors[activation.plan_type] || ''}>{activation.plan_type?.replace(/_/g, ' ')}</Badge>
                             <Badge className={statusColors[activation.status] || ''}>{activation.status?.replace(/_/g, ' ')}</Badge>
@@ -67,7 +67,7 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
 
                         {activation.plan_details?.length > 0 && (
                             <div>
-                                <div className="font-medium text-slate-700">Plan Details</div>
+                                <div className="font-medium text-foreground">Plan Details</div>
                                 <ul className="mt-1 list-disc pl-5 space-y-1">
                                     {activation.plan_details.map((d: string, i: number) => <li key={i}>{d}</li>)}
                                 </ul>
@@ -76,7 +76,7 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
 
                         {activation.triggers?.length > 0 && (
                             <div>
-                                <div className="font-medium text-slate-700">Triggers</div>
+                                <div className="font-medium text-foreground">Triggers</div>
                                 <ul className="mt-1 list-disc pl-5 space-y-1">
                                     {activation.triggers.map((t: string, i: number) => <li key={i}>{t}</li>)}
                                 </ul>
@@ -85,7 +85,7 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
 
                         {activation.interventions?.length > 0 && (
                             <div>
-                                <div className="font-medium text-slate-700">Interventions</div>
+                                <div className="font-medium text-foreground">Interventions</div>
                                 <ul className="mt-1 list-disc pl-5 space-y-1">
                                     {activation.interventions.map((v: string, i: number) => <li key={i}>{v}</li>)}
                                 </ul>
@@ -94,7 +94,7 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
 
                         {activation.escalation_steps?.length > 0 && (
                             <div>
-                                <div className="font-medium text-slate-700">Escalation Steps</div>
+                                <div className="font-medium text-foreground">Escalation Steps</div>
                                 <ol className="mt-1 list-decimal pl-5 space-y-1">
                                     {activation.escalation_steps.map((s: string, i: number) => <li key={i}>{s}</li>)}
                                 </ol>
@@ -107,14 +107,14 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
                     <CardHeader>
                         <CardTitle className="text-base">Review Info</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm text-slate-600">
+                    <CardContent className="space-y-2 text-sm text-muted-foreground">
                         {activation.reviewed_by ? (
                             <>
                                 <div>Reviewed by: {activation.reviewed_by?.name || 'Unknown'}</div>
                                 <div>Review notes: {activation.review_notes || 'None'}</div>
                             </>
                         ) : (
-                            <div className="text-slate-500">Not yet reviewed.</div>
+                            <div className="text-muted-foreground">Not yet reviewed.</div>
                         )}
                     </CardContent>
                 </Card>
@@ -126,18 +126,18 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
                     <CardContent>
                         {activation.acknowledgments?.length ? (
                             <div className="space-y-2">
-                                <div className="text-sm text-slate-500">{activation.acknowledgments.length} staff acknowledged</div>
+                                <div className="text-sm text-muted-foreground">{activation.acknowledgments.length} staff acknowledged</div>
                                 <ul className="space-y-1 text-sm">
                                     {activation.acknowledgments.map((ack: any, i: number) => (
                                         <li key={i} className="flex justify-between">
                                             <span>{ack.user?.name || 'Unknown'}</span>
-                                            <span className="text-xs text-slate-400">{formatDateTime(ack.acknowledged_at)}</span>
+                                            <span className="text-xs text-muted-foreground">{formatDateTime(ack.acknowledged_at)}</span>
                                         </li>
                                     ))}
                                 </ul>
                             </div>
                         ) : (
-                            <div className="text-sm text-slate-500">No acknowledgments yet.</div>
+                            <div className="text-sm text-muted-foreground">No acknowledgments yet.</div>
                         )}
                     </CardContent>
                 </Card>

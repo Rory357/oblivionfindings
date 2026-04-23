@@ -121,9 +121,9 @@ const EVENT_CONFIG: Record<
     prescriber_order: {
         label: 'Prescriber Order',
         icon: FileText,
-        color: 'text-purple-600 dark:text-purple-400',
-        bg: 'bg-purple-100 dark:bg-purple-900/40',
-        badgeVariant: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+        color: 'text-primary dark:text-primary',
+        bg: 'bg-primary/10 dark:bg-primary/40',
+        badgeVariant: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
     },
     review_completed: {
         label: 'Review Completed',
@@ -341,8 +341,8 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/40">
-                                <Calendar className="h-5 w-5 text-purple-600" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                <Calendar className="h-5 w-5 text-primary" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{stats.this_month.toLocaleString()}</p>

@@ -56,7 +56,7 @@ const reasonLabels: Record<string, string> = {
 };
 
 function SatisfactionStars({ rating }: { rating: number | null }) {
-    if (rating === null) return <span className="text-sm text-slate-400">Not rated</span>;
+    if (rating === null) return <span className="text-sm text-muted-foreground">Not rated</span>;
     return (
         <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -65,7 +65,7 @@ function SatisfactionStars({ rating }: { rating: number | null }) {
                     className={`h-5 w-5 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'}`}
                 />
             ))}
-            <span className="ml-2 text-sm text-slate-600">{rating}/5</span>
+            <span className="ml-2 text-sm text-muted-foreground">{rating}/5</span>
         </div>
     );
 }
@@ -74,8 +74,8 @@ function FeedbackSection({ title, content }: { title: string; content: string | 
     if (!content) return null;
     return (
         <div>
-            <h4 className="mb-1 text-sm font-medium text-slate-700">{title}</h4>
-            <p className="whitespace-pre-wrap text-sm text-slate-600">{content}</p>
+            <h4 className="mb-1 text-sm font-medium text-foreground">{title}</h4>
+            <p className="whitespace-pre-wrap text-sm text-muted-foreground">{content}</p>
         </div>
     );
 }
@@ -106,32 +106,32 @@ export default function ExitInterviewShow({ interview, can }: Props) {
                         <CardContent>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 <div>
-                                    <p className="text-xs text-slate-500">Employee</p>
+                                    <p className="text-xs text-muted-foreground">Employee</p>
                                     <p className="font-medium">{interview.employee_profile?.user?.name ?? '-'}</p>
-                                    <p className="text-sm text-slate-600">{interview.employee_profile?.position_title ?? '-'}</p>
+                                    <p className="text-sm text-muted-foreground">{interview.employee_profile?.position_title ?? '-'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-slate-500">Interviewer</p>
+                                    <p className="text-xs text-muted-foreground">Interviewer</p>
                                     <p className="font-medium">{interview.interviewer?.name ?? '-'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-slate-500">Date</p>
+                                    <p className="text-xs text-muted-foreground">Date</p>
                                     <p className="font-medium">{formatDate(interview.interview_date)}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-slate-500">Departure Reason</p>
+                                    <p className="text-xs text-muted-foreground">Departure Reason</p>
                                     <Badge variant="outline" className="mt-1">
                                         {reasonLabels[interview.departure_reason] ?? interview.departure_reason}
                                     </Badge>
                                 </div>
                                 <div>
-                                    <p className="mb-1 text-xs text-slate-500">Overall Satisfaction</p>
+                                    <p className="mb-1 text-xs text-muted-foreground">Overall Satisfaction</p>
                                     <SatisfactionStars rating={interview.overall_satisfaction} />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-slate-500">Would Recommend</p>
+                                    <p className="text-xs text-muted-foreground">Would Recommend</p>
                                     {interview.would_recommend === null ? (
-                                        <span className="text-sm text-slate-400">Not specified</span>
+                                        <span className="text-sm text-muted-foreground">Not specified</span>
                                     ) : interview.would_recommend ? (
                                         <Badge className="mt-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
                                             <ThumbsUp className="mr-1 h-3 w-3" /> Yes
@@ -145,7 +145,7 @@ export default function ExitInterviewShow({ interview, can }: Props) {
                             </div>
 
                             {interview.is_confidential && (
-                                <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
+                                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                                     <Lock className="h-3 w-3" />
                                     This interview is marked as confidential.
                                 </div>
@@ -170,7 +170,7 @@ export default function ExitInterviewShow({ interview, can }: Props) {
                                 !interview.management_feedback &&
                                 !interview.culture_feedback &&
                                 !interview.additional_comments && (
-                                    <p className="text-sm text-slate-500">No detailed feedback was recorded.</p>
+                                    <p className="text-sm text-muted-foreground">No detailed feedback was recorded.</p>
                                 )}
                         </CardContent>
                     </Card>

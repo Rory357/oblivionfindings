@@ -37,7 +37,7 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Evidence Packs</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Bundled evidence collections for respite stays.
                         </div>
                     </div>
@@ -78,7 +78,7 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                                         <div className="flex-1">
                                             <div className="font-semibold">{pack.title || `Evidence Pack #${pack.id}`}</div>
                                             {pack.description && (
-                                                <div className="mt-1 text-xs font-normal text-slate-500">
+                                                <div className="mt-1 text-xs font-normal text-muted-foreground">
                                                     {pack.description.length > 100 ? `${pack.description.substring(0, 100)}...` : pack.description}
                                                 </div>
                                             )}
@@ -89,7 +89,7 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                                                 )}
                                                 {pack.sealed_at && <Badge variant="outline">Sealed</Badge>}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 {formatDateTime(pack.created_at)}
                                             </div>
                                         </div>
@@ -102,7 +102,7 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                         </Card>
                     ))}
                     {!packs.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No items found.
                         </div>
                     )}

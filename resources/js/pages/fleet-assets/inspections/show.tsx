@@ -90,7 +90,7 @@ const SECTION_COLORS: Record<string, string> = {
 function ResultIcon({ result }: { result: string }) {
     if (result === 'pass') return <CheckCircle className="h-5 w-5 text-green-600" />;
     if (result === 'fail') return <XCircle className="h-5 w-5 text-red-600" />;
-    return <MinusCircle className="h-5 w-5 text-gray-400" />;
+    return <MinusCircle className="h-5 w-5 text-muted-foreground" />;
 }
 
 export default function InspectionShow({ inspection }: Props) {
@@ -140,13 +140,13 @@ export default function InspectionShow({ inspection }: Props) {
                 <div className={cn(
                     'rounded-lg border px-5 py-4',
                     insp.passed
-                        ? 'bg-purple-50 border-purple-200 text-purple-900 dark:bg-purple-950/30 dark:border-purple-800 dark:text-purple-200'
+                        ? 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70'
                         : 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200'
                 )}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             {insp.passed ? (
-                                <CheckCircle className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                                <CheckCircle className="h-6 w-6 text-primary dark:text-primary" />
                             ) : (
                                 <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
                             )}
@@ -228,8 +228,8 @@ export default function InspectionShow({ inspection }: Props) {
                                     <div className="text-2xl font-bold text-red-600">{counts.fail}</div>
                                     <div className="mt-1 text-xs text-muted-foreground">Failed</div>
                                 </div>
-                                <div className="rounded-lg bg-gray-50 p-3 text-center dark:bg-gray-950/20">
-                                    <div className="text-2xl font-bold text-gray-500">{counts.na}</div>
+                                <div className="rounded-lg bg-muted p-3 text-center dark:bg-muted/20">
+                                    <div className="text-2xl font-bold text-muted-foreground">{counts.na}</div>
                                     <div className="mt-1 text-xs text-muted-foreground">N/A</div>
                                 </div>
                             </div>

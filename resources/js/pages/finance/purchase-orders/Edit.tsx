@@ -225,7 +225,7 @@ export default function PurchaseOrderEdit() {
                         <CardContent className="space-y-3">
                             {errors?.lines && <p className="text-sm text-red-600">{errors.lines}</p>}
 
-                            <div className="hidden md:grid md:grid-cols-12 md:gap-2 md:text-xs md:font-medium md:text-slate-500">
+                            <div className="hidden md:grid md:grid-cols-12 md:gap-2 md:text-xs md:font-medium md:text-muted-foreground">
                                 <div className="col-span-3">Description</div>
                                 <div className="col-span-1">Qty</div>
                                 <div className="col-span-2">Unit Price</div>
@@ -298,7 +298,7 @@ export default function PurchaseOrderEdit() {
                                         <div className="md:col-span-2 md:text-right">
                                             <Label className="md:hidden">Line Total</Label>
                                             <div className="text-sm font-medium">{formatNZD(c.total)}</div>
-                                            <div className="text-xs text-slate-500">GST: {formatNZD(c.gst)}</div>
+                                            <div className="text-xs text-muted-foreground">GST: {formatNZD(c.gst)}</div>
                                         </div>
                                         <div className="md:col-span-1 md:text-center">
                                             {lines.length > 1 && (
@@ -315,11 +315,11 @@ export default function PurchaseOrderEdit() {
                                 <div className="flex justify-end">
                                     <div className="w-64 space-y-1 text-sm">
                                         <div className="flex justify-between">
-                                            <span className="text-slate-500">Subtotal</span>
+                                            <span className="text-muted-foreground">Subtotal</span>
                                             <span>{formatNZD(totals.subtotal)}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-slate-500">GST</span>
+                                            <span className="text-muted-foreground">GST</span>
                                             <span>{formatNZD(totals.gst)}</span>
                                         </div>
                                         <div className="flex justify-between border-t pt-1 font-semibold">

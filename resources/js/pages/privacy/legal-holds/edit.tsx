@@ -84,7 +84,7 @@ export default function EditLegalHold({ hold }: Props) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <h1 className="text-lg font-semibold">Legal Hold {hold.hold_reference}</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Type: {hold.hold_type} - Status: {hold.status}
                         </div>
                     </div>
@@ -96,21 +96,21 @@ export default function EditLegalHold({ hold }: Props) {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Scale className="h-5 w-5 text-purple-500" />
+                            <Scale className="h-5 w-5 text-primary" />
                             Hold Details
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-3 sm:grid-cols-3">
                         <div className="text-sm">
-                            <div className="text-xs text-slate-500">Imposed</div>
+                            <div className="text-xs text-muted-foreground">Imposed</div>
                             <div>{formatDate(hold.imposed_at)}</div>
                         </div>
                         <div className="text-sm">
-                            <div className="text-xs text-slate-500">Review Date</div>
+                            <div className="text-xs text-muted-foreground">Review Date</div>
                             <div>{formatDate(hold.review_date)}</div>
                         </div>
                         <div className="text-sm">
-                            <div className="text-xs text-slate-500">Released</div>
+                            <div className="text-xs text-muted-foreground">Released</div>
                             <div>{formatDate(hold.released_at)}</div>
                         </div>
                     </CardContent>
@@ -210,7 +210,7 @@ export default function EditLegalHold({ hold }: Props) {
                         <CardHeader>
                             <CardTitle className="text-base">Release Notes</CardTitle>
                         </CardHeader>
-                        <CardContent className="text-sm text-slate-600">
+                        <CardContent className="text-sm text-muted-foreground">
                             {hold.release_reason || 'No release reason recorded.'}
                         </CardContent>
                     </Card>

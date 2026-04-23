@@ -184,7 +184,7 @@ export default function TerminologyPage(props: Props) {
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => applyPreset(name)}
-                                                className="hover:border-violet-400 hover:text-violet-600"
+                                                className="hover:border-primary hover:text-primary"
                                             >
                                                 {name}
                                                 {name === 'Disability Support' && (
@@ -256,7 +256,7 @@ export default function TerminologyPage(props: Props) {
                             <Button
                                 type="submit"
                                 disabled={form.processing}
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className="bg-primary hover:bg-primary"
                             >
                                 Save Changes
                             </Button>

@@ -182,7 +182,7 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                     {form.data.overall_satisfaction > 0 && (
                                         <button
                                             type="button"
-                                            className="ml-2 text-xs text-slate-500 hover:text-slate-700"
+                                            className="ml-2 text-xs text-muted-foreground hover:text-foreground"
                                             onClick={() => form.setData('overall_satisfaction', 0)}
                                         >
                                             Clear
@@ -266,7 +266,7 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                     id="is_confidential"
                                     checked={form.data.is_confidential}
                                     onChange={(e) => form.setData('is_confidential', e.target.checked)}
-                                    className="rounded border-gray-300"
+                                    className="rounded border-border"
                                 />
                                 <Label htmlFor="is_confidential">Mark as confidential</Label>
                             </div>

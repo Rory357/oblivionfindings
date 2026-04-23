@@ -312,7 +312,7 @@ export default function FleetReports({
                                     <div className="text-xs text-muted-foreground">Total Cost</div>
                                 </div>
                                 <div className="rounded-md border p-3 text-center">
-                                    <div className="text-2xl font-bold text-purple-600">{maintenance_stats.completed_count ?? 0}</div>
+                                    <div className="text-2xl font-bold text-primary">{maintenance_stats.completed_count ?? 0}</div>
                                     <div className="text-xs text-muted-foreground">Completed</div>
                                 </div>
                                 <div className="rounded-md border p-3 text-center">

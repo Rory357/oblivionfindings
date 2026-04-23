@@ -32,10 +32,10 @@ const INCIDENT_TYPES: Array<{
 }> = [
     { value: 'injury', label: 'Injury', icon: Activity, color: 'border-red-300 bg-red-50 text-red-700' },
     { value: 'behaviour', label: 'Behaviour', icon: User, color: 'border-blue-300 bg-blue-50 text-blue-700' },
-    { value: 'medication', label: 'Medication', icon: Pill, color: 'border-purple-300 bg-purple-50 text-purple-700' },
+    { value: 'medication', label: 'Medication', icon: Pill, color: 'border-primary bg-primary/10 text-primary' },
     { value: 'safeguarding', label: 'Safeguarding', icon: Shield, color: 'border-orange-300 bg-orange-50 text-orange-700' },
     { value: 'near_miss', label: 'Near miss', icon: Eye, color: 'border-amber-300 bg-amber-50 text-amber-700' },
-    { value: 'other', label: 'Other', icon: HelpCircle, color: 'border-slate-300 bg-slate-50 text-slate-700' },
+    { value: 'other', label: 'Other', icon: HelpCircle, color: 'border-border bg-muted text-foreground' },
 ];
 
 const SEVERITY_OPTIONS: Array<{

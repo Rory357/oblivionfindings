@@ -46,11 +46,11 @@ const EMOTIONS: Array<{ key: string; emoji: string; label: string; color: string
     { key: 'happy', emoji: '😊', label: 'Happy', color: 'bg-emerald-100 text-emerald-700' },
     { key: 'calm', emoji: '😌', label: 'Calm', color: 'bg-sky-100 text-sky-700' },
     { key: 'excited', emoji: '🤩', label: 'Excited', color: 'bg-amber-100 text-amber-700' },
-    { key: 'tired', emoji: '😴', label: 'Tired', color: 'bg-indigo-100 text-indigo-700' },
+    { key: 'tired', emoji: '😴', label: 'Tired', color: 'bg-primary/10 text-primary' },
     { key: 'anxious', emoji: '😰', label: 'Anxious', color: 'bg-orange-100 text-orange-700' },
     { key: 'sad', emoji: '😢', label: 'Sad', color: 'bg-blue-100 text-blue-700' },
     { key: 'frustrated', emoji: '😤', label: 'Frustrated', color: 'bg-red-100 text-red-700' },
-    { key: 'confused', emoji: '😕', label: 'Confused', color: 'bg-purple-100 text-purple-700' },
+    { key: 'confused', emoji: '😕', label: 'Confused', color: 'bg-primary/10 text-primary' },
 ];
 const EMOTION_MAP = Object.fromEntries(EMOTIONS.map(e => [e.key, e]));
 
@@ -68,8 +68,8 @@ type Props = {
 };
 
 const NOTE_TYPE_STYLES: Record<string, { border: string; bg: string; label: string; dot: string }> = {
-    general: { border: 'border-l-violet-400', bg: 'bg-violet-50', label: 'General', dot: 'bg-violet-500' },
-    goal_update: { border: 'border-l-indigo-400', bg: 'bg-indigo-50', label: 'Goal Update', dot: 'bg-indigo-500' },
+    general: { border: 'border-l-violet-400', bg: 'bg-primary/10', label: 'General', dot: 'bg-primary' },
+    goal_update: { border: 'border-l-indigo-400', bg: 'bg-primary/10', label: 'Goal Update', dot: 'bg-primary' },
     observation: { border: 'border-l-blue-400', bg: 'bg-blue-50', label: 'Observation', dot: 'bg-blue-500' },
     handover: { border: 'border-l-cyan-400', bg: 'bg-cyan-50', label: 'Handover', dot: 'bg-cyan-500' },
     incident: { border: 'border-l-red-400', bg: 'bg-red-50', label: 'Incident', dot: 'bg-red-500' },
@@ -178,7 +178,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
             <PageHeader title="Progress Notes" description="Goal updates, observations, and progress tracking across all clients."
                 backHref={filters?.client_id ? `/operations/clients/${filters.client_id}` : '/operations'}
                 actions={
-                    <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => setShowAddForm(!showAddForm)}>
+                    <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary" onClick={() => setShowAddForm(!showAddForm)}>
                         <Plus className="h-4 w-4" /> Add Note
                     </Button>
                 }
@@ -193,7 +193,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
 
                 {/* Add Note Form */}
                 {showAddForm && (
-                    <Card className="overflow-hidden border-violet-200">
+                    <Card className="overflow-hidden border-primary">
                         <div className="flex items-center justify-between bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
                             <h3 className="text-sm font-semibold text-white">New Progress Note</h3>
                             <DraftSavedIndicator savedAt={savedAt} className="text-white/90 [&_svg]:text-white" />
@@ -259,7 +259,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                             <Textarea className="mt-1 min-h-[80px] text-sm" placeholder="Write your progress note..." value={noteData.content} onChange={(e) => setNoteData({ ...noteData, content: e.target.value })} />
                             <div className="mt-3 flex items-center justify-between">
                                 <Button size="sm" variant="ghost" className="text-xs" onClick={() => setShowAddForm(false)}>Cancel</Button>
-                                <Button size="sm" className="bg-violet-600 hover:bg-violet-700" onClick={submitNote} disabled={!noteData.client_id || !noteData.content.trim()}>Save Note</Button>
+                                <Button size="sm" className="bg-primary hover:bg-primary" onClick={submitNote} disabled={!noteData.client_id || !noteData.content.trim()}>Save Note</Button>
                             </div>
                         </CardContent>
                     </Card>
@@ -318,8 +318,8 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                     {(notes?.data ?? []).length === 0 && (
                         <Card className="border-dashed">
                             <CardContent className="flex flex-col items-center justify-center py-16">
-                                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
-                                    <MessageSquareText className="h-8 w-8 text-violet-400" />
+                                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                                    <MessageSquareText className="h-8 w-8 text-primary" />
                                 </div>
                                 <h2 className="text-lg font-semibold">No Progress Notes</h2>
                                 <p className="mt-1 text-sm text-muted-foreground">
@@ -355,15 +355,15 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                                             {/* Client + Goal + Shift */}
                                             <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                                                 {note.client && (
-                                                    <Link href={`/operations/clients/${note.client.id}`} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-200">
+                                                    <Link href={`/operations/clients/${note.client.id}`} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground hover:bg-muted">
                                                         {note.client.first_name} {note.client.last_name}
                                                     </Link>
                                                 )}
-                                                {note.goal && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">Goal: {note.goal.title}</span>}
+                                                {note.goal && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">Goal: {note.goal.title}</span>}
                                                 {note.shift && <span className="text-[10px] text-muted-foreground">Shift #{note.shift.id}</span>}
                                             </div>
                                             {/* Content */}
-                                            <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{note.content.length > 400 ? note.content.slice(0, 400) + '...' : note.content}</p>
+                                            <p className="mt-1.5 text-sm leading-relaxed text-foreground">{note.content.length > 400 ? note.content.slice(0, 400) + '...' : note.content}</p>
                                             {note.flagged_reason && (
                                                 <div className="mt-1.5 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
                                                     Flag reason: {note.flagged_reason}

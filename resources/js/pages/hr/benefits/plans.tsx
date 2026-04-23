@@ -89,7 +89,7 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Benefit Plans</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Manage available benefit plans for employees
                         </div>
                     </div>
@@ -109,7 +109,7 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                     </CardHeader>
                     <CardContent>
                         <div className="max-w-xs">
-                            <Label className="text-xs text-slate-500">Plan Type</Label>
+                            <Label className="text-xs text-muted-foreground">Plan Type</Label>
                             <Select
                                 value={filters.type || 'all'}
                                 onValueChange={(val) => onFilter({ type: val === 'all' ? null : val })}
@@ -165,7 +165,7 @@ export default function BenefitPlans({ plans, filters, planTypes, can }: Props) 
                                 ))}
                                 {!plans.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
+                                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                                             No benefit plans found.
                                         </TableCell>
                                     </TableRow>

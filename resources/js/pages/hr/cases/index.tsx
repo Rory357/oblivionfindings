@@ -92,26 +92,26 @@ const formatDate = (value?: string | null) => {
 
 const badgeClassByStatus: Record<string, string> = {
     open: 'bg-blue-100 text-blue-800 border-blue-200',
-    under_investigation: 'bg-purple-100 text-purple-800 border-purple-200',
+    under_investigation: 'bg-primary/10 text-primary border-primary',
     awaiting_response: 'bg-amber-100 text-amber-800 border-amber-200',
     resolved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    closed: 'bg-slate-100 text-slate-800 border-slate-200',
+    closed: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassByCaseType: Record<string, string> = {
     disciplinary: 'bg-red-100 text-red-800 border-red-200',
     grievance: 'bg-orange-100 text-orange-800 border-orange-200',
-    investigation: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    investigation: 'bg-primary/10 text-primary border-primary',
     welfare: 'bg-green-100 text-green-800 border-green-200',
     complaint: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-    other: 'bg-slate-100 text-slate-800 border-slate-200',
+    other: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassBySeverity: Record<string, string> = {
     critical: 'bg-red-100 text-red-800 border-red-200',
     high: 'bg-orange-100 text-orange-800 border-orange-200',
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    low: 'bg-slate-100 text-slate-800 border-slate-200',
+    low: 'bg-muted text-foreground border-border',
 };
 
 export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
@@ -139,7 +139,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">HR Cases</h1>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Manage disciplinary, grievance, and investigation workflows.
                         </p>
                     </div>
@@ -160,36 +160,36 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         <div className="rounded-md border p-3">
-                            <div className="text-xs text-slate-500">Open Cases</div>
+                            <div className="text-xs text-muted-foreground">Open Cases</div>
                             <div className="mt-1 flex items-center gap-2 text-xl font-semibold">
-                                <Briefcase className="h-4 w-4 text-slate-500" />
+                                <Briefcase className="h-4 w-4 text-muted-foreground" />
                                 {summary.open_cases}
                             </div>
-                            <div className="text-xs text-slate-400">Unassigned: {summary.unassigned_open_cases}</div>
+                            <div className="text-xs text-muted-foreground">Unassigned: {summary.unassigned_open_cases}</div>
                         </div>
                         <div className="rounded-md border p-3">
-                            <div className="text-xs text-slate-500">Disciplinary Active</div>
+                            <div className="text-xs text-muted-foreground">Disciplinary Active</div>
                             <div className="mt-1 flex items-center gap-2 text-xl font-semibold">
-                                <ShieldAlert className="h-4 w-4 text-slate-500" />
+                                <ShieldAlert className="h-4 w-4 text-muted-foreground" />
                                 {summary.disciplinary_active}
                             </div>
-                            <div className="text-xs text-slate-400">High/Critical: {summary.high_severity_open_cases}</div>
+                            <div className="text-xs text-muted-foreground">High/Critical: {summary.high_severity_open_cases}</div>
                         </div>
                         <div className="rounded-md border p-3">
-                            <div className="text-xs text-slate-500">SLA Watch</div>
+                            <div className="text-xs text-muted-foreground">SLA Watch</div>
                             <div className="mt-1 flex items-center gap-2 text-xl font-semibold text-amber-700">
                                 <Clock3 className="h-4 w-4" />
                                 {summary.disciplinary_sla_due_24h}
                             </div>
-                            <div className="text-xs text-slate-400">Due within 24h</div>
+                            <div className="text-xs text-muted-foreground">Due within 24h</div>
                         </div>
                         <div className="rounded-md border p-3">
-                            <div className="text-xs text-slate-500">Escalation Risk</div>
+                            <div className="text-xs text-muted-foreground">Escalation Risk</div>
                             <div className="mt-1 flex items-center gap-2 text-xl font-semibold text-red-700">
                                 <AlertTriangle className="h-4 w-4" />
                                 {summary.escalation_candidates}
                             </div>
-                            <div className="text-xs text-slate-400">
+                            <div className="text-xs text-muted-foreground">
                                 Overdue: {summary.disciplinary_sla_overdue} | Missing deadline: {summary.disciplinary_missing_deadline}
                             </div>
                         </div>
@@ -202,9 +202,9 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                         <div className="sm:col-span-5">
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Case number, title, or subject"
                                     value={filters.q || ''}
@@ -215,7 +215,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Status</Label>
+                            <Label className="text-xs text-muted-foreground">Status</Label>
                             <Select
                                 value={filters.status ?? NONE}
                                 onValueChange={(value) => onFilter({ status: value === NONE ? null : value })}
@@ -235,7 +235,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Case Type</Label>
+                            <Label className="text-xs text-muted-foreground">Case Type</Label>
                             <Select
                                 value={filters.case_type ?? NONE}
                                 onValueChange={(value) => onFilter({ case_type: value === NONE ? null : value })}
@@ -255,7 +255,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Severity</Label>
+                            <Label className="text-xs text-muted-foreground">Severity</Label>
                             <Select
                                 value={filters.severity ?? NONE}
                                 onValueChange={(value) => onFilter({ severity: value === NONE ? null : value })}
@@ -275,7 +275,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Disciplinary SLA</Label>
+                            <Label className="text-xs text-muted-foreground">Disciplinary SLA</Label>
                             <Select
                                 value={filters.sla_window ?? NONE}
                                 onValueChange={(value) => onFilter({ sla_window: value === NONE ? null : value })}
@@ -320,12 +320,12 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                                         <TableRow key={hrCase.id}>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
-                                                    <Briefcase className="h-4 w-4 text-slate-400" />
+                                                    <Briefcase className="h-4 w-4 text-muted-foreground" />
                                                     <div>
                                                         <div className="font-medium">{hrCase.case_number}</div>
-                                                        <div className="text-xs text-slate-500">{hrCase.title}</div>
+                                                        <div className="text-xs text-muted-foreground">{hrCase.title}</div>
                                                         {assigneeName ? (
-                                                            <div className="text-xs text-slate-400">Assigned: {assigneeName}</div>
+                                                            <div className="text-xs text-muted-foreground">Assigned: {assigneeName}</div>
                                                         ) : null}
                                                     </div>
                                                 </div>

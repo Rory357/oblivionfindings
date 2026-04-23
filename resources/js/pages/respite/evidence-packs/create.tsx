@@ -30,7 +30,7 @@ export default function EvidencePackCreate({ stays, stayId }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">New Evidence Pack</h1>
-                    <div className="mt-1 text-sm text-slate-500">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         Create an evidence collection for a respite stay.
                     </div>
                 </div>

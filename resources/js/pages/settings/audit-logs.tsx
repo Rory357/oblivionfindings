@@ -135,28 +135,28 @@ function eventBadgeColor(event?: string | null): string {
         case 'deleted':
             return 'border-red-300 bg-red-50 text-red-700';
         case 'login':
-            return 'border-violet-300 bg-violet-50 text-violet-700';
+            return 'border-primary bg-primary/10 text-primary';
         case 'logout':
-            return 'border-slate-300 bg-slate-50 text-slate-700';
+            return 'border-border bg-muted text-foreground';
         default:
-            return 'border-slate-300 bg-slate-50 text-slate-700';
+            return 'border-border bg-muted text-foreground';
     }
 }
 
 function moduleBadgeColor(module?: string | null): string {
     switch (module) {
         case 'operations':
-            return 'border-indigo-300 bg-indigo-50 text-indigo-700';
+            return 'border-primary bg-primary/10 text-primary';
         case 'hr':
             return 'border-cyan-300 bg-cyan-50 text-cyan-700';
         case 'fleet':
             return 'border-amber-300 bg-amber-50 text-amber-700';
         case 'settings':
-            return 'border-violet-300 bg-violet-50 text-violet-700';
+            return 'border-primary bg-primary/10 text-primary';
         case 'finance':
             return 'border-emerald-300 bg-emerald-50 text-emerald-700';
         default:
-            return 'border-slate-300 bg-slate-50 text-slate-700';
+            return 'border-border bg-muted text-foreground';
     }
 }
 
@@ -170,10 +170,10 @@ function DiffViewer({ properties }: { properties: Record<string, any> }) {
     }
 
     return (
-        <div className="mt-3 space-y-1.5 rounded-md bg-slate-50 p-3 font-mono text-xs">
+        <div className="mt-3 space-y-1.5 rounded-md bg-muted p-3 font-mono text-xs">
             {keys.map((key) => (
                 <div key={key} className="flex gap-2">
-                    <span className="shrink-0 font-semibold text-slate-600">{key}:</span>
+                    <span className="shrink-0 font-semibold text-muted-foreground">{key}:</span>
                     {old[key] !== undefined && (
                         <span className="text-red-600 line-through">
                             {JSON.stringify(old[key])}
@@ -395,8 +395,8 @@ export default function AuditLogs({
                         <CardContent className="p-0">
                             {allData.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                                    <div className="mb-4 rounded-full bg-violet-100 p-4">
-                                        <FileText className="h-8 w-8 text-violet-600" />
+                                    <div className="mb-4 rounded-full bg-primary/10 p-4">
+                                        <FileText className="h-8 w-8 text-primary" />
                                     </div>
                                     <h3 className="text-lg font-semibold">No audit events found</h3>
                                     <p className="mt-1 text-sm text-muted-foreground">
@@ -423,7 +423,7 @@ export default function AuditLogs({
                                                 >
                                                     {/* Timeline dot */}
                                                     <div className="relative z-10 mt-1 flex h-5 w-5 shrink-0 items-center justify-center">
-                                                        <div className="h-2.5 w-2.5 rounded-full border-2 border-violet-400 bg-white group-hover:bg-violet-100" />
+                                                        <div className="h-2.5 w-2.5 rounded-full border-2 border-primary bg-white group-hover:bg-primary/10" />
                                                     </div>
 
                                                     {/* Content */}
@@ -432,7 +432,7 @@ export default function AuditLogs({
                                                             {/* User avatar + name */}
                                                             <div className="flex items-center gap-2">
                                                                 <Avatar className="h-6 w-6">
-                                                                    <AvatarFallback className="bg-violet-100 text-[10px] text-violet-700">
+                                                                    <AvatarFallback className="bg-primary/10 text-[10px] text-primary">
                                                                         {event.causer
                                                                             ? getInitials(event.causer.name)
                                                                             : 'SY'}
@@ -490,7 +490,7 @@ export default function AuditLogs({
                                                         {hasDetails && (
                                                             <button
                                                                 onClick={() => toggleExpanded(event.id)}
-                                                                className="mt-2 flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700"
+                                                                className="mt-2 flex items-center gap-1 text-xs font-medium text-primary hover:text-primary"
                                                             >
                                                                 {isExpanded ? (
                                                                     <ChevronDown className="h-3 w-3" />
@@ -526,7 +526,7 @@ export default function AuditLogs({
                                         variant={link.active ? 'default' : 'outline'}
                                         size="sm"
                                         disabled={!link.url}
-                                        className={link.active ? 'bg-violet-600 hover:bg-violet-700' : ''}
+                                        className={link.active ? 'bg-primary hover:bg-primary' : ''}
                                         asChild={!!link.url}
                                     >
                                         {link.url ? (

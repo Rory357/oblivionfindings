@@ -69,7 +69,7 @@ function expiryColor(dateStr: string | null): string {
     if (days < 0) return 'text-red-600 dark:text-red-400';
     if (days <= 30) return 'text-orange-600 dark:text-orange-400';
     if (days <= 60) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-purple-600 dark:text-purple-400';
+    return 'text-primary dark:text-primary';
 }
 
 function expiryBadge(dateStr: string | null): { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string } {

@@ -44,10 +44,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 const typeColors: Record<string, string> = {
     contract: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
     letter: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
-    policy: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+    policy: 'border-primary/30 text-primary bg-primary/10',
     certificate: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-    offer: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
-    other: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+    offer: 'border-primary/30 text-primary bg-primary/10',
+    other: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
 };
 
 export default function DocumentTemplates({ templates, categories, filters, can }: Props) {

@@ -688,10 +688,10 @@ export default function ShiftSeriesShow({
                                                         key={`${issue.rule_name}-${index}`}
                                                         className="rounded-lg border border-red-200 bg-white/80 p-3"
                                                     >
-                                                        <div className="text-sm font-medium text-slate-950">
+                                                        <div className="text-sm font-medium text-foreground">
                                                             {issue.rule_name}
                                                         </div>
-                                                        <div className="mt-1 text-xs text-slate-600">
+                                                        <div className="mt-1 text-xs text-muted-foreground">
                                                             {issue.window_label}
                                                         </div>
                                                         <div className="mt-1 text-xs text-red-700">

@@ -93,7 +93,7 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
             major: 'bg-orange-100 text-orange-800',
             contraindicated: 'bg-red-100 text-red-800',
         };
-        return <Badge className={colors[severity] || 'bg-slate-100'}>{severity}</Badge>;
+        return <Badge className={colors[severity] || 'bg-muted'}>{severity}</Badge>;
     };
 
     return (
@@ -190,9 +190,9 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                 )}
 
                 {loading ? (
-                    <div className="py-8 text-center text-sm text-slate-500">Loading interactions...</div>
+                    <div className="py-8 text-center text-sm text-muted-foreground">Loading interactions...</div>
                 ) : interactions.length === 0 ? (
-                    <div className="py-8 text-center text-sm text-slate-500">No drug interactions defined.</div>
+                    <div className="py-8 text-center text-sm text-muted-foreground">No drug interactions defined.</div>
                 ) : (
                     <div className="max-h-[50vh] overflow-y-auto">
                         <div className="space-y-2 pr-4">
@@ -204,7 +204,7 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                                             ? 'border-red-200 bg-red-50'
                                             : interaction.severity === 'major'
                                             ? 'border-orange-200 bg-orange-50'
-                                            : 'bg-slate-50'
+                                            : 'bg-muted'
                                     }`}
                                 >
                                     <div className="flex items-start justify-between">
@@ -215,14 +215,14 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                                                     {interaction.medication_a} + {interaction.medication_b}
                                                 </span>
                                             </div>
-                                            <p className="text-sm text-slate-700">{interaction.description}</p>
+                                            <p className="text-sm text-foreground">{interaction.description}</p>
                                             {interaction.clinical_effects && (
-                                                <p className="text-xs text-slate-500 mt-1">
+                                                <p className="text-xs text-muted-foreground mt-1">
                                                     <strong>Effects:</strong> {interaction.clinical_effects}
                                                 </p>
                                             )}
                                             {interaction.management && (
-                                                <p className="text-xs text-slate-600 mt-1">
+                                                <p className="text-xs text-muted-foreground mt-1">
                                                     <strong>Management:</strong> {interaction.management}
                                                 </p>
                                             )}
@@ -237,7 +237,7 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                     </div>
                 )}
 
-                <div className="text-xs text-slate-500 pt-2 border-t">
+                <div className="text-xs text-muted-foreground pt-2 border-t">
                     <p>These interactions are automatically checked when administering medications.</p>
                 </div>
             </DialogContent>

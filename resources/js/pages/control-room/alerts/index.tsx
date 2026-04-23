@@ -111,7 +111,7 @@ const statusColors: Record<string, string> = {
     ack: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     triaging: 'bg-blue-100 text-blue-800 border-blue-200',
     resolved: 'bg-green-100 text-green-800 border-green-200',
-    closed: 'bg-gray-100 text-gray-800 border-gray-200',
+    closed: 'bg-muted text-foreground border-border',
 };
 
 const statusLabels: Record<string, string> = {
@@ -635,7 +635,7 @@ export default function AlertsIndex({
                                                 <Circle
                                                     className={`h-3 w-3 fill-current ${
                                                         slaColors[alert.sla_status] ??
-                                                        'text-gray-400'
+                                                        'text-muted-foreground'
                                                     }`}
                                                 />
                                             ) : (

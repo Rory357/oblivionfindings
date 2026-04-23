@@ -113,7 +113,7 @@ export default function Documents({ client, documents }: Props) {
     };
 
     const fileIcon = (mime: string) => {
-        if (mime.startsWith('image/')) return <FileImage className="h-5 w-5 text-violet-500" />;
+        if (mime.startsWith('image/')) return <FileImage className="h-5 w-5 text-primary" />;
         if (mime.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
         return <File className="h-5 w-5 text-blue-500" />;
     };

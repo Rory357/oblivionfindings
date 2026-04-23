@@ -78,9 +78,9 @@ const statusColor = (status: string) => {
         case 'in_progress':
             return 'bg-amber-100 text-amber-800';
         case 'cancelled':
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -95,7 +95,7 @@ const severityColor = (severity: string) => {
         case 'low':
             return 'bg-green-100 text-green-800';
         default:
-            return 'bg-slate-100 text-slate-800';
+            return 'bg-muted text-foreground';
     }
 };
 
@@ -142,7 +142,7 @@ export default function DrillShow({ drill, staff }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">{drill.title}</h1>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             <span>{drill.site?.name ?? 'Unknown Site'}</span>
                             <span className="capitalize">{drill.drill_type.replace(/_/g, ' ')}</span>
                             <Badge className={statusColor(drill.status)}>{drill.status}</Badge>
@@ -173,7 +173,7 @@ export default function DrillShow({ drill, staff }: Props) {
                     <CardContent>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                             <div>
-                                <div className="text-xs text-slate-500">Scheduled</div>
+                                <div className="text-xs text-muted-foreground">Scheduled</div>
                                 <div className="mt-0.5 text-sm">
                                     {new Date(drill.scheduled_at).toLocaleDateString('en-GB')}{' '}
                                     {new Date(drill.scheduled_at).toLocaleTimeString('en-GB', {
@@ -184,13 +184,13 @@ export default function DrillShow({ drill, staff }: Props) {
                             </div>
                             {drill.duration_minutes && (
                                 <div>
-                                    <div className="text-xs text-slate-500">Duration</div>
+                                    <div className="text-xs text-muted-foreground">Duration</div>
                                     <div className="mt-0.5 text-sm">{drill.duration_minutes} minutes</div>
                                 </div>
                             )}
                             {drill.evacuation_time_seconds && (
                                 <div>
-                                    <div className="text-xs text-slate-500">Evacuation Time</div>
+                                    <div className="text-xs text-muted-foreground">Evacuation Time</div>
                                     <div className="mt-0.5 text-sm">
                                         {Math.floor(drill.evacuation_time_seconds / 60)}m{' '}
                                         {drill.evacuation_time_seconds % 60}s
@@ -200,7 +200,7 @@ export default function DrillShow({ drill, staff }: Props) {
                         </div>
                         {drill.scenario_description && (
                             <div className="mt-4">
-                                <div className="text-xs text-slate-500">Scenario Description</div>
+                                <div className="text-xs text-muted-foreground">Scenario Description</div>
                                 <div className="mt-0.5 text-sm whitespace-pre-wrap">
                                     {drill.scenario_description}
                                 </div>
@@ -208,19 +208,19 @@ export default function DrillShow({ drill, staff }: Props) {
                         )}
                         {drill.outcome && (
                             <div className="mt-4">
-                                <div className="text-xs text-slate-500">Outcome</div>
+                                <div className="text-xs text-muted-foreground">Outcome</div>
                                 <div className="mt-0.5 text-sm capitalize">{drill.outcome}</div>
                             </div>
                         )}
                         {drill.observer_notes && (
                             <div className="mt-4">
-                                <div className="text-xs text-slate-500">Observer Notes</div>
+                                <div className="text-xs text-muted-foreground">Observer Notes</div>
                                 <div className="mt-0.5 text-sm whitespace-pre-wrap">{drill.observer_notes}</div>
                             </div>
                         )}
                         {drill.improvements && (
                             <div className="mt-4">
-                                <div className="text-xs text-slate-500">Improvements Identified</div>
+                                <div className="text-xs text-muted-foreground">Improvements Identified</div>
                                 <div className="mt-0.5 text-sm whitespace-pre-wrap">{drill.improvements}</div>
                             </div>
                         )}
@@ -361,7 +361,7 @@ export default function DrillShow({ drill, staff }: Props) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 pr-4 font-medium">Name</th>
                                         <th className="pb-2 pr-4 font-medium">Role</th>
                                         <th className="pb-2 font-medium">Attended</th>
@@ -382,7 +382,7 @@ export default function DrillShow({ drill, staff }: Props) {
                                 </tbody>
                             </table>
                             {!drill.participants.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No participants recorded.
                                 </div>
                             )}
@@ -423,11 +423,11 @@ export default function DrillShow({ drill, staff }: Props) {
                                             <div className="mt-2 text-sm">{f.description}</div>
                                             {f.corrective_action && (
                                                 <div className="mt-2">
-                                                    <div className="text-xs text-slate-500">Corrective Action</div>
+                                                    <div className="text-xs text-muted-foreground">Corrective Action</div>
                                                     <div className="text-sm">{f.corrective_action}</div>
                                                 </div>
                                             )}
-                                            <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                                            <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                                                 {f.assigned_to && <span>Assigned to: {f.assigned_to.name}</span>}
                                                 {f.due_date && (
                                                     <span>
@@ -456,7 +456,7 @@ export default function DrillShow({ drill, staff }: Props) {
                                 </div>
                             ))}
                             {!drill.findings.length && (
-                                <div className="py-4 text-center text-sm text-slate-500">
+                                <div className="py-4 text-center text-sm text-muted-foreground">
                                     No findings recorded.
                                 </div>
                             )}

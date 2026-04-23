@@ -113,7 +113,7 @@ const statusBadgeColors: Record<string, string> = {
     online: 'bg-green-100 text-green-800 border-green-200',
     offline: 'bg-red-100 text-red-800 border-red-200',
     maintenance: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    retired: 'bg-gray-100 text-gray-800 border-gray-200',
+    retired: 'bg-muted text-foreground border-border',
 };
 
 const severityColors: Record<string, string> = {
@@ -128,7 +128,7 @@ const alertStatusColors: Record<string, string> = {
     ack: 'bg-yellow-100 text-yellow-800',
     triaging: 'bg-blue-100 text-blue-800',
     resolved: 'bg-green-100 text-green-800',
-    closed: 'bg-gray-100 text-gray-800',
+    closed: 'bg-muted text-foreground',
 };
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -148,7 +148,7 @@ function BatteryGauge({ level }: { level: number | null }) {
         return (
             <div className="flex flex-col items-center justify-center">
                 <div className="relative h-24 w-24 rounded-full border-8 border-muted flex items-center justify-center">
-                    <Battery className="h-6 w-6 text-gray-400" />
+                    <Battery className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <span className="mt-2 text-xs text-muted-foreground">No data</span>
             </div>
@@ -396,7 +396,7 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                                 <TableCell>
                                                     {signal.severity_hint ? (
                                                         <Badge
-                                                            className={`text-[10px] ${severityColors[signal.severity_hint] ?? 'bg-gray-100 text-gray-800'}`}
+                                                            className={`text-[10px] ${severityColors[signal.severity_hint] ?? 'bg-muted text-foreground'}`}
                                                         >
                                                             {signal.severity_hint}
                                                         </Badge>
@@ -461,7 +461,7 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge
-                                                        className={`text-[10px] ${severityColors[alert.severity] ?? 'bg-gray-100 text-gray-800'}`}
+                                                        className={`text-[10px] ${severityColors[alert.severity] ?? 'bg-muted text-foreground'}`}
                                                     >
                                                         {alert.severity}
                                                     </Badge>

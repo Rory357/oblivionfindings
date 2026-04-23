@@ -89,10 +89,10 @@ function NavItemComponent({
             {isNested && (
                 <>
                     {/* Horizontal line connecting to parent */}
-                    <div className="absolute left-4 top-1/2 w-3 h-px bg-slate-200 dark:bg-slate-700" />
+                    <div className="absolute left-4 top-1/2 w-3 h-px bg-muted dark:bg-slate-700" />
                     {/* Vertical line continuing down (if not last) */}
                     {!isLast && (
-                        <div className="absolute left-4 top-1/2 w-px h-[calc(100%+8px)] bg-slate-200 dark:bg-slate-700" />
+                        <div className="absolute left-4 top-1/2 w-px h-[calc(100%+8px)] bg-muted dark:bg-slate-700" />
                     )}
                 </>
             )}
@@ -104,8 +104,8 @@ function NavItemComponent({
                     relative transition-all duration-200
                     ${isNested ? 'pl-8' : ''}
                     ${isActive
-                        ? 'bg-primary/10 !text-slate-800 dark:!text-slate-100 font-medium'
-                        : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+                        ? 'bg-primary/10 !text-foreground dark:!text-slate-100 font-medium'
+                        : 'hover:bg-muted dark:hover:bg-slate-800'
                     }
                     rounded-lg my-0.5
                 `}
@@ -116,7 +116,7 @@ function NavItemComponent({
                             flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300
                             ${isActive
                                 ? 'bg-primary text-white shadow-sm'
-                                : 'bg-slate-100 text-slate-500 group-hover:shadow-sm dark:bg-slate-800 dark:text-slate-400 icon-gradient-bg'
+                                : 'bg-muted text-muted-foreground group-hover:shadow-sm dark:bg-muted dark:text-muted-foreground icon-gradient-bg'
                             }
                         `}>
                             <item.icon className="w-4 h-4" />
@@ -165,7 +165,7 @@ function NavGroupComponent({
                         <span className="flex-1 flex items-center gap-2">
                             <span className={`
                                 text-xs font-semibold uppercase tracking-wider
-                                ${isOpen ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'}
+                                ${isOpen ? 'text-foreground dark:text-muted-foreground' : 'text-muted-foreground dark:text-muted-foreground'}
                             `}>
                                 {group.label}
                             </span>
@@ -173,8 +173,8 @@ function NavGroupComponent({
                         <ChevronDown
                             className={`ml-auto h-4 w-4 transition-all duration-200 ${
                                 isOpen 
-                                    ? 'rotate-180 text-slate-600 dark:text-slate-400' 
-                                    : 'text-slate-400 dark:text-slate-500 group-hover/label:text-slate-600'
+                                    ? 'rotate-180 text-muted-foreground dark:text-muted-foreground' 
+                                    : 'text-muted-foreground dark:text-muted-foreground group-hover/label:text-muted-foreground'
                             }`}
                         />
                     </SidebarGroupLabel>
@@ -183,7 +183,7 @@ function NavGroupComponent({
                     {/* Subtle background tint for group content */}
                     <div className={`
                         relative ml-1 pl-2 py-1 rounded-lg
-                        ${hasNestedItems ? '' : 'border-l border-slate-100 dark:border-slate-800'}
+                        ${hasNestedItems ? '' : 'border-l border-border dark:border-border'}
                     `}>
                         <SidebarMenu className="gap-0.5">
                             {group.items.map((item, index) => {

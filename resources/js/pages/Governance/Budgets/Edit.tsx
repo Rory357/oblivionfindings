@@ -45,7 +45,7 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-3 mb-6">
                     <DollarSign className="w-8 h-8 text-emerald-600" />
-                    <h1 className="text-3xl font-bold text-gray-900">Edit Budget</h1>
+                    <h1 className="text-3xl font-bold text-foreground">Edit Budget</h1>
                 </div>
                 <Card>
                     <CardHeader><CardTitle>Budget Details</CardTitle></CardHeader>
@@ -67,7 +67,7 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
                                 <Label>Total Budget ($)</Label>
                                 <Input type="number" step="0.01" value={data.total_budget} onChange={(e) => setData('total_budget', parseFloat(e.target.value))} />
                                 {errors.total_budget && <p className="text-sm text-red-600 mt-1">{errors.total_budget}</p>}
-                                <p className="text-xs text-gray-500 mt-1">This is automatically recalculated when line items are added or removed.</p>
+                                <p className="text-xs text-muted-foreground mt-1">This is automatically recalculated when line items are added or removed.</p>
                             </div>
                             <div>
                                 <Label>Description</Label>

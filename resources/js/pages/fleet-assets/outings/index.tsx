@@ -74,8 +74,8 @@ type Props = {
 
 const STATUS_COLORS: Record<string, string> = {
     planned: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    active: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-    completed: 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400',
+    active: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary',
+    completed: 'bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground',
     cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 };
 
@@ -245,7 +245,7 @@ export default function OutingsIndex({ outings, filters, stats, chart_data, can 
                                                     {formatDate(outing.planned_departure)}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <Link href={`/fleet-assets/outings/${outing.id}`} className="font-medium text-purple-700 hover:underline dark:text-purple-400">
+                                                    <Link href={`/fleet-assets/outings/${outing.id}`} className="font-medium text-primary hover:underline dark:text-primary">
                                                         {outing.title}
                                                     </Link>
                                                     {outing.purpose && (

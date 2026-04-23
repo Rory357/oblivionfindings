@@ -175,17 +175,17 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     submitted: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Submitted' },
     approved: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Approved' },
     rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
-    draft: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Draft' },
+    draft: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Draft' },
 };
 
 const payTypeConfig: Record<string, { className: string; label: string }> = {
-    standard: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Standard' },
-    sleepover: { className: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10', label: 'Sleepover' },
-    on_call: { className: 'border-purple-500/30 text-purple-400 bg-purple-500/10', label: 'On-Call' },
+    standard: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Standard' },
+    sleepover: { className: 'border-primary/30 text-primary bg-primary/10', label: 'Sleepover' },
+    on_call: { className: 'border-primary/30 text-primary bg-primary/10', label: 'On-Call' },
     public_holiday: { className: 'border-orange-500/30 text-orange-400 bg-orange-500/10', label: 'Public Holiday' },
     night: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Night' },
     weekend: { className: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10', label: 'Weekend' },
-    evening: { className: 'border-violet-500/30 text-violet-400 bg-violet-500/10', label: 'Evening' },
+    evening: { className: 'border-primary/30 text-primary bg-primary/10', label: 'Evening' },
 };
 
 const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -613,7 +613,7 @@ export default function TimeIndex({
                                                 <table className="w-full text-sm">
                                                     <thead className="border-b bg-muted/50">
                                                         <tr>
-                                                            <th className="w-10 px-4 py-3"><input type="checkbox" checked={selectedApprovalIds.length === approvalTimesheets.length && approvalTimesheets.length > 0} onChange={toggleAllApprovals} className="h-4 w-4 rounded border-gray-300" /></th>
+                                                            <th className="w-10 px-4 py-3"><input type="checkbox" checked={selectedApprovalIds.length === approvalTimesheets.length && approvalTimesheets.length > 0} onChange={toggleAllApprovals} className="h-4 w-4 rounded border-border" /></th>
                                                             <th className="px-4 py-3 text-left font-medium">Staff</th>
                                                             <th className="px-4 py-3 text-left font-medium">Period</th>
                                                             <th className="px-4 py-3 text-right font-medium">Hours</th>
@@ -624,7 +624,7 @@ export default function TimeIndex({
                                                     <tbody>
                                                         {approvalTimesheets.map((ts) => (
                                                             <tr key={ts.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                                                <td className="px-4 py-3"><input type="checkbox" checked={selectedApprovalIds.includes(ts.id)} onChange={() => toggleApprovalSelect(ts.id)} className="h-4 w-4 rounded border-gray-300" /></td>
+                                                                <td className="px-4 py-3"><input type="checkbox" checked={selectedApprovalIds.includes(ts.id)} onChange={() => toggleApprovalSelect(ts.id)} className="h-4 w-4 rounded border-border" /></td>
                                                                 <td className="px-4 py-3 font-medium">{ts.user_name}</td>
                                                                 <td className="px-4 py-3">{ts.period_start} <ArrowRight className="mx-1 inline h-3 w-3" /> {ts.period_end}</td>
                                                                 <td className="px-4 py-3 text-right font-medium">{ts.total_hours != null ? `${ts.total_hours}h` : '-'}</td>
@@ -759,7 +759,7 @@ export default function TimeIndex({
                                         {Object.entries(payTypeConfig).map(([k, v]) => (
                                             <SelectItem key={k} value={k}>
                                                 <span className="flex items-center gap-2">
-                                                    <span className={`h-2 w-2 rounded-full ${v.className.includes('indigo') ? 'bg-indigo-500' : v.className.includes('purple') ? 'bg-purple-500' : v.className.includes('orange') ? 'bg-orange-500' : v.className.includes('cyan') ? 'bg-cyan-500' : v.className.includes('blue') ? 'bg-blue-500' : v.className.includes('violet') ? 'bg-violet-500' : 'bg-slate-500'}`} />
+                                                    <span className={`h-2 w-2 rounded-full ${v.className.includes('indigo') ? 'bg-primary' : v.className.includes('purple') ? 'bg-primary' : v.className.includes('orange') ? 'bg-orange-500' : v.className.includes('cyan') ? 'bg-cyan-500' : v.className.includes('blue') ? 'bg-blue-500' : v.className.includes('violet') ? 'bg-primary' : 'bg-slate-500'}`} />
                                                     {v.label}
                                                 </span>
                                             </SelectItem>

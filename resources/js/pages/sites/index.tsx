@@ -75,7 +75,7 @@ const typeColors: Record<string, string> = {
     head_office: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300',
     house: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
     facility: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
-    residential: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300',
+    residential: 'border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/10 dark:text-primary/70',
 };
 
 function addressFor(site: Site): string {
@@ -115,7 +115,7 @@ function RiskBadge({ site }: { site: Site }) {
         );
     }
     return (
-        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-400">
+        <Badge variant="outline" className="border-border bg-muted text-muted-foreground dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-muted-foreground">
             <CheckCircle2 className="mr-1 h-3 w-3" />
             Standard
         </Badge>
@@ -332,7 +332,7 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                                             variant="outline"
                                                             className={s.is_active
                                                                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                                                : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-slate-400'
+                                                                : 'border-border bg-muted text-muted-foreground dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-muted-foreground'
                                                             }
                                                         >
                                                             {s.is_active ? 'Active' : 'Inactive'}

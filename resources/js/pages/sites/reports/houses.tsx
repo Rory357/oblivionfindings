@@ -42,7 +42,7 @@ type Props = {
 };
 
 const severityColors: Record<string, string> = {
-    low: 'bg-slate-500/20 text-slate-400',
+    low: 'bg-slate-500/20 text-muted-foreground',
     medium: 'bg-yellow-500/20 text-yellow-400',
     high: 'bg-orange-500/20 text-orange-400',
     critical: 'bg-red-500/20 text-red-400',
@@ -73,7 +73,7 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                             <Home className="w-5 h-5 text-emerald-400" />
                             House Reports
                         </h1>
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-muted-foreground">
                             Quality home checks, occupancy, and compliance
                         </p>
                     </div>
@@ -90,37 +90,37 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_houses}</div>
-                            <div className="text-sm text-slate-400">Houses</div>
+                            <div className="text-sm text-muted-foreground">Houses</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_bedrooms}</div>
-                            <div className="text-sm text-slate-400">Bedrooms</div>
+                            <div className="text-sm text-muted-foreground">Bedrooms</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_clients}</div>
-                            <div className="text-sm text-slate-400">Clients</div>
+                            <div className="text-sm text-muted-foreground">Clients</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-red-500/5 border-red-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-red-400">{stats.open_hazards}</div>
-                            <div className="text-sm text-slate-400">Open Hazards</div>
+                            <div className="text-sm text-muted-foreground">Open Hazards</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-red-500/5 border-red-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-red-400">{stats.critical_hazards}</div>
-                            <div className="text-sm text-slate-400">Critical</div>
+                            <div className="text-sm text-muted-foreground">Critical</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-emerald-400">{stats.checklist_completion_rate}%</div>
-                            <div className="text-sm text-slate-400">Checklist Completion</div>
+                            <div className="text-sm text-muted-foreground">Checklist Completion</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -170,7 +170,7 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                                     <div key={house.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{house.name}</div>
-                                            <div className="text-sm text-slate-400 flex items-center gap-3">
+                                            <div className="text-sm text-muted-foreground flex items-center gap-3">
                                                 <span className="flex items-center gap-1">
                                                     <BedDouble className="w-3.5 h-3.5" />
                                                     {house.house_rooms_count} bedrooms

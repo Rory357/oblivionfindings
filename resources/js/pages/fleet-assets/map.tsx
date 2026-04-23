@@ -242,7 +242,7 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                             onClick={() => setShowHouses(!showHouses)}
                             className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                                 showHouses
-                                    ? 'bg-purple-600 text-white'
+                                    ? 'bg-primary text-white'
                                     : 'bg-muted text-muted-foreground'
                             }`}
                         >
@@ -324,7 +324,7 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                                             selectedId === `h-${h.id}` ? 'bg-muted' : ''
                                         }`}
                                     >
-                                        <Home className="h-3 w-3 shrink-0 text-purple-500" />
+                                        <Home className="h-3 w-3 shrink-0 text-primary" />
                                         <div className="min-w-0">
                                             <div className="truncate font-medium">{h.name}</div>
                                             <div className="truncate text-xs text-muted-foreground">{h.address}</div>

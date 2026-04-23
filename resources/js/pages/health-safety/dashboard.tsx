@@ -116,17 +116,17 @@ const KPI_CONFIG: Array<{
         label: 'Incidents (30 days)',
         icon: AlertTriangle,
         href: '/incidents',
-        color: (v) => (v > 5 ? 'text-red-700' : v > 0 ? 'text-amber-700' : 'text-slate-700'),
-        bgColor: (v) => (v > 5 ? 'border-red-200 bg-red-50/60' : v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'),
-        iconBg: (v) => (v > 5 ? 'bg-red-100 text-red-600' : v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'),
+        color: (v) => (v > 5 ? 'text-red-700' : v > 0 ? 'text-amber-700' : 'text-foreground'),
+        bgColor: (v) => (v > 5 ? 'border-red-200 bg-red-50/60' : v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-border bg-white'),
+        iconBg: (v) => (v > 5 ? 'bg-red-100 text-red-600' : v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'near_misses_30d',
         label: 'Near Misses (30 days)',
         icon: Eye,
         href: '/incidents?type=near_miss',
-        color: () => 'text-slate-700',
-        bgColor: () => 'border-slate-200 bg-white',
+        color: () => 'text-foreground',
+        bgColor: () => 'border-border bg-white',
         iconBg: () => 'bg-blue-100 text-blue-600',
     },
     {
@@ -152,18 +152,18 @@ const KPI_CONFIG: Array<{
         label: 'Workplace Injuries (YTD)',
         icon: Heart,
         href: '/health-safety/injuries',
-        color: (v) => (v > 0 ? 'text-red-700' : 'text-slate-700'),
-        bgColor: (v) => (v > 0 ? 'border-red-200 bg-red-50/60' : 'border-slate-200 bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'),
+        color: (v) => (v > 0 ? 'text-red-700' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-red-200 bg-red-50/60' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-red-100 text-red-600' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'lost_time_days_ytd',
         label: 'Lost Time Days (YTD)',
         icon: Activity,
         href: '/health-safety/injuries',
-        color: (v) => (v > 0 ? 'text-amber-700' : 'text-slate-700'),
-        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'),
+        color: (v) => (v > 0 ? 'text-amber-700' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'days_since_notifiable',
@@ -188,27 +188,27 @@ const KPI_CONFIG: Array<{
         label: 'Active Alerts',
         icon: Bell,
         href: '/health-safety/lone-workers',
-        color: (v) => (v > 0 ? 'text-amber-700' : 'text-slate-700'),
-        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'),
+        color: (v) => (v > 0 ? 'text-amber-700' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'open_safeguarding',
         label: 'Open Safeguarding',
         icon: ShieldAlert,
         href: '/safeguarding',
-        color: (v) => (v > 0 ? 'text-purple-700' : 'text-slate-700'),
-        bgColor: (v) => (v > 0 ? 'border-purple-200 bg-purple-50/60' : 'border-slate-200 bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'),
+        color: (v) => (v > 0 ? 'text-primary' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-primary bg-primary/10/60' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'fleet_incidents_30d',
         label: 'Fleet Incidents (30 days)',
         icon: Truck,
         href: '/fleet-assets/incidents',
-        color: (v) => (v > 0 ? 'text-amber-700' : 'text-slate-700'),
-        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'),
+        color: (v) => (v > 0 ? 'text-amber-700' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'fleet_unresolved',
@@ -267,7 +267,7 @@ function severityColor(s: string) {
         case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
         case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'low': return 'bg-blue-100 text-blue-800 border-blue-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -275,8 +275,8 @@ function statusColor(s: string) {
     switch (s) {
         case 'closed': case 'resolved': return 'bg-green-100 text-green-800 border-green-200';
         case 'open': case 'reported': return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'in_progress': return 'bg-purple-100 text-purple-800 border-purple-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        case 'in_progress': return 'bg-primary/10 text-primary border-primary';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -286,7 +286,7 @@ function riskColor(r: string) {
         case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
         case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         case 'low': return 'bg-green-100 text-green-800 border-green-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -295,7 +295,7 @@ function drillStatusBadge(status: string) {
         case 'compliant': return 'bg-green-100 text-green-800 border-green-200';
         case 'due_soon': return 'bg-amber-100 text-amber-800 border-amber-200';
         case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -518,7 +518,7 @@ export default function HealthSafetyDashboard({
                                         <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                                         <Tooltip content={<CustomTooltip />} />
                                         <Legend
-                                            formatter={(value: string) => <span className="text-xs capitalize text-slate-600">{value.replace(/_/g, ' ')}</span>}
+                                            formatter={(value: string) => <span className="text-xs capitalize text-muted-foreground">{value.replace(/_/g, ' ')}</span>}
                                         />
                                         {allTypes.map((type) => (
                                             <Area
@@ -658,7 +658,7 @@ export default function HealthSafetyDashboard({
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-medium text-muted-foreground">Active Investigations</span>
-                                        <Activity className="h-4 w-4 text-purple-500" />
+                                        <Activity className="h-4 w-4 text-primary" />
                                     </div>
                                     <div className="mt-2 text-2xl font-bold">{backbone.investigations.active_investigations}</div>
                                     <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
@@ -721,7 +721,7 @@ export default function HealthSafetyDashboard({
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-medium text-muted-foreground">Open H&S Events</span>
-                                        <FileWarning className="h-4 w-4 text-slate-500" />
+                                        <FileWarning className="h-4 w-4 text-muted-foreground" />
                                     </div>
                                     <div className="mt-2 text-2xl font-bold">{backbone.events.open_events}</div>
                                     <div className="mt-1 flex gap-3 text-xs text-muted-foreground">

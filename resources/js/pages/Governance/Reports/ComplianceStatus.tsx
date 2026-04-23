@@ -52,13 +52,13 @@ export default function ComplianceStatus({ auth, report }: Props) {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-6 space-y-2">
-          <h1 className="text-3xl font-bold text-slate-900">Compliance Status Report</h1>
-          <p className="text-sm text-slate-600">A framework-by-framework view of obligations due, overdue, and complete.</p>
+          <h1 className="text-3xl font-bold text-foreground">Compliance Status Report</h1>
+          <p className="text-sm text-muted-foreground">A framework-by-framework view of obligations due, overdue, and complete.</p>
         </div>
 
         <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {[
-            { label: 'Total Obligations', value: report.summary.total, tone: 'text-slate-900' },
+            { label: 'Total Obligations', value: report.summary.total, tone: 'text-foreground' },
             { label: 'Complete', value: report.summary.complete, tone: 'text-green-700' },
             { label: 'Overdue', value: report.summary.overdue, tone: 'text-red-700' },
             { label: 'Due Soon', value: report.summary.due_soon, tone: 'text-amber-700' },
@@ -66,7 +66,7 @@ export default function ComplianceStatus({ auth, report }: Props) {
           ].map((item) => (
             <Card key={item.label}>
               <CardContent className="pt-6">
-                <p className="text-sm text-slate-500">{item.label}</p>
+                <p className="text-sm text-muted-foreground">{item.label}</p>
                 <p className={`mt-2 text-3xl font-bold ${item.tone}`}>{item.value}</p>
               </CardContent>
             </Card>
@@ -80,7 +80,7 @@ export default function ComplianceStatus({ auth, report }: Props) {
           </CardHeader>
           <CardContent className="space-y-3">
             <Progress value={report.summary.completion_rate} />
-            <p className="text-sm text-slate-600">{report.summary.completion_rate}% of tracked obligations are currently complete.</p>
+            <p className="text-sm text-muted-foreground">{report.summary.completion_rate}% of tracked obligations are currently complete.</p>
           </CardContent>
         </Card>
 
@@ -94,13 +94,13 @@ export default function ComplianceStatus({ auth, report }: Props) {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {framework.items.map((item) => (
-                    <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 lg:flex-row lg:items-center lg:justify-between">
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-slate-900">{item.title}</p>
+                          <p className="font-medium text-foreground">{item.title}</p>
                           <Badge variant="outline">{item.code}</Badge>
                         </div>
-                        <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                           {item.owner && <span>Owner: {item.owner}</span>}
                           {item.due_date && <span>Due: {item.due_date}</span>}
                           {item.days_remaining !== null && (
@@ -110,7 +110,7 @@ export default function ComplianceStatus({ auth, report }: Props) {
                           )}
                         </div>
                       </div>
-                      <Badge className={statusStyles[item.status] ?? 'bg-slate-100 text-slate-800 border-slate-200'}>
+                      <Badge className={statusStyles[item.status] ?? 'bg-muted text-foreground border-border'}>
                         {item.status.replace(/_/g, ' ')}
                       </Badge>
                     </div>
@@ -121,7 +121,7 @@ export default function ComplianceStatus({ auth, report }: Props) {
           ) : (
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-slate-500">No compliance obligations were found.</p>
+                <p className="text-sm text-muted-foreground">No compliance obligations were found.</p>
               </CardContent>
             </Card>
           )}

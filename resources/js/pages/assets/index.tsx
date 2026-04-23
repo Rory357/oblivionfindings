@@ -56,7 +56,7 @@ export default function AssetsIndex() {
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-xl font-semibold">Assets</h1>
-                        <p className="text-sm text-slate-500">Site + client assets, inspections, maintenance, documents.</p>
+                        <p className="text-sm text-muted-foreground">Site + client assets, inspections, maintenance, documents.</p>
                     </div>
                     {can?.create ? (
                         <Link href="/assets/create">
@@ -165,27 +165,27 @@ export default function AssetsIndex() {
                                                 {a.name}
                                             </Link>
                                             {a.asset_tag ? (
-                                                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">#{a.asset_tag}</span>
+                                                <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">#{a.asset_tag}</span>
                                             ) : null}
-                                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{a.status}</span>
-                                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{a.risk_level}</span>
+                                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{a.status}</span>
+                                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{a.risk_level}</span>
                                             {a.category ? (
-                                                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{a.category}</span>
+                                                <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{a.category}</span>
                                             ) : null}
                                         </div>
-                                        <div className="mt-1 text-xs text-slate-500">
+                                        <div className="mt-1 text-xs text-muted-foreground">
                                             {a.site ? `Site: ${a.site.name}` : 'Site: —'}
                                             {a.client ? ` • Client: ${a.client.first_name} ${a.client.last_name}` : ''}
                                         </div>
                                     </div>
-                                    <div className="shrink-0 text-right text-xs text-slate-600">
+                                    <div className="shrink-0 text-right text-xs text-muted-foreground">
                                         {a.inspection_due_at ? <div>Inspection: {a.inspection_due_at}</div> : null}
                                         {a.maintenance_due_at ? <div>Maintenance: {a.maintenance_due_at}</div> : null}
                                     </div>
                                 </div>
                             ))
                         ) : (
-                            <div className="text-sm text-slate-500">No assets found.</div>
+                            <div className="text-sm text-muted-foreground">No assets found.</div>
                         )}
 
                         {assets?.links ? (
@@ -195,7 +195,7 @@ export default function AssetsIndex() {
                                         key={idx}
                                         disabled={!l.url}
                                         onClick={() => l.url && router.get(l.url, {}, { preserveScroll: true, preserveState: true })}
-                                        className={`rounded border px-3 py-1 text-sm ${l.active ? 'bg-slate-100' : 'hover:bg-slate-50'} ${!l.url ? 'opacity-50' : ''}`}
+                                        className={`rounded border px-3 py-1 text-sm ${l.active ? 'bg-muted' : 'hover:bg-muted'} ${!l.url ? 'opacity-50' : ''}`}
                                         dangerouslySetInnerHTML={{ __html: l.label }}
                                     />
                                 ))}

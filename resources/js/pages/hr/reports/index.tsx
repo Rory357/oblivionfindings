@@ -85,7 +85,7 @@ const categoryColors: Record<string, string> = {
     turnover: 'border-red-500/30 text-red-400 bg-red-500/10',
     compliance: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
     leave: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
-    training: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+    training: 'border-primary/30 text-primary bg-primary/10',
 };
 
 const weekdayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

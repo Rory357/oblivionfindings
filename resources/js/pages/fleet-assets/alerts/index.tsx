@@ -215,9 +215,9 @@ export default function AlertsIndex({
                     <FleetStatCard label="HIGH" value={highCount} icon={ShieldAlert} color="amber" valueClassName="text-orange-400" subtitle="High priority" />
                     <FleetStatCard label="MEDIUM" value={mediumCount} icon={AlertTriangle} color="amber" valueClassName="text-yellow-400" subtitle="Medium severity" />
                     {severityTotal > 0 && (
-                        <Card className="border bg-purple-50 dark:bg-purple-950/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
+                        <Card className="border bg-primary/10 dark:bg-primary/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
                             <CardContent className="p-4">
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-3">SEVERITY DISTRIBUTION</p>
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-3">SEVERITY DISTRIBUTION</p>
                                 <div className="flex h-3 w-full overflow-hidden rounded-full">
                                     {severityBars.map((bar) => (
                                         bar.count > 0 && (
@@ -234,7 +234,7 @@ export default function AlertsIndex({
                                     {severityBars.map((bar) => (
                                         <div key={bar.label} className="flex items-center gap-1.5">
                                             <span className={`inline-block h-2.5 w-2.5 rounded-sm ${bar.color}`} />
-                                            <span className="text-slate-400">{bar.label}</span>
+                                            <span className="text-muted-foreground">{bar.label}</span>
                                             <span className="font-medium text-white">{bar.count}</span>
                                         </div>
                                     ))}
@@ -290,7 +290,7 @@ export default function AlertsIndex({
                                             type="checkbox"
                                             checked={operationalAlerts.length > 0 && selectedIds.length === operationalAlerts.length}
                                             onChange={toggleSelectAll}
-                                            className="h-3.5 w-3.5 rounded border-gray-300"
+                                            className="h-3.5 w-3.5 rounded border-border"
                                         />
                                     </th>
                                 )}
@@ -312,7 +312,7 @@ export default function AlertsIndex({
                                                     type="checkbox"
                                                     checked={selectedIds.includes(`cr-${alert.id}`)}
                                                     onChange={() => toggleSelect(`cr-${alert.id}`)}
-                                                    className="h-3.5 w-3.5 rounded border-gray-300"
+                                                    className="h-3.5 w-3.5 rounded border-border"
                                                 />
                                             </td>
                                         )}

@@ -73,7 +73,7 @@ export default function GlobalNavSearch() {
             <Button
                 type="button"
                 variant="outline"
-                className="mr-2 hidden h-9 w-[240px] justify-start gap-2 px-3 text-sm text-slate-500 lg:flex"
+                className="mr-2 hidden h-9 w-[240px] justify-start gap-2 px-3 text-sm text-muted-foreground lg:flex"
                 onClick={() => setOpen(true)}
             >
                 <Search className="h-4 w-4 opacity-70" />

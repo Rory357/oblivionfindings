@@ -17,7 +17,7 @@ export default function IncidentTemplateIndex({ auth, templates }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Incident templates</h1>
-                        <div className="mt-1 text-sm text-slate-500">Prefill incident reporting fields</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Prefill incident reporting fields</div>
                     </div>
 
                     {(auth.can as any)?.incidents?.templatesManage && (
@@ -35,9 +35,9 @@ export default function IncidentTemplateIndex({ auth, templates }: Props) {
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <div className="font-semibold">
-                                                {t.name} {!t.is_active ? <span className="ml-2 text-xs text-slate-400">(inactive)</span> : null}
+                                                {t.name} {!t.is_active ? <span className="ml-2 text-xs text-muted-foreground">(inactive)</span> : null}
                                             </div>
-                                            <div className="mt-1 text-xs text-slate-500">
+                                            <div className="mt-1 text-xs text-muted-foreground">
                                                 {t.type || '—'} • {t.severity || '—'}
                                             </div>
                                         </div>
@@ -49,7 +49,7 @@ export default function IncidentTemplateIndex({ auth, templates }: Props) {
                             </CardHeader>
                         </Card>
                     ))}
-                    {!templates.length && <div className="text-sm text-slate-500">No templates yet.</div>}
+                    {!templates.length && <div className="text-sm text-muted-foreground">No templates yet.</div>}
                 </div>
             </div>
         </AppLayout>

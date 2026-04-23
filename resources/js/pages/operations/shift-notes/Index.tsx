@@ -123,7 +123,7 @@ function ExpandableText({ text, maxLength = 300 }: { text: string; maxLength?: n
     return (
         <div>
             <p className="text-sm whitespace-pre-wrap">{expanded ? text : text.slice(0, maxLength) + '...'}</p>
-            <button className="mt-1 text-xs font-medium text-indigo-600" onClick={() => setExpanded(!expanded)}>
+            <button className="mt-1 text-xs font-medium text-primary" onClick={() => setExpanded(!expanded)}>
                 {expanded ? 'Show less' : 'Show more'}
             </button>
         </div>
@@ -307,7 +307,7 @@ export default function ShiftNotesIndex({
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-8 w-8">
-                                                <AvatarFallback className="bg-slate-100 text-xs">{initials}</AvatarFallback>
+                                                <AvatarFallback className="bg-muted text-xs">{initials}</AvatarFallback>
                                             </Avatar>
                                             <div>
                                                 <div className="flex items-center gap-2">

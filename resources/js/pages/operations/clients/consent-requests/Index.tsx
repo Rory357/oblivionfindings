@@ -32,8 +32,8 @@ const STATUS_STYLES: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-800',
     approved: 'bg-emerald-100 text-emerald-800',
     declined: 'bg-red-100 text-red-800',
-    cancelled: 'bg-slate-100 text-slate-600',
-    expired: 'bg-slate-100 text-slate-500',
+    cancelled: 'bg-muted text-muted-foreground',
+    expired: 'bg-muted text-muted-foreground',
 };
 
 const AUTHORITY_LABEL: Record<string, string> = {
@@ -93,7 +93,7 @@ export default function ConsentRequestsIndex({ client, requests = [], stats }: P
                                                 >
                                                     {r.consent_type?.name ?? 'Consent'}
                                                 </Link>
-                                                <Badge className={STATUS_STYLES[r.status] ?? 'bg-slate-100'}>{r.status}</Badge>
+                                                <Badge className={STATUS_STYLES[r.status] ?? 'bg-muted'}>{r.status}</Badge>
                                                 {r.is_expired && r.status === 'pending' && (
                                                     <Badge className="bg-red-100 text-red-700">overdue</Badge>
                                                 )}
@@ -142,7 +142,7 @@ function StatCard({
     tone?: 'slate' | 'amber' | 'emerald' | 'red';
 }) {
     const toneClass: Record<string, string> = {
-        slate: 'text-slate-600',
+        slate: 'text-muted-foreground',
         amber: 'text-amber-600',
         emerald: 'text-emerald-600',
         red: 'text-red-600',

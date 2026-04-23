@@ -136,8 +136,8 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">New Journal Entry</h1>
-                    <p className="text-gray-500 mt-1">Create a manual general ledger journal entry</p>
+                    <h1 className="text-3xl font-bold text-foreground">New Journal Entry</h1>
+                    <p className="text-muted-foreground mt-1">Create a manual general ledger journal entry</p>
                 </div>
 
                 {postingError && (
@@ -334,7 +334,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                                     size="sm"
                                                     onClick={() => removeLine(index)}
                                                     disabled={data.lines.length <= 2}
-                                                    className="text-gray-400 hover:text-red-600"
+                                                    className="text-muted-foreground hover:text-red-600"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>

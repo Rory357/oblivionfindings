@@ -798,7 +798,7 @@ export default function Data() {
                 );
             case 'withdrawn':
                 return (
-                    <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    <Badge variant="outline" className="border-border bg-muted text-foreground dark:border-border dark:bg-muted dark:text-muted-foreground">
                         Withdrawn
                     </Badge>
                 );
@@ -896,11 +896,11 @@ export default function Data() {
 
                 <TabsRoot defaultValue="export" className="space-y-6">
                     <TabsList className="w-full justify-start border-b bg-transparent p-0">
-                        <TabsTrigger dusk="data-tab-export" value="export" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Database className="h-3.5 w-3.5" />Export & Import</TabsTrigger>
-                        <TabsTrigger dusk="data-tab-requests" value="requests" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Shield className="h-3.5 w-3.5" />Privacy Requests</TabsTrigger>
-                        <TabsTrigger dusk="data-tab-retention" value="retention" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Clock className="h-3.5 w-3.5" />Retention</TabsTrigger>
-                        <TabsTrigger dusk="data-tab-compliance" value="compliance" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Landmark className="h-3.5 w-3.5" />Compliance</TabsTrigger>
-                        <TabsTrigger dusk="data-tab-settings" value="settings" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Settings className="h-3.5 w-3.5" />Settings</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-export" value="export" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary"><Database className="h-3.5 w-3.5" />Export & Import</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-requests" value="requests" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary"><Shield className="h-3.5 w-3.5" />Privacy Requests</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-retention" value="retention" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary"><Clock className="h-3.5 w-3.5" />Retention</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-compliance" value="compliance" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary"><Landmark className="h-3.5 w-3.5" />Compliance</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-settings" value="settings" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary"><Settings className="h-3.5 w-3.5" />Settings</TabsTrigger>
                     </TabsList>
 
                 <TabsContent value="export" className="space-y-8">
@@ -911,8 +911,8 @@ export default function Data() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                                    <Download className="h-5 w-5 text-violet-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                    <Download className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
                                     <CardTitle>Data Export</CardTitle>
@@ -930,7 +930,7 @@ export default function Data() {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="h-auto px-2 py-1 text-xs text-violet-600"
+                                        className="h-auto px-2 py-1 text-xs text-primary"
                                         onClick={toggleAllModules}
                                     >
                                         {selectedModules.length === allModuleIds.length ? 'Deselect all' : 'Select all'}
@@ -1053,7 +1053,7 @@ export default function Data() {
                                 dusk="data-export-submit"
                                 onClick={handleExport}
                                 disabled={!bulkExportAvailable || selectedModules.length === 0}
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className="bg-primary hover:bg-primary"
                             >
                                 <Download className="mr-2 h-4 w-4" />
                                 Export Selected Data
@@ -1094,7 +1094,7 @@ export default function Data() {
                                                         <td className="px-4 py-2.5">{statusBadge(exp.status)}</td>
                                                         <td className="px-4 py-2.5 text-right">
                                                             {exp.status === 'completed' && (
-                                                                <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs text-violet-600">
+                                                                <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs text-primary">
                                                                     <Download className="mr-1 h-3 w-3" /> Download
                                                                 </Button>
                                                             )}
@@ -1130,8 +1130,8 @@ export default function Data() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                                    <Upload className="h-5 w-5 text-violet-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                    <Upload className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
                                     <CardTitle>Data Import</CardTitle>
@@ -1151,10 +1151,10 @@ export default function Data() {
                                     return (
                                         <div
                                             key={imp.id}
-                                            className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-5 text-center transition hover:border-violet-300 hover:bg-violet-50/50 dark:hover:border-violet-700 dark:hover:bg-violet-950/20"
+                                            className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-5 text-center transition hover:border-primary hover:bg-primary/10/50 dark:hover:border-primary dark:hover:bg-primary/20"
                                         >
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/40">
-                                                <Icon className="h-5 w-5 text-violet-600" />
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/40">
+                                                <Icon className="h-5 w-5 text-primary" />
                                             </div>
                                             <div>
                                                 <p className="text-sm font-medium">{imp.title}</p>
@@ -1204,8 +1204,8 @@ export default function Data() {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                                        <Eye className="h-5 w-5 text-violet-600" />
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                        <Eye className="h-5 w-5 text-primary" />
                                     </div>
                                     <div>
                                         <CardTitle>Data Subject Access Requests (DSAR)</CardTitle>
@@ -1216,7 +1216,7 @@ export default function Data() {
                                 </div>
                                 <Button
                                     dusk="data-dsar-open"
-                                    className="bg-violet-600 hover:bg-violet-700"
+                                    className="bg-primary hover:bg-primary"
                                     onClick={() => setShowDsarDialog(true)}
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
@@ -1260,7 +1260,7 @@ export default function Data() {
                                                 <tr dusk={`data-dsar-row-${req.id}`} key={req.id} className="border-b last:border-0">
                                                 <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs">{req.id}</td>
                                                 <td className="px-4 py-2.5">
-                                                    <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-400">
+                                                    <Badge variant="outline" className="border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary dark:text-primary">
                                                         {req.type}
                                                     </Badge>
                                                 </td>
@@ -1336,11 +1336,11 @@ export default function Data() {
                                                             <CheckCircle className="mr-1 h-3 w-3" /> Notified
                                                         </Badge>
                                                     ) : breach.commissionerNotificationRequired === false ? (
-                                                        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                                        <Badge variant="outline" className="border-border bg-muted text-foreground dark:border-border dark:bg-muted dark:text-muted-foreground">
                                                             Not required
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+                                                        <Badge variant="outline" className="border-border bg-muted text-muted-foreground dark:border-border dark:bg-muted dark:text-muted-foreground">
                                                             Pending
                                                         </Badge>
                                                     )}
@@ -1372,8 +1372,8 @@ export default function Data() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                                    <Archive className="h-5 w-5 text-violet-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                    <Archive className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
                                     <CardTitle>Data Retention</CardTitle>
@@ -1427,7 +1427,7 @@ export default function Data() {
 
                             <Button
                                 dusk="data-save-retention"
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className="bg-primary hover:bg-primary"
                                 onClick={saveRetentionPolicies}
                                 disabled={savingRetention}
                             >
@@ -1535,8 +1535,8 @@ export default function Data() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                                    <Shield className="h-5 w-5 text-violet-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                    <Shield className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
                                     <CardTitle>Privacy & Consent</CardTitle>
@@ -1630,7 +1630,7 @@ export default function Data() {
 
                                 <Button
                                     dusk="data-save-privacy"
-                                    className="bg-violet-600 hover:bg-violet-700"
+                                    className="bg-primary hover:bg-primary"
                                     onClick={savePrivacySettings}
                                     disabled={savingPrivacy}
                                 >
@@ -1645,8 +1645,8 @@ export default function Data() {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                                    <Globe className="h-5 w-5 text-violet-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                    <Globe className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
                                     <CardTitle>NZ Regulatory Compliance</CardTitle>
@@ -1778,7 +1778,7 @@ export default function Data() {
 
                             <Button
                                 dusk="data-save-compliance"
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className="bg-primary hover:bg-primary"
                                 onClick={saveComplianceSettings}
                                 disabled={savingCompliance}
                             >
@@ -1794,8 +1794,8 @@ export default function Data() {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                                        <Building2 className="h-5 w-5 text-violet-600" />
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
+                                        <Building2 className="h-5 w-5 text-primary" />
                                     </div>
                                     <div>
                                         <CardTitle>Third-Party Data Processors</CardTitle>
@@ -1806,7 +1806,7 @@ export default function Data() {
                                 </div>
                                 <Button
                                     dusk="data-processor-open"
-                                    className="bg-violet-600 hover:bg-violet-700"
+                                    className="bg-primary hover:bg-primary"
                                     onClick={() => openProcessorDialog()}
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
@@ -1859,7 +1859,7 @@ export default function Data() {
                                                     dusk={`data-processor-edit-${proc.id}`}
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-auto px-2 py-1 text-xs text-violet-600"
+                                                    className="h-auto px-2 py-1 text-xs text-primary"
                                                     onClick={() => openProcessorDialog(proc)}
                                                 >
                                                     Edit
@@ -2104,7 +2104,7 @@ export default function Data() {
                             </Button>
                             <Button
                                 dusk="data-dsar-submit"
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className="bg-primary hover:bg-primary"
                                 onClick={createDsarRequest}
                                 disabled={submittingDsar}
                             >
@@ -2393,7 +2393,7 @@ export default function Data() {
                             </Button>
                             <Button
                                 dusk="data-processor-submit"
-                                className="bg-violet-600 hover:bg-violet-700"
+                                className="bg-primary hover:bg-primary"
                                 onClick={submitProcessor}
                                 disabled={submittingProcessor}
                             >

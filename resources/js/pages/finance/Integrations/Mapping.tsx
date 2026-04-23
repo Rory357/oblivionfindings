@@ -45,8 +45,8 @@ const providerLabels: Record<string, string> = {
 
 const typeColors: Record<string, string> = {
     asset: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-    liability: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
-    equity: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30',
+    liability: 'bg-primary/10 text-primary border-primary/30',
+    equity: 'bg-primary/10 text-primary border-primary/30',
     revenue: 'bg-green-500/10 text-green-600 border-green-500/30',
     expense: 'bg-red-500/10 text-red-600 border-red-500/30',
 };

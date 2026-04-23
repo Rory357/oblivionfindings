@@ -64,7 +64,7 @@ const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground' },
     awaiting_approval: { label: 'Awaiting Approval', className: 'bg-yellow-100 text-yellow-800' },
     approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
     partially_paid: { label: 'Partially Paid', className: 'bg-orange-100 text-orange-800' },
@@ -104,8 +104,8 @@ export default function BillShow({ auth, bill }: Props) {
                 <div className="flex items-start justify-between mb-6">
                     <div>
                         <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-gray-900">{bill.bill_number}</h1>
-                            <Badge className={statusConfig[bill.status]?.className ?? 'bg-gray-100 text-gray-800'}>
+                            <h1 className="text-3xl font-bold text-foreground">{bill.bill_number}</h1>
+                            <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
                                 {statusConfig[bill.status]?.label ?? bill.status}
                             </Badge>
                             {isOverdue && (
@@ -115,7 +115,7 @@ export default function BillShow({ auth, bill }: Props) {
                                 </Badge>
                             )}
                         </div>
-                        <p className="text-gray-500 mt-1">
+                        <p className="text-muted-foreground mt-1">
                             {bill.vendor?.name ?? 'Unknown vendor'}
                             {bill.vendor_reference && <span> - Ref: {bill.vendor_reference}</span>}
                         </p>
@@ -152,18 +152,18 @@ export default function BillShow({ auth, bill }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Bill Date</span>
+                                <span className="text-muted-foreground">Bill Date</span>
                                 <span className="font-medium">{formatDate(bill.bill_date)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Due Date</span>
+                                <span className="text-muted-foreground">Due Date</span>
                                 <span className={cn('font-medium', isOverdue && 'text-red-600')}>
                                     {formatDate(bill.due_date)}
                                 </span>
                             </div>
                             {bill.purchase_order && (
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Purchase Order</span>
+                                    <span className="text-muted-foreground">Purchase Order</span>
                                     <Link href={`/finance/purchase-orders/${bill.purchase_order.id}`} className="text-blue-600 hover:underline font-medium">
                                         {bill.purchase_order.po_number}
                                     </Link>
@@ -171,20 +171,20 @@ export default function BillShow({ auth, bill }: Props) {
                             )}
                             {bill.approved_by && (
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Approved By</span>
+                                    <span className="text-muted-foreground">Approved By</span>
                                     <span className="font-medium">{bill.approved_by.name}</span>
                                 </div>
                             )}
                             {bill.approved_at && (
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Approved At</span>
+                                    <span className="text-muted-foreground">Approved At</span>
                                     <span className="font-medium">{formatDateTime(bill.approved_at)}</span>
                                 </div>
                             )}
                             {bill.notes && (
                                 <div className="pt-2 border-t">
-                                    <span className="text-gray-500 block mb-1">Notes</span>
-                                    <p className="text-gray-700 whitespace-pre-wrap">{bill.notes}</p>
+                                    <span className="text-muted-foreground block mb-1">Notes</span>
+                                    <p className="text-foreground whitespace-pre-wrap">{bill.notes}</p>
                                 </div>
                             )}
                         </CardContent>
@@ -197,11 +197,11 @@ export default function BillShow({ auth, bill }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Subtotal</span>
+                                <span className="text-muted-foreground">Subtotal</span>
                                 <span>{formatCurrency(bill.subtotal)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">GST</span>
+                                <span className="text-muted-foreground">GST</span>
                                 <span>{formatCurrency(bill.gst_amount)}</span>
                             </div>
                             <Separator />
@@ -230,24 +230,24 @@ export default function BillShow({ auth, bill }: Props) {
                             {bill.journal ? (
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Journal #</span>
+                                        <span className="text-muted-foreground">Journal #</span>
                                         <Link href={`/finance/journals/${bill.journal.id}`} className="text-blue-600 hover:underline font-medium">
                                             {bill.journal.journal_number}
                                         </Link>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Status</span>
+                                        <span className="text-muted-foreground">Status</span>
                                         <Badge className="bg-green-100 text-green-800">{bill.journal.status}</Badge>
                                     </div>
                                     {bill.journal.posted_at && (
                                         <div className="flex justify-between">
-                                            <span className="text-gray-500">Posted</span>
+                                            <span className="text-muted-foreground">Posted</span>
                                             <span className="font-medium">{formatDateTime(bill.journal.posted_at)}</span>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-4 text-gray-400">
+                                <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
                                     <FileText className="w-8 h-8 mb-2" />
                                     <p className="text-sm">No journal posted yet</p>
                                 </div>
@@ -318,7 +318,7 @@ export default function BillShow({ auth, bill }: Props) {
                                     <TableRow key={payment.id}>
                                         <TableCell>{formatDate(payment.payment_date)}</TableCell>
                                         <TableCell className="text-right font-medium">{formatCurrency(payment.amount)}</TableCell>
-                                        <TableCell className="text-gray-500">{payment.notes ?? '-'}</TableCell>
+                                        <TableCell className="text-muted-foreground">{payment.notes ?? '-'}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

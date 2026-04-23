@@ -127,11 +127,11 @@ function getZoneBadge(resident: Resident): { text: string; className: string } {
     }
     switch (resident.geofence_status) {
         case 'in_zone':
-            return { text: 'In Zone', className: 'bg-purple-100 text-purple-700 border-purple-200' };
+            return { text: 'In Zone', className: 'bg-primary/10 text-primary border-primary' };
         case 'outside_zone':
             return { text: 'Outside', className: 'bg-red-100 text-red-700 border-red-200' };
         default:
-            return { text: 'Unknown', className: 'bg-slate-100 text-slate-600' };
+            return { text: 'Unknown', className: 'bg-muted text-muted-foreground' };
     }
 }
 
@@ -139,7 +139,7 @@ function getBatteryBarColor(battery: number | null): string {
     if (battery == null) return 'bg-slate-300';
     if (battery < 20) return 'bg-red-500 animate-pulse';
     if (battery <= 40) return 'bg-amber-500';
-    return 'bg-purple-500';
+    return 'bg-primary';
 }
 
 function formatAlertType(alertType: string): string {
@@ -321,7 +321,7 @@ export default function ResidentTrackingIndex({
                                     onClick={() => setActiveTab('all')}
                                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                                         activeTab === 'all'
-                                            ? 'bg-purple-100 text-purple-700'
+                                            ? 'bg-primary/10 text-primary'
                                             : 'text-muted-foreground hover:bg-muted'
                                     }`}
                                 >
@@ -367,7 +367,7 @@ export default function ResidentTrackingIndex({
                                 <div className="divide-y">
                                     {safeAlerts.length === 0 ? (
                                         <div className="flex flex-col items-center gap-2 py-10 text-center">
-                                            <CheckCircle2 className="h-8 w-8 text-purple-400" />
+                                            <CheckCircle2 className="h-8 w-8 text-primary" />
                                             <p className="text-sm font-medium">All residents safe</p>
                                             <p className="text-xs text-muted-foreground">No recent alerts</p>
                                         </div>
@@ -475,7 +475,7 @@ export default function ResidentTrackingIndex({
                         <CardContent>
                             {safeAlerts.length === 0 ? (
                                 <div className="flex flex-col items-center gap-2 py-6 text-center">
-                                    <CheckCircle2 className="h-8 w-8 text-purple-400" />
+                                    <CheckCircle2 className="h-8 w-8 text-primary" />
                                     <p className="text-sm font-medium">All residents safe</p>
                                     <p className="text-xs text-muted-foreground">No recent alerts to display</p>
                                 </div>
@@ -563,7 +563,7 @@ export default function ResidentTrackingIndex({
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Shield className="h-4 w-4 text-purple-500" />
+                                <Shield className="h-4 w-4 text-primary" />
                                 Safety Analytics
                             </CardTitle>
                         </CardHeader>

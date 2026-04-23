@@ -63,7 +63,7 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
                             <Warehouse className="w-5 h-5 text-amber-400" />
                             Facility Reports
                         </h1>
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-muted-foreground">
                             Equipment safety, zone utilization, and compliance
                         </p>
                     </div>
@@ -80,37 +80,37 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_facilities}</div>
-                            <div className="text-sm text-slate-400">Facilities</div>
+                            <div className="text-sm text-muted-foreground">Facilities</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_zones}</div>
-                            <div className="text-sm text-slate-400">Zones</div>
+                            <div className="text-sm text-muted-foreground">Zones</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_assets}</div>
-                            <div className="text-sm text-slate-400">Assets</div>
+                            <div className="text-sm text-muted-foreground">Assets</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-red-500/5 border-red-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-red-400">{stats.open_hazards}</div>
-                            <div className="text-sm text-slate-400">Open Hazards</div>
+                            <div className="text-sm text-muted-foreground">Open Hazards</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-orange-500/5 border-orange-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-orange-400">{stats.equipment_failures}</div>
-                            <div className="text-sm text-slate-400">Equipment Issues</div>
+                            <div className="text-sm text-muted-foreground">Equipment Issues</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-emerald-400">{stats.safety_walkthrough_completion}%</div>
-                            <div className="text-sm text-slate-400">Walkthroughs</div>
+                            <div className="text-sm text-muted-foreground">Walkthroughs</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -160,7 +160,7 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
                                     <div key={facility.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{facility.name}</div>
-                                            <div className="text-sm text-slate-400 flex items-center gap-3">
+                                            <div className="text-sm text-muted-foreground flex items-center gap-3">
                                                 <span className="flex items-center gap-1">
                                                     <LayoutGrid className="w-3.5 h-3.5" />
                                                     {facility.facility_zones_count} zones

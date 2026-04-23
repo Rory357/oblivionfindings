@@ -109,7 +109,7 @@ export default function CreateClient({
                                 {errors.service_context_id}
                             </div>
                         )}
-                        <div className="mt-1 text-xs text-slate-500">
+                        <div className="mt-1 text-xs text-muted-foreground">
                             Residential / home support / respite classification (used for audit and reporting).
                         </div>
                     </div>
@@ -242,7 +242,7 @@ export default function CreateClient({
                             />
                             Create login account for this {clientSingular.toLowerCase()}
                         </label>
-                        <div className="mt-2 text-xs text-slate-500">
+                        <div className="mt-2 text-xs text-muted-foreground">
                             Uses the Contact email above. Contact email is required when this is checked.
                         </div>
                     </div>
@@ -341,7 +341,7 @@ export default function CreateClient({
 
                     <button
                         disabled={processing}
-                        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                         type="submit"
                     >
                         {processing ? 'Saving…' : 'Create client'}

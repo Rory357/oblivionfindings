@@ -86,8 +86,8 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
             <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Clinical Governance</h1>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <h1 className="text-2xl font-bold text-foreground">Clinical Governance</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">
                             Automated clinical indicator snapshot for Governance oversight.
                         </p>
                     </div>
@@ -112,7 +112,7 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
 
                 {Object.entries(grouped).map(([categoryLabel, categoryIndicators]) => (
                     <div key={categoryLabel} className="space-y-3">
-                        <h2 className="text-lg font-semibold text-gray-900">{categoryLabel}</h2>
+                        <h2 className="text-lg font-semibold text-foreground">{categoryLabel}</h2>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                             {categoryIndicators.map((indicator) => {
                                 const latestValue = getLatestValue(indicator.id);
@@ -122,17 +122,17 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
                                         <CardContent className="space-y-4 p-5">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div>
-                                                    <p className="text-sm font-semibold text-gray-900">
+                                                    <p className="text-sm font-semibold text-foreground">
                                                         {indicator.name}
                                                     </p>
-                                                    <p className="mt-1 text-xs text-gray-500">
+                                                    <p className="mt-1 text-xs text-muted-foreground">
                                                         {indicator.definition ?? indicator.data_source ?? 'Automated indicator'}
                                                     </p>
                                                 </div>
                                                 <Badge
                                                     className={cn(
                                                         'capitalize',
-                                                        latestValue ? statusStyles[latestValue.status] : 'bg-slate-100 text-slate-700',
+                                                        latestValue ? statusStyles[latestValue.status] : 'bg-muted text-foreground',
                                                     )}
                                                 >
                                                     {latestValue?.status ?? 'No data'}
@@ -141,16 +141,16 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
 
                                             <div className="flex items-end justify-between gap-3">
                                                 <div className="flex items-baseline gap-2">
-                                                    <span className="text-3xl font-bold text-gray-900">
+                                                    <span className="text-3xl font-bold text-foreground">
                                                         {latestValue ? latestValue.value : '—'}
                                                     </span>
                                                     {indicator.unit && (
-                                                        <span className="text-xs uppercase tracking-wide text-gray-500">
+                                                        <span className="text-xs uppercase tracking-wide text-muted-foreground">
                                                             {indicator.unit}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="text-gray-500">
+                                                <div className="text-muted-foreground">
                                                     {latestValue?.trend === 'up' ? (
                                                         <TrendingUp className="h-4 w-4" />
                                                     ) : latestValue?.trend === 'down' ? (
@@ -161,7 +161,7 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center justify-between gap-3 text-xs text-gray-500">
+                                            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                                                 <span>
                                                     Target: {indicator.target_direction === 'below' ? '≤' : indicator.target_direction === 'above' ? '≥' : '='}{' '}
                                                     {indicator.target_value ?? '—'}
@@ -188,15 +188,15 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
                 {latestSnapshot?.narrative && (
                     <Card>
                         <CardContent className="space-y-2 p-5">
-                            <p className="text-sm font-semibold text-gray-900">Narrative</p>
-                            <p className="text-sm leading-6 text-gray-600">{latestSnapshot.narrative}</p>
+                            <p className="text-sm font-semibold text-foreground">Narrative</p>
+                            <p className="text-sm leading-6 text-muted-foreground">{latestSnapshot.narrative}</p>
                         </CardContent>
                     </Card>
                 )}
 
                 {indicators.length === 0 && (
                     <Card>
-                        <CardContent className="p-8 text-center text-sm text-gray-500">
+                        <CardContent className="p-8 text-center text-sm text-muted-foreground">
                             No automated clinical governance indicators are available yet.
                         </CardContent>
                     </Card>

@@ -72,7 +72,7 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-xl font-semibold">{title}</h1>
-                        <p className="text-sm text-slate-500">Add site-level or client-level assets. Client assets inherit the client’s site.</p>
+                        <p className="text-sm text-muted-foreground">Add site-level or client-level assets. Client assets inherit the client’s site.</p>
                     </div>
                     {mode === 'edit' && asset ? (
                         <Link href={`/assets/${asset.id}`}>
@@ -129,7 +129,7 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <div className="mt-1 text-xs text-slate-500">If you select a client, the site will be set automatically on save.</div>
+                            <div className="mt-1 text-xs text-muted-foreground">If you select a client, the site will be set automatically on save.</div>
                             <InputError message={form.errors.client_id} />
                         </div>
                     </CardContent>
@@ -263,7 +263,7 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                             />
                             <div className="space-y-1">
                                 <Label>Requires inspection</Label>
-                                <div className="text-xs text-slate-500">Track an inspection due date and record inspection events.</div>
+                                <div className="text-xs text-muted-foreground">Track an inspection due date and record inspection events.</div>
                             </div>
                         </div>
                         <div className="space-y-1">
@@ -283,7 +283,7 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                             />
                             <div className="space-y-1">
                                 <Label>Requires maintenance</Label>
-                                <div className="text-xs text-slate-500">Track a maintenance due date and record maintenance events.</div>
+                                <div className="text-xs text-muted-foreground">Track a maintenance due date and record maintenance events.</div>
                             </div>
                         </div>
                         <div className="space-y-1">

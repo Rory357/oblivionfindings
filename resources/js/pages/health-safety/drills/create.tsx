@@ -40,7 +40,7 @@ export default function DrillCreate({ sites }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Schedule Drill</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             Schedule a new emergency drill for a site
                         </div>
                     </div>

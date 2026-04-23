@@ -88,10 +88,10 @@ function getLicenceExpiryDays(dateStr: string | null | undefined): number | null
 }
 
 const statusBannerColors: Record<string, string> = {
-    eligible: 'bg-purple-50 border-purple-200 text-purple-900 dark:bg-purple-950/30 dark:border-purple-800 dark:text-purple-200',
+    eligible: 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
     suspended: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
     expired: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
-    unknown: 'bg-slate-50 border-slate-200 text-slate-900 dark:bg-slate-950/30 dark:border-slate-800 dark:text-slate-200',
+    unknown: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
 };
 
 export default function DriverShow({ driver, assigned_vehicles, sessions, driving_metrics, recent_trips }: Props) {

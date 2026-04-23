@@ -56,7 +56,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
             case 'rejected':
                 return 'bg-red-100 text-red-800 border-red-200';
             default:
-                return 'bg-slate-100 text-slate-800 border-slate-200';
+                return 'bg-muted text-foreground border-border';
         }
     };
 
@@ -71,7 +71,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
             case 'very_high':
                 return 'bg-red-100 text-red-800 border-red-200';
             default:
-                return 'bg-slate-100 text-slate-800 border-slate-200';
+                return 'bg-muted text-foreground border-border';
         }
     };
 
@@ -125,7 +125,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-slate-500">Search</Label>
+                            <Label className="text-xs text-muted-foreground">Search</Label>
                             <Input
                                 placeholder="Search by name or project"
                                 value={filters.q || ''}
@@ -134,7 +134,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Outcome</Label>
+                            <Label className="text-xs text-muted-foreground">Outcome</Label>
                             <Select
                                 value={filters.outcome ?? ANY}
                                 onValueChange={(v) => onFilter({ outcome: v === ANY ? null : v })}
@@ -151,7 +151,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-slate-500">Risk Level</Label>
+                            <Label className="text-xs text-muted-foreground">Risk Level</Label>
                             <Select
                                 value={filters.risk_level ?? ANY}
                                 onValueChange={(v) => onFilter({ risk_level: v === ANY ? null : v })}
@@ -193,10 +193,10 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <div className="mt-2 text-sm text-slate-600">
+                                            <div className="mt-2 text-sm text-muted-foreground">
                                                 {dpia.project_or_process}
                                             </div>
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Assessed: {formatDate(dpia.assessment_date)}
                                                 {dpia.assessor && ` by ${dpia.assessor.name}`}
                                                 {dpia.review_date && ` • Review: ${formatDate(dpia.review_date)}`}
@@ -211,7 +211,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                         </Card>
                     ))}
                     {!dpias.data.length && (
-                        <div className="py-8 text-center text-sm text-slate-500">
+                        <div className="py-8 text-center text-sm text-muted-foreground">
                             No impact assessments found.
                         </div>
                     )}

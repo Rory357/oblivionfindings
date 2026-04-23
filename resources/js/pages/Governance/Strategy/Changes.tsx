@@ -45,8 +45,8 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Strategic Plan Changes</h1>
-                    <p className="text-gray-500 mt-1">Changes since last snapshot</p>
+                    <h1 className="text-3xl font-bold text-foreground">Strategic Plan Changes</h1>
+                    <p className="text-muted-foreground mt-1">Changes since last snapshot</p>
                 </div>
 
                 {/* Plan Header */}
@@ -60,7 +60,7 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
                 {!changes.has_snapshot ? (
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="flex items-center gap-3 text-gray-500">
+                            <div className="flex items-center gap-3 text-muted-foreground">
                                 <Info className="w-5 h-5" />
                                 <span>No previous snapshot available. Changes will be tracked after the first snapshot is created.</span>
                             </div>
@@ -69,7 +69,7 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
                 ) : changes.changes.length === 0 ? (
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="text-center text-gray-500 py-8">No changes detected since last snapshot.</div>
+                            <div className="text-center text-muted-foreground py-8">No changes detected since last snapshot.</div>
                         </CardContent>
                     </Card>
                 ) : (
@@ -91,12 +91,12 @@ export default function StrategyChanges({ auth, plan, changes }: Props) {
                                     <CardContent>
                                         <div className="space-y-3">
                                             {items.map((item, i) => (
-                                                <div key={i} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-gray-50">
+                                                <div key={i} className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted">
                                                     <Badge className={config.badgeClass}>{config.label}</Badge>
                                                     <div>
-                                                        <p className="font-medium text-gray-900">{item.goal}</p>
+                                                        <p className="font-medium text-foreground">{item.goal}</p>
                                                         {item.detail && (
-                                                            <p className="text-sm text-gray-600 mt-1">{item.detail}</p>
+                                                            <p className="text-sm text-muted-foreground mt-1">{item.detail}</p>
                                                         )}
                                                     </div>
                                                 </div>

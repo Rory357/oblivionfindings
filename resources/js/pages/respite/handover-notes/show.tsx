@@ -19,7 +19,7 @@ export default function HandoverNoteShow({ note }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Handover Note #{note.id}</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <div className="mt-1 text-sm text-muted-foreground">
                             {note.stay?.client?.first_name} {note.stay?.client?.last_name}
                         </div>
                     </div>
@@ -33,13 +33,13 @@ export default function HandoverNoteShow({ note }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Note Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3 text-sm text-slate-600">
+                    <CardContent className="space-y-3 text-sm text-muted-foreground">
                         <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{note.handover_type?.replace(/_/g, ' ')}</Badge>
                             {note.sensitive_flag && <Badge className="bg-red-100 text-red-800">Sensitive</Badge>}
                         </div>
                         <div className="whitespace-pre-wrap">{note.notes}</div>
-                        <div className="text-xs text-slate-400">Created: {formatDateTime(note.created_at)}</div>
+                        <div className="text-xs text-muted-foreground">Created: {formatDateTime(note.created_at)}</div>
                     </CardContent>
                 </Card>
 
@@ -47,7 +47,7 @@ export default function HandoverNoteShow({ note }: Props) {
                     <CardHeader>
                         <CardTitle className="text-base">Acknowledgment</CardTitle>
                     </CardHeader>
-                    <CardContent className="text-sm text-slate-600">
+                    <CardContent className="text-sm text-muted-foreground">
                         {note.acknowledged_at ? (
                             <div className="space-y-1">
                                 <div>Acknowledged by: {note.acknowledged_by?.name || 'Unknown'}</div>
@@ -55,7 +55,7 @@ export default function HandoverNoteShow({ note }: Props) {
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                <div className="text-slate-500">This note has not been acknowledged yet.</div>
+                                <div className="text-muted-foreground">This note has not been acknowledged yet.</div>
                                 <Button size="sm" onClick={() => router.post(`/respite/handover-notes/${note.id}/acknowledge`)}>
                                     Acknowledge
                                 </Button>

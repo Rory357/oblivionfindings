@@ -70,7 +70,7 @@ type Props = {
     goodFaithRequiredChecks: GoodFaithOption[];
 };
 
-const stageBadgeClass = 'border-slate-300 bg-slate-100 text-slate-700';
+const stageBadgeClass = 'border-border bg-muted text-foreground';
 
 export default function EditDisciplinary({
     hrCase,

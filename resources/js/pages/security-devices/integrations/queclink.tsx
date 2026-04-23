@@ -84,7 +84,7 @@ const connectionStatusConfig: Record<
     disconnected: {
         label: 'Disconnected',
         className:
-            'bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-400',
+            'bg-muted text-foreground dark:bg-muted/50 dark:text-muted-foreground',
         icon: XCircle,
     },
     error: {

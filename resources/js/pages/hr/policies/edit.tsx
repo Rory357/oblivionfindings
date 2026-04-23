@@ -342,7 +342,7 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                             {policy.versions.map((version) => (
                                 <div key={version.id} className={`flex items-center justify-between rounded-lg border p-3 ${version.is_current ? 'border-blue-500 bg-blue-50/50' : ''}`}>
                                     <div className="flex items-center gap-3">
-                                        <FileText className="h-5 w-5 text-slate-400" />
+                                        <FileText className="h-5 w-5 text-muted-foreground" />
                                         <div>
                                             <div className="font-medium">
                                                 Version {version.version_number}

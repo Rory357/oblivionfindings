@@ -41,7 +41,7 @@ type Props = {
 
 const statusColors: Record<string, string> = {
     active: 'bg-emerald-500/20 text-emerald-400',
-    inactive: 'bg-slate-500/20 text-slate-400',
+    inactive: 'bg-slate-500/20 text-muted-foreground',
     maintenance: 'bg-yellow-500/20 text-yellow-400',
     retired: 'bg-red-500/20 text-red-400',
     disposed: 'bg-red-500/20 text-red-400',
@@ -76,7 +76,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                         <Package className="w-5 h-5 text-blue-400" />
                         Asset Condition Report
                     </h1>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-muted-foreground">
                         Assets grouped by condition with warranty expiry information
                     </p>
                 </div>
@@ -86,7 +86,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                     <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{summary.total_assets}</div>
-                            <div className="text-sm text-slate-400">Total Assets</div>
+                            <div className="text-sm text-muted-foreground">Total Assets</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-red-500/5 border-red-500/20">
@@ -95,7 +95,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                                 <ShieldAlert className="w-5 h-5" />
                                 {summary.warranty_expired}
                             </div>
-                            <div className="text-sm text-slate-400">Warranty Expired</div>
+                            <div className="text-sm text-muted-foreground">Warranty Expired</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-orange-500/5 border-orange-500/20">
@@ -104,7 +104,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                                 <Clock className="w-5 h-5" />
                                 {summary.warranty_expiring_soon}
                             </div>
-                            <div className="text-sm text-slate-400">Expiring Within 30 Days</div>
+                            <div className="text-sm text-muted-foreground">Expiring Within 30 Days</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -148,7 +148,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                 {conditionGroups.length === 0 ? (
                     <Card>
                         <CardContent className="p-8 text-center">
-                            <p className="text-sm text-slate-400">No assets found.</p>
+                            <p className="text-sm text-muted-foreground">No assets found.</p>
                         </CardContent>
                     </Card>
                 ) : (
@@ -157,10 +157,10 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="text-base flex items-center gap-2">
-                                        <Badge className={statusColors[group.status] || 'bg-slate-500/20 text-slate-400'}>
+                                        <Badge className={statusColors[group.status] || 'bg-slate-500/20 text-muted-foreground'}>
                                             {group.status}
                                         </Badge>
-                                        <span className="text-slate-400 font-normal">
+                                        <span className="text-muted-foreground font-normal">
                                             ({group.count} assets)
                                         </span>
                                     </CardTitle>
@@ -221,7 +221,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                                                                 {new Date(asset.warranty_expires_at).toLocaleDateString()}
                                                             </Badge>
                                                         ) : (
-                                                            <span className="text-slate-500">N/A</span>
+                                                            <span className="text-muted-foreground">N/A</span>
                                                         )}
                                                     </TableCell>
                                                 </TableRow>

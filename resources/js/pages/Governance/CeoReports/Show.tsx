@@ -34,10 +34,10 @@ export default function CeoReportShow({ auth, report }: Props) {
   };
 
   const getStatusColor = (status: string) => ({
-    draft: 'bg-gray-100 text-gray-800',
+    draft: 'bg-muted text-foreground',
     submitted: 'bg-blue-100 text-blue-800',
     presented: 'bg-green-100 text-green-800',
-  }[status] || 'bg-gray-100 text-gray-800');
+  }[status] || 'bg-muted text-foreground');
 
   return (
     <AppLayout>
@@ -46,10 +46,10 @@ export default function CeoReportShow({ auth, report }: Props) {
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">{report.title}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{report.title}</h1>
               <Badge className={cn('text-xs', getStatusColor(report.status))}>{report.status}</Badge>
             </div>
-            <div className="flex gap-4 mt-1 text-sm text-gray-500">
+            <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
               {report.author && <span>Author: {report.author.name}</span>}
               {report.meeting && <span>For: {report.meeting.title}</span>}
             </div>

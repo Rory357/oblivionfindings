@@ -24,7 +24,7 @@ export default function AssetAlertsIndex() {
                         <CardTitle className="text-base">Archived Asset Alerts</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                        <div className="rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">
                             These records are retained as legacy asset alert history only. Active operational alerts now live in{' '}
                             <Link href={archive?.replacement_url ?? '/fleet-assets/alerts'} className="font-medium text-blue-600 hover:underline">
                                 Fleet Alerts
@@ -36,11 +36,11 @@ export default function AssetAlertsIndex() {
                                 <div key={a.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{a.alert_type}</span>
-                                        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{a.severity}</span>
-                                        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{a.status}</span>
+                                        <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{a.alert_type}</span>
+                                        <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{a.severity}</span>
+                                        <span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">{a.status}</span>
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
+                                    <div className="mt-1 text-xs text-muted-foreground">
                                         {a.asset ? (
                                             <Link href={`/assets/${a.asset.id}`} className="hover:underline">
                                                 {a.asset.name}
@@ -50,11 +50,11 @@ export default function AssetAlertsIndex() {
                                         )}
                                     </div>
                                 </div>
-                                <div className="shrink-0 text-right text-xs text-slate-600">{a.triggered_at ?? ''}</div>
+                                <div className="shrink-0 text-right text-xs text-muted-foreground">{a.triggered_at ?? ''}</div>
                             </div>
                         ))
                     ) : (
-                        <div className="text-sm text-slate-500">No archived asset alerts.</div>
+                        <div className="text-sm text-muted-foreground">No archived asset alerts.</div>
                         )}
                     </CardContent>
                 </Card>

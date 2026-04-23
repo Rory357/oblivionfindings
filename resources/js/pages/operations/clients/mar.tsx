@@ -46,13 +46,13 @@ function pillForScheduleState(state: string) {
     case 'missed_auto':
       return { label: 'Overdue', className: 'bg-rose-100 text-rose-800 border-rose-200' };
     case 'upcoming':
-      return { label: 'Upcoming', className: 'bg-slate-100 text-slate-700 border-slate-200' };
+      return { label: 'Upcoming', className: 'bg-muted text-foreground border-border' };
     case 'historical':
-      return { label: 'Historical', className: 'bg-slate-100 text-slate-700 border-slate-200' };
+      return { label: 'Historical', className: 'bg-muted text-foreground border-border' };
     case 'prn':
-      return { label: 'PRN', className: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
+      return { label: 'PRN', className: 'bg-primary/10 text-primary border-primary' };
     default:
-      return { label: state, className: 'bg-slate-100 text-slate-700 border-slate-200' };
+      return { label: state, className: 'bg-muted text-foreground border-border' };
   }
 }
 
@@ -67,7 +67,7 @@ function pillForStatus(status?: string | null) {
     case 'missed':
       return { label: 'Missed', className: 'bg-rose-100 text-rose-800 border-rose-200' };
     default:
-      return { label: 'Not recorded', className: 'bg-slate-100 text-slate-700 border-slate-200' };
+      return { label: 'Not recorded', className: 'bg-muted text-foreground border-border' };
   }
 }
 
@@ -229,9 +229,9 @@ export default function ClientMar() {
       <div className="space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="text-sm text-slate-500">{labels?.['client.singular'] ?? 'Client'}</div>
+            <div className="text-sm text-muted-foreground">{labels?.['client.singular'] ?? 'Client'}</div>
             <div className="text-lg font-semibold">{clientName}</div>
-            <div className="text-xs text-slate-500">Daily MAR</div>
+            <div className="text-xs text-muted-foreground">Daily MAR</div>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-[170px]">
@@ -264,11 +264,11 @@ export default function ClientMar() {
         )}
 
         {break_glass && (
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+          <div className="rounded-md border border-border bg-muted p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="font-medium">Emergency access active</div>
-                <div className="text-xs text-slate-600">
+                <div className="text-xs text-muted-foreground">
                   Reason: {break_glass.reason}
                   {break_glass.expires_at ? ` • Expires: ${new Date(break_glass.expires_at).toLocaleString()}` : ''}
                 </div>
@@ -298,17 +298,17 @@ export default function ClientMar() {
                         <Badge variant="outline" className={schedulePill.className}>{schedulePill.label}</Badge>
                         <Badge variant="outline" className={statusPill.className}>{statusPill.label}</Badge>
                         {row.record?.is_correction && (
-                          <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200">Correction</Badge>
+                          <Badge variant="outline" className="bg-muted text-foreground border-border">Correction</Badge>
                         )}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
+                      <div className="mt-1 text-xs text-muted-foreground">
                         {row.scheduled_time} • {row.medication.dosage ?? '—'}
                         {row.medication.route ? ` • ${row.medication.route}` : ''}
                         {row.medication.form ? ` • ${row.medication.form}` : ''}
                         {row.medication.controlled_drug ? ' • Controlled (witness required)' : ''}
                       </div>
                       {row.record && (
-                        <div className="mt-2 text-xs text-slate-600">
+                        <div className="mt-2 text-xs text-muted-foreground">
                           {row.record.administered_at ? `Administered: ${new Date(row.record.administered_at).toLocaleString()}` : ''}
                           {row.record.administered_by?.name ? ` • By: ${row.record.administered_by.name}` : ''}
                           {row.record.reason ? ` • Reason: ${row.record.reason}` : ''}
@@ -328,7 +328,7 @@ export default function ClientMar() {
                 </div>
               );
             })}
-            {!dueRows.length && <div className="text-sm text-slate-500">No due doses for this date.</div>}
+            {!dueRows.length && <div className="text-sm text-muted-foreground">No due doses for this date.</div>}
 
             {prnRows.length > 0 && (
               <>
@@ -340,15 +340,15 @@ export default function ClientMar() {
                       <div>
                         <div className="flex items-center gap-2">
                           <div className="text-sm font-medium">{row.medication.name}</div>
-                          <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200">PRN</Badge>
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary">PRN</Badge>
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">
+                        <div className="mt-1 text-xs text-muted-foreground">
                           {row.medication.dosage ?? '—'}
                           {row.medication.route ? ` • ${row.medication.route}` : ''}
                           {row.medication.form ? ` • ${row.medication.form}` : ''}
                         </div>
                         {row.medication.prn_reason && (
-                          <div className="mt-2 text-xs text-slate-600">Indication: {row.medication.prn_reason}</div>
+                          <div className="mt-2 text-xs text-muted-foreground">Indication: {row.medication.prn_reason}</div>
                         )}
                       </div>
                       {can.record && (
@@ -374,10 +374,10 @@ export default function ClientMar() {
                     <div className="text-sm font-medium">{h.medication?.name ?? 'Medication'}</div>
                     <Badge variant="outline" className={pillForStatus(h.status).className}>{pillForStatus(h.status).label}</Badge>
                     {h.is_correction && (
-                      <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200">Correction</Badge>
+                      <Badge variant="outline" className="bg-muted text-foreground border-border">Correction</Badge>
                     )}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted-foreground">
                     {h.administered_at ? new Date(h.administered_at).toLocaleString() : ''}
                     {h.administeredBy?.name ? ` • ${h.administeredBy.name}` : ''}
                     {h.reason ? ` • Reason: ${h.reason}` : ''}
@@ -389,7 +389,7 @@ export default function ClientMar() {
                 )}
               </div>
             ))}
-            {!history.length && <div className="text-sm text-slate-500">No administrations recorded for this date.</div>}
+            {!history.length && <div className="text-sm text-muted-foreground">No administrations recorded for this date.</div>}
           </CardContent>
         </Card>
       </div>
@@ -400,7 +400,7 @@ export default function ClientMar() {
             <DialogTitle>Record administration</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="text-sm text-slate-600">
+            <div className="text-sm text-muted-foreground">
               {adminRow?.medication?.name} {adminRow?.scheduled_time ? `• ${adminRow.scheduled_time}` : ''}
             </div>
             <div className="grid gap-2">
@@ -439,7 +439,7 @@ export default function ClientMar() {
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="text-xs text-slate-500">Witness must be a different authorised user.</div>
+                <div className="text-xs text-muted-foreground">Witness must be a different authorised user.</div>
               </div>
             )}
             <div className="grid gap-2">

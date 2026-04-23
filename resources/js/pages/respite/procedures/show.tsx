@@ -22,7 +22,7 @@ export default function RespiteProcedureShow({ template }: Props) {
             <div className="space-y-4">
                 <div>
                     <h1 className="text-lg font-semibold">{template.name}</h1>
-                    <div className="mt-1 text-sm text-slate-500">Version {template.version}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Version {template.version}</div>
                 </div>
                 <RespiteSubnav />
 
@@ -44,12 +44,12 @@ export default function RespiteProcedureShow({ template }: Props) {
                                             )}
                                         </div>
                                         {step.required_evidence?.length ? (
-                                            <div className="mt-2 text-xs text-slate-500">
+                                            <div className="mt-2 text-xs text-muted-foreground">
                                                 Evidence: {step.required_evidence.join(', ')}
                                             </div>
                                         ) : null}
                                         {step.sla_minutes ? (
-                                            <div className="mt-1 text-xs text-slate-500">
+                                            <div className="mt-1 text-xs text-muted-foreground">
                                                 SLA: {step.sla_minutes} minutes
                                             </div>
                                         ) : null}
@@ -57,10 +57,10 @@ export default function RespiteProcedureShow({ template }: Props) {
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-sm text-slate-500">No steps defined yet.</div>
+                            <div className="text-sm text-muted-foreground">No steps defined yet.</div>
                         )}
                         <details className="mt-3">
-                            <summary className="cursor-pointer text-xs text-slate-500">View raw JSON</summary>
+                            <summary className="cursor-pointer text-xs text-muted-foreground">View raw JSON</summary>
                             <pre className="mt-2 text-xs whitespace-pre-wrap">
                                 {JSON.stringify(template.steps_json, null, 2)}
                             </pre>

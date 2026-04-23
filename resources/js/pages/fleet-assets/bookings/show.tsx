@@ -62,10 +62,10 @@ type Props = {
 const statusBannerColors: Record<string, string> = {
     pending: 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200',
     approved: 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200',
-    checked_out: 'bg-purple-50 border-purple-200 text-purple-900 dark:bg-purple-950/30 dark:border-purple-800 dark:text-purple-200',
-    returned: 'bg-slate-50 border-slate-200 text-slate-900 dark:bg-slate-950/30 dark:border-slate-800 dark:text-slate-200',
+    checked_out: 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
+    returned: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
     rejected: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
-    cancelled: 'bg-gray-50 border-gray-200 text-gray-900 dark:bg-gray-950/30 dark:border-gray-800 dark:text-gray-200',
+    cancelled: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
 };
 
 const statusSteps = ['pending', 'approved', 'checked_out', 'returned'];
@@ -364,7 +364,7 @@ export default function BookingShow({ booking, can }: Props) {
 
                     {/* Checked Out: Return */}
                     {canManage && b.status === 'checked_out' && (
-                        <Card className="border-2 border-purple-200 dark:border-purple-800">
+                        <Card className="border-2 border-primary dark:border-primary/30">
                             <CardHeader>
                                 <CardTitle className="text-base">Return Vehicle</CardTitle>
                             </CardHeader>

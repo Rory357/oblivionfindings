@@ -517,11 +517,11 @@ export default function FleetAssetsDashboard({
                             href="/fleet-assets/bookings"
                         />
                     )}
-                    <Card className="border bg-purple-50 dark:bg-purple-950/20">
+                    <Card className="border bg-primary/10 dark:bg-primary/20">
                         <CardContent className="p-4">
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Alerts</p>
+                                    <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Alerts</p>
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-2xl font-bold">{stats.active_alerts ?? 0}</span>
                                         {(stats.critical_alerts ?? 0) > 0 && (
@@ -533,7 +533,7 @@ export default function FleetAssetsDashboard({
                                     <AlertTriangle className="h-4 w-4 text-amber-400" />
                                 </div>
                             </div>
-                            <div className="mt-2 flex items-center gap-1 text-[10px] text-slate-500">
+                            <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
                                 <Wrench className="h-3 w-3" /> {stats.upcoming_maintenance_count ?? 0} upcoming services
                             </div>
                         </CardContent>
@@ -682,7 +682,7 @@ export default function FleetAssetsDashboard({
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                                    <CheckCircle2 className="mb-1.5 h-6 w-6 text-purple-500" />
+                                    <CheckCircle2 className="mb-1.5 h-6 w-6 text-primary" />
                                     <p className="text-xs font-medium">All clear</p>
                                 </div>
                             )}
@@ -761,8 +761,8 @@ export default function FleetAssetsDashboard({
                             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                 {(my_site_vehicles ?? []).map((v) => (
                                     <div key={v.id} className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
-                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                                            <Car className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
+                                            <Car className="h-4 w-4 text-primary dark:text-primary" />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium truncate">{v.name}</p>

@@ -104,30 +104,30 @@ const statusStyles: Record<string, string> = {
   in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
   critical: 'bg-red-100 text-red-800 border-red-200',
   blocked: 'bg-red-100 text-red-800 border-red-200',
-  unknown: 'bg-slate-100 text-slate-800 border-slate-200',
+  unknown: 'bg-muted text-foreground border-border',
   fresh: 'bg-emerald-100 text-emerald-800 border-emerald-200',
   stable: 'bg-sky-100 text-sky-800 border-sky-200',
   stale: 'bg-orange-100 text-orange-800 border-orange-200',
 };
 
 const metricToneStyles: Record<string, string> = {
-  default: 'text-slate-900',
+  default: 'text-foreground',
   warning: 'text-amber-700',
   critical: 'text-red-700',
-  muted: 'text-slate-500',
+  muted: 'text-muted-foreground',
 };
 
 const workflowPriorityStyles: Record<string, string> = {
   critical: 'bg-red-100 text-red-800 border-red-200',
   high: 'bg-orange-100 text-orange-800 border-orange-200',
   medium: 'bg-blue-100 text-blue-800 border-blue-200',
-  low: 'bg-slate-100 text-slate-800 border-slate-200',
+  low: 'bg-muted text-foreground border-border',
 };
 
 const workflowStatusStyles: Record<string, string> = {
   overdue: 'bg-red-100 text-red-800 border-red-200',
   due_soon: 'bg-amber-100 text-amber-800 border-amber-200',
-  pending: 'bg-slate-100 text-slate-800 border-slate-200',
+  pending: 'bg-muted text-foreground border-border',
 };
 
 const cardIcon = (key: string) => {
@@ -144,9 +144,9 @@ const cardIcon = (key: string) => {
     case 'hs_backbone':
       return <Shield className="h-5 w-5 text-emerald-600" />;
     case 'workforce':
-      return <Users className="h-5 w-5 text-indigo-600" />;
+      return <Users className="h-5 w-5 text-primary" />;
     default:
-      return <LayoutGrid className="h-5 w-5 text-slate-600" />;
+      return <LayoutGrid className="h-5 w-5 text-muted-foreground" />;
   }
 };
 
@@ -194,20 +194,20 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Governance Dashboard</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Governance Dashboard</p>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold text-slate-900" dusk="governance-cockpit-heading">Executive & Board Cockpit</h1>
+              <h1 className="text-3xl font-bold text-foreground" dusk="governance-cockpit-heading">Executive & Board Cockpit</h1>
               {isBoardMember && boardRole && (
                 <Badge className="bg-blue-100 text-blue-800 border-blue-200">
                   {formatLabel(boardRole)}
                 </Badge>
               )}
             </div>
-            <p className="max-w-3xl text-sm text-slate-600">
+            <p className="max-w-3xl text-sm text-muted-foreground">
               A single governance map for meetings, plans, risk, compliance, workforce, finance, safety, privacy, and operational control.
             </p>
             {cockpit?.period_label && (
-              <p className="text-xs uppercase tracking-wide text-slate-500">{cockpit.period_label}</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{cockpit.period_label}</p>
             )}
           </div>
 
@@ -244,17 +244,17 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
 
               {workflow?.actions.length ? (
                 workflow.actions.slice(0, 8).map((action) => (
-                  <div key={action.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4 lg:flex-row lg:justify-between">
+                  <div key={action.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 lg:flex-row lg:justify-between">
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline">{action.area}</Badge>
                         <Badge className={workflowPriorityStyles[action.priority]}>{action.priority}</Badge>
                         <Badge className={workflowStatusStyles[action.status]}>{formatLabel(action.status)}</Badge>
-                        {action.due_date && <span className="text-xs text-slate-500">Due {action.due_date}</span>}
+                        {action.due_date && <span className="text-xs text-muted-foreground">Due {action.due_date}</span>}
                       </div>
-                      <p className="font-medium text-slate-900">{action.title}</p>
-                      <p className="text-sm text-slate-600">{action.detail}</p>
-                      {action.owner && <p className="text-xs text-slate-500">Owner: {action.owner}</p>}
+                      <p className="font-medium text-foreground">{action.title}</p>
+                      <p className="text-sm text-muted-foreground">{action.detail}</p>
+                      {action.owner && <p className="text-xs text-muted-foreground">Owner: {action.owner}</p>}
                     </div>
                     <Button size="sm" variant="outline" asChild>
                       <a href={action.action_url}>{action.action_label}</a>
@@ -262,7 +262,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">No open workflow blockers right now.</p>
+                <p className="text-sm text-muted-foreground">No open workflow blockers right now.</p>
               )}
             </CardContent>
           </Card>
@@ -279,14 +279,14 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                     key={action.href}
                     href={action.href}
                     dusk={`role-action-${toDuskKey(action.label)}`}
-                    className="block rounded-lg border border-slate-200 p-3 transition hover:border-slate-300 hover:bg-slate-50"
+                    className="block rounded-lg border border-border p-3 transition hover:border-border hover:bg-muted"
                   >
-                    <p className="font-medium text-slate-900">{action.label}</p>
-                    <p className="text-sm text-slate-600">{action.description}</p>
+                    <p className="font-medium text-foreground">{action.label}</p>
+                    <p className="text-sm text-muted-foreground">{action.description}</p>
                   </Link>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">No role-specific actions are available.</p>
+                <p className="text-sm text-muted-foreground">No role-specific actions are available.</p>
               )}
             </CardContent>
           </Card>
@@ -296,8 +296,8 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
           {cockpit?.sections.map((section) => (
             <section key={section.key} className="space-y-4">
               <div className="space-y-1">
-                <h2 className="text-xl font-semibold text-slate-900">{section.title}</h2>
-                <p className="text-sm text-slate-600">{section.description}</p>
+                <h2 className="text-xl font-semibold text-foreground">{section.title}</h2>
+                <p className="text-sm text-muted-foreground">{section.description}</p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -306,7 +306,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                     <CardHeader className="space-y-3 pb-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-slate-100 p-2">{cardIcon(card.key)}</div>
+                          <div className="rounded-lg bg-muted p-2">{cardIcon(card.key)}</div>
                           <div>
                             <CardTitle className="text-lg">{card.title}</CardTitle>
                             <CardDescription>{card.description}</CardDescription>
@@ -322,8 +322,8 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-2 gap-3">
                         {card.metrics.map((metric) => (
-                          <div key={`${card.key}-${metric.label}`} className="rounded-lg bg-slate-50 p-3">
-                            <p className="text-xs uppercase tracking-wide text-slate-500">{metric.label}</p>
+                          <div key={`${card.key}-${metric.label}`} className="rounded-lg bg-muted p-3">
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">{metric.label}</p>
                             <p className={cn('mt-1 text-lg font-semibold', metricToneStyles[metric.tone] ?? metricToneStyles.default)}>
                               {metric.value}
                             </p>
@@ -333,10 +333,10 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
 
                       {card.highlights.length > 0 && (
                         <div className="space-y-2">
-                          <p className="text-xs uppercase tracking-wide text-slate-500">Highlights</p>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Highlights</p>
                           <div className="space-y-2">
                             {card.highlights.slice(0, 3).map((highlight) => (
-                              <p key={highlight} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                              <p key={highlight} className="rounded-lg border border-border px-3 py-2 text-sm text-foreground">
                                 {highlight}
                               </p>
                             ))}
@@ -356,12 +356,12 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
         </div>
 
         <div className="mt-10">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Governance Modules</h2>
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Governance Modules</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
             {[
               { label: 'Policies', href: '/governance/policies', icon: <BookOpen className="h-5 w-5" />, color: 'text-blue-600 bg-blue-50' },
-              { label: 'CEO Reports', href: '/governance/ceo-reports', icon: <FileText className="h-5 w-5" />, color: 'text-indigo-600 bg-indigo-50' },
-              { label: 'Interests', href: '/governance/interests/mine', icon: <ClipboardList className="h-5 w-5" />, color: 'text-purple-600 bg-purple-50' },
+              { label: 'CEO Reports', href: '/governance/ceo-reports', icon: <FileText className="h-5 w-5" />, color: 'text-primary bg-primary/10' },
+              { label: 'Interests', href: '/governance/interests/mine', icon: <ClipboardList className="h-5 w-5" />, color: 'text-primary bg-primary/10' },
               { label: 'Evaluations', href: '/governance/evaluations', icon: <Star className="h-5 w-5" />, color: 'text-amber-600 bg-amber-50' },
               { label: 'Documents', href: '/governance/documents', icon: <FolderOpen className="h-5 w-5" />, color: 'text-emerald-600 bg-emerald-50' },
               { label: 'Clinical', href: '/governance/clinical', icon: <HeartPulse className="h-5 w-5" />, color: 'text-rose-600 bg-rose-50' },
@@ -370,10 +370,10 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
               <Link
                 key={tile.href}
                 href={tile.href}
-                className="flex flex-col items-center gap-2 rounded-lg border border-slate-200 p-4 text-center transition hover:border-slate-300 hover:bg-slate-50"
+                className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-center transition hover:border-border hover:bg-muted"
               >
                 <div className={cn('rounded-lg p-2', tile.color)}>{tile.icon}</div>
-                <span className="text-sm font-medium text-slate-700">{tile.label}</span>
+                <span className="text-sm font-medium text-foreground">{tile.label}</span>
               </Link>
             ))}
           </div>

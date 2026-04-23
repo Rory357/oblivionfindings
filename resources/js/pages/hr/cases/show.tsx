@@ -79,26 +79,26 @@ const requiredGoodFaithChecks = [
 
 const badgeClassByStatus: Record<string, string> = {
     open: 'bg-blue-100 text-blue-800 border-blue-200',
-    under_investigation: 'bg-purple-100 text-purple-800 border-purple-200',
+    under_investigation: 'bg-primary/10 text-primary border-primary',
     awaiting_response: 'bg-amber-100 text-amber-800 border-amber-200',
     resolved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    closed: 'bg-slate-100 text-slate-800 border-slate-200',
+    closed: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassByCaseType: Record<string, string> = {
     disciplinary: 'bg-red-100 text-red-800 border-red-200',
     grievance: 'bg-orange-100 text-orange-800 border-orange-200',
-    investigation: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    investigation: 'bg-primary/10 text-primary border-primary',
     welfare: 'bg-green-100 text-green-800 border-green-200',
     complaint: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-    other: 'bg-slate-100 text-slate-800 border-slate-200',
+    other: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassBySeverity: Record<string, string> = {
     critical: 'bg-red-100 text-red-800 border-red-200',
     high: 'bg-orange-100 text-orange-800 border-orange-200',
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    low: 'bg-slate-100 text-slate-800 border-slate-200',
+    low: 'bg-muted text-foreground border-border',
 };
 
 const formatDate = (value?: string | null) => {
@@ -135,9 +135,9 @@ const getEventDotClass = (eventType: string) => {
             return 'bg-green-500';
         case 'phone_call':
         case 'email':
-            return 'bg-indigo-500';
+            return 'bg-primary';
         case 'investigation_update':
-            return 'bg-purple-500';
+            return 'bg-primary';
         case 'letter':
         case 'document':
             return 'bg-amber-500';
@@ -151,7 +151,7 @@ const visibilityFilterValues = ['all', 'internal', 'restricted', 'full'] as cons
 type VisibilityFilter = (typeof visibilityFilterValues)[number];
 
 const visibilityBadgeClass: Record<'internal' | 'restricted' | 'full', string> = {
-    internal: 'bg-slate-100 text-slate-800 border-slate-200',
+    internal: 'bg-muted text-foreground border-border',
     restricted: 'bg-amber-100 text-amber-800 border-amber-200',
     full: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 };
@@ -219,7 +219,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <Briefcase className="h-5 w-5 text-slate-500" />
+                            <Briefcase className="h-5 w-5 text-muted-foreground" />
                             {hrCase.case_number}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
@@ -281,27 +281,27 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div>
-                                <div className="text-xs text-slate-500">Title</div>
+                                <div className="text-xs text-muted-foreground">Title</div>
                                 <div className="font-medium">{hrCase.title}</div>
                             </div>
-                            <div className="whitespace-pre-wrap text-sm text-slate-700">{hrCase.description}</div>
+                            <div className="whitespace-pre-wrap text-sm text-foreground">{hrCase.description}</div>
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
-                                    <div className="text-xs text-slate-500">Opened</div>
+                                    <div className="text-xs text-muted-foreground">Opened</div>
                                     <div className="font-medium">{formatDate(hrCase.opened_at)}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500">Closed</div>
+                                    <div className="text-xs text-muted-foreground">Closed</div>
                                     <div className="font-medium">{formatDate(hrCase.closed_at)}</div>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
-                                    <div className="text-xs text-slate-500">Outcome Type</div>
+                                    <div className="text-xs text-muted-foreground">Outcome Type</div>
                                     <div className="font-medium">{hrCase.outcome_type ? hrCase.outcome_type.replace(/_/g, ' ') : 'Not set'}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500">Outcome</div>
+                                    <div className="text-xs text-muted-foreground">Outcome</div>
                                     <div className="font-medium">{hrCase.outcome || 'Not set'}</div>
                                 </div>
                             </div>
@@ -317,16 +317,16 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Subject</div>
+                                <div className="text-xs text-muted-foreground">Subject</div>
                                 <div className="font-medium">{hrCase.subject?.name || 'Unknown'}</div>
-                                {hrCase.subject?.email ? <div className="text-xs text-slate-400">{hrCase.subject.email}</div> : null}
+                                {hrCase.subject?.email ? <div className="text-xs text-muted-foreground">{hrCase.subject.email}</div> : null}
                             </div>
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Opened By</div>
+                                <div className="text-xs text-muted-foreground">Opened By</div>
                                 <div className="font-medium">{hrCase.reported_by?.name || 'Unknown'}</div>
                             </div>
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Assigned To</div>
+                                <div className="text-xs text-muted-foreground">Assigned To</div>
                                 <div className="font-medium">{assignedTo?.name || 'Unassigned'}</div>
                             </div>
                         </CardContent>
@@ -337,7 +337,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                     <CardHeader>
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Clock className="h-5 w-5 text-purple-500" />
+                                <Clock className="h-5 w-5 text-primary" />
                                 Timeline
                             </CardTitle>
                             <div className="w-full sm:w-56">
@@ -362,7 +362,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                     <CardContent>
                         {filteredTimeline.length > 0 ? (
                             <div className="relative space-y-4 pl-6">
-                                <div className="absolute bottom-2 left-[9px] top-2 w-0.5 bg-slate-200" />
+                                <div className="absolute bottom-2 left-[9px] top-2 w-0.5 bg-muted" />
                                 {filteredTimeline.map((item) => (
                                     <div key={`${item.type}-${item.id}`} className="relative">
                                         <div className={`absolute -left-6 top-1.5 h-3 w-3 rounded-full ${getEventDotClass(item.event_type)}`} />
@@ -376,17 +376,17 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                                         {normalizeVisibility(item.visibility)}
                                                     </Badge>
                                                     <div className="text-sm font-medium">{item.title}</div>
-                                                    {item.description ? <div className="text-sm text-slate-700">{item.description}</div> : null}
+                                                    {item.description ? <div className="text-sm text-foreground">{item.description}</div> : null}
                                                 </div>
-                                                <div className="shrink-0 text-xs text-slate-500">{formatDateTime(item.occurred_at)}</div>
+                                                <div className="shrink-0 text-xs text-muted-foreground">{formatDateTime(item.occurred_at)}</div>
                                             </div>
-                                            {item.created_by ? <div className="mt-1 text-xs text-slate-400">By {item.created_by}</div> : null}
+                                            {item.created_by ? <div className="mt-1 text-xs text-muted-foreground">By {item.created_by}</div> : null}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="py-6 text-center text-sm text-slate-500">
+                            <div className="py-6 text-center text-sm text-muted-foreground">
                                 {timeline.length > 0 ? 'No timeline events for this visibility filter.' : 'No events recorded yet.'}
                             </div>
                         )}
@@ -424,13 +424,13 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                                 <div className="font-medium capitalize">
                                                     {action.action_type.replace(/_/g, ' ')} - {action.stage.replace(/_/g, ' ')}
                                                 </div>
-                                                <div className="text-sm text-slate-700">{action.allegation_summary}</div>
-                                                {action.outcome ? <div className="text-sm text-slate-600">Outcome: {action.outcome}</div> : null}
-                                                <div className="text-xs text-slate-500">
+                                                <div className="text-sm text-foreground">{action.allegation_summary}</div>
+                                                {action.outcome ? <div className="text-sm text-muted-foreground">Outcome: {action.outcome}</div> : null}
+                                                <div className="text-xs text-muted-foreground">
                                                     Employee: {action.employee?.name ?? 'Unknown'} | Investigator: {action.investigator?.name ?? 'Unassigned'} | Created:{' '}
                                                     {formatDate(action.created_at)}
                                                 </div>
-                                                <div className="text-xs text-slate-500">
+                                                <div className="text-xs text-muted-foreground">
                                                     Response deadline: {formatDate(action.response_deadline)}
                                                 </div>
                                             </div>
@@ -459,7 +459,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                 );
                             })}
                             {disciplinaryActions.length === 0 ? (
-                                <p className="py-4 text-center text-sm text-slate-500">No disciplinary actions recorded.</p>
+                                <p className="py-4 text-center text-sm text-muted-foreground">No disciplinary actions recorded.</p>
                             ) : null}
                         </CardContent>
                     </Card>

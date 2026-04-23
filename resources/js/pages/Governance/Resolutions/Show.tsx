@@ -189,13 +189,13 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
           {/* Header */}
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold text-gray-900">{resolution.title}</h1>
+              <h1 className="text-3xl font-bold text-foreground">{resolution.title}</h1>
               <Badge className={cn(
                 resolution.status === 'open' && 'bg-green-100 text-green-800',
-                resolution.status === 'closed' && 'bg-purple-100 text-purple-800',
+                resolution.status === 'closed' && 'bg-primary/10 text-primary',
                 resolution.status === 'implemented' && 'bg-green-100 text-green-800',
-                resolution.status === 'archived' && 'bg-gray-100 text-gray-800',
-                resolution.status === 'draft' && 'bg-gray-100 text-gray-800',
+                resolution.status === 'archived' && 'bg-muted text-foreground',
+                resolution.status === 'draft' && 'bg-muted text-foreground',
               )}>
                 {resolution.status}
               </Badge>
@@ -207,7 +207,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                 </Badge>
               )}
             </div>
-            <p className="text-gray-500">{resolution.resolution_reference}</p>
+            <p className="text-muted-foreground">{resolution.resolution_reference}</p>
           </div>
 
           {/* Context */}
@@ -216,7 +216,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               <CardTitle>Context</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-gray-700 whitespace-pre-wrap">{resolution.context}</p>
+              <p className="text-foreground whitespace-pre-wrap">{resolution.context}</p>
               
               {resolution.recommendation && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -238,7 +238,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                   <div key={index} className="p-4 border rounded-lg">
                     <p className="font-medium">{option.label}</p>
                     {option.description && (
-                      <p className="text-sm text-gray-500 mt-1">{option.description}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{option.description}</p>
                     )}
                   </div>
                 ))}
@@ -276,14 +276,14 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                   <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
                     <RadioGroupItem value="abstain" />
                     <span className="flex items-center gap-2">
-                      <MinusCircle className="w-5 h-5 text-gray-500" />
+                      <MinusCircle className="w-5 h-5 text-muted-foreground" />
                       Abstain
                     </span>
                   </label>
                 </RadioGroup>
 
                 <div className="mt-4">
-                  <label htmlFor="conflict" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="conflict" className="text-sm font-medium text-foreground">
                     Conflict Declaration (optional)
                   </label>
                   <Textarea
@@ -325,11 +325,11 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                   <Badge className={cn(
                     my_vote.vote === 'for' && 'bg-green-100 text-green-800',
                     my_vote.vote === 'against' && 'bg-red-100 text-red-800',
-                    my_vote.vote === 'abstain' && 'bg-gray-100 text-gray-800',
+                    my_vote.vote === 'abstain' && 'bg-muted text-foreground',
                   )}>
                     {my_vote.vote.toUpperCase()}
                   </Badge>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-muted-foreground">
                     Voted {new Date(my_vote.voted_at).toLocaleString()}
                   </span>
                   {my_vote.conflict_declared && (
@@ -359,9 +359,9 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                     <p className="text-3xl font-bold text-red-600">{results.summary.against}</p>
                     <p className="text-sm text-red-800">Against ({results.percentages.against}%)</p>
                   </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <p className="text-3xl font-bold text-gray-600">{results.summary.abstain}</p>
-                    <p className="text-sm text-gray-800">Abstain</p>
+                  <div className="text-center p-4 bg-muted rounded-lg">
+                    <p className="text-3xl font-bold text-muted-foreground">{results.summary.abstain}</p>
+                    <p className="text-sm text-foreground">Abstain</p>
                   </div>
                 </div>
 
@@ -373,7 +373,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                       <Badge className={cn(
                         vote.vote === 'for' && 'bg-green-100 text-green-800',
                         vote.vote === 'against' && 'bg-red-100 text-red-800',
-                        vote.vote === 'abstain' && 'bg-gray-100 text-gray-800',
+                        vote.vote === 'abstain' && 'bg-muted text-foreground',
                       )}>
                         {vote.vote}
                       </Badge>
@@ -411,7 +411,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                     onChange={(e) => setFinalNotes(e.target.value)}
                   />
                   {resolution.outcome_notes && (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       Previous notes: {resolution.outcome_notes}
                     </p>
                   )}
@@ -433,7 +433,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                     </div>
                   )}
                   {isFinalized && (
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       This resolution is {resolution.status}.
                     </p>
                   )}

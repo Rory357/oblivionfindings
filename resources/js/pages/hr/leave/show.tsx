@@ -38,7 +38,7 @@ const statusColors: Record<string, string> = {
     pending: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
     approved: 'bg-green-500/10 text-green-500 border-green-500/30',
     declined: 'bg-red-500/10 text-red-500 border-red-500/30',
-    cancelled: 'bg-slate-500/10 text-slate-500 border-slate-500/30',
+    cancelled: 'bg-slate-500/10 text-muted-foreground border-slate-500/30',
 };
 
 export default function ShowLeave({ request, can }: Props) {

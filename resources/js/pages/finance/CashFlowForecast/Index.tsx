@@ -52,7 +52,7 @@ const periodTypeLabels: Record<string, string> = {
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700 border-gray-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
     final: { label: 'Final', className: 'bg-green-100 text-green-700 border-green-300' },
 };
 

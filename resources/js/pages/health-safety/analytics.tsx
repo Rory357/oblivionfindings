@@ -35,7 +35,7 @@ function severityBlockColor(s: string) {
         case 'high': return 'bg-orange-100 border-orange-300 text-orange-800';
         case 'medium': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
         case 'low': return 'bg-blue-100 border-blue-300 text-blue-800';
-        default: return 'bg-slate-100 border-slate-300 text-slate-800';
+        default: return 'bg-muted border-border text-foreground';
     }
 }
 
@@ -44,7 +44,7 @@ function drillStatusBadge(status: string) {
         case 'compliant': return 'bg-green-100 text-green-800 border-green-200';
         case 'due_soon': return 'bg-amber-100 text-amber-800 border-amber-200';
         case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
-        default: return 'bg-slate-100 text-slate-800 border-slate-200';
+        default: return 'bg-muted text-foreground border-border';
     }
 }
 
@@ -92,11 +92,11 @@ export default function HealthSafetyAnalytics({
                 <Card>
                     <CardContent className="flex flex-wrap items-end gap-3 pt-4">
                         <div>
-                            <Label className="text-xs text-slate-500">From</Label>
+                            <Label className="text-xs text-muted-foreground">From</Label>
                             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
                         </div>
                         <div>
-                            <Label className="text-xs text-slate-500">To</Label>
+                            <Label className="text-xs text-muted-foreground">To</Label>
                             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
                         </div>
                         <Button size="sm" onClick={applyFilters}>Apply</Button>
@@ -123,7 +123,7 @@ export default function HealthSafetyAnalytics({
                                     <span className="w-8 text-right text-xs font-semibold">{d.count}</span>
                                 </div>
                             ))}
-                            {!incident_data.length && <div className="py-4 text-center text-sm text-slate-500">No incident data.</div>}
+                            {!incident_data.length && <div className="py-4 text-center text-sm text-muted-foreground">No incident data.</div>}
                         </CardContent>
                     </Card>
 
@@ -143,24 +143,24 @@ export default function HealthSafetyAnalytics({
                                 ))}
                             </div>
                             {/* Near-miss vs Incident ratio */}
-                            <div className="flex items-center justify-center gap-6 rounded-lg border bg-slate-50 p-4">
+                            <div className="flex items-center justify-center gap-6 rounded-lg border bg-muted p-4">
                                 <div className="text-center">
                                     <div className="text-2xl font-bold text-blue-600">{nearMissCount}</div>
-                                    <div className="text-xs text-slate-500">Near Misses</div>
+                                    <div className="text-xs text-muted-foreground">Near Misses</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-lg font-medium text-slate-400">vs</div>
+                                    <div className="text-lg font-medium text-muted-foreground">vs</div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-2xl font-bold text-orange-600">{incidentCount}</div>
-                                    <div className="text-xs text-slate-500">Incidents</div>
+                                    <div className="text-xs text-muted-foreground">Incidents</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-lg font-medium text-slate-400">=</div>
+                                    <div className="text-lg font-medium text-muted-foreground">=</div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-2xl font-bold text-green-600">{ratio}</div>
-                                    <div className="text-xs text-slate-500">Ratio</div>
+                                    <div className="text-xs text-muted-foreground">Ratio</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -176,7 +176,7 @@ export default function HealthSafetyAnalytics({
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 font-medium">Category</th>
                                         <th className="pb-2 font-medium">Count</th>
                                         <th className="pb-2 font-medium">Percentage</th>
@@ -190,7 +190,7 @@ export default function HealthSafetyAnalytics({
                                             <td className="py-2">{d.count}</td>
                                             <td className="py-2">{d.percentage}%</td>
                                             <td className="py-2">
-                                                <div className="h-3 w-full max-w-[200px] rounded-full bg-slate-100">
+                                                <div className="h-3 w-full max-w-[200px] rounded-full bg-muted">
                                                     <div className="h-3 rounded-full bg-blue-500" style={{ width: `${d.percentage}%` }} />
                                                 </div>
                                             </td>
@@ -198,7 +198,7 @@ export default function HealthSafetyAnalytics({
                                     ))}
                                     {!root_cause_data.length && (
                                         <tr>
-                                            <td colSpan={4} className="py-4 text-center text-slate-500">No root cause data available.</td>
+                                            <td colSpan={4} className="py-4 text-center text-muted-foreground">No root cause data available.</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -216,7 +216,7 @@ export default function HealthSafetyAnalytics({
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
+                                    <tr className="border-b text-left text-xs text-muted-foreground">
                                         <th className="pb-2 font-medium">Site</th>
                                         <th className="pb-2 font-medium">Total Incidents</th>
                                         <th className="pb-2 font-medium">Open Hazards</th>
@@ -246,7 +246,7 @@ export default function HealthSafetyAnalytics({
                                     ))}
                                     {!site_comparison.length && (
                                         <tr>
-                                            <td colSpan={6} className="py-4 text-center text-slate-500">No site data available.</td>
+                                            <td colSpan={6} className="py-4 text-center text-muted-foreground">No site data available.</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -275,7 +275,7 @@ export default function HealthSafetyAnalytics({
                                     <span className="w-8 text-right text-xs font-semibold">{d.count}</span>
                                 </div>
                             ))}
-                            {!(injury_data.by_type ?? []).length && <div className="py-4 text-center text-sm text-slate-500">No injury type data.</div>}
+                            {!(injury_data.by_type ?? []).length && <div className="py-4 text-center text-sm text-muted-foreground">No injury type data.</div>}
                         </CardContent>
                     </Card>
 
@@ -287,12 +287,12 @@ export default function HealthSafetyAnalytics({
                         <CardContent>
                             <div className="space-y-1">
                                 {(injury_data.by_body_part ?? []).map((d, idx) => (
-                                    <div key={d.body_part} className="flex items-center justify-between rounded px-2 py-1 text-sm odd:bg-slate-50">
+                                    <div key={d.body_part} className="flex items-center justify-between rounded px-2 py-1 text-sm odd:bg-muted">
                                         <span className="capitalize">{d.body_part.replace(/_/g, ' ')}</span>
                                         <span className="font-semibold">{d.count}</span>
                                     </div>
                                 ))}
-                                {!(injury_data.by_body_part ?? []).length && <div className="py-4 text-center text-sm text-slate-500">No body part data.</div>}
+                                {!(injury_data.by_body_part ?? []).length && <div className="py-4 text-center text-sm text-muted-foreground">No body part data.</div>}
                             </div>
                         </CardContent>
                     </Card>
