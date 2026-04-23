@@ -129,7 +129,9 @@ class PortalLocationController extends Controller
             'tracker' => $trackerInfo,
             'currentLocation' => $currentLocation,
             'trackingConsent' => $trackingConsent ? [
-                'status' => $trackingConsent->status,
+                // The portal UI treats any active consent as "active" / "granted",
+                // so normalize the model's stored "given" status into that vocabulary.
+                'status' => 'active',
                 'given_at' => optional($trackingConsent->given_at)->toISOString(),
                 'expires_at' => optional($trackingConsent->expires_at)->toISOString(),
             ] : null,

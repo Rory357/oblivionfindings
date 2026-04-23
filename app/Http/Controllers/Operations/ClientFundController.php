@@ -31,7 +31,7 @@ class ClientFundController extends Controller
             ->paginate(20)
             ->through(fn (ClientFund $fund) => [
                 'id' => $fund->id,
-                'name' => $fund->name,
+                'name' => $fund->fund_name,
                 'fund_type' => $fund->fund_type ?? 'trust',
                 'balance' => (float) ($fund->balance ?? 0),
                 'low_balance_threshold' => $fund->low_balance_threshold,
@@ -57,7 +57,11 @@ class ClientFundController extends Controller
                 'total_balance' => (float) ClientFund::query()
                     ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
                     ->sum('balance'),
-                'low_balance_alerts' => 0,
+                'low_balance_alerts' => ClientFund::query()
+                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                    ->whereNotNull('low_balance_threshold')
+                    ->whereColumn('balance', '<=', 'low_balance_threshold')
+                    ->count(),
             ],
         ]);
     }
@@ -102,21 +106,21 @@ class ClientFundController extends Controller
             'client_id' => ['required', 'integer', 'exists:clients,id'],
             'name' => ['required', 'string', 'max:255'],
             'funding_source' => ['nullable', 'string', 'max:255'],
+            'fund_type' => ['nullable', 'string', 'max:100'],
             'total_budget' => ['required', 'numeric', 'min:0'],
             'balance' => ['nullable', 'numeric'],
-            'starts_at' => ['nullable', 'date'],
-            'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'low_balance_threshold' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string'],
         ]);
 
         ClientFund::create([
             'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
-            'name' => $data['name'],
-            'funding_source' => $data['funding_source'] ?? null,
-            'total_budget' => $data['total_budget'],
+            'fund_name' => $data['name'],
+            'fund_type' => $data['fund_type'] ?? 'general',
             'balance' => $data['balance'] ?? $data['total_budget'],
-            'starts_at' => $data['starts_at'] ?? null,
-            'ends_at' => $data['ends_at'] ?? null,
+            'low_balance_threshold' => $data['low_balance_threshold'] ?? null,
+            'notes' => trim(collect([$data['funding_source'] ?? null, $data['notes'] ?? null])->filter()->join("\n\n")) ?: null,
         ]);
 
         return redirect()->back()->with('success', 'Client fund created.');
@@ -134,12 +138,17 @@ class ClientFundController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'funding_source' => ['nullable', 'string', 'max:255'],
-            'total_budget' => ['sometimes', 'required', 'numeric', 'min:0'],
-            'starts_at' => ['nullable', 'date'],
-            'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'fund_type' => ['nullable', 'string', 'max:100'],
+            'low_balance_threshold' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string'],
         ]);
 
-        $fund->update($data);
+        $fund->update(array_filter([
+            'fund_name' => $data['name'] ?? null,
+            'fund_type' => $data['fund_type'] ?? null,
+            'low_balance_threshold' => $data['low_balance_threshold'] ?? null,
+            'notes' => trim(collect([$data['funding_source'] ?? null, $data['notes'] ?? null])->filter()->join("\n\n")) ?: null,
+        ], fn ($value) => $value !== null));
 
         return redirect()->back()->with('success', 'Client fund updated.');
     }
@@ -165,12 +174,14 @@ class ClientFundController extends Controller
             : $fund->balance - $data['amount'];
 
         $fund->transactions()->create([
-            'type' => $data['type'],
+            'organization_id' => $fund->organization_id,
+            'transaction_type' => $data['type'],
             'amount' => $data['amount'],
             'description' => $data['description'],
             'reference' => $data['reference'] ?? null,
             'running_balance' => $newBalance,
-            'created_by' => $auth->id,
+            'transaction_date' => now()->toDateString(),
+            'recorded_by' => $auth->id,
         ]);
 
         $fund->update(['balance' => $newBalance]);

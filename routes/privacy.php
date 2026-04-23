@@ -25,24 +25,24 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.requests.create');
         Route::post('/privacy/requests', [DataSubjectRequestController::class, 'store'])
             ->name('privacy.requests.store');
-        Route::put('/privacy/requests/{request}', [DataSubjectRequestController::class, 'update'])
+        Route::put('/privacy/requests/{dsRequest}', [DataSubjectRequestController::class, 'update'])
             ->name('privacy.requests.update');
-        Route::post('/privacy/requests/{request}/verify-identity', [DataSubjectRequestController::class, 'verifyIdentity'])
+        Route::post('/privacy/requests/{dsRequest}/verify-identity', [DataSubjectRequestController::class, 'verifyIdentity'])
             ->name('privacy.requests.verify-identity');
-        Route::post('/privacy/requests/{request}/extend', [DataSubjectRequestController::class, 'extend'])
+        Route::post('/privacy/requests/{dsRequest}/extend', [DataSubjectRequestController::class, 'extend'])
             ->name('privacy.requests.extend');
-        Route::post('/privacy/requests/{request}/complete', [DataSubjectRequestController::class, 'complete'])
+        Route::post('/privacy/requests/{dsRequest}/complete', [DataSubjectRequestController::class, 'complete'])
             ->name('privacy.requests.complete');
-        Route::post('/privacy/requests/{request}/refuse', [DataSubjectRequestController::class, 'refuse'])
+        Route::post('/privacy/requests/{dsRequest}/refuse', [DataSubjectRequestController::class, 'refuse'])
             ->name('privacy.requests.refuse');
     });
 
     Route::middleware('permission:privacy.viewRequests')->group(function () {
         Route::get('/privacy/requests', [DataSubjectRequestController::class, 'index'])
             ->name('privacy.requests.index');
-        Route::get('/privacy/requests/{request}', [DataSubjectRequestController::class, 'show'])
+        Route::get('/privacy/requests/{dsRequest}', [DataSubjectRequestController::class, 'show'])
             ->name('privacy.requests.show');
-        Route::get('/privacy/requests/{request}/export', [DataSubjectRequestController::class, 'export'])
+        Route::get('/privacy/requests/{dsRequest}/export', [DataSubjectRequestController::class, 'export'])
             ->name('privacy.requests.export');
     });
 

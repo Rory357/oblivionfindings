@@ -7,10 +7,15 @@ use App\Http\Controllers\Settings\TerminologyController;
 use App\Http\Controllers\Settings\AccessController;
 use App\Http\Controllers\Settings\RolesController;
 use App\Http\Controllers\Settings\BrandingController;
+use App\Http\Controllers\Settings\AuditLogSettingsController;
 use App\Http\Controllers\Settings\ServiceContextController;
 use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\NotificationEscalationsController;
 use App\Http\Controllers\Settings\IntegrationHubController;
+use App\Http\Controllers\Settings\ModuleSettingsController;
+use App\Http\Controllers\Settings\ApiSettingsController;
+use App\Http\Controllers\Settings\DataSettingsController;
+use App\Http\Controllers\Settings\EmailSettingsController;
 use App\Http\Controllers\Settings\NotificationTemplateController;
 use App\Http\Controllers\Settings\SsoGroupController;
 use App\Http\Controllers\System\UsersController;
@@ -155,7 +160,15 @@ Route::middleware('auth')->group(function () {
         ->name('settings.templates.reset');
 
     // Email Settings
-    Route::get('settings/email', fn () => Inertia::render('settings/email-settings'))->name('settings.email');
+    Route::get('settings/email', [EmailSettingsController::class, 'index'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.email');
+    Route::put('settings/email', [EmailSettingsController::class, 'update'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.email.update');
+    Route::post('settings/email/test', [EmailSettingsController::class, 'test'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.email.test');
 
     // Security Settings
     Route::get('settings/security', fn () => Inertia::render('settings/security', [
@@ -218,23 +231,85 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:settings.access.manage')
         ->name('settings.security.update');
 
-    // API & Webhooks (UI-first, no backend yet)
-    Route::get('settings/api', fn () => Inertia::render('settings/api'))->name('settings.api');
+    // API & Webhooks
+    Route::get('settings/api', [ApiSettingsController::class, 'index'])
+        ->middleware('permission:integrations.view')
+        ->name('settings.api');
+    Route::post('settings/api/keys', [ApiSettingsController::class, 'storeKey'])
+        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->name('settings.api.keys.store');
+    Route::post('settings/api/keys/{keyId}/revoke', [ApiSettingsController::class, 'revokeKey'])
+        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->name('settings.api.keys.revoke');
+    Route::post('settings/api/webhooks', [ApiSettingsController::class, 'storeWebhook'])
+        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->name('settings.api.webhooks.store');
+    Route::post('settings/api/webhooks/{webhookId}/test', [ApiSettingsController::class, 'testWebhook'])
+        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->name('settings.api.webhooks.test');
+    Route::delete('settings/api/webhooks/{webhookId}', [ApiSettingsController::class, 'destroyWebhook'])
+        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->name('settings.api.webhooks.destroy');
 
-    // Data & Privacy (UI-first, no backend yet)
-    Route::get('settings/data', fn () => Inertia::render('settings/data'))->name('settings.data');
+    // Data & Privacy
+    Route::get('settings/data', [DataSettingsController::class, 'index'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data');
+    Route::put('settings/data/retention', [DataSettingsController::class, 'updateRetention'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data.retention.update');
+    Route::put('settings/data/privacy', [DataSettingsController::class, 'updatePrivacy'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data.privacy.update');
+    Route::put('settings/data/compliance', [DataSettingsController::class, 'updateCompliance'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data.compliance.update');
+    Route::post('settings/data/requests', [DataSettingsController::class, 'storeRequest'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data.requests.store');
+    Route::post('settings/data/breaches', [DataSettingsController::class, 'storeBreach'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data.breaches.store');
+    Route::post('settings/data/processors', [DataSettingsController::class, 'storeProcessor'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data.processors.store');
+    Route::put('settings/data/processors/{processorId}', [DataSettingsController::class, 'updateProcessor'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data.processors.update');
+    Route::delete('settings/data/processors/{processorId}', [DataSettingsController::class, 'destroyProcessor'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.data.processors.destroy');
 
-    // Modules & Features (UI-first, no backend yet)
-    Route::get('settings/modules', fn () => Inertia::render('settings/modules'))->name('settings.modules');
+    // Modules & Features
+    Route::get('settings/modules', [ModuleSettingsController::class, 'index'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.modules');
+    Route::put('settings/modules', [ModuleSettingsController::class, 'update'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.modules.update');
 
     // User Management
-    Route::get('settings/users', [UsersController::class, 'index'])->name('settings.users.index');
-    Route::get('settings/users/{target}', [UsersController::class, 'show'])->name('settings.users.show');
-    Route::put('settings/users/{target}', [UsersController::class, 'update'])->name('settings.users.update');
-    Route::post('settings/users/{target}/approve', [UsersController::class, 'approve'])->name('settings.users.approve');
-    Route::post('settings/users/{target}/suspend', [UsersController::class, 'suspend'])->name('settings.users.suspend');
-    Route::delete('settings/users/{target}/sessions/{session}', [UsersController::class, 'terminateSession'])->name('settings.users.terminate-session');
-    Route::delete('settings/users/{target}/sessions', [UsersController::class, 'terminateAllSessions'])->name('settings.users.terminate-all-sessions');
+    Route::get('settings/users', [UsersController::class, 'index'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.index');
+    Route::get('settings/users/{target}', [UsersController::class, 'show'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.show');
+    Route::put('settings/users/{target}', [UsersController::class, 'update'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.update');
+    Route::post('settings/users/{target}/approve', [UsersController::class, 'approve'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.approve');
+    Route::post('settings/users/{target}/suspend', [UsersController::class, 'suspend'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.suspend');
+    Route::delete('settings/users/{target}/sessions/{session}', [UsersController::class, 'terminateSession'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.terminate-session');
+    Route::delete('settings/users/{target}/sessions', [UsersController::class, 'terminateAllSessions'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.terminate-all-sessions');
 
     // SSO Configuration
     Route::get('settings/sso', fn () => Inertia::render('settings/sso-config', [
@@ -265,26 +340,12 @@ Route::middleware('auth')->group(function () {
         ->name('settings.sso_groups.fetch');
 
     // Audit Logs
-    Route::get('settings/audit-logs', function () {
-        $query = \App\Models\AuditLog::query()
-            ->with('user:id,name,email')
-            ->orderByDesc('created_at');
-        if (request('q')) {
-            $query->where(function ($q) {
-                $q->where('action', 'like', '%' . request('q') . '%')
-                  ->orWhere('auditable_type', 'like', '%' . request('q') . '%');
-            });
-        }
-        if (request('user_id')) { $query->where('user_id', request('user_id')); }
-        if (request('type')) { $query->where('event', request('type')); }
-        return Inertia::render('settings/audit-logs', [
-            'events' => $query->paginate(50),
-            'users' => \App\Models\User::select('id', 'name')->orderBy('name')->get(),
-            'filters' => request()->only('q', 'user_id', 'type', 'from', 'to'),
-        ]);
-    })
+    Route::get('settings/audit-logs', [AuditLogSettingsController::class, 'index'])
         ->middleware('permission:audit.viewAny|settings.access.manage')
         ->name('settings.audit_logs');
+    Route::get('settings/audit-logs/export', [AuditLogSettingsController::class, 'export'])
+        ->middleware('permission:audit.viewAny|settings.access.manage')
+        ->name('settings.audit_logs.export');
 
     // Integrations hub
     Route::get('settings/integrations', [IntegrationHubController::class, 'index'])

@@ -117,6 +117,8 @@ const categoryLabels: Record<string, string> = {
     other: 'Other',
 };
 
+const ALL_SENTINEL = '__all__';
+
 function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md' }) {
     const cls = size === 'sm' ? 'w-3.5 h-3.5' : 'w-5 h-5';
     return (
@@ -160,11 +162,18 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
 
     function submitFeedback(e: React.FormEvent) {
         e.preventDefault();
+        feedbackForm.transform((data) => ({
+            ...data,
+            rating: data.rating > 0 ? data.rating : null,
+        }));
         feedbackForm.post(`/sites/${site.id}/feedback`, {
             preserveScroll: true,
             onSuccess: () => {
                 feedbackForm.reset();
                 setDialogOpen(false);
+            },
+            onFinish: () => {
+                feedbackForm.transform((data) => data);
             },
         });
     }
@@ -184,7 +193,8 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
     }
 
     function applyFilter(key: string, value: string) {
-        const newFilters = { ...filters, [key]: value || undefined };
+        const nextValue = value === ALL_SENTINEL ? undefined : value || undefined;
+        const newFilters = { ...filters, [key]: nextValue };
         router.get(`/sites/${site.id}/feedback`, newFilters as any, { preserveState: true, preserveScroll: true });
     }
 
@@ -349,10 +359,10 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                         <div className="flex flex-wrap items-end gap-3">
                             <div className="min-w-[140px]">
                                 <Label className="text-xs text-slate-400">Type</Label>
-                                <Select value={filters.type || ''} onValueChange={(v) => applyFilter('type', v)}>
+                                <Select value={filters.type || ALL_SENTINEL} onValueChange={(v) => applyFilter('type', v)}>
                                     <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">All Types</SelectItem>
+                                        <SelectItem value={ALL_SENTINEL}>All Types</SelectItem>
                                         {Object.entries(typeLabels).map(([val, label]) => (
                                             <SelectItem key={val} value={val}>{label}</SelectItem>
                                         ))}
@@ -361,10 +371,10 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                             </div>
                             <div className="min-w-[140px]">
                                 <Label className="text-xs text-slate-400">Status</Label>
-                                <Select value={filters.status || ''} onValueChange={(v) => applyFilter('status', v)}>
+                                <Select value={filters.status || ALL_SENTINEL} onValueChange={(v) => applyFilter('status', v)}>
                                     <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">All Statuses</SelectItem>
+                                        <SelectItem value={ALL_SENTINEL}>All Statuses</SelectItem>
                                         {Object.entries(statusLabels).map(([val, label]) => (
                                             <SelectItem key={val} value={val}>{label}</SelectItem>
                                         ))}
@@ -373,10 +383,10 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                             </div>
                             <div className="min-w-[120px]">
                                 <Label className="text-xs text-slate-400">Rating</Label>
-                                <Select value={filters.rating || ''} onValueChange={(v) => applyFilter('rating', v)}>
+                                <Select value={filters.rating || ALL_SENTINEL} onValueChange={(v) => applyFilter('rating', v)}>
                                     <SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">Any Rating</SelectItem>
+                                        <SelectItem value={ALL_SENTINEL}>Any Rating</SelectItem>
                                         {[5, 4, 3, 2, 1].map((r) => (
                                             <SelectItem key={r} value={String(r)}>{r} Star{r !== 1 ? 's' : ''}</SelectItem>
                                         ))}

@@ -55,7 +55,7 @@ class SitePolicy
             ->contains(fn (string $permission) => $user->canDo($permission));
 
         if (! $hasTypeScopedPermissions) {
-            return false;
+            return true;
         }
 
         return isset($typePermissions[$type]) && $user->canDo($typePermissions[$type]);

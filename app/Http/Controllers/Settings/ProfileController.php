@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -64,7 +65,7 @@ class ProfileController extends Controller
         $validated = $request->validated();
         $user = $request->user();
 
-        $user->fill([
+        $userAttributes = $this->filterExistingUserColumns([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'cellphone' => $validated['phone'],
@@ -73,7 +74,13 @@ class ProfileController extends Controller
             'time_format' => $validated['time_format'],
         ]);
 
-        if ($user->isDirty('email')) {
+        $user->fill($userAttributes);
+
+        if (
+            array_key_exists('email', $userAttributes)
+            && $user->isDirty('email')
+            && Schema::hasColumn('users', 'email_verified_at')
+        ) {
             $user->email_verified_at = null;
         }
 
@@ -105,6 +112,22 @@ class ProfileController extends Controller
         }
 
         return filled($value) ? (string) $value : null;
+    }
+
+    /**
+     * Filter profile attributes down to columns the current users table can persist.
+     *
+     * This keeps the profile page from 500ing when local environments are behind
+     * on optional profile-preferences migrations.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function filterExistingUserColumns(array $attributes): array
+    {
+        return collect($attributes)
+            ->filter(fn (mixed $value, string $column): bool => Schema::hasColumn('users', $column))
+            ->all();
     }
 
 

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, DollarSign, Eye, Pencil, Plus, Search, Wallet } from 'lucide-react';
+import { AlertTriangle, DollarSign, Eye, Plus, Search, Wallet } from 'lucide-react';
 
 const ANY = '__ANY__';
 
@@ -160,11 +160,6 @@ export default function ClientFundsIndex({ funds = { data: [], links: [], curren
                                         <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
                                             <Link href={`/operations/client-funds/${fund.id}`}>
                                                 <Eye className="h-3.5 w-3.5" />
-                                            </Link>
-                                        </Button>
-                                        <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                            <Link href={`/operations/client-funds/${fund.id}/edit`}>
-                                                <Pencil className="h-3.5 w-3.5" />
                                             </Link>
                                         </Button>
                                     </div>

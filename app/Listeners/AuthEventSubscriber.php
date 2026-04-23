@@ -8,9 +8,13 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Events\Dispatcher;
+use Illuminate\Support\Facades\Schema;
 
 class AuthEventSubscriber
 {
+    /** @var array<string, bool> */
+    private static array $userColumnCache = [];
+
     public function handleLogin(Login $event): void
     {
         $user = $event->user;
@@ -18,11 +22,23 @@ class AuthEventSubscriber
 
         UserLoginLog::record('login', $user->id, $request->ip(), $request->userAgent());
 
-        $user->update([
-            'last_login_at' => now(),
-            'last_login_ip' => $request->ip(),
-            'login_count' => ($user->login_count ?? 0) + 1,
-        ]);
+        $updates = [];
+
+        if ($this->usersTableHasColumn('last_login_at')) {
+            $updates['last_login_at'] = now();
+        }
+
+        if ($this->usersTableHasColumn('last_login_ip')) {
+            $updates['last_login_ip'] = $request->ip();
+        }
+
+        if ($this->usersTableHasColumn('login_count')) {
+            $updates['login_count'] = (int) ($user->login_count ?? 0) + 1;
+        }
+
+        if ($updates !== []) {
+            $user->forceFill($updates)->save();
+        }
     }
 
     public function handleLogout(Logout $event): void
@@ -55,5 +71,11 @@ class AuthEventSubscriber
             Failed::class => 'handleFailed',
             PasswordReset::class => 'handlePasswordReset',
         ];
+    }
+
+    private function usersTableHasColumn(string $column): bool
+    {
+        return self::$userColumnCache[$column]
+            ??= Schema::hasColumn('users', $column);
     }
 }

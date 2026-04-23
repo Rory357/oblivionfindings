@@ -241,7 +241,7 @@ export default function AccessControlDashboard({ stats, roles }: Props) {
                                                 </p>
                                             </div>
                                         </div>
-                                        <Link href={`/system/access/roles?edit=${role.id}`}>
+                                        <Link dusk={`system-role-view-${role.id}`} href={`/system/access/roles?edit=${role.id}`}>
                                             <Button variant="ghost" size="sm">
                                                 View
                                             </Button>

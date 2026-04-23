@@ -37,18 +37,20 @@ class HandleInertiaRequests extends Middleware
 
         // Pull all app-settings we need for chrome (labels / theme / branding)
         // in one query and key by setting name. Avoids 4+ round-trips per page.
-        $settings = AppSetting::query()
-            ->where(function ($q) {
-                $q->where('key', 'like', 'labels.%')
-                    ->orWhereIn('key', [
-                        'theme.light',
-                        'theme.dark',
-                        'branding.name',
-                        'branding.logo_path',
-                    ]);
-            })
-            ->get(['key', 'value'])
-            ->keyBy('key');
+        $settings = Schema::hasTable('app_settings')
+            ? AppSetting::query()
+                ->where(function ($q) {
+                    $q->where('key', 'like', 'labels.%')
+                        ->orWhereIn('key', [
+                            'theme.light',
+                            'theme.dark',
+                            'branding.name',
+                            'branding.logo_path',
+                        ]);
+                })
+                ->get(['key', 'value'])
+                ->keyBy('key')
+            : collect();
 
         $labelOverrides = $settings
             ->filter(fn ($row, $key) => str_starts_with($key, 'labels.'))

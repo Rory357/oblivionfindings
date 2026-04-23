@@ -675,6 +675,24 @@ class RosteringController extends Controller
         ]);
     }
 
+    public function autoSchedule(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
+
+        $data = $request->validate([
+            'week' => ['nullable', 'date'],
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+        ]);
+
+        return redirect()
+            ->route('operations.rostering.index', array_filter([
+                'week' => $data['week'] ?? null,
+                'client_id' => $data['client_id'] ?? null,
+            ]))
+            ->with('warning', 'Auto-scheduling is not configured yet. Please assign open shifts manually.');
+    }
+
     /**
      * Get compliance status badges for all active staff (for rostering overlays).
      */

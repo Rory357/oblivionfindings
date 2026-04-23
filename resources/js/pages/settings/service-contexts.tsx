@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -414,6 +415,9 @@ export default function ServiceContextsPage(props: Props) {
                             <DialogContent className="max-w-lg">
                                 <DialogHeader>
                                     <DialogTitle>Create service context</DialogTitle>
+                                    <DialogDescription>
+                                        Add a service context for residential, respite, or other delivery settings.
+                                    </DialogDescription>
                                 </DialogHeader>
                                 <form
                                     onSubmit={(e) => {
@@ -765,7 +769,9 @@ function ContextCard({
                         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Edit service context</DialogTitle>
-                                <p className="text-sm text-muted-foreground">Update service details, funding, and staffing information.</p>
+                                <DialogDescription>
+                                    Update service details, funding, staffing, and contact information.
+                                </DialogDescription>
                             </DialogHeader>
 
                             <form

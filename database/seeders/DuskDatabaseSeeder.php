@@ -47,6 +47,11 @@ class DuskDatabaseSeeder extends Seeder
             'calendar.create','calendar.manage_recurring','calendar.view','calendar.viewAny',
             'care_note_templates.viewAny','care_plans.create','care_plans.delete','care_plans.update','care_plans.viewAny',
             'checklists.manage_templates','checklists.run','checklists.schedule','checklists.view',
+            'clinical.dashboard',
+            'clinical.events.record','clinical.events.review','clinical.events.viewAny','clinical.events.viewAssigned',
+            'clinical.observations.correct','clinical.observations.record','clinical.observations.recordClinical',
+            'clinical.observations.viewAny','clinical.observations.viewAssigned',
+            'clinical.protocols.manage','clinical.protocols.viewAny',
             'client_funds.manage','clients.assignments.update','clients.create','clients.onboarding.manage',
             'clients.update','clients.viewAny','clients.viewAssigned',
             'competency.assess','competency.manage','competency.viewAny',
@@ -144,6 +149,7 @@ class DuskDatabaseSeeder extends Seeder
             'shifts.create','shifts.manageAny','shifts.tasks.updateSelf','shifts.update','shifts.viewAny','shifts.viewAssigned',
             'siteHardware.manage','siteHardware.view','sites.create','sites.update','sites.viewAny',
             'staff.assignments.update','staff.availability.updateAny','staff.availability.updateSelf',
+            'staff.credentials.updateAny','staff.credentials.updateSelf','staff.credentials.viewAny',
             'staff.update','staff.viewAny',
             'summaries.generate','timeline.create','timeline.pin',
             'timesheets.approve','timesheets.create','timesheets.manageAny','timesheets.submit',
@@ -211,6 +217,10 @@ class DuskDatabaseSeeder extends Seeder
 
         $supportWorkerPermissionKeys = [
             'calendar.view',
+            'clinical.events.record',
+            'clinical.events.viewAssigned',
+            'clinical.observations.record',
+            'clinical.observations.viewAssigned',
             'clients.viewAssigned',
             'controlRoom.alerts.view',
             'controlRoom.viewAny',
@@ -224,6 +234,7 @@ class DuskDatabaseSeeder extends Seeder
             'medications.view',
             'shifts.tasks.updateSelf',
             'shifts.viewAssigned',
+            'staff.credentials.updateSelf',
             'staff.availability.updateSelf',
             'timesheets.create',
             'timesheets.submit',
@@ -233,6 +244,14 @@ class DuskDatabaseSeeder extends Seeder
         $managerPermissionKeys = array_values(array_unique(array_merge(
             $supportWorkerPermissionKeys,
             [
+                'clinical.dashboard',
+                'clinical.events.review',
+                'clinical.events.viewAny',
+                'clinical.observations.correct',
+                'clinical.observations.recordClinical',
+                'clinical.observations.viewAny',
+                'clinical.protocols.manage',
+                'clinical.protocols.viewAny',
                 'clients.assignments.update',
                 'clients.update',
                 'clients.viewAny',
@@ -251,6 +270,8 @@ class DuskDatabaseSeeder extends Seeder
                 'shifts.update',
                 'shifts.viewAny',
                 'staff.assignments.update',
+                'staff.credentials.updateAny',
+                'staff.credentials.viewAny',
                 'staff.viewAny',
                 'timesheets.approve',
                 'timesheets.manageAny',
@@ -670,6 +691,10 @@ class DuskDatabaseSeeder extends Seeder
      */
     private function seedUser(array $overrides): User
     {
+        if (Schema::hasColumn('users', 'organization_id') && ! array_key_exists('organization_id', $overrides)) {
+            $overrides['organization_id'] = 1;
+        }
+
         $attributes = User::factory()
             ->withoutTwoFactor()
             ->make($overrides)

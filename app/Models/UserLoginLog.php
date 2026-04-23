@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 class UserLoginLog extends Model
 {
@@ -63,13 +64,19 @@ class UserLoginLog extends Model
 
     public static function record(string $eventType, ?int $userId, ?string $ip, ?string $ua, array $meta = []): static
     {
-        return static::create([
+        $attributes = [
             'user_id' => $userId,
             'event_type' => $eventType,
             'ip_address' => $ip,
             'user_agent' => $ua,
             'metadata' => !empty($meta) ? $meta : null,
             'created_at' => now(),
-        ]);
+        ];
+
+        if (! Schema::hasTable((new static())->getTable())) {
+            return new static($attributes);
+        }
+
+        return static::create($attributes);
     }
 }

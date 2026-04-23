@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Eye, FileText, Hash, Pencil, Plus, Search, StickyNote } from 'lucide-react';
+import { FileText, Hash, Pencil, Plus, Search, StickyNote } from 'lucide-react';
 
 const ANY = '__ANY__';
 
@@ -110,7 +110,7 @@ export default function NoteTemplatesIndex({ templates = { data: [], links: [], 
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <Link href={`/operations/note-templates/${tpl.id}`} className="text-sm font-semibold hover:underline">
+                                        <Link href={`/operations/note-templates/${tpl.id}/edit`} className="text-sm font-semibold hover:underline">
                                             {tpl.name}
                                         </Link>
                                         <Badge variant={tpl.is_active ? 'default' : 'secondary'} className="h-4 px-1.5 text-[9px]">
@@ -128,11 +128,6 @@ export default function NoteTemplatesIndex({ templates = { data: [], links: [], 
                                     </div>
                                 </div>
                                 <div className="flex shrink-0 gap-1">
-                                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/operations/note-templates/${tpl.id}`}>
-                                            <Eye className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
                                         <Link href={`/operations/note-templates/${tpl.id}/edit`}>
                                             <Pencil className="h-3.5 w-3.5" />

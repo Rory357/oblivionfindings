@@ -25,7 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Archive,
@@ -51,7 +51,7 @@ import {
     Landmark,
     Settings,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // ---------------------------------------------------------------------------
 // Static data -- Export modules grouped by category
@@ -168,7 +168,7 @@ interface DsarRequest {
     dateReceived: string;
     dueDate: string;
     workingDaysLeft: number;
-    status: 'new' | 'in_progress' | 'completed' | 'overdue';
+    status: 'new' | 'in_progress' | 'completed' | 'overdue' | 'rejected' | 'withdrawn';
     assignedTo: string;
 }
 
@@ -191,6 +191,7 @@ interface DataBreach {
     severity: 'low' | 'medium' | 'high' | 'critical';
     individualsAffected: number;
     commissionerNotified: boolean;
+    commissionerNotificationRequired?: boolean;
     status: 'investigating' | 'contained' | 'resolved' | 'reported';
 }
 
@@ -208,13 +209,73 @@ interface DataProcessor {
     id: string;
     company: string;
     contact: string;
+    email?: string | null;
+    purpose?: string;
     purposes: string[];
     dataCategories: string[];
     agreementStatus: 'dpa_signed' | 'standard_terms' | 'negotiating' | 'no_agreement';
+    countryCode?: string;
     country: string;
     countryFlag: string;
     reviewDate: string;
     overdue: boolean;
+}
+
+type DataSettingsPageProps = {
+    retention_values?: Record<string, string>;
+    privacy_settings?: {
+        anonymisation: boolean;
+        consent_required: boolean;
+        data_portability: boolean;
+        right_to_erasure: boolean;
+        privacy_url: string;
+        dpo_name: string;
+        privacy_email: string;
+    };
+    compliance_settings?: {
+        privacy_act_mode: boolean;
+        nzdsf_reporting: boolean;
+        health_info_code: boolean;
+        data_sovereignty: string;
+        health_custodian: string;
+        privacy_officer: string;
+        require_privacy_officer_approval: boolean;
+        log_medical_access: boolean;
+    };
+    dsar_requests?: DsarRequest[];
+    breaches?: DataBreach[];
+    processors?: DataProcessor[];
+};
+
+type StatusMessage = {
+    type: 'success' | 'error';
+    text: string;
+};
+
+function csrfToken(): string {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+}
+
+async function requestJson<TResponse>(url: string, method: 'POST' | 'PUT' | 'DELETE', body?: Record<string, unknown>): Promise<TResponse> {
+    const response = await fetch(url, {
+        method,
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken(),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: 'same-origin',
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        const message = typeof payload?.message === 'string' ? payload.message : 'Request failed.';
+        throw new Error(message);
+    }
+
+    return payload as TResponse;
 }
 
 const placeholderProcessors: DataProcessor[] = [
@@ -269,6 +330,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 // ---------------------------------------------------------------------------
 
 export default function Data() {
+    const {
+        retention_values = {},
+        privacy_settings,
+        compliance_settings,
+        dsar_requests = [],
+        breaches: breachProps = [],
+        processors: processorProps = [],
+    } = usePage<DataSettingsPageProps>().props;
+
     // Export state
     const [selectedModules, setSelectedModules] = useState<string[]>([]);
     const [exportFormat, setExportFormat] = useState('csv');
@@ -279,27 +349,41 @@ export default function Data() {
 
     // Retention state
     const [retentionValues, setRetentionValues] = useState<Record<string, string>>(() =>
-        Object.fromEntries(retentionRows.map((r) => [r.id, r.defaultValue])),
+        ({
+            ...Object.fromEntries(retentionRows.map((r) => [r.id, r.defaultValue])),
+            ...retention_values,
+        }),
     );
+    const [savingRetention, setSavingRetention] = useState(false);
 
     // Privacy & consent state
-    const [anonymisation, setAnonymisation] = useState(false);
-    const [consentRequired, setConsentRequired] = useState(true);
-    const [dataPortability, setDataPortability] = useState(true);
-    const [rightToErasure, setRightToErasure] = useState(true);
-    const [privacyUrl, setPrivacyUrl] = useState('');
-    const [dpoName, setDpoName] = useState('');
-    const [privacyEmail, setPrivacyEmail] = useState('');
+    const [anonymisation, setAnonymisation] = useState(privacy_settings?.anonymisation ?? false);
+    const [consentRequired, setConsentRequired] = useState(privacy_settings?.consent_required ?? true);
+    const [dataPortability, setDataPortability] = useState(privacy_settings?.data_portability ?? true);
+    const [rightToErasure, setRightToErasure] = useState(privacy_settings?.right_to_erasure ?? true);
+    const [privacyUrl, setPrivacyUrl] = useState(privacy_settings?.privacy_url ?? '');
+    const [dpoName, setDpoName] = useState(privacy_settings?.dpo_name ?? '');
+    const [privacyEmail, setPrivacyEmail] = useState(privacy_settings?.privacy_email ?? '');
+    const [savingPrivacy, setSavingPrivacy] = useState(false);
 
     // NZ regulatory state
-    const [privacyActMode, setPrivacyActMode] = useState(true);
-    const [nzdsfReporting, setNzdsfReporting] = useState(false);
-    const [healthInfoCode, setHealthInfoCode] = useState(true);
-    const [dataSovereignty, setDataSovereignty] = useState('nz-only');
-    const [healthCustodian, setHealthCustodian] = useState('');
-    const [privacyOfficer, setPrivacyOfficer] = useState('');
-    const [requirePrivacyOfficerApproval, setRequirePrivacyOfficerApproval] = useState(false);
-    const [logMedicalAccess, setLogMedicalAccess] = useState(true);
+    const [privacyActMode, setPrivacyActMode] = useState(compliance_settings?.privacy_act_mode ?? true);
+    const [nzdsfReporting, setNzdsfReporting] = useState(compliance_settings?.nzdsf_reporting ?? false);
+    const [healthInfoCode, setHealthInfoCode] = useState(compliance_settings?.health_info_code ?? true);
+    const [dataSovereignty, setDataSovereignty] = useState(compliance_settings?.data_sovereignty ?? 'nz-only');
+    const [healthCustodian, setHealthCustodian] = useState(compliance_settings?.health_custodian ?? '');
+    const [privacyOfficer, setPrivacyOfficer] = useState(compliance_settings?.privacy_officer ?? '');
+    const [requirePrivacyOfficerApproval, setRequirePrivacyOfficerApproval] = useState(compliance_settings?.require_privacy_officer_approval ?? false);
+    const [logMedicalAccess, setLogMedicalAccess] = useState(compliance_settings?.log_medical_access ?? true);
+    const [savingCompliance, setSavingCompliance] = useState(false);
+
+    const [dsarRequests, setDsarRequests] = useState<DsarRequest[]>(dsar_requests);
+    const [breaches, setBreaches] = useState<DataBreach[]>(breachProps);
+    const [processors, setProcessors] = useState<DataProcessor[]>(processorProps);
+    const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
+    const bulkExportAvailable = false;
+    const bulkImportAvailable = false;
+    const dangerZoneAvailable = false;
 
     // DSAR state
     const [showDsarDialog, setShowDsarDialog] = useState(false);
@@ -310,6 +394,7 @@ export default function Data() {
     const [dsarRelationship, setDsarRelationship] = useState('self');
     const [dsarDetails, setDsarDetails] = useState('');
     const [dsarIdentityVerified, setDsarIdentityVerified] = useState(false);
+    const [submittingDsar, setSubmittingDsar] = useState(false);
 
     // Data Breach state
     const [showBreachDialog, setShowBreachDialog] = useState(false);
@@ -321,9 +406,11 @@ export default function Data() {
     const [breachDiscoveryDate, setBreachDiscoveryDate] = useState('');
     const [breachCommissionerNotified, setBreachCommissionerNotified] = useState(false);
     const [breachIndividualsNotified, setBreachIndividualsNotified] = useState(false);
+    const [submittingBreach, setSubmittingBreach] = useState(false);
 
     // Third-party processor state
     const [showProcessorDialog, setShowProcessorDialog] = useState(false);
+    const [editingProcessorId, setEditingProcessorId] = useState<string | null>(null);
     const [processorCompany, setProcessorCompany] = useState('');
     const [processorContact, setProcessorContact] = useState('');
     const [processorEmail, setProcessorEmail] = useState('');
@@ -332,12 +419,54 @@ export default function Data() {
     const [processorAgreement, setProcessorAgreement] = useState('no_agreement');
     const [processorCountry, setProcessorCountry] = useState('nz');
     const [processorReviewDate, setProcessorReviewDate] = useState('');
+    const [submittingProcessor, setSubmittingProcessor] = useState(false);
+    const [removingProcessorId, setRemovingProcessorId] = useState<string | null>(null);
 
     // Danger zone dialogs
     const [showPurgeDialog, setShowPurgeDialog] = useState(false);
     const [purgeConfirmText, setPurgeConfirmText] = useState('');
     const [showDeleteOrgDialog, setShowDeleteOrgDialog] = useState(false);
     const [deleteOrgConfirmText, setDeleteOrgConfirmText] = useState('');
+
+    useEffect(() => {
+        setRetentionValues({
+            ...Object.fromEntries(retentionRows.map((r) => [r.id, r.defaultValue])),
+            ...retention_values,
+        });
+    }, [retention_values]);
+
+    useEffect(() => {
+        setAnonymisation(privacy_settings?.anonymisation ?? false);
+        setConsentRequired(privacy_settings?.consent_required ?? true);
+        setDataPortability(privacy_settings?.data_portability ?? true);
+        setRightToErasure(privacy_settings?.right_to_erasure ?? true);
+        setPrivacyUrl(privacy_settings?.privacy_url ?? '');
+        setDpoName(privacy_settings?.dpo_name ?? '');
+        setPrivacyEmail(privacy_settings?.privacy_email ?? '');
+    }, [privacy_settings]);
+
+    useEffect(() => {
+        setPrivacyActMode(compliance_settings?.privacy_act_mode ?? true);
+        setNzdsfReporting(compliance_settings?.nzdsf_reporting ?? false);
+        setHealthInfoCode(compliance_settings?.health_info_code ?? true);
+        setDataSovereignty(compliance_settings?.data_sovereignty ?? 'nz-only');
+        setHealthCustodian(compliance_settings?.health_custodian ?? '');
+        setPrivacyOfficer(compliance_settings?.privacy_officer ?? '');
+        setRequirePrivacyOfficerApproval(compliance_settings?.require_privacy_officer_approval ?? false);
+        setLogMedicalAccess(compliance_settings?.log_medical_access ?? true);
+    }, [compliance_settings]);
+
+    useEffect(() => {
+        setDsarRequests(dsar_requests);
+    }, [dsar_requests]);
+
+    useEffect(() => {
+        setBreaches(breachProps);
+    }, [breachProps]);
+
+    useEffect(() => {
+        setProcessors(processorProps);
+    }, [processorProps]);
 
     // -----------------------------------------------------------------------
     // Helpers
@@ -358,7 +487,10 @@ export default function Data() {
     }
 
     function handleExport() {
-        // UI-only placeholder — would trigger backend export via router.post
+        setStatusMessage({
+            type: 'error',
+            text: 'Bulk export and import are not wired on this screen yet.',
+        });
     }
 
     function toggleBreachDataType(type: string) {
@@ -371,6 +503,256 @@ export default function Data() {
         setProcessorDataCategories((prev) =>
             prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
         );
+    }
+
+    function resetDsarForm() {
+        setDsarType('access');
+        setDsarRequesterName('');
+        setDsarRequesterEmail('');
+        setDsarRequesterPhone('');
+        setDsarRelationship('self');
+        setDsarDetails('');
+        setDsarIdentityVerified(false);
+    }
+
+    function resetBreachForm() {
+        setBreachType('unauthorised_access');
+        setBreachSeverity('medium');
+        setBreachDescription('');
+        setBreachDataTypes([]);
+        setBreachIndividuals('');
+        setBreachDiscoveryDate('');
+        setBreachCommissionerNotified(false);
+        setBreachIndividualsNotified(false);
+    }
+
+    function resetProcessorForm() {
+        setEditingProcessorId(null);
+        setProcessorCompany('');
+        setProcessorContact('');
+        setProcessorEmail('');
+        setProcessorPurpose('cloud_hosting');
+        setProcessorDataCategories([]);
+        setProcessorAgreement('no_agreement');
+        setProcessorCountry('nz');
+        setProcessorReviewDate('');
+    }
+
+    function inferProcessorPurpose(processor: DataProcessor): string {
+        return processor.purpose
+            ?? ({
+                'SSO / Authentication': 'sso',
+                'Email delivery': 'email',
+                'SMS delivery': 'sms',
+                'Cloud hosting': 'cloud_hosting',
+                Backup: 'backup',
+                Analytics: 'analytics',
+                'Payroll integration': 'payroll',
+                'Calendar sync': 'calendar',
+            }[processor.purposes[0] ?? ''] ?? 'cloud_hosting');
+    }
+
+    function openProcessorDialog(processor?: DataProcessor) {
+        if (!processor) {
+            resetProcessorForm();
+            setShowProcessorDialog(true);
+
+            return;
+        }
+
+        setEditingProcessorId(processor.id);
+        setProcessorCompany(processor.company);
+        setProcessorContact(processor.contact);
+        setProcessorEmail(processor.email ?? '');
+        setProcessorPurpose(inferProcessorPurpose(processor));
+        setProcessorDataCategories(processor.dataCategories);
+        setProcessorAgreement(processor.agreementStatus);
+        setProcessorCountry(processor.countryCode ?? 'other');
+        setProcessorReviewDate(processor.reviewDate);
+        setShowProcessorDialog(true);
+    }
+
+    async function saveRetentionPolicies() {
+        setSavingRetention(true);
+
+        try {
+            const payload = await requestJson<{ message: string; values: Record<string, string> }>(
+                '/settings/data/retention',
+                'PUT',
+                { values: retentionValues },
+            );
+
+            setRetentionValues(payload.values);
+            setStatusMessage({ type: 'success', text: payload.message });
+        } catch (error) {
+            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not save retention policies.' });
+        } finally {
+            setSavingRetention(false);
+        }
+    }
+
+    async function savePrivacySettings() {
+        setSavingPrivacy(true);
+
+        try {
+            const payload = await requestJson<{ message: string; settings: DataSettingsPageProps['privacy_settings'] }>(
+                '/settings/data/privacy',
+                'PUT',
+                {
+                    anonymisation,
+                    consent_required: consentRequired,
+                    data_portability: dataPortability,
+                    right_to_erasure: rightToErasure,
+                    privacy_url: privacyUrl,
+                    dpo_name: dpoName,
+                    privacy_email: privacyEmail,
+                },
+            );
+
+            setStatusMessage({ type: 'success', text: payload.message });
+        } catch (error) {
+            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not save privacy settings.' });
+        } finally {
+            setSavingPrivacy(false);
+        }
+    }
+
+    async function saveComplianceSettings() {
+        setSavingCompliance(true);
+
+        try {
+            const payload = await requestJson<{ message: string; settings: DataSettingsPageProps['compliance_settings'] }>(
+                '/settings/data/compliance',
+                'PUT',
+                {
+                    privacy_act_mode: privacyActMode,
+                    nzdsf_reporting: nzdsfReporting,
+                    health_info_code: healthInfoCode,
+                    data_sovereignty: dataSovereignty,
+                    health_custodian: healthCustodian,
+                    privacy_officer: privacyOfficer,
+                    require_privacy_officer_approval: requirePrivacyOfficerApproval,
+                    log_medical_access: logMedicalAccess,
+                },
+            );
+
+            setStatusMessage({ type: 'success', text: payload.message });
+        } catch (error) {
+            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not save compliance settings.' });
+        } finally {
+            setSavingCompliance(false);
+        }
+    }
+
+    async function createDsarRequest() {
+        setSubmittingDsar(true);
+
+        try {
+            const payload = await requestJson<{ message: string; request: DsarRequest }>(
+                '/settings/data/requests',
+                'POST',
+                {
+                    request_type: dsarType,
+                    requester_name: dsarRequesterName,
+                    requester_email: dsarRequesterEmail,
+                    requester_phone: dsarRequesterPhone,
+                    relationship: dsarRelationship,
+                    details: dsarDetails,
+                    identity_verified: dsarIdentityVerified,
+                },
+            );
+
+            setDsarRequests((current) => [payload.request, ...current].slice(0, 5));
+            setStatusMessage({ type: 'success', text: payload.message });
+            setShowDsarDialog(false);
+            resetDsarForm();
+        } catch (error) {
+            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not create privacy request.' });
+        } finally {
+            setSubmittingDsar(false);
+        }
+    }
+
+    async function createBreach() {
+        setSubmittingBreach(true);
+
+        try {
+            const payload = await requestJson<{ message: string; breach: DataBreach }>(
+                '/settings/data/breaches',
+                'POST',
+                {
+                    breach_type: breachType,
+                    severity: breachSeverity,
+                    description: breachDescription,
+                    data_types: breachDataTypes,
+                    individuals_affected: breachIndividuals === '' ? null : Number.parseInt(breachIndividuals, 10),
+                    discovery_date: breachDiscoveryDate,
+                    commissioner_notified: breachCommissionerNotified,
+                    individuals_notified: breachIndividualsNotified,
+                },
+            );
+
+            setBreaches((current) => [payload.breach, ...current].slice(0, 5));
+            setStatusMessage({ type: 'success', text: payload.message });
+            setShowBreachDialog(false);
+            resetBreachForm();
+        } catch (error) {
+            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not record data breach.' });
+        } finally {
+            setSubmittingBreach(false);
+        }
+    }
+
+    async function submitProcessor() {
+        setSubmittingProcessor(true);
+
+        try {
+            const payload = await requestJson<{ message: string; processor: DataProcessor }>(
+                editingProcessorId ? `/settings/data/processors/${editingProcessorId}` : '/settings/data/processors',
+                editingProcessorId ? 'PUT' : 'POST',
+                {
+                    company: processorCompany,
+                    contact: processorContact,
+                    email: processorEmail,
+                    purpose: processorPurpose,
+                    data_categories: processorDataCategories,
+                    agreement_status: processorAgreement,
+                    country: processorCountry,
+                    review_date: processorReviewDate,
+                },
+            );
+
+            setProcessors((current) => {
+                if (!editingProcessorId) {
+                    return [payload.processor, ...current];
+                }
+
+                return current.map((processor) =>
+                    processor.id === editingProcessorId ? payload.processor : processor,
+                );
+            });
+            setStatusMessage({ type: 'success', text: payload.message });
+            setShowProcessorDialog(false);
+            resetProcessorForm();
+        } catch (error) {
+            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not save processor.' });
+        } finally {
+            setSubmittingProcessor(false);
+        }
+    }
+
+    async function removeProcessor(id: string) {
+        setRemovingProcessorId(id);
+
+        try {
+            const payload = await requestJson<{ message: string }>(`/settings/data/processors/${id}`, 'DELETE');
+            setProcessors((current) => current.filter((processor) => processor.id !== id));
+            setStatusMessage({ type: 'success', text: payload.message });
+        } catch (error) {
+            setStatusMessage({ type: 'error', text: error instanceof Error ? error.message : 'Could not remove processor.' });
+        } finally {
+            setRemovingProcessorId(null);
+        }
     }
 
     function statusBadge(status: RecentExport['status']) {
@@ -406,6 +788,18 @@ export default function Data() {
                 return (
                     <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
                         <CheckCircle className="mr-1 h-3 w-3" /> Completed
+                    </Badge>
+                );
+            case 'rejected':
+                return (
+                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                        Rejected
+                    </Badge>
+                );
+            case 'withdrawn':
+                return (
+                    <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                        Withdrawn
                     </Badge>
                 );
             case 'overdue':
@@ -445,9 +839,17 @@ export default function Data() {
 
     // Computed values
     const hasMedicalSelected = selectedModules.some((id) => medicalModuleIds.includes(id));
-    const dsarOpen = placeholderDsarRequests.filter((r) => r.status === 'new' || r.status === 'in_progress').length;
-    const dsarCompleted = placeholderDsarRequests.filter((r) => r.status === 'completed').length;
-    const dsarOverdue = placeholderDsarRequests.filter((r) => r.status === 'overdue').length;
+    const dsarOpen = dsarRequests.filter((r) => r.status === 'new' || r.status === 'in_progress').length;
+    const dsarCompleted = dsarRequests.filter((r) => r.status === 'completed').length;
+    const dsarOverdue = dsarRequests.filter((r) => r.status === 'overdue').length;
+
+    function formatLocalDate(date: Date): string {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+
+        return `${year}-${month}-${day}`;
+    }
 
     function calcDueDate(): string {
         const today = new Date();
@@ -458,14 +860,14 @@ export default function Data() {
             const day = d.getDay();
             if (day !== 0 && day !== 6) added++;
         }
-        return d.toISOString().split('T')[0];
+        return formatLocalDate(d);
     }
 
     function calc72HourDeadline(discoveryDate: string): string {
         if (!discoveryDate) return '';
         const d = new Date(discoveryDate);
         d.setHours(d.getHours() + 72);
-        return d.toISOString().split('T')[0];
+        return formatLocalDate(d);
     }
 
     // -----------------------------------------------------------------------
@@ -481,13 +883,24 @@ export default function Data() {
                     <p className="mt-1 text-sm text-muted-foreground">Manage data exports, privacy requests, retention policies, and compliance settings.</p>
                 </div>
 
+                {statusMessage && (
+                    <Card className="mb-6">
+                        <CardContent
+                            dusk="data-status-message"
+                            className={`py-4 text-sm font-medium ${statusMessage.type === 'success' ? 'text-emerald-700' : 'text-red-700'}`}
+                        >
+                            {statusMessage.text}
+                        </CardContent>
+                    </Card>
+                )}
+
                 <TabsRoot defaultValue="export" className="space-y-6">
                     <TabsList className="w-full justify-start border-b bg-transparent p-0">
-                        <TabsTrigger value="export" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Database className="h-3.5 w-3.5" />Export & Import</TabsTrigger>
-                        <TabsTrigger value="requests" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Shield className="h-3.5 w-3.5" />Privacy Requests</TabsTrigger>
-                        <TabsTrigger value="retention" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Clock className="h-3.5 w-3.5" />Retention</TabsTrigger>
-                        <TabsTrigger value="compliance" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Landmark className="h-3.5 w-3.5" />Compliance</TabsTrigger>
-                        <TabsTrigger value="settings" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Settings className="h-3.5 w-3.5" />Settings</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-export" value="export" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Database className="h-3.5 w-3.5" />Export & Import</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-requests" value="requests" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Shield className="h-3.5 w-3.5" />Privacy Requests</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-retention" value="retention" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Clock className="h-3.5 w-3.5" />Retention</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-compliance" value="compliance" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Landmark className="h-3.5 w-3.5" />Compliance</TabsTrigger>
+                        <TabsTrigger dusk="data-tab-settings" value="settings" className="rounded-none gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600"><Settings className="h-3.5 w-3.5" />Settings</TabsTrigger>
                     </TabsList>
 
                 <TabsContent value="export" className="space-y-8">
@@ -637,49 +1050,68 @@ export default function Data() {
 
                             {/* Export button */}
                             <Button
+                                dusk="data-export-submit"
                                 onClick={handleExport}
-                                disabled={selectedModules.length === 0}
+                                disabled={!bulkExportAvailable || selectedModules.length === 0}
                                 className="bg-violet-600 hover:bg-violet-700"
                             >
                                 <Download className="mr-2 h-4 w-4" />
                                 Export Selected Data
                             </Button>
 
+                            {!bulkExportAvailable && (
+                                <div
+                                    dusk="data-export-unavailable"
+                                    className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                                >
+                                    Bulk export is not available from this screen yet. Use Privacy Requests for subject-level exports until the export queue is wired here.
+                                </div>
+                            )}
+
                             {/* Recent exports table */}
                             <div className="space-y-3 pt-2">
                                 <h4 className="text-sm font-medium">Recent Exports</h4>
-                                <div className="overflow-x-auto rounded-lg border">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/50">
-                                                <th className="px-4 py-2.5 text-left font-medium">Date</th>
-                                                <th className="px-4 py-2.5 text-left font-medium">Modules</th>
-                                                <th className="px-4 py-2.5 text-left font-medium">Format</th>
-                                                <th className="px-4 py-2.5 text-left font-medium">Size</th>
-                                                <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                                                <th className="px-4 py-2.5 text-right font-medium" />
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {recentExports.map((exp) => (
-                                                <tr key={exp.id} className="border-b last:border-0">
-                                                    <td className="whitespace-nowrap px-4 py-2.5">{exp.date}</td>
-                                                    <td className="px-4 py-2.5 text-muted-foreground">{exp.modules.join(', ')}</td>
-                                                    <td className="px-4 py-2.5">{exp.format}</td>
-                                                    <td className="px-4 py-2.5 tabular-nums">{exp.size}</td>
-                                                    <td className="px-4 py-2.5">{statusBadge(exp.status)}</td>
-                                                    <td className="px-4 py-2.5 text-right">
-                                                        {exp.status === 'completed' && (
-                                                            <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs text-violet-600">
-                                                                <Download className="mr-1 h-3 w-3" /> Download
-                                                            </Button>
-                                                        )}
-                                                    </td>
+                                {bulkExportAvailable ? (
+                                    <div className="overflow-x-auto rounded-lg border">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b bg-muted/50">
+                                                    <th className="px-4 py-2.5 text-left font-medium">Date</th>
+                                                    <th className="px-4 py-2.5 text-left font-medium">Modules</th>
+                                                    <th className="px-4 py-2.5 text-left font-medium">Format</th>
+                                                    <th className="px-4 py-2.5 text-left font-medium">Size</th>
+                                                    <th className="px-4 py-2.5 text-left font-medium">Status</th>
+                                                    <th className="px-4 py-2.5 text-right font-medium" />
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody>
+                                                {recentExports.map((exp) => (
+                                                    <tr key={exp.id} className="border-b last:border-0">
+                                                        <td className="whitespace-nowrap px-4 py-2.5">{exp.date}</td>
+                                                        <td className="px-4 py-2.5 text-muted-foreground">{exp.modules.join(', ')}</td>
+                                                        <td className="px-4 py-2.5">{exp.format}</td>
+                                                        <td className="px-4 py-2.5 tabular-nums">{exp.size}</td>
+                                                        <td className="px-4 py-2.5">{statusBadge(exp.status)}</td>
+                                                        <td className="px-4 py-2.5 text-right">
+                                                            {exp.status === 'completed' && (
+                                                                <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs text-violet-600">
+                                                                    <Download className="mr-1 h-3 w-3" /> Download
+                                                                </Button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div
+                                        dusk="data-export-history-unavailable"
+                                        className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground"
+                                    >
+                                        Recent export history will appear here once the bulk export queue is connected to this settings page.
+                                    </div>
+                                )}
                             </div>
 
                             {/* Privacy notice */}
@@ -728,13 +1160,28 @@ export default function Data() {
                                                 <p className="text-sm font-medium">{imp.title}</p>
                                                 <p className="mt-0.5 text-xs text-muted-foreground">{imp.description}</p>
                                             </div>
-                                            <Button variant="outline" size="sm" className="mt-1">
+                                            <Button
+                                                dusk={`data-import-${imp.id}`}
+                                                variant="outline"
+                                                size="sm"
+                                                className="mt-1"
+                                                disabled={!bulkImportAvailable}
+                                            >
                                                 <Upload className="mr-1.5 h-3 w-3" /> Choose File
                                             </Button>
                                         </div>
                                     );
                                 })}
                             </div>
+
+                            {!bulkImportAvailable && (
+                                <div
+                                    dusk="data-import-unavailable"
+                                    className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                                >
+                                    Bulk import is not yet available from this screen. The cards are shown for roadmap visibility, but upload flows are still pending backend wiring.
+                                </div>
+                            )}
 
                             <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
                                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -768,6 +1215,7 @@ export default function Data() {
                                     </div>
                                 </div>
                                 <Button
+                                    dusk="data-dsar-open"
                                     className="bg-violet-600 hover:bg-violet-700"
                                     onClick={() => setShowDsarDialog(true)}
                                 >
@@ -808,8 +1256,8 @@ export default function Data() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {placeholderDsarRequests.map((req) => (
-                                            <tr key={req.id} className="border-b last:border-0">
+                                            {dsarRequests.map((req) => (
+                                                <tr dusk={`data-dsar-row-${req.id}`} key={req.id} className="border-b last:border-0">
                                                 <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs">{req.id}</td>
                                                 <td className="px-4 py-2.5">
                                                     <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-400">
@@ -853,7 +1301,7 @@ export default function Data() {
                                         </CardDescription>
                                     </div>
                                 </div>
-                                <Button variant="destructive" onClick={() => setShowBreachDialog(true)}>
+                                <Button dusk="data-breach-open" variant="destructive" onClick={() => setShowBreachDialog(true)}>
                                     <ShieldAlert className="mr-2 h-4 w-4" />
                                     Report Breach
                                 </Button>
@@ -875,8 +1323,8 @@ export default function Data() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {placeholderBreaches.map((breach) => (
-                                            <tr key={breach.id} className="border-b last:border-0">
+                                            {breaches.map((breach) => (
+                                                <tr dusk={`data-breach-row-${breach.id}`} key={breach.id} className="border-b last:border-0">
                                                 <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs">{breach.id}</td>
                                                 <td className="whitespace-nowrap px-4 py-2.5">{breach.date}</td>
                                                 <td className="px-4 py-2.5">{breach.type}</td>
@@ -886,6 +1334,10 @@ export default function Data() {
                                                     {breach.commissionerNotified ? (
                                                         <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
                                                             <CheckCircle className="mr-1 h-3 w-3" /> Notified
+                                                        </Badge>
+                                                    ) : breach.commissionerNotificationRequired === false ? (
+                                                        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                                            Not required
                                                         </Badge>
                                                     ) : (
                                                         <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
@@ -952,15 +1404,15 @@ export default function Data() {
                                                             setRetentionValues((prev) => ({ ...prev, [row.id]: v }))
                                                         }
                                                     >
-                                                        <SelectTrigger className="h-8 w-44">
+                                                        <SelectTrigger dusk={`retention-${row.id}`} className="h-8 w-44">
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            {row.options.map((opt) => (
-                                                                <SelectItem key={opt.value} value={opt.value}>
-                                                                    {opt.label}
-                                                                </SelectItem>
-                                                            ))}
+                                                                    {row.options.map((opt) => (
+                                                                        <SelectItem dusk={`retention-${row.id}-${opt.value}`} key={opt.value} value={opt.value}>
+                                                                            {opt.label}
+                                                                        </SelectItem>
+                                                                    ))}
                                                         </SelectContent>
                                                     </Select>
                                                 </td>
@@ -973,7 +1425,14 @@ export default function Data() {
                                 </table>
                             </div>
 
-                            <Button className="bg-violet-600 hover:bg-violet-700">Save Retention Policies</Button>
+                            <Button
+                                dusk="data-save-retention"
+                                className="bg-violet-600 hover:bg-violet-700"
+                                onClick={saveRetentionPolicies}
+                                disabled={savingRetention}
+                            >
+                                {savingRetention ? 'Saving…' : 'Save Retention Policies'}
+                            </Button>
 
                             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1009,8 +1468,10 @@ export default function Data() {
                                     </p>
                                 </div>
                                 <Button
+                                    dusk="data-danger-purge-open"
                                     variant="outline"
                                     className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30"
+                                    disabled={!dangerZoneAvailable}
                                     onClick={() => setShowPurgeDialog(true)}
                                 >
                                     Purge Records
@@ -1026,8 +1487,10 @@ export default function Data() {
                                     </p>
                                 </div>
                                 <Button
+                                    dusk="data-danger-reset-demo"
                                     variant="outline"
                                     className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30"
+                                    disabled={!dangerZoneAvailable}
                                 >
                                     Reset Demo
                                 </Button>
@@ -1041,10 +1504,24 @@ export default function Data() {
                                         Permanently delete your entire organisation and all associated data
                                     </p>
                                 </div>
-                                <Button variant="destructive" onClick={() => setShowDeleteOrgDialog(true)}>
+                                <Button
+                                    dusk="data-danger-delete-org-open"
+                                    variant="destructive"
+                                    disabled={!dangerZoneAvailable}
+                                    onClick={() => setShowDeleteOrgDialog(true)}
+                                >
                                     Delete Organisation
                                 </Button>
                             </div>
+
+                            {!dangerZoneAvailable && (
+                                <div
+                                    dusk="data-danger-unavailable"
+                                    className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                                >
+                                    High-impact maintenance actions are not available from the web UI in this environment.
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -1119,6 +1596,7 @@ export default function Data() {
                                     <Label htmlFor="privacy-url">Privacy Policy URL</Label>
                                     <Input
                                         id="privacy-url"
+                                        dusk="data-privacy-url"
                                         value={privacyUrl}
                                         onChange={(e) => setPrivacyUrl(e.target.value)}
                                         placeholder="https://yourorganisation.co.nz/privacy"
@@ -1129,6 +1607,7 @@ export default function Data() {
                                     <Label htmlFor="dpo-name">Data Protection Officer</Label>
                                     <Input
                                         id="dpo-name"
+                                        dusk="data-privacy-dpo"
                                         value={dpoName}
                                         onChange={(e) => setDpoName(e.target.value)}
                                         placeholder="Name and contact details"
@@ -1139,6 +1618,7 @@ export default function Data() {
                                     <Label htmlFor="privacy-email">Privacy Officer Email</Label>
                                     <Input
                                         id="privacy-email"
+                                        dusk="data-privacy-email"
                                         type="email"
                                         value={privacyEmail}
                                         onChange={(e) => setPrivacyEmail(e.target.value)}
@@ -1148,7 +1628,14 @@ export default function Data() {
                                 </div>
                             </div>
 
-                            <Button className="bg-violet-600 hover:bg-violet-700">Save Privacy Settings</Button>
+                                <Button
+                                    dusk="data-save-privacy"
+                                    className="bg-violet-600 hover:bg-violet-700"
+                                    onClick={savePrivacySettings}
+                                    disabled={savingPrivacy}
+                                >
+                                    {savingPrivacy ? 'Saving…' : 'Save Privacy Settings'}
+                                </Button>
                         </CardContent>
                     </Card>
 
@@ -1227,13 +1714,13 @@ export default function Data() {
                                         Restrict where data can be stored and processed
                                     </p>
                                     <Select value={dataSovereignty} onValueChange={setDataSovereignty}>
-                                        <SelectTrigger className="w-56">
+                                        <SelectTrigger dusk="data-compliance-sovereignty" className="w-56">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="nz-only">New Zealand only</SelectItem>
-                                            <SelectItem value="au-nz">Australia & NZ</SelectItem>
-                                            <SelectItem value="none">No restriction</SelectItem>
+                                            <SelectItem dusk="data-compliance-sovereignty-nz-only" value="nz-only">New Zealand only</SelectItem>
+                                            <SelectItem dusk="data-compliance-sovereignty-au-nz" value="au-nz">Australia & NZ</SelectItem>
+                                            <SelectItem dusk="data-compliance-sovereignty-none" value="none">No restriction</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1249,6 +1736,7 @@ export default function Data() {
                                     </p>
                                     <Input
                                         id="health-custodian"
+                                        dusk="data-compliance-custodian"
                                         value={healthCustodian}
                                         onChange={(e) => setHealthCustodian(e.target.value)}
                                         placeholder="Full name"
@@ -1262,6 +1750,7 @@ export default function Data() {
                                     </p>
                                     <Input
                                         id="privacy-officer"
+                                        dusk="data-compliance-officer"
                                         value={privacyOfficer}
                                         onChange={(e) => setPrivacyOfficer(e.target.value)}
                                         placeholder="Full name"
@@ -1287,7 +1776,14 @@ export default function Data() {
                                 </span>
                             </div>
 
-                            <Button className="bg-violet-600 hover:bg-violet-700">Save Compliance Settings</Button>
+                            <Button
+                                dusk="data-save-compliance"
+                                className="bg-violet-600 hover:bg-violet-700"
+                                onClick={saveComplianceSettings}
+                                disabled={savingCompliance}
+                            >
+                                {savingCompliance ? 'Saving…' : 'Save Compliance Settings'}
+                            </Button>
                         </CardContent>
                     </Card>
 
@@ -1309,8 +1805,9 @@ export default function Data() {
                                     </div>
                                 </div>
                                 <Button
+                                    dusk="data-processor-open"
                                     className="bg-violet-600 hover:bg-violet-700"
-                                    onClick={() => setShowProcessorDialog(true)}
+                                    onClick={() => openProcessorDialog()}
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
                                     Add Processor
@@ -1319,8 +1816,9 @@ export default function Data() {
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                {placeholderProcessors.map((proc) => (
+                                {processors.map((proc) => (
                                     <div
+                                        dusk={`data-processor-row-${proc.id}`}
                                         key={proc.id}
                                         className={`rounded-lg border p-4 ${proc.overdue ? 'border-red-200 dark:border-red-900' : ''}`}
                                     >
@@ -1357,10 +1855,23 @@ export default function Data() {
                                                 </p>
                                             </div>
                                             <div className="flex gap-2">
-                                                <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs text-violet-600">
+                                                <Button
+                                                    dusk={`data-processor-edit-${proc.id}`}
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-auto px-2 py-1 text-xs text-violet-600"
+                                                    onClick={() => openProcessorDialog(proc)}
+                                                >
                                                     Edit
                                                 </Button>
-                                                <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs text-red-600">
+                                                <Button
+                                                    dusk={`data-processor-remove-${proc.id}`}
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-auto px-2 py-1 text-xs text-red-600"
+                                                    onClick={() => removeProcessor(proc.id)}
+                                                    disabled={removingProcessorId === proc.id}
+                                                >
                                                     Remove
                                                 </Button>
                                             </div>
@@ -1468,7 +1979,16 @@ export default function Data() {
                 </Dialog>
 
                 {/* DSAR New Request dialog */}
-                <Dialog open={showDsarDialog} onOpenChange={setShowDsarDialog}>
+                <Dialog
+                    open={showDsarDialog}
+                    onOpenChange={(open) => {
+                        setShowDsarDialog(open);
+
+                        if (!open) {
+                            resetDsarForm();
+                        }
+                    }}
+                >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
                             <DialogTitle>New Data Subject Access Request</DialogTitle>
@@ -1481,16 +2001,16 @@ export default function Data() {
                             <div>
                                 <Label>Request Type</Label>
                                 <Select value={dsarType} onValueChange={setDsarType}>
-                                    <SelectTrigger className="mt-1">
+                                    <SelectTrigger dusk="data-dsar-type" className="mt-1">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="access">Access</SelectItem>
-                                        <SelectItem value="correction">Correction</SelectItem>
-                                        <SelectItem value="erasure">Erasure</SelectItem>
-                                        <SelectItem value="restriction">Restriction</SelectItem>
-                                        <SelectItem value="portability">Portability</SelectItem>
-                                        <SelectItem value="objection">Objection</SelectItem>
+                                        <SelectItem dusk="data-dsar-type-access" value="access">Access</SelectItem>
+                                        <SelectItem dusk="data-dsar-type-rectification" value="rectification">Correction</SelectItem>
+                                        <SelectItem dusk="data-dsar-type-erasure" value="erasure">Erasure</SelectItem>
+                                        <SelectItem dusk="data-dsar-type-restriction" value="restriction">Restriction</SelectItem>
+                                        <SelectItem dusk="data-dsar-type-portability" value="portability">Portability</SelectItem>
+                                        <SelectItem dusk="data-dsar-type-objection" value="objection">Objection</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -1500,6 +2020,7 @@ export default function Data() {
                                     <Label htmlFor="dsar-name">Requester Name</Label>
                                     <Input
                                         id="dsar-name"
+                                        dusk="data-dsar-name"
                                         value={dsarRequesterName}
                                         onChange={(e) => setDsarRequesterName(e.target.value)}
                                         placeholder="Full name"
@@ -1510,6 +2031,7 @@ export default function Data() {
                                     <Label htmlFor="dsar-email">Email</Label>
                                     <Input
                                         id="dsar-email"
+                                        dusk="data-dsar-email"
                                         type="email"
                                         value={dsarRequesterEmail}
                                         onChange={(e) => setDsarRequesterEmail(e.target.value)}
@@ -1524,6 +2046,7 @@ export default function Data() {
                                     <Label htmlFor="dsar-phone">Phone</Label>
                                     <Input
                                         id="dsar-phone"
+                                        dusk="data-dsar-phone"
                                         value={dsarRequesterPhone}
                                         onChange={(e) => setDsarRequesterPhone(e.target.value)}
                                         placeholder="021 XXX XXXX"
@@ -1533,14 +2056,14 @@ export default function Data() {
                                 <div>
                                     <Label>Relationship</Label>
                                     <Select value={dsarRelationship} onValueChange={setDsarRelationship}>
-                                        <SelectTrigger className="mt-1">
+                                        <SelectTrigger dusk="data-dsar-relationship" className="mt-1">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="self">Self</SelectItem>
-                                            <SelectItem value="whanau">Wh&#257;nau / Family</SelectItem>
-                                            <SelectItem value="legal_rep">Legal Representative</SelectItem>
-                                            <SelectItem value="advocate">Advocate</SelectItem>
+                                            <SelectItem dusk="data-dsar-relationship-self" value="self">Self</SelectItem>
+                                            <SelectItem dusk="data-dsar-relationship-whanau" value="whanau">Wh&#257;nau / Family</SelectItem>
+                                            <SelectItem dusk="data-dsar-relationship-legal-rep" value="legal_rep">Legal Representative</SelectItem>
+                                            <SelectItem dusk="data-dsar-relationship-advocate" value="advocate">Advocate</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1550,6 +2073,7 @@ export default function Data() {
                                 <Label htmlFor="dsar-details">Details</Label>
                                 <Textarea
                                     id="dsar-details"
+                                    dusk="data-dsar-details"
                                     value={dsarDetails}
                                     onChange={(e) => setDsarDetails(e.target.value)}
                                     placeholder="Describe the request..."
@@ -1565,7 +2089,7 @@ export default function Data() {
                                         Confirm the requester's identity has been verified
                                     </p>
                                 </div>
-                                <Switch checked={dsarIdentityVerified} onCheckedChange={setDsarIdentityVerified} />
+                                <Switch dusk="data-dsar-identity" checked={dsarIdentityVerified} onCheckedChange={setDsarIdentityVerified} />
                             </div>
 
                             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
@@ -1579,24 +2103,28 @@ export default function Data() {
                                 Cancel
                             </Button>
                             <Button
+                                dusk="data-dsar-submit"
                                 className="bg-violet-600 hover:bg-violet-700"
-                                onClick={() => {
-                                    setShowDsarDialog(false);
-                                    setDsarRequesterName('');
-                                    setDsarRequesterEmail('');
-                                    setDsarRequesterPhone('');
-                                    setDsarDetails('');
-                                    setDsarIdentityVerified(false);
-                                }}
+                                onClick={createDsarRequest}
+                                disabled={submittingDsar}
                             >
-                                Create Request
+                                {submittingDsar ? 'Creating…' : 'Create Request'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
 
                 {/* Data Breach Report dialog */}
-                <Dialog open={showBreachDialog} onOpenChange={setShowBreachDialog}>
+                <Dialog
+                    open={showBreachDialog}
+                    onOpenChange={(open) => {
+                        setShowBreachDialog(open);
+
+                        if (!open) {
+                            resetBreachForm();
+                        }
+                    }}
+                >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
                             <DialogTitle className="text-red-600">Report Data Breach</DialogTitle>
@@ -1609,29 +2137,29 @@ export default function Data() {
                                 <div>
                                     <Label>Breach Type</Label>
                                     <Select value={breachType} onValueChange={setBreachType}>
-                                        <SelectTrigger className="mt-1">
+                                        <SelectTrigger dusk="data-breach-type" className="mt-1">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="unauthorised_access">Unauthorised access</SelectItem>
-                                            <SelectItem value="data_loss">Data loss</SelectItem>
-                                            <SelectItem value="system_compromise">System compromise</SelectItem>
-                                            <SelectItem value="employee_error">Employee error</SelectItem>
-                                            <SelectItem value="third_party">Third-party breach</SelectItem>
+                                            <SelectItem dusk="data-breach-type-unauthorised-access" value="unauthorised_access">Unauthorised access</SelectItem>
+                                            <SelectItem dusk="data-breach-type-data-loss" value="data_loss">Data loss</SelectItem>
+                                            <SelectItem dusk="data-breach-type-system-compromise" value="system_compromise">System compromise</SelectItem>
+                                            <SelectItem dusk="data-breach-type-employee-error" value="employee_error">Employee error</SelectItem>
+                                            <SelectItem dusk="data-breach-type-third-party" value="third_party">Third-party breach</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div>
                                     <Label>Severity</Label>
                                     <Select value={breachSeverity} onValueChange={setBreachSeverity}>
-                                        <SelectTrigger className="mt-1">
+                                        <SelectTrigger dusk="data-breach-severity" className="mt-1">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="low">Low</SelectItem>
-                                            <SelectItem value="medium">Medium</SelectItem>
-                                            <SelectItem value="high">High</SelectItem>
-                                            <SelectItem value="critical">Critical</SelectItem>
+                                            <SelectItem dusk="data-breach-severity-low" value="low">Low</SelectItem>
+                                            <SelectItem dusk="data-breach-severity-medium" value="medium">Medium</SelectItem>
+                                            <SelectItem dusk="data-breach-severity-high" value="high">High</SelectItem>
+                                            <SelectItem dusk="data-breach-severity-critical" value="critical">Critical</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1641,6 +2169,7 @@ export default function Data() {
                                 <Label htmlFor="breach-desc">Description</Label>
                                 <Textarea
                                     id="breach-desc"
+                                    dusk="data-breach-description"
                                     value={breachDescription}
                                     onChange={(e) => setBreachDescription(e.target.value)}
                                     placeholder="Describe what happened..."
@@ -1669,6 +2198,7 @@ export default function Data() {
                                     <Label htmlFor="breach-individuals">Number of individuals affected</Label>
                                     <Input
                                         id="breach-individuals"
+                                        dusk="data-breach-individuals"
                                         type="number"
                                         value={breachIndividuals}
                                         onChange={(e) => setBreachIndividuals(e.target.value)}
@@ -1680,6 +2210,7 @@ export default function Data() {
                                     <Label htmlFor="breach-discovery">Discovery date</Label>
                                     <Input
                                         id="breach-discovery"
+                                        dusk="data-breach-discovery"
                                         type="date"
                                         value={breachDiscoveryDate}
                                         onChange={(e) => setBreachDiscoveryDate(e.target.value)}
@@ -1697,11 +2228,11 @@ export default function Data() {
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between gap-4">
                                     <p className="text-sm font-medium">Notified Privacy Commissioner</p>
-                                    <Switch checked={breachCommissionerNotified} onCheckedChange={setBreachCommissionerNotified} />
+                                    <Switch dusk="data-breach-commissioner" checked={breachCommissionerNotified} onCheckedChange={setBreachCommissionerNotified} />
                                 </div>
                                 <div className="flex items-center justify-between gap-4">
                                     <p className="text-sm font-medium">Notified affected individuals</p>
-                                    <Switch checked={breachIndividualsNotified} onCheckedChange={setBreachIndividualsNotified} />
+                                    <Switch dusk="data-breach-individuals-notified" checked={breachIndividualsNotified} onCheckedChange={setBreachIndividualsNotified} />
                                 </div>
                             </div>
                         </div>
@@ -1710,28 +2241,31 @@ export default function Data() {
                                 Cancel
                             </Button>
                             <Button
+                                dusk="data-breach-submit"
                                 variant="destructive"
-                                onClick={() => {
-                                    setShowBreachDialog(false);
-                                    setBreachDescription('');
-                                    setBreachDataTypes([]);
-                                    setBreachIndividuals('');
-                                    setBreachDiscoveryDate('');
-                                    setBreachCommissionerNotified(false);
-                                    setBreachIndividualsNotified(false);
-                                }}
+                                onClick={createBreach}
+                                disabled={submittingBreach}
                             >
-                                Report Breach
+                                {submittingBreach ? 'Reporting…' : 'Report Breach'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
 
                 {/* Add Processor dialog */}
-                <Dialog open={showProcessorDialog} onOpenChange={setShowProcessorDialog}>
+                <Dialog
+                    open={showProcessorDialog}
+                    onOpenChange={(open) => {
+                        setShowProcessorDialog(open);
+
+                        if (!open) {
+                            resetProcessorForm();
+                        }
+                    }}
+                >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
-                            <DialogTitle>Add Third-Party Data Processor</DialogTitle>
+                            <DialogTitle>{editingProcessorId ? 'Edit Third-Party Data Processor' : 'Add Third-Party Data Processor'}</DialogTitle>
                             <DialogDescription>
                                 Register a third party that processes personal data on behalf of your organisation.
                             </DialogDescription>
@@ -1742,6 +2276,7 @@ export default function Data() {
                                     <Label htmlFor="proc-company">Company Name</Label>
                                     <Input
                                         id="proc-company"
+                                        dusk="data-processor-company"
                                         value={processorCompany}
                                         onChange={(e) => setProcessorCompany(e.target.value)}
                                         placeholder="Company name"
@@ -1752,6 +2287,7 @@ export default function Data() {
                                     <Label htmlFor="proc-contact">Contact Name</Label>
                                     <Input
                                         id="proc-contact"
+                                        dusk="data-processor-contact"
                                         value={processorContact}
                                         onChange={(e) => setProcessorContact(e.target.value)}
                                         placeholder="Contact person"
@@ -1764,6 +2300,7 @@ export default function Data() {
                                 <Label htmlFor="proc-email">Email</Label>
                                 <Input
                                     id="proc-email"
+                                    dusk="data-processor-email"
                                     type="email"
                                     value={processorEmail}
                                     onChange={(e) => setProcessorEmail(e.target.value)}
@@ -1775,18 +2312,18 @@ export default function Data() {
                             <div>
                                 <Label>Processing Purpose</Label>
                                 <Select value={processorPurpose} onValueChange={setProcessorPurpose}>
-                                    <SelectTrigger className="mt-1">
+                                    <SelectTrigger dusk="data-processor-purpose" className="mt-1">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="sso">SSO / Authentication</SelectItem>
-                                        <SelectItem value="email">Email delivery</SelectItem>
-                                        <SelectItem value="sms">SMS delivery</SelectItem>
-                                        <SelectItem value="cloud_hosting">Cloud hosting</SelectItem>
-                                        <SelectItem value="backup">Backup</SelectItem>
-                                        <SelectItem value="analytics">Analytics</SelectItem>
-                                        <SelectItem value="payroll">Payroll integration</SelectItem>
-                                        <SelectItem value="calendar">Calendar sync</SelectItem>
+                                        <SelectItem dusk="data-processor-purpose-sso" value="sso">SSO / Authentication</SelectItem>
+                                        <SelectItem dusk="data-processor-purpose-email" value="email">Email delivery</SelectItem>
+                                        <SelectItem dusk="data-processor-purpose-sms" value="sms">SMS delivery</SelectItem>
+                                        <SelectItem dusk="data-processor-purpose-cloud-hosting" value="cloud_hosting">Cloud hosting</SelectItem>
+                                        <SelectItem dusk="data-processor-purpose-backup" value="backup">Backup</SelectItem>
+                                        <SelectItem dusk="data-processor-purpose-analytics" value="analytics">Analytics</SelectItem>
+                                        <SelectItem dusk="data-processor-purpose-payroll" value="payroll">Payroll integration</SelectItem>
+                                        <SelectItem dusk="data-processor-purpose-calendar" value="calendar">Calendar sync</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -1810,29 +2347,29 @@ export default function Data() {
                                 <div>
                                     <Label>Agreement Type</Label>
                                     <Select value={processorAgreement} onValueChange={setProcessorAgreement}>
-                                        <SelectTrigger className="mt-1">
+                                        <SelectTrigger dusk="data-processor-agreement" className="mt-1">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="dpa_signed">DPA signed</SelectItem>
-                                            <SelectItem value="standard_terms">Standard terms</SelectItem>
-                                            <SelectItem value="negotiating">Under negotiation</SelectItem>
-                                            <SelectItem value="no_agreement">No agreement</SelectItem>
+                                            <SelectItem dusk="data-processor-agreement-dpa-signed" value="dpa_signed">DPA signed</SelectItem>
+                                            <SelectItem dusk="data-processor-agreement-standard-terms" value="standard_terms">Standard terms</SelectItem>
+                                            <SelectItem dusk="data-processor-agreement-negotiating" value="negotiating">Under negotiation</SelectItem>
+                                            <SelectItem dusk="data-processor-agreement-no-agreement" value="no_agreement">No agreement</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div>
                                     <Label>Country</Label>
                                     <Select value={processorCountry} onValueChange={setProcessorCountry}>
-                                        <SelectTrigger className="mt-1">
+                                        <SelectTrigger dusk="data-processor-country" className="mt-1">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="nz">New Zealand</SelectItem>
-                                            <SelectItem value="au">Australia</SelectItem>
-                                            <SelectItem value="us">USA</SelectItem>
-                                            <SelectItem value="uk">UK</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
+                                            <SelectItem dusk="data-processor-country-nz" value="nz">New Zealand</SelectItem>
+                                            <SelectItem dusk="data-processor-country-au" value="au">Australia</SelectItem>
+                                            <SelectItem dusk="data-processor-country-us" value="us">USA</SelectItem>
+                                            <SelectItem dusk="data-processor-country-uk" value="uk">UK</SelectItem>
+                                            <SelectItem dusk="data-processor-country-other" value="other">Other</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1842,6 +2379,7 @@ export default function Data() {
                                 <Label htmlFor="proc-review">Review Date</Label>
                                 <Input
                                     id="proc-review"
+                                    dusk="data-processor-review"
                                     type="date"
                                     value={processorReviewDate}
                                     onChange={(e) => setProcessorReviewDate(e.target.value)}
@@ -1854,17 +2392,12 @@ export default function Data() {
                                 Cancel
                             </Button>
                             <Button
+                                dusk="data-processor-submit"
                                 className="bg-violet-600 hover:bg-violet-700"
-                                onClick={() => {
-                                    setShowProcessorDialog(false);
-                                    setProcessorCompany('');
-                                    setProcessorContact('');
-                                    setProcessorEmail('');
-                                    setProcessorDataCategories([]);
-                                    setProcessorReviewDate('');
-                                }}
+                                onClick={submitProcessor}
+                                disabled={submittingProcessor}
                             >
-                                Add Processor
+                                {submittingProcessor ? 'Saving…' : editingProcessorId ? 'Save Processor' : 'Add Processor'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

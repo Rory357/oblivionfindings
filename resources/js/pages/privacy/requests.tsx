@@ -178,6 +178,10 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                         const daysRemaining = getDaysRemaining(request.extended_due_date || request.due_date);
                         const isOverdue = daysRemaining < 0;
                         const isDueSoon = daysRemaining >= 0 && daysRemaining <= 7;
+                        const isIdentityVerified = request.identity_verified === 'verified'
+                            || request.identity_verified === true
+                            || request.identity_verified === 1
+                            || request.identity_verified === '1';
 
                         return (
                             <Card key={request.id}>
@@ -208,7 +212,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                                             {daysRemaining} days remaining
                                                         </Badge>
                                                     )}
-                                                    {request.identity_verified && (
+                                                    {isIdentityVerified && (
                                                         <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
                                                             Identity Verified
                                                         </Badge>

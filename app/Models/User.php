@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'organization_id',
 
         // Keep this while you migrate off users.role
         // (You already reference auth.user.role in React)
@@ -35,6 +36,8 @@ class User extends Authenticatable
         'profile_photo_path',
         'cellphone',
         'work_phone',
+        'last_seen_at',
+        'presence_status',
         'timezone',
         'date_format',
         'time_format',
@@ -67,6 +70,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'approved_at' => 'datetime',
+            'last_seen_at' => 'datetime',
         ];
     }
 
@@ -114,6 +118,17 @@ class User extends Authenticatable
         return $this->profile_photo_url;
     }
 
+    public function getOrganizationIdAttribute($value): ?int
+    {
+        if (array_key_exists('organization_id', $this->attributes)) {
+            return $value === null ? null : (int) $value;
+        }
+
+        // A number of domain controllers still scope records by organization_id,
+        // while lighter local schemas do not add the column to users.
+        return 1;
+    }
+
     // ---------------------------
     // Existing relationship
     // ---------------------------
@@ -136,6 +151,11 @@ class User extends Authenticatable
         return $this->belongsToMany(\App\Models\Client::class, 'client_portal_users')
             ->withPivot('relation')
             ->withTimestamps();
+    }
+
+    public function identities()
+    {
+        return $this->hasMany(\App\Models\Identity::class);
     }
 
     public function canAccessClientPortal(\App\Models\Client $client): bool

@@ -64,16 +64,19 @@ class QualificationMatchController extends Controller
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
             'qualification_name' => ['required', 'string', 'max:255'],
+            'qualification_type' => ['nullable', 'string', 'max:100'],
             'is_mandatory' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
+            'description' => ['nullable', 'string'],
         ]);
 
         StaffQualificationRequirement::create([
             'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
             'qualification_name' => $data['qualification_name'],
+            'qualification_type' => $data['qualification_type'] ?? 'certification',
             'is_mandatory' => $data['is_mandatory'] ?? true,
-            'notes' => $data['notes'] ?? null,
+            'description' => $data['description'] ?? $data['notes'] ?? null,
         ]);
 
         return redirect()->back()->with('success', 'Qualification requirement added.');
@@ -90,11 +93,18 @@ class QualificationMatchController extends Controller
 
         $data = $request->validate([
             'qualification_name' => ['sometimes', 'required', 'string', 'max:255'],
+            'qualification_type' => ['nullable', 'string', 'max:100'],
             'is_mandatory' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
+            'description' => ['nullable', 'string'],
         ]);
 
-        $requirement->update($data);
+        $requirement->update(array_filter([
+            'qualification_name' => $data['qualification_name'] ?? null,
+            'qualification_type' => $data['qualification_type'] ?? null,
+            'is_mandatory' => $data['is_mandatory'] ?? null,
+            'description' => $data['description'] ?? $data['notes'] ?? null,
+        ], fn ($value) => $value !== null));
 
         return redirect()->back()->with('success', 'Qualification requirement updated.');
     }
@@ -120,7 +130,7 @@ class QualificationMatchController extends Controller
 
         $shift = Shift::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['staff.trainingRecords', 'staff.credentials', 'client'])
+            ->with(['staff.staffTrainingRecords', 'staff.staffCredentials', 'client'])
             ->findOrFail($shift);
 
         $requirements = StaffQualificationRequirement::query()
@@ -132,8 +142,8 @@ class QualificationMatchController extends Controller
         foreach ($requirements as $req) {
             $met = false;
             if ($shift->staff) {
-                $met = $shift->staff->credentials()
-                    ->where('name', $req->qualification_name)
+                $met = $shift->staff->staffCredentials()
+                    ->where('type', $req->qualification_name)
                     ->where(function ($q) {
                         $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
                     })

@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -158,8 +158,13 @@ const eventFilterCategories: Record<string, string[]> = {
 };
 
 export default function UserShow({ user, allRoles = [], login_logs = [], active_sessions = [], login_stats }: Props) {
+    const page = usePage<{ auth?: { user?: { id?: number } } }>();
     const u = user ?? ({} as any);
     const roles: Role[] = u.roles ?? [];
+    const currentUserId = page.props.auth?.user?.id;
+    const isSystemView = page.url.startsWith('/system/users');
+    const usersBasePath = isSystemView ? '/system/users' : '/settings/users';
+    const isSelf = currentUserId === u.id;
     const initials = (u.name ?? '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
     const [showAddRole, setShowAddRole] = useState(false);
     const assignedIds = new Set(roles.map((r: Role) => r.id));
@@ -171,19 +176,22 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
         ? login_logs
         : login_logs.filter((log) => eventFilterCategories[eventFilter]?.includes(log.event_type));
 
-    const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Settings', href: '/settings' },
-        { title: 'Users', href: '/settings/users' },
-        { title: u.name ?? 'User', href: `/settings/users/${u.id}` },
-    ];
+    const breadcrumbs: BreadcrumbItem[] = isSystemView
+        ? [
+              { title: 'Dashboard', href: '/dashboard' },
+              { title: 'System Users', href: usersBasePath },
+              { title: u.name ?? 'User', href: `${usersBasePath}/${u.id}` },
+          ]
+        : [
+              { title: 'Settings', href: '/settings' },
+              { title: 'Users', href: usersBasePath },
+              { title: u.name ?? 'User', href: `${usersBasePath}/${u.id}` },
+          ];
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`${u.name ?? 'User'} — Settings`} />
-            <SettingsLayout>
-                <div className="space-y-6">
+    const content = (
+        <div className="space-y-6">
                     {/* Back link */}
-                    <Link href="/settings/users" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+                    <Link dusk="user-back-link" href={usersBasePath} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
                         <ArrowLeft className="h-4 w-4" /> Back to Users
                     </Link>
 
@@ -213,14 +221,22 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                    {!u.is_active && (
-                                        <Button size="sm" onClick={() => router.post(`/settings/users/${u.id}/approve`, {}, { preserveScroll: true })}>
+                                    {!u.is_active && !isSelf && (
+                                        <Button
+                                            size="sm"
+                                            dusk="user-approve-action"
+                                            onClick={() => router.post(`${usersBasePath}/${u.id}/approve`, {}, { preserveScroll: true })}
+                                        >
                                             <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Approve
                                         </Button>
                                     )}
-                                    {u.is_active && (
-                                        <Button size="sm" variant="outline" className="text-amber-600 border-amber-300 hover:bg-amber-50"
-                                            onClick={() => router.post(`/settings/users/${u.id}/suspend`, {}, { preserveScroll: true })}>
+                                    {u.is_active && !isSelf && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            dusk="user-suspend-action"
+                                            className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                                            onClick={() => router.post(`${usersBasePath}/${u.id}/suspend`, {}, { preserveScroll: true })}>
                                             <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> Suspend
                                         </Button>
                                     )}
@@ -330,7 +346,13 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                     <CardDescription>Assign or remove roles for this user</CardDescription>
                                                 </div>
                                                 {availableRoles.length > 0 && (
-                                                    <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowAddRole(!showAddRole)}>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        dusk="user-role-add-toggle"
+                                                        className="gap-1"
+                                                        onClick={() => setShowAddRole(!showAddRole)}
+                                                    >
                                                         <Plus className="h-3.5 w-3.5" /> Add
                                                     </Button>
                                                 )}
@@ -343,9 +365,10 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                     {availableRoles.map((role) => (
                                                         <button
                                                             key={role.id}
+                                                            dusk={`user-role-assign-${role.id}`}
                                                             onClick={() => {
                                                                 const newIds = [...Array.from(assignedIds), role.id];
-                                                                router.put(`/settings/users/${u.id}/roles`, { role_ids: newIds }, { preserveScroll: true });
+                                                                router.put(`${usersBasePath}/${u.id}`, { role_ids: newIds }, { preserveScroll: true });
                                                                 setShowAddRole(false);
                                                             }}
                                                             className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
@@ -366,10 +389,11 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                                 <span className="text-sm font-medium">{role.label || role.name}</span>
                                                             </div>
                                                             <button
-                                                                onClick={() => {
-                                                                    const newIds = Array.from(assignedIds).filter(id => id !== role.id);
-                                                                    router.put(`/settings/users/${u.id}/roles`, { role_ids: newIds }, { preserveScroll: true });
-                                                                }}
+                                                            dusk={`user-role-remove-${role.id}`}
+                                                            onClick={() => {
+                                                                const newIds = Array.from(assignedIds).filter(id => id !== role.id);
+                                                                router.put(`${usersBasePath}/${u.id}`, { role_ids: newIds }, { preserveScroll: true });
+                                                            }}
                                                                 className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"
                                                                 title="Remove role"
                                                             >
@@ -504,7 +528,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                     <Button
                                         size="sm"
                                         variant="destructive"
-                                        onClick={() => router.delete(`/settings/users/${u.id}/sessions`, { preserveScroll: true })}
+                                        onClick={() => router.delete(`${usersBasePath}/${u.id}/sessions`, { preserveScroll: true })}
                                     >
                                         <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                                         Terminate All Other Sessions
@@ -559,7 +583,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                         size="sm"
                                                         variant="outline"
                                                         className="text-red-600 border-red-300 hover:bg-red-50"
-                                                        onClick={() => router.delete(`/settings/users/${u.id}/sessions/${session.id}`, { preserveScroll: true })}
+                                                        onClick={() => router.delete(`${usersBasePath}/${u.id}/sessions/${session.id}`, { preserveScroll: true })}
                                                     >
                                                         Terminate
                                                     </Button>
@@ -676,8 +700,13 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                             </TabsContent>
                         )}
                     </Tabs>
-                </div>
-            </SettingsLayout>
+        </div>
+    );
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={`${u.name ?? 'User'} — ${isSystemView ? 'System' : 'Settings'}`} />
+            {isSystemView ? content : <SettingsLayout>{content}</SettingsLayout>}
         </AppLayout>
     );
 }

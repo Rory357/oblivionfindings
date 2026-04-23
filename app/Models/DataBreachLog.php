@@ -14,6 +14,8 @@ class DataBreachLog extends Model
 
     protected $fillable = [
         'breach_reference',
+        'breach_type',
+        'severity',
         'discovered_at',
         'discovered_by_user_id',
         'nature_of_breach',

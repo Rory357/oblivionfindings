@@ -203,6 +203,16 @@ export default function AuditLogs({
     const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
     const allData = events?.data ?? [];
+    const exportParams = new URLSearchParams();
+
+    if (search) exportParams.set('search', search);
+    if (userFilter !== 'all') exportParams.set('user', userFilter);
+    if (moduleFilter !== 'all') exportParams.set('module', moduleFilter);
+    if (actionFilter !== 'all') exportParams.set('action', actionFilter);
+    if (dateFrom) exportParams.set('date_from', dateFrom);
+    if (dateTo) exportParams.set('date_to', dateTo);
+
+    const exportHref = `/settings/audit-logs/export${exportParams.toString() ? `?${exportParams.toString()}` : ''}`;
 
     function applyFilters(overrides: Record<string, string> = {}) {
         router.get(
@@ -245,9 +255,11 @@ export default function AuditLogs({
                         title="Audit Logs"
                         description="Track all changes made across the system"
                         actions={
-                            <Button variant="outline">
-                                <Download className="mr-2 h-4 w-4" />
-                                Export CSV
+                            <Button variant="outline" asChild>
+                                <a href={exportHref} dusk="audit-export-link">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Export CSV
+                                </a>
                             </Button>
                         }
                     />
@@ -282,6 +294,7 @@ export default function AuditLogs({
                                     <div className="relative flex-1">
                                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                         <Input
+                                            dusk="audit-search"
                                             placeholder="Search audit events..."
                                             value={search}
                                             onChange={(e) => setSearch(e.target.value)}

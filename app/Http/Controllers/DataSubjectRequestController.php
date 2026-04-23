@@ -95,9 +95,9 @@ class DataSubjectRequestController extends Controller
     /**
      * Display the specified request.
      */
-    public function show(DataSubjectRequest $request): Response
+    public function show(DataSubjectRequest $dsRequest): Response
     {
-        $request->load([
+        $dsRequest->load([
             'client',
             'user',
             'verifiedBy',
@@ -106,7 +106,7 @@ class DataSubjectRequestController extends Controller
         ]);
 
         return Inertia::render('privacy/requests/show', [
-            'request' => $request,
+            'request' => $dsRequest,
             'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
     }
@@ -143,7 +143,7 @@ class DataSubjectRequestController extends Controller
         ]);
 
         $dsRequest->update([
-            'identity_verified' => true,
+            'identity_verified' => 'verified',
             'identity_verified_at' => now(),
             'verified_by_user_id' => auth()->id(),
             'verification_method' => $request->verification_method,
@@ -217,23 +217,22 @@ class DataSubjectRequestController extends Controller
     /**
      * Export the request data.
      */
-    public function export(DataSubjectRequest $request)
+    public function export(DataSubjectRequest $dsRequest)
     {
-        $dsr = $request;
-        $dsr->load(['client', 'user']);
+        $dsRequest->load(['client', 'user']);
 
         $data = [
             'export_metadata' => [
-                'reference_number' => $dsr->reference_number,
-                'request_type' => $dsr->request_type,
+                'reference_number' => $dsRequest->reference_number,
+                'request_type' => $dsRequest->request_type,
                 'generated_at' => now()->toIso8601String(),
                 'generated_by' => auth()->user()->name ?? 'System',
             ],
         ];
 
         // Collect data based on whether this is a client or user request
-        if ($dsr->client_id && $dsr->client) {
-            $client = $dsr->client;
+        if ($dsRequest->client_id && $dsRequest->client) {
+            $client = $dsRequest->client;
 
             $data['personal_information'] = [
                 'name' => $client->first_name . ' ' . $client->last_name,
@@ -312,8 +311,8 @@ class DataSubjectRequestController extends Controller
                 'expires_at' => $consent->expires_at?->format('Y-m-d'),
             ])->toArray();
 
-        } elseif ($dsr->user_id && $dsr->user) {
-            $user = $dsr->user;
+        } elseif ($dsRequest->user_id && $dsRequest->user) {
+            $user = $dsRequest->user;
 
             $data['personal_information'] = [
                 'name' => $user->name,
@@ -321,26 +320,26 @@ class DataSubjectRequestController extends Controller
             ];
         } else {
             $data['personal_information'] = [
-                'subject_name' => $dsr->subject_name,
-                'subject_email' => $dsr->subject_email,
+                'subject_name' => $dsRequest->subject_name,
+                'subject_email' => $dsRequest->subject_email,
                 'note' => 'No linked client or user record found. Only request metadata is available.',
             ];
         }
 
         $data['request_details'] = [
-            'request_type' => $dsr->request_type,
-            'request_details' => $dsr->request_details,
-            'specific_data_requested' => $dsr->specific_data_requested,
-            'status' => $dsr->status,
-            'received_at' => $dsr->received_at?->format('Y-m-d'),
-            'due_date' => $dsr->due_date?->format('Y-m-d'),
+            'request_type' => $dsRequest->request_type,
+            'request_details' => $dsRequest->request_details,
+            'specific_data_requested' => $dsRequest->specific_data_requested,
+            'status' => $dsRequest->status,
+            'received_at' => $dsRequest->received_at?->format('Y-m-d'),
+            'due_date' => $dsRequest->due_date?->format('Y-m-d'),
         ];
 
-        $filename = 'dsr-' . $dsr->reference_number . '-' . now()->format('Y-m-d') . '.json';
+        $filename = 'dsr-' . $dsRequest->reference_number . '-' . now()->format('Y-m-d') . '.json';
         $path = 'private/dsr-exports/' . $filename;
         Storage::disk('local')->put($path, json_encode($data, JSON_PRETTY_PRINT));
 
-        $dsr->update([
+        $dsRequest->update([
             'export_path' => $path,
             'export_generated_at' => now(),
         ]);

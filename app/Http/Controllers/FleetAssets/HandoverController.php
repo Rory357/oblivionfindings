@@ -42,7 +42,7 @@ class HandoverController extends Controller
 
         $query = FleetShiftHandover::query()
             ->with([
-                'asset:id,name,registration_number,site_id,home_site_id',
+                'asset' => fn ($assetQuery) => $assetQuery->select($this->handoverAssetColumns()),
                 'outgoingUser:id,name',
                 'incomingUser:id,name',
             ]);
@@ -123,7 +123,7 @@ class HandoverController extends Controller
         $this->applyAssetSiteScope($vehicleQuery, $auth, $siteAccess);
 
         $vehicles = $vehicleQuery
-            ->get(['id', 'name', 'registration_number'])
+            ->get($this->vehicleOptionColumns())
             ->map(fn ($a) => [
                 'id' => $a->id,
                 'name' => $a->name,
@@ -216,7 +216,7 @@ class HandoverController extends Controller
         );
 
         $handover->load([
-            'asset:id,name,registration_number',
+            'asset' => fn ($assetQuery) => $assetQuery->select($this->vehicleOptionColumns()),
             'outgoingUser:id,name',
             'incomingUser:id,name',
         ]);
@@ -365,5 +365,30 @@ class HandoverController extends Controller
             $handover->outgoing_user_id,
             $handover->incoming_user_id,
         ], true);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function vehicleOptionColumns(): array
+    {
+        $columns = ['id', 'name'];
+
+        if (Schema::hasColumn('assets', 'registration_number')) {
+            $columns[] = 'registration_number';
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function handoverAssetColumns(): array
+    {
+        return array_merge(
+            $this->vehicleOptionColumns(),
+            ['site_id', 'home_site_id'],
+        );
     }
 }

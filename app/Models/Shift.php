@@ -15,6 +15,7 @@ class Shift extends Model
     use AuditableChanges;
 
     protected $fillable = [
+        'organization_id',
         'shift_series_id',
         'client_id',
         'site_id',
@@ -55,6 +56,18 @@ class Shift extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (self $shift): void {
+            if (! $shift->organization_id) {
+                $clientOrganizationId = $shift->client_id
+                    ? Client::query()->whereKey($shift->client_id)->value('organization_id')
+                    : null;
+
+                $shift->organization_id = $clientOrganizationId
+                    ?: auth()->user()?->organization_id
+                    ?: 1;
+            }
+        });
+
         static::saving(function (self $shift): void {
             app(\App\Services\ShiftSafetyInvariantService::class)->assertShift($shift);
         });

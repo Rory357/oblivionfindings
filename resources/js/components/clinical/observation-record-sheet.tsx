@@ -40,6 +40,7 @@ interface Props {
     canRecordClinical: boolean;
     defaultType?: string | null;
     protocolScheduleId?: number | null;
+    onRecorded?: () => void;
 }
 
 const INITIAL_DATA: Record<ObsType, Record<string, any>> = {
@@ -67,6 +68,7 @@ export default function ObservationRecordSheet({
     canRecordClinical,
     defaultType,
     protocolScheduleId,
+    onRecorded,
 }: Props) {
     const initialType = (defaultType as ObsType) || 'general';
     const [type, setType] = useState<ObsType>(initialType);
@@ -134,6 +136,7 @@ export default function ObservationRecordSheet({
                 preserveScroll: true,
                 onSuccess: () => {
                     onOpenChange(false);
+                    onRecorded?.();
                     setType('general');
                     setData(INITIAL_DATA.general);
                     setNotes('');

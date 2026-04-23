@@ -61,7 +61,7 @@ class StaffCredentialController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        StaffCredential::create(array_merge($data, ['user_id' => $user->id]));
+        $credential = StaffCredential::create(array_merge($data, ['user_id' => $user->id]));
 
         app(NotificationService::class)->notifyCrud($request->user(), 'created', 'staff credential', $credential, null, [
             'title' => 'Credential added',

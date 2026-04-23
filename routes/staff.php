@@ -23,7 +23,6 @@ Route::middleware(['auth'])->group(function () {
 
     // Staff profile (own profile always accessible, managers can view any)
     Route::get('/staff/{user}', [StaffController::class, 'show'])
-        ->middleware('permission:staff.viewAny')
         ->name('staff.show');
 
     // Staff updates
@@ -43,13 +42,13 @@ Route::middleware(['auth'])->group(function () {
         ->name('staff.assignments.update');
 
     // Staff credentials (compliance) - read
-    Route::middleware('permission:staff.credentials.viewAny')->group(function () {
+    Route::middleware('permission:staff.credentials.viewAny|staff.viewAny|staff.credentials.updateSelf')->group(function () {
         Route::get('/staff/{user}/credentials', [StaffCredentialController::class, 'index'])
             ->name('staff.credentials.index');
     });
 
     // Staff credentials (compliance) - write
-    Route::middleware('permission:staff.credentials.updateAny')->group(function () {
+    Route::middleware('permission:staff.credentials.updateAny|staff.update|staff.credentials.updateSelf')->group(function () {
         Route::post('/staff/{user}/credentials', [StaffCredentialController::class, 'store'])
             ->name('staff.credentials.store');
         Route::put('/staff/{user}/credentials/{credential}', [StaffCredentialController::class, 'update'])
@@ -59,13 +58,13 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Staff availability - read
-    Route::middleware('permission:staff.viewAny')->group(function () {
+    Route::middleware('permission:staff.viewAny|staff.availability.updateAny|staff.availability.updateSelf')->group(function () {
         Route::get('/staff/{user}/availability', [StaffAvailabilityController::class, 'index'])
             ->name('staff.availability.index');
     });
 
     // Staff availability - write
-    Route::middleware('permission:staff.availability.updateAny')->group(function () {
+    Route::middleware('permission:staff.availability.updateAny|staff.availability.updateSelf')->group(function () {
         Route::post('/staff/{user}/availability', [StaffAvailabilityController::class, 'store'])
             ->name('staff.availability.store');
         Route::delete('/staff/{user}/availability/{availability}', [StaffAvailabilityController::class, 'destroy'])

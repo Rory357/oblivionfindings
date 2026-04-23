@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, Award, CheckCircle2, Eye, Pencil, Search, ShieldCheck, XCircle } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, Award, CheckCircle2, Search, ShieldCheck, XCircle } from 'lucide-react';
 
 type QualificationRequirement = {
     id: number;
@@ -86,9 +86,9 @@ export default function QualificationsIndex({ requirements = { data: [], links: 
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2">
-                                            <Link href={`/operations/qualifications/${req.id}`} className="text-sm font-semibold hover:underline">
+                                            <span className="text-sm font-semibold">
                                                 {req.qualification_name}
-                                            </Link>
+                                            </span>
                                             <Badge variant={req.is_mandatory ? 'destructive' : 'outline'} className="h-4 px-1.5 text-[9px]">
                                                 {req.is_mandatory ? 'Mandatory' : 'Optional'}
                                             </Badge>
@@ -103,17 +103,8 @@ export default function QualificationsIndex({ requirements = { data: [], links: 
                                             <span>{req.matched_workers}/{req.total_workers} workers qualified</span>
                                         </div>
                                     </div>
-                                    <div className="flex shrink-0 gap-1">
-                                        <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                            <Link href={`/operations/qualifications/${req.id}`}>
-                                                <Eye className="h-3.5 w-3.5" />
-                                            </Link>
-                                        </Button>
-                                        <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                            <Link href={`/operations/qualifications/${req.id}/edit`}>
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </Link>
-                                        </Button>
+                                    <div className="shrink-0 text-xs text-muted-foreground">
+                                        Configure from client or shift workflows
                                     </div>
                                 </CardContent>
                             </Card>

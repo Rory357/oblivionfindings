@@ -16,12 +16,14 @@ class EvvController extends Controller
 
         $data = $request->validate([
             'verification_status' => ['nullable', 'string', 'in:pending,verified,flagged'],
+            'status' => ['nullable', 'string', 'in:pending,verified,flagged'],
         ]);
+        $status = $data['verification_status'] ?? $data['status'] ?? null;
 
         $query = EvvRecord::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['staff:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at'])
-            ->when(!empty($data['verification_status']), fn ($q) => $q->where('verification_status', $data['verification_status']))
+            ->with(['user:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at'])
+            ->when(!empty($status), fn ($q) => $q->where('verification_status', $status))
             ->orderByDesc('check_in_time');
 
         $stats = [
@@ -31,34 +33,36 @@ class EvvController extends Controller
             'flagged' => EvvRecord::where('organization_id', $auth->organization_id)->where('verification_status', 'flagged')->count(),
         ];
 
-        $records = $query->paginate(20)->withQueryString();
+        $records = $query->paginate(20)
+            ->through(fn (EvvRecord $record) => $this->serializeRecord($record))
+            ->withQueryString();
 
         return inertia('operations/evv/Index', [
             'records' => $records,
             'stats' => $stats,
-            'filters' => $request->only(['verification_status']),
+            'filters' => ['status' => $status],
         ]);
     }
 
     public function show(Request $request, $record)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('evv.view'), 403);
+        abort_unless($auth && ($auth->canDo('evv.view') || $auth->canDo('evv.viewAny')), 403);
 
         $record = EvvRecord::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['staff:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at,site_id', 'shift.site:id,name'])
+            ->with(['user:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at,site_id', 'shift.site:id,name'])
             ->findOrFail($record);
 
         return inertia('operations/evv/Show', [
-            'record' => $record,
+            'record' => $this->serializeRecord($record, true),
         ]);
     }
 
     public function checkIn(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('evv.checkIn'), 403);
+        abort_unless($auth && ($auth->canDo('evv.checkIn') || $auth->canDo('evv.record')), 403);
 
         $data = $request->validate([
             'shift_id' => ['required', 'integer', 'exists:shifts,id'],
@@ -83,35 +87,51 @@ class EvvController extends Controller
             'organization_id' => $auth->organization_id,
             'shift_id' => $data['shift_id'],
             'client_id' => $data['client_id'],
-            'staff_id' => $auth->id,
+            'user_id' => $auth->id,
             'check_in_time' => now(),
             'check_in_latitude' => $data['latitude'],
             'check_in_longitude' => $data['longitude'],
-            'check_in_distance' => $distance,
+            'distance_from_site_in' => $distance,
             'verification_status' => 'pending',
         ]);
 
         return redirect()->back()->with('success', 'Checked in.');
     }
 
-    public function checkOut(Request $request, $record)
+    public function checkOut(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('evv.checkOut'), 403);
-
-        $record = EvvRecord::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($record);
+        abort_unless($auth && ($auth->canDo('evv.checkOut') || $auth->canDo('evv.record')), 403);
 
         $data = $request->validate([
+            'record_id' => ['nullable', 'integer', 'exists:evv_records,id'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
         ]);
+
+        $record = EvvRecord::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->when(!empty($data['record_id']), fn ($q) => $q->whereKey($data['record_id']))
+            ->when(empty($data['record_id']), fn ($q) => $q->where('user_id', $auth->id)->whereNull('check_out_time'))
+            ->with('shift.site')
+            ->latest('check_in_time')
+            ->firstOrFail();
+
+        $distance = null;
+        if ($record->shift?->site?->latitude && $record->shift?->site?->longitude) {
+            $distance = $this->calculateDistance(
+                $data['latitude'],
+                $data['longitude'],
+                $record->shift->site->latitude,
+                $record->shift->site->longitude
+            );
+        }
 
         $record->update([
             'check_out_time' => now(),
             'check_out_latitude' => $data['latitude'],
             'check_out_longitude' => $data['longitude'],
+            'distance_from_site_out' => $distance,
         ]);
 
         return redirect()->back()->with('success', 'Checked out.');
@@ -133,9 +153,8 @@ class EvvController extends Controller
 
         $record->update([
             'verification_status' => $data['verification_status'],
-            'verification_notes' => $data['verification_notes'] ?? null,
-            'verified_by' => $auth->id,
-            'verified_at' => now(),
+            'flagged_reason' => $data['verification_status'] === 'flagged' ? ($data['verification_notes'] ?? null) : null,
+            'notes' => $data['verification_notes'] ?? $record->notes,
         ]);
 
         return redirect()->back()->with('success', 'Record ' . $data['verification_status'] . '.');
@@ -152,5 +171,52 @@ class EvvController extends Controller
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
         return round($earthRadius * $c, 2);
+    }
+
+    private function serializeRecord(EvvRecord $record, bool $includeDetails = false): array
+    {
+        $payload = [
+            'id' => $record->id,
+            'status' => $record->verification_status,
+            'verification_status' => $record->verification_status,
+            'check_in_time' => optional($record->check_in_time)->toIso8601String(),
+            'check_out_time' => optional($record->check_out_time)->toIso8601String(),
+            'gps_verified' => (bool) ($record->geofence_check_in ?? false),
+            'has_issues' => $record->verification_status === 'flagged' || filled($record->flagged_reason),
+            'issue_description' => $record->flagged_reason,
+            'worker' => $record->user ? [
+                'id' => $record->user->id,
+                'name' => $record->user->name,
+            ] : null,
+            'client' => $record->client ? [
+                'id' => $record->client->id,
+                'first_name' => $record->client->first_name,
+                'last_name' => $record->client->last_name,
+            ] : null,
+            'shift_date' => optional($record->shift?->starts_at ?? $record->check_in_time)->toDateString(),
+        ];
+
+        if ($includeDetails) {
+            $payload += [
+                'check_in_latitude' => $record->check_in_latitude,
+                'check_in_longitude' => $record->check_in_longitude,
+                'check_out_latitude' => $record->check_out_latitude,
+                'check_out_longitude' => $record->check_out_longitude,
+                'distance_from_site_in' => $record->distance_from_site_in,
+                'distance_from_site_out' => $record->distance_from_site_out,
+                'notes' => $record->notes,
+                'shift' => $record->shift ? [
+                    'id' => $record->shift->id,
+                    'starts_at' => optional($record->shift->starts_at)->toIso8601String(),
+                    'ends_at' => optional($record->shift->ends_at)->toIso8601String(),
+                    'site' => $record->shift->site ? [
+                        'id' => $record->shift->site->id,
+                        'name' => $record->shift->site->name,
+                    ] : null,
+                ] : null,
+            ];
+        }
+
+        return $payload;
     }
 }

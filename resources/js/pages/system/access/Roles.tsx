@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import {
     Shield,
     ArrowLeft,
@@ -81,6 +81,7 @@ type Props = {
 };
 
 export default function RolesManagement({ systemRoles, customRoles, permissions, permissionGroups }: Props) {
+    const page = usePage();
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [editingRole, setEditingRole] = useState<Role | null>(null);
     const [cloneRole, setCloneRole] = useState<Role | null>(null);
@@ -158,6 +159,24 @@ export default function RolesManagement({ systemRoles, customRoles, permissions,
             label: `${role.label} (Copy)`,
         });
     };
+
+    useEffect(() => {
+        const editRoleId = new URLSearchParams(page.url.split('?')[1] ?? '').get('edit');
+
+        if (!editRoleId) {
+            return;
+        }
+
+        const roleId = Number.parseInt(editRoleId, 10);
+        const role = [...systemRoles, ...customRoles].find((candidate) => candidate.id === roleId);
+
+        if (!role) {
+            return;
+        }
+
+        openEditDialog(role);
+        window.history.replaceState(window.history.state, '', '/system/access/roles');
+    }, [customRoles, page.url, systemRoles]);
 
     const groupedPermissions = permissionGroups.map((group) => ({
         group,

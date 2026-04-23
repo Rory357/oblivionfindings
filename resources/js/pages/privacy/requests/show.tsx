@@ -11,6 +11,11 @@ type Props = {
 };
 
 export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
+    const isIdentityVerified = dsr.identity_verified === 'verified'
+        || dsr.identity_verified === true
+        || dsr.identity_verified === 1
+        || dsr.identity_verified === '1';
+
     const statusLabels: Record<string, string> = {
         received: 'received',
         under_review: 'under review',
@@ -103,7 +108,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                                     {daysRemaining} days remaining
                                 </Badge>
                             )}
-                            {dsr.identity_verified && (
+                            {isIdentityVerified && (
                                 <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Identity Verified
@@ -133,7 +138,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                                 <span className="text-xs text-slate-500">Email</span>
                                 <p className="font-medium">{dsr.subject_email}</p>
                             </div>
-                            {dsr.identity_verified && (
+                            {isIdentityVerified && (
                                 <div>
                                     <span className="text-xs text-slate-500">Verified By</span>
                                     <p className="font-medium">{dsr.verified_by?.name || 'N/A'}</p>
@@ -219,7 +224,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                             <CardTitle className="text-base">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
-                            {!dsr.identity_verified && (
+                            {!isIdentityVerified && (
                                 <Button
                                     size="sm"
                                     onClick={() => {

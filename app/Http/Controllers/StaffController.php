@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class StaffController extends Controller
@@ -26,18 +28,24 @@ class StaffController extends Controller
         $search = trim((string) $request->query('q', ''));
 
         $users = User::staff()
-            ->when($search !== '', fn($q) => $q
+            ->when($search !== '', fn ($q) => $q->where(fn ($subQuery) => $subQuery
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
-            )
+            ))
             ->orderBy('name')
-            ->with([
-                'roles:id,name,label',
-                'staffProfile:user_id,job_title,department,status,hire_date',
-            ])
-            ->withCount('assignedClients')
+            ->with(['roles:id,name,label'])
             ->paginate(20)
             ->withQueryString();
+
+        $userIds = collect($users->items())->pluck('id')->all();
+        $staffProfiles = $this->staffProfileMap($userIds);
+        $assignedClientCounts = $this->assignedClientCountMap($userIds);
+
+        $users->through(fn (User $user) => $this->serializeStaffUser(
+            $user,
+            $staffProfiles[$user->id] ?? null,
+            $assignedClientCounts[$user->id] ?? 0,
+        ));
 
         return inertia('staff/index', [
             'users' => $users,
@@ -58,11 +66,9 @@ class StaffController extends Controller
             abort_unless($auth->canDo('staff.viewAny'), 403);
         }
 
-        $user->load([
-            'roles:id,name,label',
-            'staffProfile',
-            'assignedClients:id,first_name,last_name,status',
-        ]);
+        $user->load(['roles:id,name,label']);
+        $staffProfile = $this->staffProfileMap([$user->id])[$user->id] ?? null;
+        $assignedClients = $this->assignedClientsForUser($user->id);
 
         // Today shifts snapshot (for dashboard-like view)
         $today = now()->startOfDay();
@@ -74,24 +80,42 @@ class StaffController extends Controller
             ->where('user_id', $user->id)
             ->whereBetween('starts_at', [$today, $tomorrow])
             ->orderBy('starts_at')
-            ->with('client:id,first_name,last_name')
             ->get();
 
         $upcomingShifts = \App\Models\Shift::query()
             ->where('user_id', $user->id)
             ->whereBetween('starts_at', [now(), $rangeEnd])
             ->orderBy('starts_at')
-            ->with('client:id,first_name,last_name')
             ->limit(200)
             ->get();
 
-        $myDayItems = app(WorkstreamService::class)
-            ->forStaff($user, (clone $today), (clone $rangeEnd))
-            ->take(250)
-            ->values();
+        $shiftClients = $this->clientSummaryMap(
+            $todayShifts
+                ->pluck('client_id')
+                ->merge($upcomingShifts->pluck('client_id'))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all()
+        );
+
+        $todayShifts = $this->serializeShifts($todayShifts, $shiftClients);
+        $upcomingShifts = $this->serializeShifts($upcomingShifts, $shiftClients);
+
+        try {
+            $myDayItems = app(WorkstreamService::class)
+                ->forStaff($user, (clone $today), (clone $rangeEnd))
+                ->take(250)
+                ->values();
+        } catch (\Throwable) {
+            $myDayItems = collect();
+        }
 
         return inertia('staff/show', [
-            'user' => $user,
+            'user' => array_merge(
+                $this->serializeStaffUser($user, $staffProfile),
+                ['assigned_clients' => $assignedClients]
+            ),
             'myDayItems' => $myDayItems,
             'todayShifts' => $todayShifts,
             'upcomingShifts' => $upcomingShifts,
@@ -204,12 +228,13 @@ class StaffController extends Controller
         // Portal users should never appear in the staff module.
         abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
 
-        $user->load(['roles:id,name,label', 'staffProfile']);
+        $user->load(['roles:id,name,label']);
+        $staffProfile = $this->staffProfileMap([$user->id])[$user->id] ?? null;
 
         $roles = Role::query()->orderBy('label')->get(['id', 'name', 'label']);
 
         return inertia('staff/edit', [
-            'user' => $user,
+            'user' => $this->serializeStaffUser($user, $staffProfile),
             'roles' => $roles,
         ]);
     }
@@ -228,11 +253,15 @@ class StaffController extends Controller
             'role_ids' => ['array'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
             'profile' => ['array'],
+            'profile.phone' => ['nullable', 'string', 'max:50'],
             'profile.job_title' => ['nullable', 'string', 'max:255'],
             'profile.department' => ['nullable', 'string', 'max:255'],
+            'profile.employment_type' => ['nullable', 'string', 'max:255'],
             'profile.work_phone' => ['nullable', 'string', 'max:50'],
             'profile.mobile_phone' => ['nullable', 'string', 'max:50'],
-            'profile.hire_date' => ['nullable', 'date'],
+            'profile.start_date' => ['nullable', 'date_format:Y-m-d'],
+            'profile.hire_date' => ['nullable', 'date_format:Y-m-d'],
+            'profile.is_active' => ['nullable', 'boolean'],
             'profile.status' => ['nullable', 'in:active,on_leave,suspended,terminated'],
         ]);
 
@@ -252,17 +281,7 @@ class StaffController extends Controller
 
         // Staff profile
         $profileData = $data['profile'] ?? [];
-        $user->staffProfile()->updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'job_title' => $profileData['job_title'] ?? null,
-                'department' => $profileData['department'] ?? null,
-                'work_phone' => $profileData['work_phone'] ?? null,
-                'mobile_phone' => $profileData['mobile_phone'] ?? null,
-                'hire_date' => $profileData['hire_date'] ?? null,
-                'status' => $profileData['status'] ?? 'active',
-            ]
-        );
+        $this->persistStaffProfile($user->id, $profileData);
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'staff', $user, null, [
             'title' => "Staff updated: {$user->name}",
@@ -271,5 +290,291 @@ class StaffController extends Controller
         ]);
 
         return redirect()->route('staff.show', $user)->with('success', 'Staff updated.');
+    }
+
+    private function serializeStaffUser(User $user, ?array $staffProfile = null, int $assignedClientsCount = 0): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'avatar' => $user->avatar,
+            'profile_photo_url' => $user->profile_photo_url,
+            'roles' => $user->roles->map(fn ($role) => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'label' => $role->label,
+            ])->values()->all(),
+            'staff_profile' => $staffProfile,
+            'assigned_clients_count' => $assignedClientsCount,
+        ];
+    }
+
+    private function assignedClientCountMap(array $userIds): array
+    {
+        if ($userIds === [] || ! Schema::hasTable('client_user')) {
+            return [];
+        }
+
+        $query = DB::table('client_user')
+            ->selectRaw('client_user.user_id as user_id, count(*) as assigned_clients_count')
+            ->whereIn('client_user.user_id', $userIds)
+            ->groupBy('client_user.user_id');
+
+        if (Schema::hasTable('clients')) {
+            $query->join('clients', 'clients.id', '=', 'client_user.client_id');
+
+            if (Schema::hasColumn('clients', 'deleted_at')) {
+                $query->whereNull('clients.deleted_at');
+            }
+        }
+
+        return $query
+            ->pluck('assigned_clients_count', 'user_id')
+            ->map(fn ($count) => (int) $count)
+            ->all();
+    }
+
+    private function assignedClientsForUser(int $userId): array
+    {
+        if (! Schema::hasTable('client_user') || ! Schema::hasTable('clients')) {
+            return [];
+        }
+
+        $query = DB::table('client_user')
+            ->join('clients', 'clients.id', '=', 'client_user.client_id')
+            ->where('client_user.user_id', $userId)
+            ->orderBy('clients.first_name')
+            ->orderBy('clients.last_name')
+            ->select('clients.id', 'clients.first_name', 'clients.last_name', 'clients.status');
+
+        if (Schema::hasColumn('clients', 'deleted_at')) {
+            $query->whereNull('clients.deleted_at');
+        }
+
+        return $query->get()->map(fn ($client) => [
+            'id' => $client->id,
+            'first_name' => $client->first_name,
+            'last_name' => $client->last_name,
+            'status' => $client->status,
+        ])->all();
+    }
+
+    private function clientSummaryMap(array $clientIds): array
+    {
+        if ($clientIds === [] || ! Schema::hasTable('clients')) {
+            return [];
+        }
+
+        $query = DB::table('clients')
+            ->whereIn('id', $clientIds)
+            ->select('id', 'first_name', 'last_name');
+
+        if (Schema::hasColumn('clients', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        return $query
+            ->get()
+            ->keyBy('id')
+            ->map(fn ($client) => [
+                'id' => $client->id,
+                'first_name' => $client->first_name,
+                'last_name' => $client->last_name,
+            ])
+            ->all();
+    }
+
+    private function serializeShifts($shifts, array $clientMap): array
+    {
+        return $shifts->map(fn ($shift) => [
+            'id' => $shift->id,
+            'starts_at' => optional($shift->starts_at)->toISOString(),
+            'ends_at' => optional($shift->ends_at)->toISOString(),
+            'status' => $shift->status,
+            'location' => $shift->location,
+            'client' => $shift->client_id ? ($clientMap[$shift->client_id] ?? null) : null,
+        ])->values()->all();
+    }
+
+    private function staffProfileMap(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        if (Schema::hasTable('staff') && Schema::hasColumn('staff', 'user_id')) {
+            $query = DB::table('staff')
+                ->whereIn('user_id', $userIds)
+                ->select($this->availableColumns('staff', [
+                    'user_id',
+                    'job_title',
+                    'department',
+                    'work_phone',
+                    'mobile_phone',
+                    'hire_date',
+                    'status',
+                ]));
+
+            if (Schema::hasColumn('staff', 'deleted_at')) {
+                $query->whereNull('deleted_at');
+            }
+
+            return $query
+                ->get()
+                ->mapWithKeys(fn ($profile) => [
+                    $profile->user_id => [
+                        'phone' => $profile->work_phone ?? $profile->mobile_phone ?? null,
+                        'job_title' => $profile->job_title ?? null,
+                        'department' => $profile->department ?? null,
+                        'employment_type' => $profile->department ?? null,
+                        'work_phone' => $profile->work_phone ?? null,
+                        'mobile_phone' => $profile->mobile_phone ?? null,
+                        'hire_date' => $profile->hire_date ?? null,
+                        'start_date' => $profile->hire_date ?? null,
+                        'status' => $profile->status ?? 'active',
+                        'is_active' => ($profile->status ?? 'active') === 'active',
+                    ],
+                ])
+                ->all();
+        }
+
+        if (Schema::hasTable('staff_profiles') && Schema::hasColumn('staff_profiles', 'user_id')) {
+            return DB::table('staff_profiles')
+                ->whereIn('user_id', $userIds)
+                ->select($this->availableColumns('staff_profiles', [
+                    'user_id',
+                    'phone',
+                    'job_title',
+                    'employment_type',
+                    'start_date',
+                    'is_active',
+                ]))
+                ->get()
+                ->mapWithKeys(fn ($profile) => [
+                    $profile->user_id => [
+                        'phone' => $profile->phone ?? null,
+                        'job_title' => $profile->job_title ?? null,
+                        'employment_type' => $profile->employment_type ?? null,
+                        'start_date' => $profile->start_date ?? null,
+                        'hire_date' => $profile->start_date ?? null,
+                        'status' => ($profile->is_active ?? true) ? 'active' : 'inactive',
+                        'is_active' => (bool) ($profile->is_active ?? true),
+                    ],
+                ])
+                ->all();
+        }
+
+        return [];
+    }
+
+    private function persistStaffProfile(int $userId, array $profileData): void
+    {
+        $now = now();
+
+        if (Schema::hasTable('staff') && Schema::hasColumn('staff', 'user_id')) {
+            $existing = DB::table('staff')
+                ->where('user_id', $userId)
+                ->first($this->availableColumns('staff', [
+                    'job_title',
+                    'department',
+                    'work_phone',
+                    'mobile_phone',
+                    'hire_date',
+                    'status',
+                ]));
+
+            $status = $profileData['status'] ?? null;
+            if ($status === null && array_key_exists('is_active', $profileData)) {
+                $status = $profileData['is_active'] ? 'active' : 'inactive';
+            }
+
+            $hasGenericPhone = array_key_exists('phone', $profileData);
+            $genericPhone = $hasGenericPhone ? $profileData['phone'] : null;
+
+            $values = [
+                'job_title' => array_key_exists('job_title', $profileData)
+                    ? $profileData['job_title']
+                    : ($existing->job_title ?? null),
+                // The legacy staff table stores this UI field in `department`.
+                'department' => array_key_exists('department', $profileData)
+                    ? $profileData['department']
+                    : (array_key_exists('employment_type', $profileData)
+                        ? $profileData['employment_type']
+                        : ($existing->department ?? null)),
+                'work_phone' => array_key_exists('work_phone', $profileData)
+                    ? $profileData['work_phone']
+                    : ($hasGenericPhone ? $genericPhone : ($existing->work_phone ?? null)),
+                'mobile_phone' => array_key_exists('mobile_phone', $profileData)
+                    ? $profileData['mobile_phone']
+                    : ($hasGenericPhone ? $genericPhone : ($existing->mobile_phone ?? null)),
+                'hire_date' => $this->normalizeProfileDate(
+                    array_key_exists('hire_date', $profileData)
+                        ? $profileData['hire_date']
+                        : (array_key_exists('start_date', $profileData)
+                            ? $profileData['start_date']
+                            : ($existing->hire_date ?? null))
+                ),
+                'status' => $status ?? ($existing->status ?? 'active'),
+            ];
+
+            $this->updateOrInsertProfileRow('staff', $userId, $values, $now);
+
+            return;
+        }
+
+        if (Schema::hasTable('staff_profiles') && Schema::hasColumn('staff_profiles', 'user_id')) {
+            $values = [
+                'phone' => $profileData['phone']
+                    ?? $profileData['work_phone']
+                    ?? $profileData['mobile_phone']
+                    ?? null,
+                'job_title' => $profileData['job_title'] ?? null,
+                'employment_type' => $profileData['employment_type'] ?? ($profileData['department'] ?? null),
+                'start_date' => $this->normalizeProfileDate(
+                    $profileData['start_date'] ?? ($profileData['hire_date'] ?? null)
+                ),
+                'is_active' => array_key_exists('is_active', $profileData)
+                    ? (bool) $profileData['is_active']
+                    : (($profileData['status'] ?? 'active') === 'active'),
+            ];
+
+            $this->updateOrInsertProfileRow('staff_profiles', $userId, $values, $now);
+        }
+    }
+
+    private function normalizeProfileDate(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return Carbon::createFromFormat('Y-m-d', $value)->toDateString();
+    }
+
+    private function updateOrInsertProfileRow(string $table, int $userId, array $values, $timestamp): void
+    {
+        $query = DB::table($table)->where('user_id', $userId);
+
+        if ($query->exists()) {
+            $query->update(array_merge($values, ['updated_at' => $timestamp]));
+
+            return;
+        }
+
+        DB::table($table)->insert(array_merge($values, [
+            'user_id' => $userId,
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ]));
+    }
+
+    private function availableColumns(string $table, array $columns): array
+    {
+        return array_values(array_filter(
+            $columns,
+            fn ($column) => Schema::hasColumn($table, $column)
+        ));
     }
 }

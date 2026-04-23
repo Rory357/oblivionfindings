@@ -147,6 +147,14 @@ export default function ClientObservationsTab({
         });
     }, []);
 
+    const handleObservationRecorded = useCallback(() => {
+        router.reload({
+            only: ['health_summary'],
+            preserveScroll: true,
+            preserveState: true,
+        });
+    }, []);
+
     return (
         <>
             <Card>
@@ -301,6 +309,7 @@ export default function ClientObservationsTab({
                     open={sheetOpen}
                     onOpenChange={handleSheetClose}
                     canRecordClinical={canRecordClinical}
+                    onRecorded={handleObservationRecorded}
                 />
             ) : null}
 

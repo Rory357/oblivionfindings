@@ -6,15 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -22,7 +13,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -41,12 +31,11 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     CheckCircle,
     Clock,
     Download,
-    Mail,
     MoreHorizontal,
     Pencil,
     Search,
@@ -60,11 +49,6 @@ import {
     Users2,
 } from 'lucide-react';
 import { useState } from 'react';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Settings', href: '/settings/profile' },
-    { title: 'Users', href: '/settings/users' },
-];
 
 const ANY = '__ANY__';
 
@@ -165,27 +149,33 @@ export default function UsersIndex({
     filters = {},
     stats = { total: 0, active: 0, pending: 0, staff: 0 },
 }: Props) {
+    const page = usePage<SharedData>();
     const [search, setSearch] = useState(filters.search ?? '');
     const [statusFilter, setStatusFilter] = useState(filters.status ?? 'all');
     const [roleFilter, setRoleFilter] = useState(filters.role ?? 'all');
     const [twoFaFilter, setTwoFaFilter] = useState(filters.has_2fa ?? 'all');
     const [activityFilter, setActivityFilter] = useState(filters.activity ?? 'all');
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
-    const [inviteOpen, setInviteOpen] = useState(false);
-    const { auth } = usePage<SharedData>().props;
+    const { auth } = page.props;
     const canImpersonate = (auth.can as any)?.settings?.impersonate;
-
-    const inviteForm = useForm({
-        name: '',
-        email: '',
-        role_ids: [] as number[],
-    });
+    const currentUserId = auth.user.id;
+    const isSystemView = page.url.startsWith('/system/users');
+    const usersBasePath = isSystemView ? '/system/users' : '/settings/users';
+    const breadcrumbs: BreadcrumbItem[] = isSystemView
+        ? [
+              { title: 'Dashboard', href: '/dashboard' },
+              { title: 'System Users', href: usersBasePath },
+          ]
+        : [
+              { title: 'Settings', href: '/settings/profile' },
+              { title: 'Users', href: usersBasePath },
+          ];
 
     const allData = users?.data ?? [];
 
     function applyFilters(overrides: Record<string, string> = {}) {
         router.get(
-            '/settings/users',
+            usersBasePath,
             {
                 search: overrides.search ?? search,
                 status: overrides.status ?? statusFilter,
@@ -232,21 +222,15 @@ export default function UsersIndex({
     }
 
     function toggleAll() {
-        if (selectedIds.length === allData.length) {
+        const selectableIds = allData
+            .filter((user) => user.id !== currentUserId)
+            .map((user) => user.id);
+
+        if (selectedIds.length === selectableIds.length) {
             setSelectedIds([]);
         } else {
-            setSelectedIds(allData.map((u) => u.id));
+            setSelectedIds(selectableIds);
         }
-    }
-
-    function handleInvite(e: React.FormEvent) {
-        e.preventDefault();
-        inviteForm.post('/settings/users', {
-            onSuccess: () => {
-                setInviteOpen(false);
-                inviteForm.reset();
-            },
-        });
     }
 
     function handleImpersonate(userId: number) {
@@ -254,24 +238,25 @@ export default function UsersIndex({
     }
 
     function handleSuspend(userId: number) {
-        router.post(`/settings/users/${userId}/suspend`, {}, { preserveScroll: true });
+        if (userId === currentUserId) {
+            return;
+        }
+
+        router.post(`${usersBasePath}/${userId}/suspend`, {}, { preserveScroll: true });
     }
 
     function handleApprove(userId: number) {
-        router.post(`/settings/users/${userId}/approve`, {}, { preserveScroll: true });
+        router.post(`${usersBasePath}/${userId}/approve`, {}, { preserveScroll: true });
     }
 
     const adminCount = allData.filter(
         (u) => u.roles?.some((r) => r.label?.toLowerCase().includes('admin')),
     ).length;
 
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="User Management" />
-            <SettingsLayout>
-                <div className="space-y-6">
+    const content = (
+        <div className="space-y-6">
                     <PageHeader
-                        title="User Management"
+                        title={isSystemView ? 'System Users' : 'User Management'}
                         description="Manage user accounts, roles, and access across your organisation"
                         actions={
                             <div className="flex items-center gap-2">
@@ -279,80 +264,12 @@ export default function UsersIndex({
                                     <Download className="mr-2 h-4 w-4" />
                                     Export CSV
                                 </Button>
-                                <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button className="bg-violet-600 hover:bg-violet-700">
+                                <Button asChild className="bg-violet-600 hover:bg-violet-700" dusk="users-create-link">
+                                    <Link href="/system/users/create">
                                             <UserPlus className="mr-2 h-4 w-4" />
-                                            Invite User
-                                        </Button>
-                                    </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Invite New User</DialogTitle>
-                                        <DialogDescription>
-                                            Send an invitation to join your organisation.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <form onSubmit={handleInvite} className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="invite-name">Full Name</Label>
-                                            <Input
-                                                id="invite-name"
-                                                placeholder="e.g. Aroha Williams"
-                                                value={inviteForm.data.name}
-                                                onChange={(e) => inviteForm.setData('name', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="invite-email">Email Address</Label>
-                                            <Input
-                                                id="invite-email"
-                                                type="email"
-                                                placeholder="aroha@example.co.nz"
-                                                value={inviteForm.data.email}
-                                                onChange={(e) => inviteForm.setData('email', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Role</Label>
-                                            <Select
-                                                value={inviteForm.data.role_ids[0]?.toString() ?? ''}
-                                                onValueChange={(val) =>
-                                                    inviteForm.setData('role_ids', val ? [parseInt(val)] : [])
-                                                }
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select a role..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {(roles ?? []).map((role) => (
-                                                        <SelectItem key={role.id} value={role.id.toString()}>
-                                                            {role.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => setInviteOpen(false)}
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button
-                                                type="submit"
-                                                className="bg-violet-600 hover:bg-violet-700"
-                                                disabled={inviteForm.processing}
-                                            >
-                                                <Mail className="mr-2 h-4 w-4" />
-                                                Send Invitation
-                                            </Button>
-                                        </DialogFooter>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
+                                            Create User
+                                    </Link>
+                                </Button>
                             </div>
                         }
                     />
@@ -527,9 +444,10 @@ export default function UsersIndex({
                                         <TableRow>
                                             <TableHead className="w-10">
                                                 <Checkbox
+                                                    dusk="users-select-all"
                                                     checked={
                                                         allData.length > 0 &&
-                                                        selectedIds.length === allData.length
+                                                        selectedIds.length === allData.filter((user) => user.id !== currentUserId).length
                                                     }
                                                     onCheckedChange={toggleAll}
                                                 />
@@ -553,13 +471,15 @@ export default function UsersIndex({
                                             >
                                                 <TableCell onClick={(e) => e.stopPropagation()}>
                                                     <Checkbox
+                                                        dusk={`user-select-${user.id}`}
                                                         checked={selectedIds.includes(user.id)}
+                                                        disabled={user.id === currentUserId}
                                                         onCheckedChange={() => toggleSelect(user.id)}
                                                     />
-                                                </TableCell>
+                                            </TableCell>
                                                 <TableCell>
                                                     <Link
-                                                        href={`/settings/users/${user.id}`}
+                                                        href={`${usersBasePath}/${user.id}`}
                                                         className="flex items-center gap-3"
                                                     >
                                                         <Avatar className="h-8 w-8">
@@ -621,13 +541,18 @@ export default function UsersIndex({
                                                 <TableCell onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
-                                                            <Button size="icon" variant="ghost" className="h-8 w-8">
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="h-8 w-8"
+                                                                dusk={`user-actions-${user.id}`}
+                                                            >
                                                                 <MoreHorizontal className="h-4 w-4" />
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
                                                             <DropdownMenuItem asChild>
-                                                                <Link href={`/settings/users/${user.id}`}>
+                                                                <Link href={`${usersBasePath}/${user.id}`}>
                                                                     <Pencil className="mr-2 h-4 w-4" />
                                                                     Edit
                                                                 </Link>
@@ -640,23 +565,29 @@ export default function UsersIndex({
                                                                     Impersonate
                                                                 </DropdownMenuItem>
                                                             )}
-                                                            <DropdownMenuSeparator />
-                                                            {user.is_active ? (
-                                                                <DropdownMenuItem
-                                                                    className="text-red-600 focus:text-red-600"
-                                                                    onClick={() => handleSuspend(user.id)}
-                                                                >
-                                                                    <UserMinus className="mr-2 h-4 w-4" />
-                                                                    Suspend
-                                                                </DropdownMenuItem>
-                                                            ) : (
-                                                                <DropdownMenuItem
-                                                                    className="text-emerald-600 focus:text-emerald-600"
-                                                                    onClick={() => handleApprove(user.id)}
-                                                                >
-                                                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                                                    Approve
-                                                                </DropdownMenuItem>
+                                                            {user.id !== currentUserId && (
+                                                                <>
+                                                                    <DropdownMenuSeparator />
+                                                                    {user.is_active ? (
+                                                                        <DropdownMenuItem
+                                                                            dusk={`user-suspend-${user.id}`}
+                                                                            className="text-red-600 focus:text-red-600"
+                                                                            onClick={() => handleSuspend(user.id)}
+                                                                        >
+                                                                            <UserMinus className="mr-2 h-4 w-4" />
+                                                                            Suspend
+                                                                        </DropdownMenuItem>
+                                                                    ) : (
+                                                                        <DropdownMenuItem
+                                                                            dusk={`user-approve-${user.id}`}
+                                                                            className="text-emerald-600 focus:text-emerald-600"
+                                                                            onClick={() => handleApprove(user.id)}
+                                                                        >
+                                                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                                                            Approve
+                                                                        </DropdownMenuItem>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
@@ -698,8 +629,13 @@ export default function UsersIndex({
                             </div>
                         </div>
                     )}
-                </div>
-            </SettingsLayout>
+        </div>
+    );
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={isSystemView ? 'System Users' : 'User Management'} />
+            {isSystemView ? content : <SettingsLayout>{content}</SettingsLayout>}
         </AppLayout>
     );
 }

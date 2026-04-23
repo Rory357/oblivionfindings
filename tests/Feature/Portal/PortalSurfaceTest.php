@@ -3,6 +3,8 @@
 namespace Tests\Feature\Portal;
 
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,6 +74,42 @@ class PortalSurfaceTest extends TestCase
                 ->has('supportWorkers', 1)
                 ->where('supportWorkers.0.id', $staffUser->id)
                 ->where('supportWorkers.0.name', $staffUser->name)
+            );
+    }
+
+    public function test_portal_location_normalizes_active_consent_for_the_ui(): void
+    {
+        $portalUser = User::factory()->create([
+            'approved_at' => now(),
+        ]);
+        $client = Client::factory()->create();
+        $consentType = ConsentType::factory()->create([
+            'name' => 'Asset Location Tracking (Safety)',
+        ]);
+        $givenAt = now()->subHour()->startOfSecond();
+
+        $client->portalUsers()->attach($portalUser->id, ['relation' => 'next_of_kin']);
+
+        ClientConsent::create([
+            'client_id' => $client->id,
+            'consent_type_id' => $consentType->id,
+            'status' => 'given',
+            'given_at' => $givenAt,
+            'expires_at' => now()->addDay(),
+            'given_by_user_id' => $portalUser->id,
+            'given_by_relationship' => 'next_of_kin',
+            'given_method' => 'portal',
+            'created_by' => $portalUser->id,
+            'updated_by' => $portalUser->id,
+        ]);
+
+        $this->actingAs($portalUser)
+            ->get("/portal/clients/{$client->id}/location")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('portal/location')
+                ->where('trackingConsent.status', 'active')
+                ->where('trackingConsent.given_at', $givenAt->toISOString())
             );
     }
 }
