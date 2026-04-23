@@ -70,6 +70,36 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+
+    --color-status-success: var(--status-success);
+    --color-status-success-bg: var(--status-success-bg);
+    --color-status-success-foreground: var(--status-success-foreground);
+    --color-status-warning: var(--status-warning);
+    --color-status-warning-bg: var(--status-warning-bg);
+    --color-status-warning-foreground: var(--status-warning-foreground);
+    --color-status-critical: var(--status-critical);
+    --color-status-critical-bg: var(--status-critical-bg);
+    --color-status-critical-foreground: var(--status-critical-foreground);
+    --color-status-info: var(--status-info);
+    --color-status-info-bg: var(--status-info-bg);
+    --color-status-info-foreground: var(--status-info-foreground);
+    --color-status-neutral: var(--status-neutral);
+    --color-status-neutral-bg: var(--status-neutral-bg);
+
+    --color-category-ops: var(--category-ops);
+    --color-category-ops-bg: var(--category-ops-bg);
+    --color-category-hr: var(--category-hr);
+    --color-category-hr-bg: var(--category-hr-bg);
+    --color-category-compliance: var(--category-compliance);
+    --color-category-compliance-bg: var(--category-compliance-bg);
+    --color-category-incidents: var(--category-incidents);
+    --color-category-incidents-bg: var(--category-incidents-bg);
+    --color-category-governance: var(--category-governance);
+    --color-category-governance-bg: var(--category-governance-bg);
+    --color-category-sites: var(--category-sites);
+    --color-category-sites-bg: var(--category-sites-bg);
+    --color-category-fleet: var(--category-fleet);
+    --color-category-fleet-bg: var(--category-fleet-bg);
 }
 
 :root {
@@ -116,6 +146,41 @@
     --sidebar-accent-foreground: oklch(0.25 0.015 277);
     --sidebar-border: oklch(0.92 0.010 277);
     --sidebar-ring: var(--color-purple-400);
+
+    /* Status tokens — semantic meaning, not brand-tied */
+    --status-success: oklch(60% 0.15 150);
+    --status-success-bg: oklch(94% 0.05 150);
+    --status-success-foreground: oklch(28% 0.10 150);
+    --status-warning: oklch(66% 0.15 85);
+    --status-warning-bg: oklch(95% 0.06 85);
+    --status-warning-foreground: oklch(35% 0.12 85);
+    --status-critical: oklch(55% 0.22 25);
+    --status-critical-bg: oklch(94% 0.06 25);
+    --status-critical-foreground: oklch(30% 0.15 25);
+    --status-info: var(--primary);
+    --status-info-bg: var(--accent);
+    --status-info-foreground: var(--primary-foreground);
+    --status-neutral: var(--muted-foreground);
+    --status-neutral-bg: var(--muted);
+
+    /* Category tokens — derived from --primary hue; rotate using oklch(from …) */
+    --category-ops: var(--primary);
+    --category-ops-bg: color-mix(in oklch, var(--primary) 12%, transparent);
+    --category-hr: oklch(from var(--primary) l c calc(h + 120));
+    --category-hr-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 120)) 12%, transparent);
+    --category-compliance: oklch(from var(--primary) l c calc(h + 60));
+    --category-compliance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 60)) 12%, transparent);
+    --category-incidents: var(--status-critical);
+    --category-incidents-bg: var(--status-critical-bg);
+    --category-governance: oklch(from var(--primary) l c calc(h + 180));
+    --category-governance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 180)) 12%, transparent);
+    --category-sites: oklch(from var(--primary) l c calc(h + 210));
+    --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 12%, transparent);
+    --category-fleet: oklch(from var(--primary) l c calc(h + 45));
+    --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 12%, transparent);
+
+    /* Font-size driver (overridden by user preference) */
+    --base-font-size: 14px;
 }
 
 .dark {
@@ -151,6 +216,38 @@
     --sidebar-accent-foreground: oklch(0.90 0.005 277);
     --sidebar-border: oklch(0.22 0.015 277);
     --sidebar-ring: var(--color-purple-400);
+
+    /* Status tokens — dark variants */
+    --status-success: oklch(70% 0.16 150);
+    --status-success-bg: oklch(22% 0.08 150);
+    --status-success-foreground: oklch(92% 0.05 150);
+    --status-warning: oklch(75% 0.15 85);
+    --status-warning-bg: oklch(24% 0.08 85);
+    --status-warning-foreground: oklch(92% 0.06 85);
+    --status-critical: oklch(65% 0.20 25);
+    --status-critical-bg: oklch(24% 0.10 25);
+    --status-critical-foreground: oklch(92% 0.06 25);
+    --status-info: var(--primary);
+    --status-info-bg: var(--accent);
+    --status-info-foreground: var(--primary-foreground);
+    --status-neutral: var(--muted-foreground);
+    --status-neutral-bg: var(--muted);
+
+    /* Category tokens — dark variants (same derivation pattern, different opacity) */
+    --category-ops: var(--primary);
+    --category-ops-bg: color-mix(in oklch, var(--primary) 20%, transparent);
+    --category-hr: oklch(from var(--primary) l c calc(h + 120));
+    --category-hr-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 120)) 20%, transparent);
+    --category-compliance: oklch(from var(--primary) l c calc(h + 60));
+    --category-compliance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 60)) 20%, transparent);
+    --category-incidents: var(--status-critical);
+    --category-incidents-bg: var(--status-critical-bg);
+    --category-governance: oklch(from var(--primary) l c calc(h + 180));
+    --category-governance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 180)) 20%, transparent);
+    --category-sites: oklch(from var(--primary) l c calc(h + 210));
+    --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 20%, transparent);
+    --category-fleet: oklch(from var(--primary) l c calc(h + 45));
+    --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 20%, transparent);
 }
 
 @layer base {
@@ -158,9 +255,57 @@
         @apply border-border;
     }
 
+    html {
+        font-size: var(--base-font-size);
+    }
+
     body {
         @apply bg-background text-foreground;
     }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Appearance — density + motion primitives
+ *
+ * Driven by `<html>` attributes/classes written by use-appearance.tsx.
+ * ────────────────────────────────────────────────────────────────────────── */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+}
+
+html[data-density="compact"] [data-sidebar-item],
+html[data-density="compact"] [data-slot="sidebar-menu-button"] {
+    padding-block: 0.25rem;
+    font-size: 0.8125rem;
+}
+
+html[data-density="comfortable"] [data-sidebar-item],
+html[data-density="comfortable"] [data-slot="sidebar-menu-button"] {
+    padding-block: 0.5rem;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Typography hierarchy — use these instead of ad-hoc text-2xl/text-xl/etc.
+ * ────────────────────────────────────────────────────────────────────────── */
+.text-page-title {
+    @apply text-2xl font-semibold tracking-tight text-foreground;
+}
+
+.text-section-title {
+    @apply text-lg font-semibold text-foreground;
+}
+
+.text-subtle {
+    @apply text-sm text-muted-foreground;
+}
+
+.text-caption {
+    @apply text-xs text-muted-foreground;
 }
 
 /* Hide scrollbars on icon sidebar */

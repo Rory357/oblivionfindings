@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import FlashToaster from './components/flash-toaster';
 import OfflineStatusBanner from './components/offline-status-banner';
-import { initializeTheme } from './hooks/use-appearance';
+import { initializeAppearance } from './hooks/use-appearance';
 import { bootEmarOffline } from './lib/emar-offline';
 import { bootOfflineQueue } from './lib/offline-queue';
 
@@ -62,5 +62,6 @@ createInertiaApp({
     },
 });
 
-// This will set light / dark mode on load...
-initializeTheme();
+// Apply saved theme + accent + font size + density + motion preferences on
+// load, before the first React render. Avoids a flash of default styles.
+initializeAppearance();
