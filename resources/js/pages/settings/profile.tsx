@@ -79,12 +79,16 @@ const DATE_FORMATS = [
     { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
 ];
 
+type LandingOption = { key: string; label: string; role_label: string };
+
 type ProfileData = {
     phone: string | null;
     jobTitle: string | null;
     timezone: string;
     dateFormat: string;
     timeFormat: string;
+    landingRoutePreference: string | null;
+    landingOptions: LandingOption[];
     emailVerifiedAt: string | null;
     createdAt: string | null;
     updatedAt: string | null;
@@ -140,6 +144,23 @@ export default function Profile({
         date_format: profileData.dateFormat,
         time_format: profileData.timeFormat,
     });
+
+    // Separate lightweight form for landing route preference. Changes save on
+    // select change — no explicit save button for this one.
+    const landingForm = useForm<{ landing_route_preference: string | null }>({
+        landing_route_preference: profileData.landingRoutePreference,
+    });
+
+    const handleLandingChange = useCallback(
+        (value: string) => {
+            const next = value === '__system__' ? null : value;
+            landingForm.setData('landing_route_preference', next);
+            landingForm.transform(() => ({ landing_route_preference: next })).put('/settings/profile/landing', {
+                preserveScroll: true,
+            });
+        },
+        [landingForm],
+    );
     const fileInputRef = useRef<HTMLInputElement>(null);
     const passwordInput = useRef<HTMLInputElement>(null);
 
@@ -431,7 +452,7 @@ export default function Profile({
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Globe className="h-4.5 w-4.5 text-violet-600" />
+                                    <Globe className="h-4.5 w-4.5 text-primary" />
                                     Preferences
                                 </CardTitle>
                                 <CardDescription>Customise your experience</CardDescription>
@@ -514,6 +535,34 @@ export default function Profile({
                                         />
                                         <span className="text-xs text-muted-foreground">More coming soon</span>
                                     </div>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="landing_route_preference">Default landing page</Label>
+                                    <Select
+                                        value={landingForm.data.landing_route_preference ?? '__system__'}
+                                        onValueChange={handleLandingChange}
+                                    >
+                                        <SelectTrigger id="landing_route_preference" className="max-w-sm">
+                                            <SelectValue placeholder="System default" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__system__">System default</SelectItem>
+                                            {profileData.landingOptions.map((opt) => (
+                                                <SelectItem key={opt.key} value={opt.key}>
+                                                    {opt.label}
+                                                    <span className="ml-2 text-xs text-muted-foreground">
+                                                        (via {opt.role_label})
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground">
+                                        {profileData.landingOptions.length === 0
+                                            ? 'None of your roles have a landing page configured. You\'ll be sent to the dashboard after login.'
+                                            : 'Pick which of your roles decides where you land after login.'}
+                                    </p>
                                 </div>
 
                                 <div className="pt-2">

@@ -15,6 +15,7 @@ use Laravel\Fortify\Actions\CanonicalizeUsername;
 use Laravel\Fortify\Actions\EnsureLoginIsNotThrottled;
 use Laravel\Fortify\Actions\PrepareAuthenticatedSession;
 use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
+use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
@@ -63,6 +64,7 @@ class FortifyServiceProvider extends ServiceProvider
     private function configureActions(): void
     {
         $this->app->singleton(RegisterResponse::class, \App\Http\Responses\RegisterResponse::class);
+        $this->app->singleton(LoginResponse::class, \App\Http\Responses\LoginResponse::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
     }

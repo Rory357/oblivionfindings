@@ -42,12 +42,16 @@ type RolePayload = {
     description?: string | null;
     users_count?: number;
     permission_keys: string[];
+    landing_route?: string | null;
 };
+
+type LandingRouteOption = { key: string; label: string };
 
 type Props = {
     mode: 'create' | 'edit';
     role: RolePayload | null;
     permissions: Permission[];
+    landingRoutes: LandingRouteOption[];
 };
 
 /**
@@ -146,11 +150,13 @@ export default function RoleEdit(props: Props) {
         label: string;
         description: string;
         permission_keys: string[];
+        landing_route: string | null;
     }>({
         name: props.role?.name ?? '',
         label: props.role?.label ?? '',
         description: props.role?.description ?? '',
         permission_keys: props.role?.permission_keys ?? [],
+        landing_route: props.role?.landing_route ?? null,
     });
 
     const filteredPermissions = useMemo(() => {
@@ -298,7 +304,7 @@ export default function RoleEdit(props: Props) {
                         <Card>
                             <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <Shield className="h-4 w-4 text-violet-600" />
+                                    <Shield className="h-4 w-4 text-primary" />
                                     Role Details
                                 </CardTitle>
                             </CardHeader>
@@ -343,6 +349,32 @@ export default function RoleEdit(props: Props) {
                                     <InputError message={(form.errors as any).description} />
                                 </div>
 
+                                <div className="space-y-2">
+                                    <Label htmlFor="landing_route">Default Landing Page</Label>
+                                    <select
+                                        id="landing_route"
+                                        value={form.data.landing_route ?? ''}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'landing_route',
+                                                e.target.value === '' ? null : e.target.value,
+                                            )
+                                        }
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    >
+                                        <option value="">System default (Dashboard)</option>
+                                        {props.landingRoutes.map((opt) => (
+                                            <option key={opt.key} value={opt.key}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-muted-foreground">
+                                        Where users with this role land after login. Users with multiple roles can pick which one wins on their profile.
+                                    </p>
+                                    <InputError message={(form.errors as any).landing_route} />
+                                </div>
+
                                 {props.mode === 'edit' && props.role?.users_count != null && (
                                     <div className="rounded-lg border bg-muted/50 p-3">
                                         <div className="flex items-center gap-2">
@@ -367,7 +399,7 @@ export default function RoleEdit(props: Props) {
                                 <Button
                                     onClick={submit}
                                     disabled={form.processing}
-                                    className="w-full bg-violet-600 hover:bg-violet-700"
+                                    className="w-full"
                                 >
                                     <Check className="mr-1.5 h-4 w-4" />
                                     {props.mode === 'create' ? 'Create Role' : 'Save Changes'}
@@ -385,7 +417,7 @@ export default function RoleEdit(props: Props) {
                         <Card>
                             <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <Shield className="h-4 w-4 text-violet-600" />
+                                    <Shield className="h-4 w-4 text-primary" />
                                     Permissions
                                 </CardTitle>
                                 <p className="text-sm text-muted-foreground">

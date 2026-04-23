@@ -25,12 +25,27 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $user->loadMissing([
-            'roles:id,name,label',
+            'roles:id,name,label,landing_route',
             'staffProfile:id,user_id,job_title,mobile_phone',
         ]);
 
-        $roles = $user->roles
+        $roleLabels = $user->roles
             ->map(fn ($role) => $role->label ?: str($role->name)->replace('_', ' ')->title()->toString())
+            ->values()
+            ->all();
+
+        // Build the landing-page dropdown from the roles assigned to this user.
+        // Each option lists one role's landing_route. "System default" is
+        // always available — falls through to LoginResponse's hierarchy.
+        $landingRoutesConfig = (array) config('landing_routes', []);
+        $landingOptions = $user->roles
+            ->filter(fn ($role) => filled($role->landing_route) && isset($landingRoutesConfig[$role->landing_route]))
+            ->map(fn ($role) => [
+                'key' => (string) $role->landing_route,
+                'label' => (string) ($landingRoutesConfig[$role->landing_route]['label'] ?? $role->landing_route),
+                'role_label' => $role->label ?: $role->name,
+            ])
+            ->unique('key')
             ->values()
             ->all();
 
@@ -43,18 +58,58 @@ class ProfileController extends Controller
                 'timezone' => $user->timezone ?? 'Pacific/Auckland',
                 'dateFormat' => $user->date_format ?? 'DD/MM/YYYY',
                 'timeFormat' => $user->time_format ?? '24',
+                'landingRoutePreference' => $user->landing_route_preference,
+                'landingOptions' => $landingOptions,
                 'emailVerifiedAt' => $this->serializeDateTime($user->email_verified_at),
                 'createdAt' => $this->serializeDateTime($user->created_at),
                 'updatedAt' => $this->serializeDateTime($user->updated_at),
                 'lastLoginAt' => $this->serializeDateTime(data_get($user, 'last_login_at')),
                 'passwordChangedAt' => $this->serializeDateTime(data_get($user, 'password_changed_at')),
-                'roles' => $roles,
+                'roles' => $roleLabels,
                 'twoFactorEnabled' => $user->two_factor_confirmed_at !== null,
                 'microsoftLinked' => false,
                 'googleLinked' => false,
                 'profilePhotoPath' => $user->profile_photo_path,
             ],
         ]);
+    }
+
+    /**
+     * Update the user's preferred landing page. Accepts a key from the keys
+     * their roles expose (or null to clear / "system default"). Validated
+     * against config('landing_routes') so a user can't opt into a route that
+     * no longer exists.
+     */
+    public function updateLanding(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $allowedKeys = array_keys((array) config('landing_routes', []));
+
+        $data = $request->validate([
+            'landing_route_preference' => [
+                'nullable',
+                'string',
+                function (string $attribute, mixed $value, \Closure $fail) use ($user, $allowedKeys) {
+                    if (! in_array($value, $allowedKeys, true)) {
+                        $fail('That landing page is no longer available.');
+                        return;
+                    }
+                    // Confirm the user has a role that offers this landing.
+                    $userRoleKeys = $user->roles()->pluck('landing_route')->filter()->unique();
+                    if (! $userRoleKeys->contains($value)) {
+                        $fail('None of your roles are configured for that landing page.');
+                    }
+                },
+            ],
+        ]);
+
+        $user->forceFill([
+            'landing_route_preference' => $data['landing_route_preference'] ?? null,
+        ])->save();
+
+        return back()->with('success', 'Landing page preference updated.');
     }
 
     /**

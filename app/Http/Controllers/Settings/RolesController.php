@@ -69,6 +69,7 @@ class RolesController extends Controller
             'mode' => 'create',
             'role' => $cloneRole,
             'permissions' => $permissions,
+            'landingRoutes' => $this->landingRouteOptions(),
         ]);
     }
 
@@ -82,6 +83,7 @@ class RolesController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'permission_keys' => ['array'],
             'permission_keys.*' => ['string', Rule::exists('permissions', 'key')],
+            'landing_route' => ['nullable', 'string', Rule::in(array_keys(config('landing_routes', [])))],
         ], [
             'name.regex' => 'Role key must be lowercase letters, numbers, or underscores (e.g. support_worker).',
         ]);
@@ -90,6 +92,7 @@ class RolesController extends Controller
             'name' => $data['name'],
             'label' => $data['label'],
             'description' => $data['description'] ?? null,
+            'landing_route' => $data['landing_route'] ?? null,
         ]);
 
         $keys = collect($data['permission_keys'] ?? [])->unique()->values();
@@ -118,9 +121,22 @@ class RolesController extends Controller
                 'description' => $role->description,
                 'users_count' => $role->users_count,
                 'permission_keys' => $role->permissions->pluck('key')->values(),
+                'landing_route' => $role->landing_route,
             ],
             'permissions' => $permissions,
+            'landingRoutes' => $this->landingRouteOptions(),
         ]);
+    }
+
+    /**
+     * @return array<array{key: string, label: string}>
+     */
+    private function landingRouteOptions(): array
+    {
+        return collect(config('landing_routes', []))
+            ->map(fn ($config, $key) => ['key' => (string) $key, 'label' => (string) ($config['label'] ?? $key)])
+            ->values()
+            ->all();
     }
 
     public function update(Request $request, Role $role)
@@ -133,6 +149,7 @@ class RolesController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'permission_keys' => ['array'],
             'permission_keys.*' => ['string', Rule::exists('permissions', 'key')],
+            'landing_route' => ['nullable', 'string', Rule::in(array_keys(config('landing_routes', [])))],
         ], [
             'name.regex' => 'Role key must be lowercase letters, numbers, or underscores (e.g. support_worker).',
         ]);
@@ -141,6 +158,7 @@ class RolesController extends Controller
             'name' => $data['name'],
             'label' => $data['label'],
             'description' => $data['description'] ?? null,
+            'landing_route' => $data['landing_route'] ?? null,
         ]);
 
         $keys = collect($data['permission_keys'] ?? [])->unique()->values();
