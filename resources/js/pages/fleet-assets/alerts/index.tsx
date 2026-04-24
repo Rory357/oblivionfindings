@@ -150,10 +150,10 @@ export default function AlertsIndex({
 
     const severityTotal = criticalCount + highCount + mediumCount + lowAlertCount;
     const severityBars = [
-        { label: 'Critical', count: criticalCount, color: 'bg-red-600' },
-        { label: 'High', count: highCount, color: 'bg-orange-500' },
-        { label: 'Medium', count: mediumCount, color: 'bg-yellow-500' },
-        { label: 'Low', count: lowAlertCount, color: 'bg-blue-400' },
+        { label: 'Critical', count: criticalCount, color: 'bg-status-critical' },
+        { label: 'High', count: highCount, color: 'bg-status-warning' },
+        { label: 'Medium', count: mediumCount, color: 'bg-status-warning' },
+        { label: 'Low', count: lowAlertCount, color: 'bg-status-info' },
     ];
 
     const applyFilters = (newFilters: Partial<typeof filters>) => {
@@ -211,9 +211,9 @@ export default function AlertsIndex({
                 {/* Dark KPI Cards */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     <FleetStatCard label="TOTAL OPEN" value={unresolvedOperationalAlerts.length} icon={Bell} subtitle="Operational Control Room alerts" />
-                    <FleetStatCard label="CRITICAL" value={criticalCount} icon={Zap} color="red" valueClassName="text-red-400" subtitle="Immediate attention" />
-                    <FleetStatCard label="HIGH" value={highCount} icon={ShieldAlert} color="amber" valueClassName="text-orange-400" subtitle="High priority" />
-                    <FleetStatCard label="MEDIUM" value={mediumCount} icon={AlertTriangle} color="amber" valueClassName="text-yellow-400" subtitle="Medium severity" />
+                    <FleetStatCard label="CRITICAL" value={criticalCount} icon={Zap} color="red" valueClassName="text-status-critical" subtitle="Immediate attention" />
+                    <FleetStatCard label="HIGH" value={highCount} icon={ShieldAlert} color="amber" valueClassName="text-status-warning" subtitle="High priority" />
+                    <FleetStatCard label="MEDIUM" value={mediumCount} icon={AlertTriangle} color="amber" valueClassName="text-status-warning" subtitle="Medium severity" />
                     {severityTotal > 0 && (
                         <Card className="border bg-primary/10 dark:bg-primary/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
                             <CardContent className="p-4">
@@ -318,7 +318,7 @@ export default function AlertsIndex({
                                         )}
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
-                                                <AlertTriangle className={`h-4 w-4 ${alert.severity === 'critical' ? 'text-red-500' : 'text-amber-500'}`} />
+                                                <AlertTriangle className={`h-4 w-4 ${alert.severity === 'critical' ? 'text-status-critical' : 'text-status-warning'}`} />
                                                 <span className="font-medium">{(alert.alert_type ?? '').replace(/_/g, ' ')}</span>
                                             </div>
                                         </td>

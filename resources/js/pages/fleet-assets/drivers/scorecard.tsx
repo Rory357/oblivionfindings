@@ -63,10 +63,10 @@ function scoreColor(score: number): string {
 
 function eventIcon(type: string) {
     switch (type) {
-        case 'harsh_brake': return <AlertTriangle className="h-4 w-4 text-amber-500" />;
-        case 'harsh_accel': return <Zap className="h-4 w-4 text-orange-500" />;
-        case 'speeding': return <Gauge className="h-4 w-4 text-red-500" />;
-        case 'idle': return <Timer className="h-4 w-4 text-blue-500" />;
+        case 'harsh_brake': return <AlertTriangle className="h-4 w-4 text-status-warning" />;
+        case 'harsh_accel': return <Zap className="h-4 w-4 text-status-warning" />;
+        case 'speeding': return <Gauge className="h-4 w-4 text-status-critical" />;
+        case 'idle': return <Timer className="h-4 w-4 text-status-info" />;
         default: return <AlertTriangle className="h-4 w-4 text-muted-foreground" />;
     }
 }
@@ -155,7 +155,7 @@ export default function DriverScorecard({
                             <div className="mt-3 text-sm text-muted-foreground">
                                 Fleet average: <span className="font-medium">{fleet_avg_score}</span>
                                 {vsFleet > 0 && <span className="text-primary ml-1">(+{vsFleet} above)</span>}
-                                {vsFleet < 0 && <span className="text-red-600 ml-1">({vsFleet} below)</span>}
+                                {vsFleet < 0 && <span className="text-status-critical ml-1">({vsFleet} below)</span>}
                                 {vsFleet === 0 && <span className="text-muted-foreground ml-1">(at average)</span>}
                             </div>
                         </CardContent>
@@ -166,12 +166,12 @@ export default function DriverScorecard({
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                    <AlertTriangle className="h-4 w-4 text-status-warning" />
                                     Harsh Braking
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold text-amber-600">{metrics.harsh_brakes}</div>
+                                <div className="text-3xl font-bold text-status-warning">{metrics.harsh_brakes}</div>
                                 <p className="text-xs text-muted-foreground mt-1">events this period</p>
                             </CardContent>
                         </Card>
@@ -179,12 +179,12 @@ export default function DriverScorecard({
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Zap className="h-4 w-4 text-orange-500" />
+                                    <Zap className="h-4 w-4 text-status-warning" />
                                     Hard Acceleration
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold text-orange-600">{metrics.hard_accels}</div>
+                                <div className="text-3xl font-bold text-status-warning">{metrics.hard_accels}</div>
                                 <p className="text-xs text-muted-foreground mt-1">events this period</p>
                             </CardContent>
                         </Card>
@@ -192,12 +192,12 @@ export default function DriverScorecard({
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Gauge className="h-4 w-4 text-red-500" />
+                                    <Gauge className="h-4 w-4 text-status-critical" />
                                     Speeding Events
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold text-red-600">{metrics.speeding_events}</div>
+                                <div className="text-3xl font-bold text-status-critical">{metrics.speeding_events}</div>
                                 <p className="text-xs text-muted-foreground mt-1">events this period</p>
                             </CardContent>
                         </Card>
@@ -205,7 +205,7 @@ export default function DriverScorecard({
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Timer className="h-4 w-4 text-blue-500" />
+                                    <Timer className="h-4 w-4 text-status-info" />
                                     Idle Time
                                 </CardTitle>
                             </CardHeader>

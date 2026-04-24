@@ -94,14 +94,14 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-600 text-white">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning text-white">
                             <ClipboardList className="h-5 w-5" />
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight">Corrective Actions</h1>
                             <p className="text-sm text-muted-foreground">
                                 {actions.total} action{actions.total !== 1 ? 's' : ''}
-                                {overdueCount > 0 && <span className="ml-2 font-medium text-red-600">{overdueCount} overdue</span>}
+                                {overdueCount > 0 && <span className="ml-2 font-medium text-status-critical">{overdueCount} overdue</span>}
                             </p>
                         </div>
                     </div>
@@ -109,15 +109,15 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
 
                 {/* Bulk selection banner */}
                 {selected.size > 0 && (
-                    <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm dark:border-blue-800 dark:bg-blue-950">
-                        <span className="font-medium text-blue-700 dark:text-blue-300">
+                    <div className="flex items-center justify-between rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2.5 text-sm dark:border-status-info/30 dark:bg-status-info">
+                        <span className="font-medium text-status-info dark:text-status-info">
                             {selected.size} action{selected.size !== 1 ? 's' : ''} selected
                         </span>
                         <div className="flex items-center gap-2">
-                            <span className="text-xs text-blue-600 dark:text-blue-400">
+                            <span className="text-xs text-status-info dark:text-status-info">
                                 Bulk operations available in management view
                             </span>
-                            <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 gap-1 text-blue-600">
+                            <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 gap-1 text-status-info">
                                 <X className="h-3 w-3" /> Clear
                             </Button>
                         </div>
@@ -194,8 +194,8 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                                             key={action.id}
                                             className={[
                                                 'hover:bg-muted/30',
-                                                action.is_overdue ? 'bg-red-50/50' : '',
-                                                isSelected ? 'bg-blue-50/60 dark:bg-blue-950/30' : '',
+                                                action.is_overdue ? 'bg-status-critical-bg' : '',
+                                                isSelected ? 'bg-status-info-bg dark:bg-status-info' : '',
                                             ].join(' ')}
                                         >
                                             <td className="px-4 py-3">
@@ -214,7 +214,7 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-1.5">
                                                     <StatusBadge status={action.is_overdue ? 'overdue' : action.status} />
-                                                    {action.is_overdue && <AlertTriangle className="h-3.5 w-3.5 text-red-500" />}
+                                                    {action.is_overdue && <AlertTriangle className="h-3.5 w-3.5 text-status-critical" />}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">{action.assigned_to_name ?? '-'}</td>

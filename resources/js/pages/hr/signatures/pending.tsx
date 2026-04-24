@@ -27,9 +27,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    pending: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Pending' },
-    signed: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Signed' },
-    declined: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Declined' },
+    pending: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Pending' },
+    signed: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Signed' },
+    declined: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Declined' },
 };
 
 export default function PendingSignatures({ signatures }: Props) {

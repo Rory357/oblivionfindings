@@ -211,7 +211,7 @@ export default function MaintenanceHealth({ stats, records, attentionDevices, lo
                         {records.data.length > 0 ? (
                             <div className="space-y-2">
                                 {records.data.map((r) => (
-                                    <div key={r.id} className={`rounded-lg border p-4 text-sm ${r.is_overdue ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/10' : ''}`}>
+                                    <div key={r.id} className={`rounded-lg border p-4 text-sm ${r.is_overdue ? 'border-status-warning/30 bg-status-warning-bg dark:bg-status-warning' : ''}`}>
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
@@ -280,7 +280,7 @@ export default function MaintenanceHealth({ stats, records, attentionDevices, lo
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" /> Devices Needing Attention
+                                    <AlertTriangle className="h-4 w-4 text-status-warning" /> Devices Needing Attention
                                 </CardTitle>
                                 <CardDescription>{totalAttention} device{totalAttention !== 1 ? 's' : ''} require attention</CardDescription>
                             </CardHeader>
@@ -315,7 +315,7 @@ export default function MaintenanceHealth({ stats, records, attentionDevices, lo
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <BatteryLow className="h-4 w-4 text-amber-500" /> Low Battery
+                                        <BatteryLow className="h-4 w-4 text-status-warning" /> Low Battery
                                     </CardTitle>
                                     <CardDescription>{lowBatteryDevices.length} device{lowBatteryDevices.length !== 1 ? 's' : ''} below 20%</CardDescription>
                                 </CardHeader>
@@ -331,7 +331,7 @@ export default function MaintenanceHealth({ stats, records, attentionDevices, lo
                                                     <p className="font-medium">{d.name}</p>
                                                     <p className="text-[10px] text-muted-foreground font-mono">{d.device_uid}</p>
                                                 </div>
-                                                <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                                <div className="flex items-center gap-1 text-status-warning dark:text-status-warning">
                                                     <Battery className="h-4 w-4" />
                                                     <span className="text-sm font-semibold">{d.battery_level}%</span>
                                                 </div>

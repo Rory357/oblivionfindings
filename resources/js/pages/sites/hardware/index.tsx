@@ -112,37 +112,37 @@ const deviceStatusConfig: Record<
 > = {
     active: {
         label: 'Online',
-        className: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        className: 'bg-status-success-bg text-status-success border-status-success/30',
         icon: Wifi,
     },
     offline: {
         label: 'Offline',
-        className: 'bg-red-500/20 text-red-400 border-red-500/30',
+        className: 'bg-status-critical-bg text-status-critical border-status-critical/30',
         icon: WifiOff,
     },
     degraded: {
         label: 'Degraded',
-        className: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+        className: 'bg-status-warning-bg text-status-warning border-status-warning/30',
         icon: HelpCircle,
     },
     maintenance: {
         label: 'Maintenance',
-        className: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+        className: 'bg-status-info-bg text-status-info border-status-info/30',
         icon: HelpCircle,
     },
     decommissioned: {
         label: 'Retired',
-        className: 'bg-slate-500/10 text-muted-foreground border-slate-500/20',
+        className: 'bg-muted-foreground/80/10 text-muted-foreground border-border/20',
         icon: Ban,
     },
     in_stock: {
         label: 'In Stock',
-        className: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+        className: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
         icon: HelpCircle,
     },
     lost: {
         label: 'Lost',
-        className: 'bg-red-500/10 text-red-300 border-red-500/20',
+        className: 'bg-status-critical-bg text-status-critical border-status-critical/20',
         icon: Ban,
     },
 };
@@ -151,7 +151,7 @@ function getDeviceStatus(status: string) {
     return (
         deviceStatusConfig[status as DeviceStatusKey] ?? {
             label: status || 'Unknown',
-            className: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+            className: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
             icon: HelpCircle,
         }
     );
@@ -401,8 +401,8 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-slate-500/10 p-2">
-                                <Cpu className="h-5 w-5 text-slate-300" />
+                            <div className="rounded-lg bg-muted-foreground/80/10 p-2">
+                                <Cpu className="h-5 w-5 text-muted-foreground" />
                             </div>
                             <div>
                                 <div className="text-2xl font-bold">{stats.total}</div>
@@ -410,26 +410,26 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-emerald-500/20 bg-emerald-500/5">
+                    <Card className="border-status-success/20 bg-status-success">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-emerald-500/10 p-2">
-                                <Wifi className="h-5 w-5 text-emerald-400" />
+                            <div className="rounded-lg bg-status-success p-2">
+                                <Wifi className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
-                                <div className="text-2xl font-bold text-emerald-400">
+                                <div className="text-2xl font-bold text-status-success">
                                     {stats.online}
                                 </div>
                                 <div className="text-sm text-muted-foreground">Online</div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-red-500/20 bg-red-500/5">
+                    <Card className="border-status-critical/20 bg-status-critical">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-red-500/10 p-2">
-                                <WifiOff className="h-5 w-5 text-red-400" />
+                            <div className="rounded-lg bg-status-critical p-2">
+                                <WifiOff className="h-5 w-5 text-status-critical" />
                             </div>
                             <div>
-                                <div className="text-2xl font-bold text-red-400">
+                                <div className="text-2xl font-bold text-status-critical">
                                     {stats.offline}
                                 </div>
                                 <div className="text-sm text-muted-foreground">Offline / degraded</div>
@@ -438,11 +438,11 @@ export default function SiteHardware({ site, devices, rooms, can }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-amber-500/10 p-2">
-                                <HelpCircle className="h-5 w-5 text-amber-400" />
+                            <div className="rounded-lg bg-status-warning p-2">
+                                <HelpCircle className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
-                                <div className="text-2xl font-bold text-amber-400">
+                                <div className="text-2xl font-bold text-status-warning">
                                     {stats.unassigned}
                                 </div>
                                 <div className="text-sm text-muted-foreground">Unassigned to rooms</div>

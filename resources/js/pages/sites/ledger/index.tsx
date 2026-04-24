@@ -99,10 +99,10 @@ const formatCurrency = (amount: number | undefined | null) => {
 };
 
 const entryTypeColors: Record<string, string> = {
-    income: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    expense: 'bg-red-500/20 text-red-300 border-red-500/30',
-    adjustment: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-    transfer: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    income: 'bg-status-success-bg text-status-success border-status-success/30',
+    expense: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    adjustment: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    transfer: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
 const entryTypeLabels: Record<string, string> = {
@@ -219,24 +219,24 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 mb-1">
-                                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                                <TrendingUp className="w-4 h-4 text-status-success" />
                                 <span className="text-sm text-muted-foreground">Income</span>
                             </div>
-                            <div className="text-2xl font-bold text-emerald-400">
+                            <div className="text-2xl font-bold text-status-success">
                                 {formatCurrency(incomeTotal)}
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-red-500/5 border-red-500/20">
+                    <Card className="bg-status-critical border-status-critical/20">
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 mb-1">
-                                <TrendingDown className="w-4 h-4 text-red-400" />
+                                <TrendingDown className="w-4 h-4 text-status-critical" />
                                 <span className="text-sm text-muted-foreground">Expenses</span>
                             </div>
-                            <div className="text-2xl font-bold text-red-400">
+                            <div className="text-2xl font-bold text-status-critical">
                                 {formatCurrency(expenseTotal)}
                             </div>
                         </CardContent>
@@ -305,9 +305,9 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                             <TableCell className="text-right font-medium">
                                                 <span className={
                                                     entry.entry_type === 'income'
-                                                        ? 'text-emerald-400'
+                                                        ? 'text-status-success'
                                                         : entry.entry_type === 'expense'
-                                                            ? 'text-red-400'
+                                                            ? 'text-status-critical'
                                                             : ''
                                                 }>
                                                     {entry.entry_type === 'expense' ? '-' : ''}
@@ -321,7 +321,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                                 {entry.attachments && entry.attachments.length > 0 ? (
                                                     <a
                                                         href={`/sites/${site.id}/ledger/entries/${entry.id}/attachment`}
-                                                        className="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
+                                                        className="inline-flex items-center gap-1 text-sm text-status-info hover:text-status-info"
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                     >
@@ -419,7 +419,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     required
                                 />
                                 {form.errors.description && (
-                                    <p className="text-sm text-red-400 mt-1">{form.errors.description}</p>
+                                    <p className="text-sm text-status-critical mt-1">{form.errors.description}</p>
                                 )}
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -435,7 +435,7 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                         required
                                     />
                                     {form.errors.amount && (
-                                        <p className="text-sm text-red-400 mt-1">{form.errors.amount}</p>
+                                        <p className="text-sm text-status-critical mt-1">{form.errors.amount}</p>
                                     )}
                                 </div>
                                 <div>
@@ -475,16 +475,16 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     onChange={(e) => form.setData('attachment', e.target.files?.[0] ?? null)}
                                 />
                                 {form.data.attachment ? (
-                                    <div className="flex items-center gap-2 rounded-md border border-blue-500/30 bg-blue-500/5 px-3 py-2 mt-1">
-                                        <Paperclip className="w-4 h-4 text-blue-400 shrink-0" />
-                                        <span className="text-sm text-blue-300 truncate flex-1">{form.data.attachment.name}</span>
+                                    <div className="flex items-center gap-2 rounded-md border border-status-info/30 bg-status-info px-3 py-2 mt-1">
+                                        <Paperclip className="w-4 h-4 text-status-info shrink-0" />
+                                        <span className="text-sm text-status-info truncate flex-1">{form.data.attachment.name}</span>
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 form.setData('attachment', null);
                                                 if (fileInputRef.current) fileInputRef.current.value = '';
                                             }}
-                                            className="text-muted-foreground hover:text-red-400 transition-colors"
+                                            className="text-muted-foreground hover:text-status-critical transition-colors"
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
@@ -493,14 +493,14 @@ export default function SiteLedger({ site, ledger, entries, canCreate, canManage
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-full mt-1 flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-600 px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-blue-500/50 hover:text-blue-400 hover:bg-blue-500/5 cursor-pointer"
+                                        className="w-full mt-1 flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-border px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-status-info/50 hover:text-status-info hover:bg-status-info cursor-pointer"
                                     >
                                         <Upload className="w-4 h-4" />
                                         Choose file (PDF or image, max 10MB)
                                     </button>
                                 )}
                                 {form.errors.attachment && (
-                                    <p className="text-sm text-red-400 mt-1">{form.errors.attachment}</p>
+                                    <p className="text-sm text-status-critical mt-1">{form.errors.attachment}</p>
                                 )}
                             </div>
                             <DialogFooter>

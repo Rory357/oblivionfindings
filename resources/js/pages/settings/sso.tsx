@@ -38,7 +38,7 @@ function CopyBlock({ label, value }: { label: string; value: string }) {
                         setTimeout(() => setCopied(false), 2000);
                     }}
                 >
-                    {copied ? <span className="text-xs text-emerald-600">Done</span> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? <span className="text-xs text-status-success">Done</span> : <Copy className="h-3.5 w-3.5" />}
                 </Button>
             </div>
         </div>
@@ -90,7 +90,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Microsoft 365</p>
                                         <div className="mt-1 flex items-center gap-2">
                                             {msConfigured ? (
-                                                <Badge className="bg-emerald-100 text-emerald-700 text-xs">Configured</Badge>
+                                                <Badge className="bg-status-success-bg text-status-success text-xs">Configured</Badge>
                                             ) : (
                                                 <Badge className="bg-muted text-muted-foreground text-xs">Not Configured</Badge>
                                             )}
@@ -109,7 +109,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Google Workspace</p>
                                         <div className="mt-1 flex items-center gap-2">
                                             {gConfigured ? (
-                                                <Badge className="bg-emerald-100 text-emerald-700 text-xs">Configured</Badge>
+                                                <Badge className="bg-status-success-bg text-status-success text-xs">Configured</Badge>
                                             ) : (
                                                 <Badge className="bg-muted text-muted-foreground text-xs">Not Configured</Badge>
                                             )}
@@ -197,8 +197,8 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                             <Switch checked={portalMicrosoftEnabled} onCheckedChange={setPortalMicrosoftEnabled} />
                                         </div>
                                     </div>
-                                    <div className="rounded-lg bg-blue-50 p-4 text-sm dark:bg-blue-950/20">
-                                        <p className="flex items-center gap-2 font-medium text-blue-800 dark:text-blue-300">
+                                    <div className="rounded-lg bg-status-info-bg p-4 text-sm dark:bg-status-info">
+                                        <p className="flex items-center gap-2 font-medium text-status-info dark:text-status-info">
                                             <Info className="h-4 w-4" />
                                             Required API Permissions
                                         </p>
@@ -207,7 +207,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                                 <Badge key={scope} variant="outline" className="text-xs font-mono">{scope}</Badge>
                                             ))}
                                         </div>
-                                        <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">Configure these in your Azure App Registration &rarr; API permissions</p>
+                                        <p className="mt-2 text-xs text-status-info dark:text-status-info">Configure these in your Azure App Registration &rarr; API permissions</p>
                                     </div>
                                     <Button className="bg-primary hover:bg-primary">Save Microsoft Settings</Button>
                                 </CardContent>
@@ -251,8 +251,8 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                             <Switch checked={portalGoogleEnabled} onCheckedChange={setPortalGoogleEnabled} />
                                         </div>
                                     </div>
-                                    <div className="rounded-lg bg-emerald-50 p-4 text-sm dark:bg-emerald-950/20">
-                                        <p className="flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-300">
+                                    <div className="rounded-lg bg-status-success-bg p-4 text-sm dark:bg-status-success">
+                                        <p className="flex items-center gap-2 font-medium text-status-success dark:text-status-success">
                                             <Info className="h-4 w-4" />
                                             Required OAuth Scopes
                                         </p>
@@ -261,7 +261,7 @@ export default function SsoSettings({ microsoft_configured = false, google_confi
                                                 <Badge key={scope} variant="outline" className="text-xs font-mono">{scope}</Badge>
                                             ))}
                                         </div>
-                                        <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">Configure these in Google Cloud Console &rarr; OAuth consent screen</p>
+                                        <p className="mt-2 text-xs text-status-success dark:text-status-success">Configure these in Google Cloud Console &rarr; OAuth consent screen</p>
                                     </div>
                                     <Button className="bg-primary hover:bg-primary">Save Google Settings</Button>
                                 </CardContent>

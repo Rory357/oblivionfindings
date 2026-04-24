@@ -249,7 +249,7 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                                                     {visibleRoles.map((role) => (
                                                         <TableCell key={role.id} className="text-center py-2">
                                                             {hasPermission(role.id, perm.id) ? (
-                                                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700">
+                                                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-status-success-bg text-status-success">
                                                                     <Check className="h-4 w-4" />
                                                                 </div>
                                                             ) : (

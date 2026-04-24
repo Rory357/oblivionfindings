@@ -76,7 +76,7 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
                                     </SelectContent>
                                 </Select>
                                 {errors.bank_account_id && (
-                                    <p className="text-sm text-red-600">{errors.bank_account_id}</p>
+                                    <p className="text-sm text-status-critical">{errors.bank_account_id}</p>
                                 )}
                                 {selectedAccount && (
                                     <p className="text-sm text-muted-foreground">
@@ -94,7 +94,7 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
                                     onChange={(e) => setData('statement_date', e.target.value)}
                                 />
                                 {errors.statement_date && (
-                                    <p className="text-sm text-red-600">{errors.statement_date}</p>
+                                    <p className="text-sm text-status-critical">{errors.statement_date}</p>
                                 )}
                             </div>
 
@@ -109,7 +109,7 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
                                     onChange={(e) => setData('statement_balance', e.target.value)}
                                 />
                                 {errors.statement_balance && (
-                                    <p className="text-sm text-red-600">{errors.statement_balance}</p>
+                                    <p className="text-sm text-status-critical">{errors.statement_balance}</p>
                                 )}
                             </div>
 

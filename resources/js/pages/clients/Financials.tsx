@@ -125,11 +125,11 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
 
                 {/* Funding Gap Banner */}
                 {gap.is_underfunded && (
-                    <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/30">
-                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/30 dark:bg-status-critical">
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical dark:text-status-critical" />
                         <div>
-                            <p className="text-sm font-medium text-red-800 dark:text-red-300">Underfunded Client</p>
-                            <p className="mt-0.5 text-sm text-red-700 dark:text-red-400">
+                            <p className="text-sm font-medium text-status-critical dark:text-status-critical">Underfunded Client</p>
+                            <p className="mt-0.5 text-sm text-status-critical dark:text-status-critical">
                                 This client's cost of care exceeds funding by {$(gap.weekly_gap)}/week.
                                 Funding covers {gap.funding_coverage_pct}% of costs.
                             </p>
@@ -210,7 +210,7 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
                                             </TableCell>
                                             <TableCell className="max-w-[300px] truncate text-sm">{entry.description}</TableCell>
                                             <TableCell className="text-right tabular-nums">
-                                                <span className={`flex items-center justify-end gap-1 ${entry.direction === 'inflow' ? 'text-green-600' : 'text-red-600'}`}>
+                                                <span className={`flex items-center justify-end gap-1 ${entry.direction === 'inflow' ? 'text-status-success' : 'text-status-critical'}`}>
                                                     {entry.direction === 'inflow' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                                                     {$(entry.amount)}
                                                 </span>

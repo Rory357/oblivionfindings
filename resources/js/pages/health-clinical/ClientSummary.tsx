@@ -60,10 +60,10 @@ type Props = {
 };
 
 const severityColor: Record<string, string> = {
-    low: 'bg-blue-100 text-blue-800',
-    medium: 'bg-amber-100 text-amber-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
+    low: 'bg-status-info-bg text-status-info',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function ClientSummary({ client, summary, observation_types, event_types }: Props) {
@@ -95,18 +95,18 @@ export default function ClientSummary({ client, summary, observation_types, even
                 {summary.medical_profile && (
                     <>
                         {summary.medical_profile.allergies && summary.medical_profile.allergies.length > 0 && (
-                            <div className="flex items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50 p-4">
-                                <ShieldAlert className="h-6 w-6 shrink-0 text-red-600" />
+                            <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
+                                <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
                                 <div>
-                                    <p className="text-sm font-bold text-red-800">Allergies</p>
-                                    <p className="text-sm text-red-700">{summary.medical_profile.allergies.join(', ')}</p>
+                                    <p className="text-sm font-bold text-status-critical">Allergies</p>
+                                    <p className="text-sm text-status-critical">{summary.medical_profile.allergies.join(', ')}</p>
                                 </div>
                             </div>
                         )}
                         {summary.medical_profile.gp_name && (
-                            <Card className="border-emerald-200 bg-emerald-50/30">
+                            <Card className="border-status-success/30 bg-status-success-bg">
                                 <CardContent className="p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">GP / Primary Care</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-status-success">GP / Primary Care</p>
                                     <p className="mt-1 text-sm font-medium">{summary.medical_profile.gp_name}</p>
                                     {summary.medical_profile.gp_practice && <p className="text-xs text-muted-foreground">{summary.medical_profile.gp_practice}</p>}
                                 </CardContent>
@@ -129,7 +129,7 @@ export default function ClientSummary({ client, summary, observation_types, even
                             ) : (
                                 <div className="space-y-2">
                                     {summary.active_protocols.map((p) => (
-                                        <div key={p.id} className={`rounded-lg border p-3 ${p.is_overdue ? 'border-red-200 bg-red-50/40' : ''}`}>
+                                        <div key={p.id} className={`rounded-lg border p-3 ${p.is_overdue ? 'border-status-critical/30 bg-status-critical-bg' : ''}`}>
                                             <div className="flex items-center justify-between">
                                                 <Badge variant="secondary" className="text-xs">{observation_types[p.observation_type] ?? p.observation_type}</Badge>
                                                 <div className="flex items-center gap-1">

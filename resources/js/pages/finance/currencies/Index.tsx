@@ -384,7 +384,7 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                             <TableCell className="font-mono text-sm font-semibold">
                                                 {currency.code}
                                                 {currency.is_base && (
-                                                    <Badge variant="outline" className="ml-2 bg-blue-500/10 text-blue-600 border-blue-500/30">
+                                                    <Badge variant="outline" className="ml-2 bg-status-info-bg text-status-info border-status-info/30">
                                                         Base
                                                     </Badge>
                                                 )}
@@ -402,7 +402,7 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                                     variant="outline"
                                                     className={
                                                         currency.is_active
-                                                            ? 'bg-green-500/10 text-green-600 border-green-500/30'
+                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
                                                             : 'bg-muted text-muted-foreground border-border'
                                                     }
                                                 >

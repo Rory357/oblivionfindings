@@ -34,7 +34,7 @@ export default function UnacknowledgedHandoverNotes({ notes }: Props) {
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <Badge variant="outline">{n.handover_type?.replace(/_/g, ' ')}</Badge>
-                                                <Badge className="bg-amber-100 text-amber-800">Unacknowledged</Badge>
+                                                <Badge className="bg-status-warning-bg text-status-warning">Unacknowledged</Badge>
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{n.notes}</div>
                                             <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(n.created_at)}</div>

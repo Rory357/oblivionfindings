@@ -73,7 +73,7 @@ export default function SubstanceCreate() {
                                     value={form.data.name}
                                     onChange={(e) => form.setData('name', e.target.value)}
                                 />
-                                {form.errors.name && <p className="text-xs text-red-600">{form.errors.name}</p>}
+                                {form.errors.name && <p className="text-xs text-status-critical">{form.errors.name}</p>}
                             </div>
                             <div className="space-y-1">
                                 <Label>Common Name</Label>
@@ -281,7 +281,7 @@ export default function SubstanceCreate() {
 
                 {/* Errors */}
                 {Object.keys(form.errors).length > 0 && (
-                    <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                    <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                         <p className="font-medium">Please fix the following errors:</p>
                         <ul className="mt-1 list-disc pl-5">
                             {Object.entries(form.errors).map(([field, message]) => (

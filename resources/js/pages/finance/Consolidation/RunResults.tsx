@@ -69,10 +69,10 @@ type PageProps = {
 };
 
 const statusColors: Record<string, string> = {
-    draft: 'bg-gray-500/10 text-muted-foreground border-gray-500/30',
-    processing: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-    completed: 'bg-green-500/10 text-green-600 border-green-500/30',
-    failed: 'bg-red-500/10 text-red-600 border-red-500/30',
+    draft: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
+    processing: 'bg-status-info-bg text-status-info border-status-info/30',
+    completed: 'bg-status-success-bg text-status-success border-status-success/30',
+    failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 function formatCurrencyStr(value: string | number, currency: string = 'NZD'): string {
@@ -169,8 +169,8 @@ export default function RunResults({ group, run }: PageProps) {
 
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    <SummaryCard title="Total Revenue" value={run.total_revenue} icon={TrendingUp} currency={group.base_currency_code} colorClass="text-green-600" />
-                    <SummaryCard title="Total Expenses" value={run.total_expenses} icon={TrendingDown} currency={group.base_currency_code} colorClass="text-red-600" />
+                    <SummaryCard title="Total Revenue" value={run.total_revenue} icon={TrendingUp} currency={group.base_currency_code} colorClass="text-status-success" />
+                    <SummaryCard title="Total Expenses" value={run.total_expenses} icon={TrendingDown} currency={group.base_currency_code} colorClass="text-status-critical" />
                     <SummaryCard title="Total Assets" value={run.total_assets} icon={Building2} currency={group.base_currency_code} />
                     <SummaryCard title="Total Liabilities" value={run.total_liabilities} icon={Minus} currency={group.base_currency_code} />
                     <SummaryCard title="Total Equity" value={run.total_equity} icon={DollarSign} currency={group.base_currency_code} />
@@ -182,7 +182,7 @@ export default function RunResults({ group, run }: PageProps) {
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Net Income</p>
-                                <p className={`text-2xl font-bold mt-1 ${netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <p className={`text-2xl font-bold mt-1 ${netIncome >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                     {formatCurrencyStr(netIncome, group.base_currency_code)}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">Revenue minus Expenses</p>

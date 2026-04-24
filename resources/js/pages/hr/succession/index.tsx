@@ -28,10 +28,10 @@ const breadcrumbs = [
 ];
 
 const riskConfig: Record<string, { className: string; label: string }> = {
-    critical: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Critical' },
-    high: { className: 'border-orange-500/30 text-orange-400 bg-orange-500/10', label: 'High' },
-    medium: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Medium' },
-    low: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Low' },
+    critical: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Critical' },
+    high: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'High' },
+    medium: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Medium' },
+    low: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Low' },
 };
 
 export default function SuccessionIndex({ plans, can }: Props) {

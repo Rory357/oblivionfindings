@@ -151,22 +151,22 @@ const roleOptions = ['control_room_operator', 'control_room_supervisor', 'site_m
 
 const severityColors: Record<string, string> = {
     low: 'bg-muted text-foreground',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 const statusColors: Record<string, string> = {
-    active: 'bg-green-100 text-green-800',
+    active: 'bg-status-success-bg text-status-success',
     inactive: 'bg-muted text-muted-foreground',
-    maintenance: 'bg-yellow-100 text-yellow-800',
+    maintenance: 'bg-status-warning-bg text-status-warning',
 };
 
 const windowStatusColors: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-800',
-    active: 'bg-green-100 text-green-800',
+    scheduled: 'bg-status-info-bg text-status-info',
+    active: 'bg-status-success-bg text-status-success',
     completed: 'bg-muted text-muted-foreground',
-    cancelled: 'bg-red-100 text-red-800',
+    cancelled: 'bg-status-critical-bg text-status-critical',
 };
 
 function formatRelativeTime(isoString: string | null): string {
@@ -185,11 +185,11 @@ function formatRelativeTime(isoString: string | null): string {
 }
 
 function heartbeatColor(isoString: string | null): string {
-    if (!isoString) return 'text-red-600';
+    if (!isoString) return 'text-status-critical';
     const diffMins = (Date.now() - new Date(isoString).getTime()) / 60000;
-    if (diffMins < 5) return 'text-green-600';
-    if (diffMins < 10) return 'text-yellow-600';
-    return 'text-red-600';
+    if (diffMins < 5) return 'text-status-success';
+    if (diffMins < 10) return 'text-status-warning';
+    return 'text-status-critical';
 }
 
 function formatDateTime(isoString: string | null): string {
@@ -1112,7 +1112,7 @@ export default function ControlRoomSettings({
                                                                         setDeleteRuleId(rule.id)
                                                                     }
                                                                 >
-                                                                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                                                    <Trash2 className="h-3.5 w-3.5 text-status-critical" />
                                                                 </Button>
                                                             </div>
                                                         </td>
@@ -1228,7 +1228,7 @@ export default function ControlRoomSettings({
                                                                 variant="outline"
                                                                 className={
                                                                     queue.open_alert_count > 0
-                                                                        ? 'bg-orange-100 text-orange-800'
+                                                                        ? 'bg-status-warning-bg text-status-warning'
                                                                         : ''
                                                                 }
                                                             >
@@ -1441,7 +1441,7 @@ export default function ControlRoomSettings({
                                                                                 handleCancelWindow(mw.id)
                                                                             }
                                                                         >
-                                                                            <X className="h-3.5 w-3.5 text-red-500" />
+                                                                            <X className="h-3.5 w-3.5 text-status-critical" />
                                                                         </Button>
                                                                     </>
                                                                 )}
@@ -1512,7 +1512,7 @@ export default function ControlRoomSettings({
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
-                                                                className="h-7 w-7 text-red-500 hover:text-red-700"
+                                                                className="h-7 w-7 text-status-critical hover:text-status-critical"
                                                                 onClick={() => {
                                                                     if (confirm('Delete this option?')) {
                                                                         router.delete(`/control-room/settings/options/${opt.id}`, { preserveScroll: true });

@@ -89,20 +89,20 @@ interface Props {
 // --- Helpers ---
 
 const categoryConfig: Record<string, { color: string; icon: typeof AlertTriangle }> = {
-    emergency: { color: 'bg-red-100 text-red-800 border-red-200', icon: AlertTriangle },
-    safety: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Shield },
-    compliance: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: CheckCircle },
+    emergency: { color: 'bg-status-critical-bg text-status-critical border-status-critical/30', icon: AlertTriangle },
+    safety: { color: 'bg-status-warning-bg text-status-warning border-status-warning/30', icon: Shield },
+    compliance: { color: 'bg-status-info-bg text-status-info border-status-info/30', icon: CheckCircle },
     maintenance: { color: 'bg-muted text-foreground border-border', icon: Wrench },
     investigation: { color: 'bg-primary/10 text-primary border-primary', icon: SearchIcon },
 };
 
 const stepTypeColors: Record<string, string> = {
-    task: 'bg-blue-100 text-blue-800',
+    task: 'bg-status-info-bg text-status-info',
     decision: 'bg-primary/10 text-primary',
-    notification: 'bg-yellow-100 text-yellow-800',
-    escalation: 'bg-red-100 text-red-800',
-    evidence: 'bg-green-100 text-green-800',
-    approval: 'bg-orange-100 text-orange-800',
+    notification: 'bg-status-warning-bg text-status-warning',
+    escalation: 'bg-status-critical-bg text-status-critical',
+    evidence: 'bg-status-success-bg text-status-success',
+    approval: 'bg-status-warning-bg text-status-warning',
 };
 
 function formatRelativeTime(isoString: string | null): string {

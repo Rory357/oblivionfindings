@@ -510,12 +510,12 @@ export default function AssetShow() {
                                                             ) : null}
                                                         </div>
                                                         <div className="flex shrink-0 items-center gap-2">
-                                                            <a href={d.download_url} className="text-sm text-blue-600 hover:underline">
+                                                            <a href={d.download_url} className="text-sm text-status-info hover:underline">
                                                                 Download
                                                             </a>
                                                             {can?.manageDocuments ? (
                                                                 <button
-                                                                    className="text-sm text-red-600 hover:underline"
+                                                                    className="text-sm text-status-critical hover:underline"
                                                                     onClick={() => {
                                                                         if (!confirm('Delete this document?')) return;
                                                                         router.delete(`/assets/${a.id}/documents/${d.id}`, { preserveScroll: true });

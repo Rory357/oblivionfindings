@@ -96,22 +96,22 @@ interface Props {
 // --- Severity config ---
 
 const severityConfig: Record<string, { label: string; className: string; borderColor: string; order: number }> = {
-    critical: { label: 'Critical', className: 'bg-red-600 text-white', borderColor: 'border-l-red-600', order: 0 },
-    high: { label: 'High', className: 'bg-orange-500 text-white', borderColor: 'border-l-orange-500', order: 1 },
-    medium: { label: 'Medium', className: 'bg-yellow-500 text-white', borderColor: 'border-l-yellow-500', order: 2 },
-    low: { label: 'Low', className: 'bg-blue-500 text-white', borderColor: 'border-l-blue-500', order: 3 },
+    critical: { label: 'Critical', className: 'bg-status-critical text-white', borderColor: 'border-l-red-600', order: 0 },
+    high: { label: 'High', className: 'bg-status-warning text-white', borderColor: 'border-l-orange-500', order: 1 },
+    medium: { label: 'Medium', className: 'bg-status-warning text-white', borderColor: 'border-l-yellow-500', order: 2 },
+    low: { label: 'Low', className: 'bg-status-info text-white', borderColor: 'border-l-blue-500', order: 3 },
 };
 
 const tierBgColors: Record<number, string> = {
-    1: 'bg-blue-600',
-    2: 'bg-orange-600',
-    3: 'bg-red-600',
+    1: 'bg-status-info',
+    2: 'bg-status-warning',
+    3: 'bg-status-critical',
 };
 
 const tierColors: Record<number, string> = {
-    1: 'bg-blue-100 text-blue-800 border-blue-200',
-    2: 'bg-orange-100 text-orange-800 border-orange-200',
-    3: 'bg-red-100 text-red-800 border-red-200',
+    1: 'bg-status-info-bg text-status-info border-status-info/30',
+    2: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    3: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 // --- Helpers ---
@@ -173,26 +173,26 @@ function getSlaStatusDotColor(
     breached: boolean,
     nowMs: number,
 ): string {
-    if (completedAt) return 'bg-green-500';
-    if (!deadline) return 'bg-gray-300';
-    if (breached) return 'bg-red-500';
+    if (completedAt) return 'bg-status-success';
+    if (!deadline) return 'bg-muted';
+    if (breached) return 'bg-status-critical';
     const deadlineMs = new Date(deadline).getTime();
     const remainingMs = deadlineMs - nowMs;
-    if (remainingMs <= 0) return 'bg-red-500';
+    if (remainingMs <= 0) return 'bg-status-critical';
     const totalMinutes = Math.floor(remainingMs / 60000);
-    if (totalMinutes <= 5) return 'bg-red-500';
-    if (totalMinutes <= 30) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (totalMinutes <= 5) return 'bg-status-critical';
+    if (totalMinutes <= 30) return 'bg-status-warning';
+    return 'bg-status-success';
 }
 
 function getSlaCountdownColor(color: 'green' | 'yellow' | 'red' | 'muted'): string {
     switch (color) {
         case 'green':
-            return 'text-green-600';
+            return 'text-status-success';
         case 'yellow':
-            return 'text-yellow-600';
+            return 'text-status-warning';
         case 'red':
-            return 'text-red-600 font-semibold';
+            return 'text-status-critical font-semibold';
         case 'muted':
             return 'text-muted-foreground';
     }
@@ -339,7 +339,7 @@ function AlertCard({
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                         <Badge className={`text-[10px] px-1.5 py-0 ${sev.className}`}>{sev.label}</Badge>
-                        {breached && <ShieldAlert className="h-3.5 w-3.5 text-red-500" />}
+                        {breached && <ShieldAlert className="h-3.5 w-3.5 text-status-critical" />}
                     </div>
                 </div>
 
@@ -419,7 +419,7 @@ function AlertCard({
                         <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 px-2 text-xs border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                            className="h-7 px-2 text-xs border-status-warning/30 text-status-warning hover:bg-status-warning-bg"
                             onClick={handleAcknowledge}
                             disabled={acking}
                         >
@@ -540,12 +540,12 @@ function QueueColumn({
                         <div
                             className={`h-full rounded-full transition-all ${
                                 queue.alert_count === 0
-                                    ? 'bg-green-400'
+                                    ? 'bg-status-success'
                                     : queue.alert_count <= 5
-                                      ? 'bg-green-500'
+                                      ? 'bg-status-success'
                                       : queue.alert_count <= 10
-                                        ? 'bg-yellow-500'
-                                        : 'bg-red-500'
+                                        ? 'bg-status-warning'
+                                        : 'bg-status-critical'
                             }`}
                             style={{ width: `${capacityPercent}%` }}
                         />
@@ -557,7 +557,7 @@ function QueueColumn({
             <div className="flex-1 space-y-2 overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 360px)' }}>
                 {queue.alerts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <CheckCircle2 className="mb-2 h-8 w-8 text-green-400" />
+                        <CheckCircle2 className="mb-2 h-8 w-8 text-status-success" />
                         <p className="text-sm text-muted-foreground">Queue clear</p>
                     </div>
                 ) : (
@@ -693,7 +693,7 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className={`text-2xl font-bold ${totalBreached > 0 ? 'text-red-600' : ''}`}>
+                            <p className={`text-2xl font-bold ${totalBreached > 0 ? 'text-status-critical' : ''}`}>
                                 {totalBreached}
                             </p>
                         </CardContent>
@@ -714,7 +714,7 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                 {queues.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16">
-                            <CheckCircle2 className="mb-4 h-12 w-12 text-green-400" />
+                            <CheckCircle2 className="mb-4 h-12 w-12 text-status-success" />
                             <p className="text-lg font-medium text-muted-foreground">
                                 No active triage queues configured
                             </p>

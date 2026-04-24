@@ -72,9 +72,9 @@ const typeLabels: Record<string, string> = {
 };
 
 const typeColors: Record<string, string> = {
-    head_office: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300',
-    house: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
-    facility: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
+    head_office: 'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info',
+    house: 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success',
+    facility: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning',
     residential: 'border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/10 dark:text-primary/70',
 };
 
@@ -92,7 +92,7 @@ function addressFor(site: Site): string {
 function RiskBadge({ site }: { site: Site }) {
     if (site.is_high_risk && site.is_high_needs) {
         return (
-            <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+            <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                 <AlertTriangle className="mr-1 h-3 w-3" />
                 High Risk + Needs
             </Badge>
@@ -100,7 +100,7 @@ function RiskBadge({ site }: { site: Site }) {
     }
     if (site.is_high_risk) {
         return (
-            <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
+            <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                 <AlertCircle className="mr-1 h-3 w-3" />
                 High Risk
             </Badge>
@@ -108,14 +108,14 @@ function RiskBadge({ site }: { site: Site }) {
     }
     if (site.is_high_needs) {
         return (
-            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+            <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                 <AlertCircle className="mr-1 h-3 w-3" />
                 High Needs
             </Badge>
         );
     }
     return (
-        <Badge variant="outline" className="border-border bg-muted text-muted-foreground dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-muted-foreground">
+        <Badge variant="outline" className="border-border bg-muted text-muted-foreground dark:border-border/30 dark:bg-muted-foreground/80/10 dark:text-muted-foreground">
             <CheckCircle2 className="mr-1 h-3 w-3" />
             Standard
         </Badge>
@@ -127,10 +127,10 @@ function RiskBadge({ site }: { site: Site }) {
 /* ------------------------------------------------------------------ */
 
 const STAT_COLORS = {
-    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', icon: 'text-blue-600 dark:text-blue-400', ring: 'ring-blue-100 dark:ring-blue-500/20' },
-    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', icon: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-100 dark:ring-emerald-500/20' },
-    amber: { bg: 'bg-amber-50 dark:bg-amber-500/10', icon: 'text-amber-600 dark:text-amber-400', ring: 'ring-amber-100 dark:ring-amber-500/20' },
-    red: { bg: 'bg-red-50 dark:bg-red-500/10', icon: 'text-red-600 dark:text-red-400', ring: 'ring-red-100 dark:ring-red-500/20' },
+    blue: { bg: 'bg-status-info-bg dark:bg-status-info', icon: 'text-status-info dark:text-status-info', ring: 'ring-status-info dark:ring-status-info/20' },
+    emerald: { bg: 'bg-status-success-bg dark:bg-status-success', icon: 'text-status-success dark:text-status-success', ring: 'ring-status-success dark:ring-status-success/20' },
+    amber: { bg: 'bg-status-warning-bg dark:bg-status-warning', icon: 'text-status-warning dark:text-status-warning', ring: 'ring-status-warning dark:ring-status-warning/20' },
+    red: { bg: 'bg-status-critical-bg dark:bg-status-critical', icon: 'text-status-critical dark:text-status-critical', ring: 'ring-status-critical dark:ring-status-critical/20' },
 };
 
 function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {
@@ -331,8 +331,8 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                                         <Badge
                                                             variant="outline"
                                                             className={s.is_active
-                                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                                                : 'border-border bg-muted text-muted-foreground dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-muted-foreground'
+                                                                ? 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success'
+                                                                : 'border-border bg-muted text-muted-foreground dark:border-border/30 dark:bg-muted-foreground/80/10 dark:text-muted-foreground'
                                                             }
                                                         >
                                                             {s.is_active ? 'Active' : 'Inactive'}

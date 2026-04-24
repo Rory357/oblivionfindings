@@ -57,9 +57,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 const ALL_FILTER_VALUE = '__all__';
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Draft' },
-    approved: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Approved' },
-    paid: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Paid' },
+    draft: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Draft' },
+    approved: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Approved' },
+    paid: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Paid' },
 };
 
 function formatCurrency(amount: string | number): string {

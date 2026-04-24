@@ -61,15 +61,15 @@ const formatDate = (value?: string | null) => {
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'clear':
-            return 'bg-green-100 text-green-800 border-green-200';
+            return 'bg-status-success-bg text-status-success border-status-success/30';
         case 'pending':
         case 'requested':
-            return 'bg-blue-100 text-blue-800 border-blue-200';
+            return 'bg-status-info-bg text-status-info border-status-info/30';
         case 'flagged':
         case 'adverse':
-            return 'bg-red-100 text-red-800 border-red-200';
+            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         case 'renewal_due':
-            return 'bg-amber-100 text-amber-800 border-amber-200';
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         default:
             return 'bg-muted text-foreground border-border';
     }
@@ -147,8 +147,8 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
-                                <CheckCircle className="h-5 w-5 text-green-500" />
-                                <div className="text-2xl font-bold text-green-600">{summary.clear}</div>
+                                <CheckCircle className="h-5 w-5 text-status-success" />
+                                <div className="text-2xl font-bold text-status-success">{summary.clear}</div>
                             </div>
                         </CardContent>
                     </Card>
@@ -158,8 +158,8 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
-                                <Clock className="h-5 w-5 text-amber-500" />
-                                <div className={`text-2xl font-bold ${summary.expiring > 0 ? 'text-amber-600' : ''}`}>
+                                <Clock className="h-5 w-5 text-status-warning" />
+                                <div className={`text-2xl font-bold ${summary.expiring > 0 ? 'text-status-warning' : ''}`}>
                                     {summary.expiring}
                                 </div>
                             </div>
@@ -171,8 +171,8 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
-                                {summary.expired > 0 && <AlertTriangle className="h-5 w-5 text-red-500" />}
-                                <div className={`text-2xl font-bold ${summary.expired > 0 ? 'text-red-600' : ''}`}>
+                                {summary.expired > 0 && <AlertTriangle className="h-5 w-5 text-status-critical" />}
+                                <div className={`text-2xl font-bold ${summary.expired > 0 ? 'text-status-critical' : ''}`}>
                                     {summary.expired}
                                 </div>
                             </div>
@@ -191,7 +191,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                             <CardTitle className="text-sm font-medium text-muted-foreground">Flagged</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-red-600">{summary.flagged}</div>
+                            <div className="text-2xl font-bold text-status-critical">{summary.flagged}</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -272,9 +272,9 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                         <TableCell>
                                             <span className={
                                                 isExpired(check.expires_at)
-                                                    ? 'font-semibold text-red-600'
+                                                    ? 'font-semibold text-status-critical'
                                                     : isExpiringSoon(check.expires_at)
-                                                        ? 'font-medium text-amber-600'
+                                                        ? 'font-medium text-status-warning'
                                                         : ''
                                             }>
                                                 {formatDate(check.expires_at)}

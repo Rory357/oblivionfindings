@@ -49,19 +49,19 @@ export default function ActionItemShow({ auth, action }: Props) {
 
   const getStatusColor = (status: string) => {
     return {
-      open: 'bg-blue-100 text-blue-800',
-      in_progress: 'bg-yellow-100 text-yellow-800',
-      complete: 'bg-green-100 text-green-800',
-      overdue: 'bg-red-100 text-red-800',
+      open: 'bg-status-info-bg text-status-info',
+      in_progress: 'bg-status-warning-bg text-status-warning',
+      complete: 'bg-status-success-bg text-status-success',
+      overdue: 'bg-status-critical-bg text-status-critical',
     }[status] || 'bg-muted text-foreground';
   };
 
   const getPriorityColor = (priority: string) => {
     return {
       low: 'bg-muted text-foreground',
-      medium: 'bg-blue-100 text-blue-800',
-      high: 'bg-orange-100 text-orange-800',
-      critical: 'bg-red-100 text-red-800',
+      medium: 'bg-status-info-bg text-status-info',
+      high: 'bg-status-warning-bg text-status-warning',
+      critical: 'bg-status-critical-bg text-status-critical',
     }[priority] || 'bg-muted text-foreground';
   };
 
@@ -166,7 +166,7 @@ export default function ActionItemShow({ auth, action }: Props) {
           <CardContent>
             {action.status === 'complete' ? (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-green-600">
+                <div className="flex items-center gap-2 text-status-success">
                   <CheckCircle className="w-4 h-4" />
                   Completed {formatDate(action.completed_at)}
                 </div>

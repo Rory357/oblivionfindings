@@ -102,24 +102,24 @@ interface Props {
 // --- Helpers ---
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-    high: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
-    medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
-    low: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+    critical: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    high: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    medium: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    low: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
 };
 
 const statusColors: Record<string, string> = {
-    open: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-    ack: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+    open: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    ack: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     triaging: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
-    resolved: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    resolved: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     closed: 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground',
 };
 
 const slaStatusDot: Record<string, string> = {
-    on_track: 'bg-green-500',
-    at_risk: 'bg-yellow-500',
-    breached: 'bg-red-500',
+    on_track: 'bg-status-success',
+    at_risk: 'bg-status-warning',
+    breached: 'bg-status-critical',
 };
 
 const severityBorder: Record<string, string> = {
@@ -238,13 +238,13 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                         label="Resolved Today"
                         value={stats.my_resolved_today}
                         icon={CheckCircle}
-                        className={stats.my_resolved_today > 0 ? 'border-green-200 dark:border-green-800' : undefined}
+                        className={stats.my_resolved_today > 0 ? 'border-status-success/30 dark:border-status-success/30' : undefined}
                     />
                     <KpiCard
                         label="Critical"
                         value={stats.my_critical}
                         icon={AlertTriangle}
-                        className={stats.my_critical > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/30' : undefined}
+                        className={stats.my_critical > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : undefined}
                     />
                 </div>
 
@@ -266,7 +266,7 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                             <CardContent>
                                 {my_alerts.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                                        <CheckCircle className="mb-2 h-10 w-10 text-green-400" />
+                                        <CheckCircle className="mb-2 h-10 w-10 text-status-success" />
                                         <p className="text-sm">No alerts assigned to you</p>
                                     </div>
                                 ) : (
@@ -364,7 +364,7 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                             <CardContent>
                                 {my_followups.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                                        <CheckCircle className="mb-2 h-10 w-10 text-green-400" />
+                                        <CheckCircle className="mb-2 h-10 w-10 text-status-success" />
                                         <p className="text-sm">No follow-ups pending</p>
                                     </div>
                                 ) : (
@@ -383,7 +383,7 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                                                     <div className="mt-1 flex items-center gap-3">
                                                         <span className={`text-xs font-medium ${
                                                             note.followup_at && new Date(note.followup_at) < new Date()
-                                                                ? 'text-red-600 dark:text-red-400'
+                                                                ? 'text-status-critical dark:text-status-critical'
                                                                 : 'text-muted-foreground'
                                                         }`}>
                                                             <Clock className="mr-1 inline h-3 w-3" />
@@ -450,11 +450,11 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
                                                 <div className="text-xs text-muted-foreground">Created</div>
                                             </div>
                                             <div>
-                                                <div className="text-lg font-bold text-green-600">{my_shift.alerts_resolved}</div>
+                                                <div className="text-lg font-bold text-status-success">{my_shift.alerts_resolved}</div>
                                                 <div className="text-xs text-muted-foreground">Resolved</div>
                                             </div>
                                             <div>
-                                                <div className="text-lg font-bold text-orange-600">{my_shift.alerts_escalated}</div>
+                                                <div className="text-lg font-bold text-status-warning">{my_shift.alerts_escalated}</div>
                                                 <div className="text-xs text-muted-foreground">Escalated</div>
                                             </div>
                                         </div>

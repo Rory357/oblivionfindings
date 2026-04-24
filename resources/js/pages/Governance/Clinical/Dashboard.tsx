@@ -47,9 +47,9 @@ type Props = {
 };
 
 const statusStyles: Record<SnapshotValue['status'], string> = {
-    normal: 'bg-emerald-100 text-emerald-800',
-    warning: 'bg-amber-100 text-amber-800',
-    critical: 'bg-red-100 text-red-800',
+    normal: 'bg-status-success-bg text-status-success',
+    warning: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 function formatPeriod(start: string | null, end: string | null): string {
@@ -98,13 +98,13 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
                     </div>
                 </div>
 
-                <Card className="border-sky-200 bg-sky-50/70">
-                    <CardContent className="flex flex-col gap-2 p-4 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
+                <Card className="border-status-info/30 bg-status-info-bg">
+                    <CardContent className="flex flex-col gap-2 p-4 text-sm text-status-info sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p className="font-medium">Automated source</p>
-                            <p className="text-sky-800/90">{sourceHint}</p>
+                            <p className="text-status-info">{sourceHint}</p>
                         </div>
-                        <Badge variant="secondary" className="w-fit bg-white text-sky-800">
+                        <Badge variant="secondary" className="w-fit bg-white text-status-info">
                             {formatPeriod(latestSnapshot?.period_start ?? null, latestSnapshot?.period_end ?? null)}
                         </Badge>
                     </CardContent>
@@ -171,7 +171,7 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
 
                                             {latestValue?.source_href && latestValue.source_label && (
                                                 <Link href={latestValue.source_href}>
-                                                    <Button variant="ghost" size="sm" className="h-8 px-0 text-sky-700">
+                                                    <Button variant="ghost" size="sm" className="h-8 px-0 text-status-info">
                                                         {latestValue.source_label}
                                                         <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
                                                     </Button>

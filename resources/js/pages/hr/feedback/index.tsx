@@ -47,17 +47,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-    pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400', label: 'Pending' },
-    completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-400', label: 'Completed' },
-    declined: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-400', label: 'Declined' },
-    expired: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-slate-400', label: 'Expired' },
+    pending: { bg: 'bg-status-warning-bg', text: 'text-status-warning', dot: 'bg-status-warning', label: 'Pending' },
+    completed: { bg: 'bg-status-success-bg', text: 'text-status-success', dot: 'bg-status-success', label: 'Completed' },
+    declined: { bg: 'bg-status-critical-bg', text: 'text-status-critical', dot: 'bg-status-critical', label: 'Declined' },
+    expired: { bg: 'bg-muted', text: 'text-muted-foreground', dot: 'bg-muted', label: 'Expired' },
 };
 
 const reviewTypeConfig: Record<string, { label: string; color: string }> = {
-    peer: { label: 'Peer', color: 'bg-blue-100 text-blue-700' },
+    peer: { label: 'Peer', color: 'bg-status-info-bg text-status-info' },
     manager: { label: 'Manager', color: 'bg-primary/10 text-primary' },
-    direct_report: { label: 'Direct Report', color: 'bg-emerald-100 text-emerald-700' },
-    self: { label: 'Self', color: 'bg-amber-100 text-amber-700' },
+    direct_report: { label: 'Direct Report', color: 'bg-status-success-bg text-status-success' },
+    self: { label: 'Self', color: 'bg-status-warning-bg text-status-warning' },
 };
 
 function formatDate(value?: string | null): string {
@@ -82,13 +82,13 @@ function getInitials(name: string) {
 }
 
 const AVATAR_COLORS = [
-    'bg-blue-500',
+    'bg-status-info',
     'bg-primary',
-    'bg-emerald-500',
-    'bg-amber-500',
-    'bg-pink-500',
-    'bg-cyan-500',
-    'bg-rose-500',
+    'bg-status-success',
+    'bg-status-warning',
+    'bg-status-critical',
+    'bg-status-info',
+    'bg-status-critical',
     'bg-primary',
 ];
 
@@ -114,7 +114,7 @@ export default function FeedbackIndex({ requests, pendingCount, stats, can }: Pr
             <Head title="360 Feedback" />
 
             <div className="space-y-6 p-4 lg:p-6">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white shadow-lg">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
                     <div className="absolute left-1/3 -top-4 h-28 w-28 rounded-full bg-white/5" />
@@ -165,7 +165,7 @@ export default function FeedbackIndex({ requests, pendingCount, stats, can }: Pr
                             label: 'Total Requests',
                             value: totalCount,
                             icon: Send,
-                            gradient: 'from-violet-500/10 to-purple-500/5',
+                            gradient: 'from-primary/10 to-primary/5',
                             iconBg: 'bg-primary/10',
                             iconColor: 'text-primary',
                             hover: 'hover:border-primary',
@@ -174,28 +174,28 @@ export default function FeedbackIndex({ requests, pendingCount, stats, can }: Pr
                             label: 'Pending',
                             value: pendingTotal,
                             icon: Clock,
-                            gradient: 'from-amber-500/10 to-yellow-500/5',
-                            iconBg: 'bg-amber-100',
-                            iconColor: 'text-amber-600',
-                            hover: 'hover:border-amber-300',
+                            gradient: 'from-status-warning/10 to-status-warning/5',
+                            iconBg: 'bg-status-warning-bg',
+                            iconColor: 'text-status-warning',
+                            hover: 'hover:border-status-warning/30',
                         },
                         {
                             label: 'Completed',
                             value: completedCount,
                             icon: CheckCircle2,
-                            gradient: 'from-emerald-500/10 to-green-500/5',
-                            iconBg: 'bg-emerald-100',
-                            iconColor: 'text-emerald-600',
-                            hover: 'hover:border-emerald-300',
+                            gradient: 'from-status-success/10 to-status-success/5',
+                            iconBg: 'bg-status-success-bg',
+                            iconColor: 'text-status-success',
+                            hover: 'hover:border-status-success/30',
                         },
                         {
                             label: 'Response Rate',
                             value: `${responseRate}%`,
                             icon: BarChart3,
-                            gradient: 'from-blue-500/10 to-indigo-500/5',
-                            iconBg: 'bg-blue-100',
-                            iconColor: 'text-blue-600',
-                            hover: 'hover:border-blue-300',
+                            gradient: 'from-status-info/10 to-primary/5',
+                            iconBg: 'bg-status-info-bg',
+                            iconColor: 'text-status-info',
+                            hover: 'hover:border-status-info/30',
                         },
                     ].map((kpi) => {
                         const Icon = kpi.icon;

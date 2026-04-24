@@ -48,23 +48,23 @@ interface Props {
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     pending: {
-        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+        className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
         label: 'Pending',
     },
     in_progress: {
-        className: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+        className: 'border-status-info/30 text-status-info bg-status-info',
         label: 'In Progress',
     },
     completed: {
-        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        className: 'border-status-success/30 text-status-success bg-status-success',
         label: 'Completed',
     },
     cancelled: {
-        className: 'border-orange-500/30 text-orange-400 bg-orange-500/10',
+        className: 'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Cancelled',
     },
     overdue: {
-        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        className: 'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Overdue',
     },
 };
@@ -177,7 +177,7 @@ export default function OffboardingShow({ checklist, progress, can }: Props) {
                                                         <div className="mt-2 flex items-center gap-2">
                                                             {task.is_required && <Badge variant="secondary">Required</Badge>}
                                                             {task.sign_off_required && <Badge variant="outline">Sign-off</Badge>}
-                                                            {completed && <Badge className="bg-emerald-600">Completed</Badge>}
+                                                            {completed && <Badge className="bg-status-success">Completed</Badge>}
                                                         </div>
                                                     </div>
 

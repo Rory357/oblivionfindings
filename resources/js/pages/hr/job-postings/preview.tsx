@@ -42,11 +42,11 @@ export default function PreviewJobPosting({ posting }: Props) {
             <Head title={`Preview: ${posting.title}`} />
             <div className="flex flex-col gap-6 p-6 max-w-3xl mx-auto">
                 {/* Preview Banner */}
-                <div className="flex items-center justify-between gap-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <div className="flex items-center justify-between gap-4 p-4 bg-status-warning border border-status-warning/30 rounded-lg">
                     <div className="flex items-center gap-2">
-                        <Eye className="h-5 w-5 text-amber-500" />
+                        <Eye className="h-5 w-5 text-status-warning" />
                         <div>
-                            <p className="font-medium text-amber-400">Preview Mode</p>
+                            <p className="font-medium text-status-warning">Preview Mode</p>
                             <p className="text-xs text-muted-foreground">This is how the posting will appear to candidates on the career portal</p>
                         </div>
                     </div>
@@ -79,14 +79,14 @@ export default function PreviewJobPosting({ posting }: Props) {
                                 )}
                                 <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> {employmentTypeLabels[posting.employment_type]}</span>
                                 {posting.is_remote && (
-                                    <Badge variant="outline" className="gap-1 border-blue-500/30 text-blue-400 bg-blue-500/10"><Wifi className="h-3 w-3" /> Remote</Badge>
+                                    <Badge variant="outline" className="gap-1 border-status-info/30 text-status-info bg-status-info"><Wifi className="h-3 w-3" /> Remote</Badge>
                                 )}
                                 {posting.is_internal && (
                                     <Badge variant="outline" className="gap-1 border-primary/30 text-primary bg-primary/10"><Lock className="h-3 w-3" /> Internal</Badge>
                                 )}
                             </div>
                             {posting.salary_range && (
-                                <p className="mt-2 text-sm flex items-center gap-1 text-emerald-400">
+                                <p className="mt-2 text-sm flex items-center gap-1 text-status-success">
                                     <DollarSign className="h-4 w-4" /> {posting.salary_range}
                                 </p>
                             )}

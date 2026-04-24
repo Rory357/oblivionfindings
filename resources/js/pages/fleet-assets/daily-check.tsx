@@ -112,13 +112,13 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-red-600">
+                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-status-critical">
                                     <XCircle className="h-4 w-4" />
                                     Not Checked
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-3xl font-bold text-red-600">{summary.unchecked}</div>
+                                <div className="text-3xl font-bold text-status-critical">{summary.unchecked}</div>
                             </CardContent>
                         </Card>
                     </div>
@@ -148,8 +148,8 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                                     vehicle.checked_today
                                         ? vehicle.check_result === 'good'
                                             ? 'border-primary/30 bg-primary/10/30 dark:bg-primary/10'
-                                            : 'border-orange-500/30 bg-orange-50/30 dark:bg-orange-950/10'
-                                        : 'border-red-500/30 bg-red-50/30 dark:bg-red-950/10'
+                                            : 'border-status-warning/30 bg-status-warning-bg dark:bg-status-warning'
+                                        : 'border-status-critical/30 bg-status-critical-bg dark:bg-status-critical'
                                 }`}
                             >
                                 <CardContent className="p-4">
@@ -159,10 +159,10 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
                                                 vehicle.check_result === 'good' ? (
                                                     <CheckCircle className="h-5 w-5 text-primary shrink-0" />
                                                 ) : (
-                                                    <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0" />
+                                                    <AlertTriangle className="h-5 w-5 text-status-warning shrink-0" />
                                                 )
                                             ) : (
-                                                <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                                                <XCircle className="h-5 w-5 text-status-critical shrink-0" />
                                             )}
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2">

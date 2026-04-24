@@ -520,7 +520,7 @@ export default function RoleEdit(props: Props) {
                                                                     />
                                                                     <div className="flex min-w-0 flex-1 items-center gap-2">
                                                                         {isChecked ? (
-                                                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-status-success" />
                                                                         ) : (
                                                                             <Circle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
                                                                         )}

@@ -171,20 +171,20 @@ const breadcrumbs = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    active: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Active' },
-    submitted: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Submitted' },
-    approved: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Approved' },
-    rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
-    draft: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Draft' },
+    active: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Active' },
+    submitted: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Submitted' },
+    approved: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
+    rejected: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Rejected' },
+    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
 };
 
 const payTypeConfig: Record<string, { className: string; label: string }> = {
-    standard: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Standard' },
+    standard: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Standard' },
     sleepover: { className: 'border-primary/30 text-primary bg-primary/10', label: 'Sleepover' },
     on_call: { className: 'border-primary/30 text-primary bg-primary/10', label: 'On-Call' },
-    public_holiday: { className: 'border-orange-500/30 text-orange-400 bg-orange-500/10', label: 'Public Holiday' },
-    night: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Night' },
-    weekend: { className: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10', label: 'Weekend' },
+    public_holiday: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Public Holiday' },
+    night: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Night' },
+    weekend: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Weekend' },
     evening: { className: 'border-primary/30 text-primary bg-primary/10', label: 'Evening' },
 };
 
@@ -349,10 +349,10 @@ export default function TimeIndex({
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
                     <KpiCard label="Hours This Week" value={kpiStats.total_hours_this_week} icon={Clock} suffix="h" decimals={1} color="bg-primary/10 text-primary" />
-                    <KpiCard label="Active Staff" value={kpiStats.active_clocked_in} icon={Users} description="Currently clocked in" color="bg-emerald-500/10 text-emerald-500" />
-                    <KpiCard label="Pending Timesheets" value={kpiStats.pending_timesheets} icon={FileText} description="Awaiting approval" color="bg-amber-500/10 text-amber-500" />
-                    <KpiCard label="Overtime Hours" value={kpiStats.overtime_hours} icon={AlertTriangle} suffix="h" decimals={1} description="Over 40h/week" color="bg-red-500/10 text-red-500" />
-                    <KpiCard label="Avg Hours/Day" value={kpiStats.avg_hours_per_day} icon={TrendingUp} suffix="h" decimals={1} color="bg-blue-500/10 text-blue-500" />
+                    <KpiCard label="Active Staff" value={kpiStats.active_clocked_in} icon={Users} description="Currently clocked in" color="bg-status-success-bg text-status-success" />
+                    <KpiCard label="Pending Timesheets" value={kpiStats.pending_timesheets} icon={FileText} description="Awaiting approval" color="bg-status-warning-bg text-status-warning" />
+                    <KpiCard label="Overtime Hours" value={kpiStats.overtime_hours} icon={AlertTriangle} suffix="h" decimals={1} description="Over 40h/week" color="bg-status-critical-bg text-status-critical" />
+                    <KpiCard label="Avg Hours/Day" value={kpiStats.avg_hours_per_day} icon={TrendingUp} suffix="h" decimals={1} color="bg-status-info-bg text-status-info" />
                 </div>
 
                 {/* Tabs */}
@@ -365,7 +365,7 @@ export default function TimeIndex({
                             <TabsTrigger value="approvals" className="relative">
                                 <CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Approvals
                                 {pendingApprovalCount > 0 && (
-                                    <Badge className="ml-1.5 h-5 min-w-[20px] rounded-full bg-amber-500 px-1.5 text-[10px] text-white">
+                                    <Badge className="ml-1.5 h-5 min-w-[20px] rounded-full bg-status-warning px-1.5 text-[10px] text-white">
                                         {pendingApprovalCount}
                                     </Badge>
                                 )}
@@ -384,14 +384,14 @@ export default function TimeIndex({
                                             {activeClock ? (
                                                 <div className="space-y-3">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-400" />
+                                                        <div className="h-3 w-3 animate-pulse rounded-full bg-status-success" />
                                                         <span className="text-sm font-medium">Clocked in since {activeClock.clock_in}</span>
                                                     </div>
                                                     <Button onClick={handleClockOut} variant="destructive" className="w-full" size="sm"><Square className="mr-2 h-4 w-4" /> Clock Out</Button>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-3">
-                                                    <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-slate-400" /><span className="text-sm text-muted-foreground">Not clocked in</span></div>
+                                                    <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-full bg-muted" /><span className="text-sm text-muted-foreground">Not clocked in</span></div>
                                                     <Button onClick={handleClockIn} className="w-full" size="sm"><Play className="mr-2 h-4 w-4" /> Clock In</Button>
                                                 </div>
                                             )}
@@ -422,12 +422,12 @@ export default function TimeIndex({
                                     <CardContent className="space-y-3">
                                         {recentActivity.map((item) => (
                                             <div key={item.id} className="flex items-start gap-2">
-                                                <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${item.action === 'clocked_in' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+                                                <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${item.action === 'clocked_in' ? 'bg-status-success' : 'bg-muted'}`} />
                                                 <div className="min-w-0 flex-1">
                                                     <p className="truncate text-sm font-medium">{item.user_name}</p>
                                                     <p className="text-xs text-muted-foreground">
                                                         {item.action === 'clocked_in' ? 'Clocked in' : 'Clocked out'} {item.time}
-                                                        {item.entry_type === 'admin_clock' && <span className="ml-1 text-amber-500">(on behalf)</span>}
+                                                        {item.entry_type === 'admin_clock' && <span className="ml-1 text-status-warning">(on behalf)</span>}
                                                     </p>
                                                 </div>
                                                 {item.pay_type !== 'standard' && (
@@ -505,14 +505,14 @@ export default function TimeIndex({
                                                 const pc = payTypeConfig[entry.pay_type] || payTypeConfig.standard;
                                                 return (
                                                     <tr key={entry.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                                        {can.approveAny && <td className="px-4 py-3 font-medium">{entry.user_name}{entry.entry_type === 'admin_clock' && <span className="ml-1 text-[10px] text-amber-500">(on behalf)</span>}</td>}
+                                                        {can.approveAny && <td className="px-4 py-3 font-medium">{entry.user_name}{entry.entry_type === 'admin_clock' && <span className="ml-1 text-[10px] text-status-warning">(on behalf)</span>}</td>}
                                                         <td className="px-4 py-3 text-muted-foreground">{entry.entry_date}</td>
                                                         <td className="px-4 py-3">{entry.client_name || '-'}{entry.shift && <span className="ml-1 text-xs text-muted-foreground">({entry.shift.starts_at}-{entry.shift.ends_at})</span>}</td>
                                                         <td className="px-4 py-3">{entry.clock_in_short}</td>
                                                         <td className="px-4 py-3">{entry.clock_out_short ?? '-'}</td>
                                                         <td className="px-4 py-3 text-right text-muted-foreground">
                                                             {entry.break_minutes > 0 ? `${entry.break_minutes}m` : '-'}
-                                                            {entry.break_compliance_met === false && <AlertTriangle className="ml-1 inline h-3 w-3 text-amber-500" />}
+                                                            {entry.break_compliance_met === false && <AlertTriangle className="ml-1 inline h-3 w-3 text-status-warning" />}
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-medium">{entry.total_hours != null ? `${entry.total_hours}h` : '-'}</td>
                                                         <td className="px-4 py-3"><Badge variant="outline" className={`text-[10px] ${pc.className}`}>{pc.label}</Badge></td>
@@ -571,9 +571,9 @@ export default function TimeIndex({
                                                         <td className="px-4 py-3 text-right">
                                                             {ts.status === 'submitted' && (
                                                                 <div className="flex justify-end gap-1">
-                                                                    <Button variant="ghost" size="sm" className="h-7 text-emerald-500" onClick={() => handleApprove(ts.id)} disabled={processing === ts.id}><CheckCircle className="mr-1 h-3 w-3" /> Approve</Button>
-                                                                    <Button variant="ghost" size="sm" className="h-7 text-amber-500" onClick={() => { setReturnTimesheetId(ts.id); setReturnNotes(''); }}><RotateCcw className="mr-1 h-3 w-3" /> Return</Button>
-                                                                    <Button variant="ghost" size="sm" className="h-7 text-red-500" onClick={() => { setRejectTimesheetId(ts.id); setRejectReason(''); }}><XCircle className="mr-1 h-3 w-3" /> Reject</Button>
+                                                                    <Button variant="ghost" size="sm" className="h-7 text-status-success" onClick={() => handleApprove(ts.id)} disabled={processing === ts.id}><CheckCircle className="mr-1 h-3 w-3" /> Approve</Button>
+                                                                    <Button variant="ghost" size="sm" className="h-7 text-status-warning" onClick={() => { setReturnTimesheetId(ts.id); setReturnNotes(''); }}><RotateCcw className="mr-1 h-3 w-3" /> Return</Button>
+                                                                    <Button variant="ghost" size="sm" className="h-7 text-status-critical" onClick={() => { setRejectTimesheetId(ts.id); setRejectReason(''); }}><XCircle className="mr-1 h-3 w-3" /> Reject</Button>
                                                                 </div>
                                                             )}
                                                         </td>
@@ -596,17 +596,17 @@ export default function TimeIndex({
                                 <>
                                     {/* Bulk actions */}
                                     {selectedApprovalIds.length > 0 && (
-                                        <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                                        <div className="flex items-center gap-2 rounded-lg border border-status-warning/20 bg-status-warning p-3">
                                             <span className="text-sm font-medium">{selectedApprovalIds.length} selected</span>
-                                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={bulkApprove} disabled={processing === 'bulk'}>
+                                            <Button size="sm" className="bg-status-success hover:bg-status-success" onClick={bulkApprove} disabled={processing === 'bulk'}>
                                                 {processing === 'bulk' ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <CheckCircle className="mr-1 h-3 w-3" />} Approve Selected
                                             </Button>
-                                            <Button size="sm" variant="outline" className="text-amber-600" onClick={() => { setBulkNotes(''); setShowBulkReturn(true); }}><RotateCcw className="mr-1 h-3 w-3" /> Return Selected</Button>
-                                            <Button size="sm" variant="outline" className="text-red-600" onClick={() => { setBulkNotes(''); setShowBulkReject(true); }}><XCircle className="mr-1 h-3 w-3" /> Reject Selected</Button>
+                                            <Button size="sm" variant="outline" className="text-status-warning" onClick={() => { setBulkNotes(''); setShowBulkReturn(true); }}><RotateCcw className="mr-1 h-3 w-3" /> Return Selected</Button>
+                                            <Button size="sm" variant="outline" className="text-status-critical" onClick={() => { setBulkNotes(''); setShowBulkReject(true); }}><XCircle className="mr-1 h-3 w-3" /> Reject Selected</Button>
                                         </div>
                                     )}
 
-                                    <Card className="border-yellow-500/20 bg-yellow-500/5">
+                                    <Card className="border-status-warning/20 bg-status-warning">
                                         <CardHeader className="pb-3"><CardTitle className="text-base">Pending Approval ({approvalTimesheets.length})</CardTitle></CardHeader>
                                         <CardContent className="p-0">
                                             <div className="overflow-hidden rounded-b-xl">
@@ -629,15 +629,15 @@ export default function TimeIndex({
                                                                 <td className="px-4 py-3">{ts.period_start} <ArrowRight className="mx-1 inline h-3 w-3" /> {ts.period_end}</td>
                                                                 <td className="px-4 py-3 text-right font-medium">{ts.total_hours != null ? `${ts.total_hours}h` : '-'}</td>
                                                                 <td className="px-4 py-3">
-                                                                    <Badge variant="outline" className={ts.hours_waiting > 48 ? 'border-red-500/30 text-red-400 bg-red-500/10' : ts.hours_waiting > 24 ? 'border-amber-500/30 text-amber-400 bg-amber-500/10' : 'border-blue-500/30 text-blue-400 bg-blue-500/10'}>
+                                                                    <Badge variant="outline" className={ts.hours_waiting > 48 ? 'border-status-critical/30 text-status-critical bg-status-critical' : ts.hours_waiting > 24 ? 'border-status-warning/30 text-status-warning bg-status-warning' : 'border-status-info/30 text-status-info bg-status-info'}>
                                                                         {ts.hours_waiting > 48 ? `${Math.round(ts.hours_waiting)}h overdue` : ts.hours_waiting > 24 ? 'Due soon' : `${Math.round(ts.hours_waiting)}h`}
                                                                     </Badge>
                                                                 </td>
                                                                 <td className="px-4 py-3 text-right">
                                                                     <div className="flex justify-end gap-1">
-                                                                        <Button variant="ghost" size="sm" className="h-7 text-emerald-500" onClick={() => handleApprove(ts.id)} disabled={processing === ts.id}><CheckCircle className="mr-1 h-3 w-3" /> Approve</Button>
-                                                                        <Button variant="ghost" size="sm" className="h-7 text-amber-500" onClick={() => { setReturnTimesheetId(ts.id); setReturnNotes(''); }}><RotateCcw className="mr-1 h-3 w-3" /> Return</Button>
-                                                                        <Button variant="ghost" size="sm" className="h-7 text-red-500" onClick={() => { setRejectTimesheetId(ts.id); setRejectReason(''); }}><XCircle className="mr-1 h-3 w-3" /> Reject</Button>
+                                                                        <Button variant="ghost" size="sm" className="h-7 text-status-success" onClick={() => handleApprove(ts.id)} disabled={processing === ts.id}><CheckCircle className="mr-1 h-3 w-3" /> Approve</Button>
+                                                                        <Button variant="ghost" size="sm" className="h-7 text-status-warning" onClick={() => { setReturnTimesheetId(ts.id); setReturnNotes(''); }}><RotateCcw className="mr-1 h-3 w-3" /> Return</Button>
+                                                                        <Button variant="ghost" size="sm" className="h-7 text-status-critical" onClick={() => { setRejectTimesheetId(ts.id); setRejectReason(''); }}><XCircle className="mr-1 h-3 w-3" /> Reject</Button>
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -732,7 +732,7 @@ export default function TimeIndex({
                             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Shift Times</Label>
                             <div className="mt-2 grid grid-cols-2 gap-3">
                                 <div>
-                                    <Label className="text-sm">Clock In <span className="text-red-500">*</span></Label>
+                                    <Label className="text-sm">Clock In <span className="text-status-critical">*</span></Label>
                                     <Input type="datetime-local" className="mt-1" value={cobForm.clock_in} onChange={(e) => setCobForm({ ...cobForm, clock_in: e.target.value })} />
                                 </div>
                                 <div>
@@ -759,7 +759,7 @@ export default function TimeIndex({
                                         {Object.entries(payTypeConfig).map(([k, v]) => (
                                             <SelectItem key={k} value={k}>
                                                 <span className="flex items-center gap-2">
-                                                    <span className={`h-2 w-2 rounded-full ${v.className.includes('indigo') ? 'bg-primary' : v.className.includes('purple') ? 'bg-primary' : v.className.includes('orange') ? 'bg-orange-500' : v.className.includes('cyan') ? 'bg-cyan-500' : v.className.includes('blue') ? 'bg-blue-500' : v.className.includes('violet') ? 'bg-primary' : 'bg-slate-500'}`} />
+                                                    <span className={`h-2 w-2 rounded-full ${v.className.includes('indigo') ? 'bg-primary' : v.className.includes('purple') ? 'bg-primary' : v.className.includes('orange') ? 'bg-status-warning' : v.className.includes('cyan') ? 'bg-status-info' : v.className.includes('blue') ? 'bg-status-info' : v.className.includes('violet') ? 'bg-primary' : 'bg-muted-foreground/80'}`} />
                                                     {v.label}
                                                 </span>
                                             </SelectItem>
@@ -771,7 +771,7 @@ export default function TimeIndex({
 
                         {/* Reason & Notes */}
                         <div>
-                            <Label className="text-sm">Reason for Entry <span className="text-red-500">*</span></Label>
+                            <Label className="text-sm">Reason for Entry <span className="text-status-critical">*</span></Label>
                             <Textarea
                                 className="mt-1"
                                 placeholder="e.g., Staff member forgot to clock in due to emergency handover"
@@ -827,7 +827,7 @@ export default function TimeIndex({
                     <div><Label>Return Notes *</Label><Textarea placeholder="What needs to be corrected?" value={returnNotes} onChange={(e) => setReturnNotes(e.target.value)} /></div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setReturnTimesheetId(null)}>Cancel</Button>
-                        <Button className="bg-amber-600 hover:bg-amber-700" onClick={submitReturn} disabled={!returnNotes.trim()}><RotateCcw className="mr-2 h-4 w-4" /> Return for Changes</Button>
+                        <Button className="bg-status-warning hover:bg-status-warning" onClick={submitReturn} disabled={!returnNotes.trim()}><RotateCcw className="mr-2 h-4 w-4" /> Return for Changes</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -863,7 +863,7 @@ export default function TimeIndex({
                     <div><Label>Return Notes *</Label><Textarea value={bulkNotes} onChange={(e) => setBulkNotes(e.target.value)} /></div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowBulkReturn(false)}>Cancel</Button>
-                        <Button className="bg-amber-600 hover:bg-amber-700" onClick={submitBulkReturn} disabled={!bulkNotes.trim() || processing === 'bulk'}>Return All</Button>
+                        <Button className="bg-status-warning hover:bg-status-warning" onClick={submitBulkReturn} disabled={!bulkNotes.trim() || processing === 'bulk'}>Return All</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

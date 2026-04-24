@@ -86,15 +86,15 @@ const formatNZD = (amount: number) =>
 const formatPct = (pct: number) => `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
 
 const varianceColorClasses: Record<string, string> = {
-    green: 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950/30',
-    yellow: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/30',
-    red: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950/30',
+    green: 'text-status-success bg-status-success-bg dark:text-status-success dark:bg-status-success',
+    yellow: 'text-status-warning bg-status-warning-bg dark:text-status-warning dark:bg-status-warning',
+    red: 'text-status-critical bg-status-critical-bg dark:text-status-critical dark:bg-status-critical',
 };
 
 const varianceBadgeClasses: Record<string, string> = {
-    green: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800',
-    yellow: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800',
-    red: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800',
+    green: 'bg-status-success-bg text-status-success border-status-success/30 dark:bg-status-success-bg dark:text-status-success dark:border-status-success/30',
+    yellow: 'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
+    red: 'bg-status-critical-bg text-status-critical border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30',
 };
 
 const categoryLabels: Record<string, string> = {
@@ -111,10 +111,10 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
     const capped = Math.min(Math.max(value, 0), 150);
     const barColor =
         color === 'red'
-            ? 'bg-red-500'
+            ? 'bg-status-critical'
             : color === 'yellow'
-              ? 'bg-amber-500'
-              : 'bg-green-500';
+              ? 'bg-status-warning'
+              : 'bg-status-success';
     const overBudget = value > 100;
 
     return (
@@ -129,7 +129,7 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
                 />
                 {overBudget && (
                     <div
-                        className="absolute inset-y-0 h-full rounded-r-full bg-red-500/60"
+                        className="absolute inset-y-0 h-full rounded-r-full bg-status-critical"
                         style={{
                             left: `${(100 / 150) * 100}%`,
                             width: `${((capped - 100) / 150) * 100}%`,
@@ -206,10 +206,10 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
     const hasBudget = !!report.budget;
 
     const overallColor = Math.abs(totals.variance_pct) >= 10
-        ? 'text-red-600'
+        ? 'text-status-critical'
         : Math.abs(totals.variance_pct) >= 5
-          ? 'text-amber-600'
-          : 'text-green-600';
+          ? 'text-status-warning'
+          : 'text-status-success';
 
     const chartData = useMemo(() =>
         categories.map(cat => {
@@ -253,7 +253,7 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
                                         <span className="flex items-center gap-2">
                                             {b.label}
                                             {b.status === 'approved' && (
-                                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                                <Badge variant="outline" className="text-xs bg-status-success-bg text-status-success border-status-success/30">
                                                     Approved
                                                 </Badge>
                                             )}
@@ -276,7 +276,7 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
 
                 {/* Flash message */}
                 {flash?.success && (
-                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/30 dark:text-green-300">
+                    <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
                         {flash.success}
                     </div>
                 )}
@@ -458,11 +458,11 @@ function CategorySection({ category }: { category: Category }) {
                     </TableCell>
                     <TableCell className="text-center">
                         {item.variance_explained ? (
-                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400">
+                            <Badge variant="outline" className="text-xs bg-status-info-bg text-status-info border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                                 Explained
                             </Badge>
                         ) : Math.abs(item.variance_pct) >= 5 ? (
-                            <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400">
+                            <Badge variant="outline" className="text-xs bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                 Review
                             </Badge>
                         ) : null}

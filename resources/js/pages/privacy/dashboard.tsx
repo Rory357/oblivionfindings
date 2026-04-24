@@ -41,14 +41,14 @@ export default function PrivacyDashboard({
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'completed':
-                return 'bg-green-100 text-green-800';
+                return 'bg-status-success-bg text-status-success';
             case 'in_progress':
-                return 'bg-blue-100 text-blue-800';
+                return 'bg-status-info-bg text-status-info';
             case 'received':
             case 'under_review':
-                return 'bg-yellow-100 text-yellow-800';
+                return 'bg-status-warning-bg text-status-warning';
             case 'rejected':
-                return 'bg-red-100 text-red-800';
+                return 'bg-status-critical-bg text-status-critical';
             default:
                 return 'bg-muted text-foreground';
         }
@@ -78,7 +78,7 @@ export default function PrivacyDashboard({
                         <Card className="transition-shadow hover:shadow-md">
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                    <FileText className="h-4 w-4 text-blue-500" />
+                                    <FileText className="h-4 w-4 text-status-info" />
                                     Data Subject Requests
                                 </CardTitle>
                             </CardHeader>
@@ -86,7 +86,7 @@ export default function PrivacyDashboard({
                                 <div className="text-2xl font-bold">{dsrStats.pending}</div>
                                 <p className="text-xs text-muted-foreground">pending requests</p>
                                 {dsrStats.overdue > 0 && (
-                                    <div className="mt-2 flex items-center gap-1 text-xs text-red-600">
+                                    <div className="mt-2 flex items-center gap-1 text-xs text-status-critical">
                                         <AlertTriangle className="h-3 w-3" />
                                         {dsrStats.overdue} overdue
                                     </div>
@@ -99,7 +99,7 @@ export default function PrivacyDashboard({
                         <Card className="transition-shadow hover:shadow-md">
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                                    <AlertTriangle className="h-4 w-4 text-status-critical" />
                                     Data Breaches
                                 </CardTitle>
                             </CardHeader>
@@ -107,7 +107,7 @@ export default function PrivacyDashboard({
                                 <div className="text-2xl font-bold">{breachStats.open}</div>
                                 <p className="text-xs text-muted-foreground">open incidents</p>
                                 {breachStats.requiring_notification > 0 && (
-                                    <div className="mt-2 flex items-center gap-1 text-xs text-orange-600">
+                                    <div className="mt-2 flex items-center gap-1 text-xs text-status-warning">
                                         <Clock className="h-3 w-3" />
                                         {breachStats.requiring_notification} requiring ICO notification
                                     </div>
@@ -135,7 +135,7 @@ export default function PrivacyDashboard({
                         <Card className="transition-shadow hover:shadow-md">
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                    <Activity className="h-4 w-4 text-green-500" />
+                                    <Activity className="h-4 w-4 text-status-success" />
                                     Impact Assessments
                                 </CardTitle>
                             </CardHeader>
@@ -143,7 +143,7 @@ export default function PrivacyDashboard({
                                 <div className="text-2xl font-bold">{dpiaStats.pending_review}</div>
                                 <p className="text-xs text-muted-foreground">pending review</p>
                                 {dpiaStats.high_risk > 0 && (
-                                    <div className="mt-2 flex items-center gap-1 text-xs text-red-600">
+                                    <div className="mt-2 flex items-center gap-1 text-xs text-status-critical">
                                         <AlertTriangle className="h-3 w-3" />
                                         {dpiaStats.high_risk} high risk
                                     </div>
@@ -159,7 +159,7 @@ export default function PrivacyDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Shield className="h-5 w-5 text-blue-500" />
+                                <Shield className="h-5 w-5 text-status-info" />
                                 Data Subject Request Statistics
                             </CardTitle>
                         </CardHeader>
@@ -169,16 +169,16 @@ export default function PrivacyDashboard({
                                     <div className="text-2xl font-bold">{dsrStats.total}</div>
                                     <p className="text-xs text-muted-foreground">Total Requests</p>
                                 </div>
-                                <div className="rounded-lg bg-yellow-50 p-4">
-                                    <div className="text-2xl font-bold text-yellow-700">{dsrStats.pending}</div>
+                                <div className="rounded-lg bg-status-warning-bg p-4">
+                                    <div className="text-2xl font-bold text-status-warning">{dsrStats.pending}</div>
                                     <p className="text-xs text-muted-foreground">Pending</p>
                                 </div>
-                                <div className="rounded-lg bg-red-50 p-4">
-                                    <div className="text-2xl font-bold text-red-700">{dsrStats.overdue}</div>
+                                <div className="rounded-lg bg-status-critical-bg p-4">
+                                    <div className="text-2xl font-bold text-status-critical">{dsrStats.overdue}</div>
                                     <p className="text-xs text-muted-foreground">Overdue</p>
                                 </div>
-                                <div className="rounded-lg bg-green-50 p-4">
-                                    <div className="text-2xl font-bold text-green-700">{dsrStats.completed_this_month}</div>
+                                <div className="rounded-lg bg-status-success-bg p-4">
+                                    <div className="text-2xl font-bold text-status-success">{dsrStats.completed_this_month}</div>
                                     <p className="text-xs text-muted-foreground">Completed This Month</p>
                                 </div>
                             </div>
@@ -190,10 +190,10 @@ export default function PrivacyDashboard({
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between text-base">
                                 <span className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5 text-blue-500" />
+                                    <FileText className="h-5 w-5 text-status-info" />
                                     Recent Requests
                                 </span>
-                                <Link href="/privacy/requests" className="text-xs text-blue-600 hover:underline">
+                                <Link href="/privacy/requests" className="text-xs text-status-info hover:underline">
                                     View All
                                 </Link>
                             </CardTitle>
@@ -239,7 +239,7 @@ export default function PrivacyDashboard({
                                     <Lock className="h-5 w-5 text-primary" />
                                     Data Retention Policies
                                 </span>
-                                <Link href="/privacy/retention" className="text-xs text-blue-600 hover:underline">
+                                <Link href="/privacy/retention" className="text-xs text-status-info hover:underline">
                                     Manage
                                 </Link>
                             </CardTitle>
@@ -250,8 +250,8 @@ export default function PrivacyDashboard({
                                     <div className="text-2xl font-bold">{retentionStats.total_policies}</div>
                                     <p className="text-xs text-muted-foreground">Total Policies</p>
                                 </div>
-                                <div className="rounded-lg bg-green-50 p-4">
-                                    <div className="text-2xl font-bold text-green-700">{retentionStats.active_policies}</div>
+                                <div className="rounded-lg bg-status-success-bg p-4">
+                                    <div className="text-2xl font-bold text-status-success">{retentionStats.active_policies}</div>
                                     <p className="text-xs text-muted-foreground">Active</p>
                                 </div>
                             </div>
@@ -261,7 +261,7 @@ export default function PrivacyDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Activity className="h-5 w-5 text-green-500" />
+                                <Activity className="h-5 w-5 text-status-success" />
                                 Compliance Overview
                             </CardTitle>
                         </CardHeader>

@@ -38,12 +38,12 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const typeColors: Record<string, string> = {
-    contract: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+    contract: 'border-status-info/30 text-status-info bg-status-info',
     policy: 'border-primary/30 text-primary bg-primary/10',
-    certificate: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-    letter: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
+    certificate: 'border-status-success/30 text-status-success bg-status-success',
+    letter: 'border-status-warning/30 text-status-warning bg-status-warning',
     offer: 'border-primary/30 text-primary bg-primary/10',
-    other: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+    other: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
 };
 
 export default function DocumentsIndex({ documents, filters, can }: Props) {

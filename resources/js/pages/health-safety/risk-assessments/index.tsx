@@ -124,7 +124,7 @@ export default function RiskAssessmentsIndex({ assessments, filters }: Props) {
                             </thead>
                             <tbody className="divide-y">
                                 {assessments.data.map(ra => (
-                                    <tr key={ra.id} className={`hover:bg-muted/30 ${ra.is_due_for_review ? 'bg-amber-50/50' : ''}`}>
+                                    <tr key={ra.id} className={`hover:bg-muted/30 ${ra.is_due_for_review ? 'bg-status-warning-bg' : ''}`}>
                                         <td className="px-4 py-3 font-medium">{ra.reference_number}</td>
                                         <td className="px-4 py-3 max-w-xs truncate text-muted-foreground">{ra.title}</td>
                                         <td className="px-4 py-3"><StatusBadge status={ra.status} /></td>
@@ -145,7 +145,7 @@ export default function RiskAssessmentsIndex({ assessments, filters }: Props) {
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-1.5 text-muted-foreground">
                                                 {fmtDate(ra.review_due_at)}
-                                                {ra.is_due_for_review && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                                                {ra.is_due_for_review && <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />}
                                             </div>
                                         </td>
                                     </tr>

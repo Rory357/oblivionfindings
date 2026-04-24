@@ -124,7 +124,7 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.stay_id && <div className="mt-1 text-xs text-red-500">{errors.stay_id}</div>}
+                                    {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
                                 </div>
                                 <div>
                                     <Label>Handover Type *</Label>
@@ -136,7 +136,7 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.handover_type && <div className="mt-1 text-xs text-red-500">{errors.handover_type}</div>}
+                                    {errors.handover_type && <div className="mt-1 text-xs text-status-critical">{errors.handover_type}</div>}
                                 </div>
                             </div>
 
@@ -150,7 +150,7 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                                     />
                                 </div>
                                 <Textarea rows={6} value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Enter handover notes..." />
-                                {errors.notes && <div className="mt-1 text-xs text-red-500">{errors.notes}</div>}
+                                {errors.notes && <div className="mt-1 text-xs text-status-critical">{errors.notes}</div>}
                             </div>
 
                             <label className="flex items-center gap-2 text-sm">

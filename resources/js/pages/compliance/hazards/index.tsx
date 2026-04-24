@@ -92,24 +92,24 @@ const riskBorderColors: Record<string, string> = {
 };
 
 const riskBgColors: Record<string, { bg: string; text: string }> = {
-    extreme: { bg: 'bg-red-100', text: 'text-red-700' },
-    high: { bg: 'bg-orange-100', text: 'text-orange-700' },
-    medium: { bg: 'bg-amber-100', text: 'text-amber-700' },
-    low: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+    extreme: { bg: 'bg-status-critical-bg', text: 'text-status-critical' },
+    high: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    low: { bg: 'bg-status-success-bg', text: 'text-status-success' },
 };
 
 const severityConfig: Record<string, { bg: string; text: string }> = {
-    low: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
-    medium: { bg: 'bg-amber-50', text: 'text-amber-700' },
-    high: { bg: 'bg-orange-50', text: 'text-orange-700' },
-    critical: { bg: 'bg-red-100', text: 'text-red-800' },
+    low: { bg: 'bg-status-success-bg', text: 'text-status-success' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    high: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical' },
 };
 
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
-    open: { bg: 'bg-red-100', text: 'text-red-700', icon: AlertTriangle },
-    in_progress: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
+    open: { bg: 'bg-status-critical-bg', text: 'text-status-critical', icon: AlertTriangle },
+    in_progress: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Clock },
     mitigated: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2 },
-    closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
+    closed: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2 },
 };
 
 export default function GlobalHazards({ sites, hazards, filters, severityOptions, assignees = [] }: Props) {
@@ -385,7 +385,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-semibold">{hazard.reference_number}</span>
-                                                <span className="text-slate-300">|</span>
+                                                <span className="text-muted-foreground">|</span>
                                                 <span className="capitalize">{hazard.hazard_type.replace(/_/g, ' ')}</span>
                                                 <span className="text-xs text-muted-foreground">{hazard.site_name}</span>
                                             </div>
@@ -401,7 +401,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                                                     {hazard.risk_rating} risk
                                                 </Badge>
                                                 {overdue && (
-                                                    <Badge className="bg-red-100 text-red-700 border-0 text-[10px] font-medium">
+                                                    <Badge className="bg-status-critical-bg text-status-critical border-0 text-[10px] font-medium">
                                                         <Clock className="mr-1 h-3 w-3" />
                                                         Overdue
                                                     </Badge>
@@ -422,7 +422,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                                                     </span>
                                                 )}
                                                 {hazard.due_date && (
-                                                    <span className={overdue ? 'text-red-600 font-medium' : ''}>
+                                                    <span className={overdue ? 'text-status-critical font-medium' : ''}>
                                                         Due {new Date(hazard.due_date).toLocaleDateString()}
                                                     </span>
                                                 )}
@@ -472,7 +472,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
 
                     {!filteredHazards.length && (
                         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-                            <ShieldAlert className="h-10 w-10 text-slate-300" />
+                            <ShieldAlert className="h-10 w-10 text-muted-foreground" />
                             <div className="mt-2 text-sm font-medium text-muted-foreground">No hazards match your filters</div>
                             <div className="text-xs text-muted-foreground">Try adjusting your filters</div>
                         </div>

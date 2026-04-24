@@ -53,7 +53,7 @@ const periodTypeLabels: Record<string, string> = {
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    final: { label: 'Final', className: 'bg-green-100 text-green-700 border-green-300' },
+    final: { label: 'Final', className: 'bg-status-success-bg text-status-success border-status-success/30' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [

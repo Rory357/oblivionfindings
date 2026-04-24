@@ -57,7 +57,7 @@ export default function CreateDataBreach({ staff }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <AlertTriangle className="h-5 w-5 text-red-500" />
+                                <AlertTriangle className="h-5 w-5 text-status-critical" />
                                 Breach Details
                             </CardTitle>
                         </CardHeader>
@@ -72,7 +72,7 @@ export default function CreateDataBreach({ staff }: Props) {
                                         onChange={(e) => setData('discovered_at', e.target.value)}
                                     />
                                     {errors.discovered_at && (
-                                        <p className="text-xs text-red-500">{errors.discovered_at}</p>
+                                        <p className="text-xs text-status-critical">{errors.discovered_at}</p>
                                     )}
                                 </div>
 
@@ -99,7 +99,7 @@ export default function CreateDataBreach({ staff }: Props) {
                                     rows={3}
                                 />
                                 {errors.nature_of_breach && (
-                                    <p className="text-xs text-red-500">{errors.nature_of_breach}</p>
+                                    <p className="text-xs text-status-critical">{errors.nature_of_breach}</p>
                                 )}
                             </div>
 

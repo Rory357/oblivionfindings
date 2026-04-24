@@ -44,14 +44,14 @@ const formatDate = (date: string) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    approved: { label: 'Approved', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
-    applied: { label: 'Applied', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
-    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
+    approved: { label: 'Approved', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
+    applied: { label: 'Applied', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
+    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
 };
 
 const typeConfig: Record<string, { label: string; className: string }> = {
     payable: { label: 'AP', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
-    receivable: { label: 'AR', className: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300' },
+    receivable: { label: 'AR', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [

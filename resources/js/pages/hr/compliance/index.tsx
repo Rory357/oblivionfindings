@@ -115,10 +115,10 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Fully Compliant</p>
-                                    <p className="text-3xl font-bold text-green-600">{summary.fully_compliant}</p>
+                                    <p className="text-3xl font-bold text-status-success">{summary.fully_compliant}</p>
                                     <p className="text-xs text-muted-foreground">{complianceRate}% of staff</p>
                                 </div>
-                                <CheckCircle2 className="h-8 w-8 text-green-500" />
+                                <CheckCircle2 className="h-8 w-8 text-status-success" />
                             </div>
                         </CardContent>
                     </Card>
@@ -138,9 +138,9 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Have Expiring</p>
-                                    <p className="text-3xl font-bold text-yellow-600">{summary.has_expiring}</p>
+                                    <p className="text-3xl font-bold text-status-warning">{summary.has_expiring}</p>
                                 </div>
-                                <Clock className="h-8 w-8 text-yellow-500" />
+                                <Clock className="h-8 w-8 text-status-warning" />
                             </div>
                         </CardContent>
                     </Card>
@@ -209,9 +209,9 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                                     <div
                                                         className={`h-full rounded-full transition-all ${
                                                             staff.compliance_percent === 100
-                                                                ? 'bg-green-500'
+                                                                ? 'bg-status-success'
                                                                 : staff.compliance_percent >= 70
-                                                                    ? 'bg-yellow-500'
+                                                                    ? 'bg-status-warning'
                                                                     : 'bg-destructive'
                                                         }`}
                                                         style={{ width: `${staff.compliance_percent}%` }}
@@ -221,13 +221,13 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                                            <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
                                                 {staff.compliant_count}
                                             </Badge>
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {staff.expired_count > 0 ? (
-                                                <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                                                <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                                     {staff.expired_count}
                                                 </Badge>
                                             ) : (
@@ -236,7 +236,7 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {staff.expiring_soon_count > 0 ? (
-                                                <Badge variant="outline" className="border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400">
+                                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                                     {staff.expiring_soon_count}
                                                 </Badge>
                                             ) : (
@@ -254,7 +254,7 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {staff.future_shifts_affected && staff.future_shifts_affected > 0 ? (
-                                                <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                                                <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                                     {staff.future_shifts_affected} shift{staff.future_shifts_affected !== 1 ? 's' : ''}
                                                 </Badge>
                                             ) : (

@@ -93,7 +93,7 @@ export default function CreateLegalHold() {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.hold_type && <p className="text-xs text-red-500">{errors.hold_type}</p>}
+                                    {errors.hold_type && <p className="text-xs text-status-critical">{errors.hold_type}</p>}
                                 </div>
 
                                 <div className="space-y-2">
@@ -103,7 +103,7 @@ export default function CreateLegalHold() {
                                         value={data.review_date}
                                         onChange={(e) => setData('review_date', e.target.value)}
                                     />
-                                    {errors.review_date && <p className="text-xs text-red-500">{errors.review_date}</p>}
+                                    {errors.review_date && <p className="text-xs text-status-critical">{errors.review_date}</p>}
                                 </div>
                             </div>
 
@@ -115,7 +115,7 @@ export default function CreateLegalHold() {
                                     rows={4}
                                     placeholder="Why is this legal hold being imposed?"
                                 />
-                                {errors.reason && <p className="text-xs text-red-500">{errors.reason}</p>}
+                                {errors.reason && <p className="text-xs text-status-critical">{errors.reason}</p>}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -126,7 +126,7 @@ export default function CreateLegalHold() {
                                         onChange={(e) => setData('legal_authority', e.target.value)}
                                         placeholder="Court order, regulator, legal counsel, etc."
                                     />
-                                    {errors.legal_authority && <p className="text-xs text-red-500">{errors.legal_authority}</p>}
+                                    {errors.legal_authority && <p className="text-xs text-status-critical">{errors.legal_authority}</p>}
                                 </div>
 
                                 <div className="space-y-2">
@@ -137,7 +137,7 @@ export default function CreateLegalHold() {
                                         rows={3}
                                         placeholder="Record IDs or references (comma or newline separated)"
                                     />
-                                    {errors.related_records && <p className="text-xs text-red-500">{errors.related_records}</p>}
+                                    {errors.related_records && <p className="text-xs text-status-critical">{errors.related_records}</p>}
                                 </div>
                             </div>
                         </CardContent>
@@ -155,7 +155,7 @@ export default function CreateLegalHold() {
                                     onChange={(e) => setData('holdable_type', e.target.value)}
                                     placeholder="e.g. App\\Models\\Client"
                                 />
-                                {errors.holdable_type && <p className="text-xs text-red-500">{errors.holdable_type}</p>}
+                                {errors.holdable_type && <p className="text-xs text-status-critical">{errors.holdable_type}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label>Record ID</Label>
@@ -166,7 +166,7 @@ export default function CreateLegalHold() {
                                     onChange={(e) => setData('holdable_id', e.target.value)}
                                     placeholder="Numeric ID"
                                 />
-                                {errors.holdable_id && <p className="text-xs text-red-500">{errors.holdable_id}</p>}
+                                {errors.holdable_id && <p className="text-xs text-status-critical">{errors.holdable_id}</p>}
                             </div>
                         </CardContent>
                     </Card>

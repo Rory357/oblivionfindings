@@ -303,7 +303,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
 
                                         <div className="mt-3 flex items-center justify-between gap-2">
                                             {canApprove && t.status === 'submitted' ? (
-                                                <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 bg-yellow-500/10 text-[10px]">
+                                                <Badge variant="outline" className="border-status-warning/30 text-status-warning bg-status-warning text-[10px]">
                                                     Needs approval
                                                 </Badge>
                                             ) : <span />}
@@ -389,7 +389,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                                         <Button variant="ghost" size="sm" className="text-xs">View</Button>
                                                     </Link>
                                                     {canApprove && t.status === 'submitted' ? (
-                                                        <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 bg-yellow-500/10 text-[10px]">
+                                                        <Badge variant="outline" className="border-status-warning/30 text-status-warning bg-status-warning text-[10px]">
                                                             Needs approval
                                                         </Badge>
                                                     ) : null}
@@ -397,7 +397,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                             </td>
                                         </tr>
                                         {showReturnBanner ? (
-                                            <tr className="border-t bg-amber-50/40 dark:bg-amber-500/5">
+                                            <tr className="border-t bg-status-warning-bg dark:bg-status-warning">
                                                 <td colSpan={rowColspan} className="p-3">
                                                     <TimesheetReturnBanner
                                                         timesheetId={t.id}
@@ -445,7 +445,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                             </div>
 
                             {bulkError ? (
-                                <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+                                <div className="flex items-center gap-2 rounded-lg border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                     <AlertCircle className="h-4 w-4 shrink-0" />
                                     {bulkError}
                                 </div>

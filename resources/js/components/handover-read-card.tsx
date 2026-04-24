@@ -113,16 +113,16 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
         <section
             aria-label="Handover from last shift"
             className={cn(
-                'scroll-mt-20 rounded-xl border border-sky-300 bg-sky-50/70 p-4 shadow-sm',
-                'dark:border-sky-500/40 dark:bg-sky-950/30',
+                'scroll-mt-20 rounded-xl border border-status-info/30 bg-status-info-bg p-4 shadow-sm',
+                'dark:border-status-info/40 dark:bg-status-info',
             )}
         >
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <h2 className="text-base font-semibold text-sky-900 dark:text-sky-100">
+                    <h2 className="text-base font-semibold text-status-info dark:text-status-info">
                         Read handover from last shift
                     </h2>
-                    <p className="mt-0.5 text-xs text-sky-900/80 dark:text-sky-100/80">
+                    <p className="mt-0.5 text-xs text-status-info dark:text-status-info">
                         Handover
                         {handover.outgoing_staff_name
                             ? ` from ${handover.outgoing_staff_name}`
@@ -135,7 +135,7 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                     type="button"
                     onClick={() => setCollapsed((v) => !v)}
                     aria-label={collapsed ? 'Expand handover' : 'Collapse handover'}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-sky-900/80 hover:bg-sky-100/70 dark:text-sky-100/80 dark:hover:bg-sky-900/40"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-status-info hover:bg-status-info-bg dark:text-status-info dark:hover:bg-status-info"
                 >
                     {collapsed ? (
                         <ChevronDown className="h-4 w-4" />
@@ -148,9 +148,9 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
             {!collapsed && (
                 <div className="mt-3 space-y-3">
                     {/* Meds */}
-                    <div className="rounded-lg border border-sky-200 bg-background/70 p-3 dark:border-sky-900/50">
+                    <div className="rounded-lg border border-status-info/30 bg-background/70 p-3 dark:border-status-info/50">
                         <div className="flex items-center gap-2 text-sm font-medium">
-                            <Pill className="h-4 w-4 text-sky-700 dark:text-sky-300" />
+                            <Pill className="h-4 w-4 text-status-info dark:text-status-info" />
                             Meds
                         </div>
                         {hasMeds ? (
@@ -162,7 +162,7 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                                     >
                                         <span
                                             aria-hidden
-                                            className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                                            className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-status-warning"
                                         />
                                         <span>{itemLabel(m, 'Outstanding medication')}</span>
                                     </li>
@@ -176,9 +176,9 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                     </div>
 
                     {/* Incidents / alerts */}
-                    <div className="rounded-lg border border-sky-200 bg-background/70 p-3 dark:border-sky-900/50">
+                    <div className="rounded-lg border border-status-info/30 bg-background/70 p-3 dark:border-status-info/50">
                         <div className="flex items-center gap-2 text-sm font-medium">
-                            <AlertTriangle className="h-4 w-4 text-sky-700 dark:text-sky-300" />
+                            <AlertTriangle className="h-4 w-4 text-status-info dark:text-status-info" />
                             Incidents / alerts
                         </div>
                         {hasIncidents || hasFollowUps ? (
@@ -190,7 +190,7 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                                     >
                                         <span
                                             aria-hidden
-                                            className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-red-500"
+                                            className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-status-critical"
                                         />
                                         <span>{itemLabel(inc, 'Incident noted last shift')}</span>
                                     </li>
@@ -202,7 +202,7 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
                                     >
                                         <span
                                             aria-hidden
-                                            className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                                            className="mt-1.5 block h-1.5 w-1.5 shrink-0 rounded-full bg-status-warning"
                                         />
                                         <span>{itemLabel(f, 'Follow-up needed')}</span>
                                     </li>
@@ -217,9 +217,9 @@ export default function HandoverReadCard({ handover }: HandoverReadCardProps) {
 
                     {/* Notes */}
                     {hasNotes && (
-                        <div className="rounded-lg border border-sky-200 bg-background/70 p-3 dark:border-sky-900/50">
+                        <div className="rounded-lg border border-status-info/30 bg-background/70 p-3 dark:border-status-info/50">
                             <div className="flex items-center gap-2 text-sm font-medium">
-                                <FileText className="h-4 w-4 text-sky-700 dark:text-sky-300" />
+                                <FileText className="h-4 w-4 text-status-info dark:text-status-info" />
                                 Notes from last shift
                             </div>
                             <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground">

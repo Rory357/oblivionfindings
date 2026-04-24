@@ -57,8 +57,8 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
 
   const getStatusColor = (status: string) => ({
     draft: 'bg-muted text-foreground',
-    active: 'bg-blue-100 text-blue-800',
-    closed: 'bg-green-100 text-green-800',
+    active: 'bg-status-info-bg text-status-info',
+    closed: 'bg-status-success-bg text-status-success',
   }[status] || 'bg-muted text-foreground');
 
   return (
@@ -153,14 +153,14 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
                   <div
-                    className="bg-blue-600 h-2 rounded-full"
+                    className="bg-status-info h-2 rounded-full"
                     style={{ width: `${responseRate.total > 0 ? (responseRate.completed / responseRate.total) * 100 : 0}%` }}
                   />
                 </div>
                 <div className="mt-4 space-y-2">
                   {evaluation.responses.map(r => (
                     <div key={r.id} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className={cn('w-4 h-4', r.is_complete ? 'text-green-500' : 'text-gray-300')} />
+                      <CheckCircle className={cn('w-4 h-4', r.is_complete ? 'text-status-success' : 'text-muted-foreground')} />
                       <span>{r.board_member?.user?.name}</span>
                     </div>
                   ))}

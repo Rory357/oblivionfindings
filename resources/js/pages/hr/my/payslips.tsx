@@ -96,9 +96,9 @@ function formatPeriod(start: string, end: string): string {
 }
 
 const STATUS_CONFIG = {
-    draft: { label: 'Draft', bg: 'bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-500/30' },
-    approved: { label: 'Approved', bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-500/30' },
-    paid: { label: 'Paid', bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/30' },
+    draft: { label: 'Draft', bg: 'bg-status-warning', text: 'text-status-warning dark:text-status-warning', border: 'border-status-warning/30' },
+    approved: { label: 'Approved', bg: 'bg-status-info', text: 'text-status-info dark:text-status-info', border: 'border-status-info/30' },
+    paid: { label: 'Paid', bg: 'bg-status-success', text: 'text-status-success dark:text-status-success', border: 'border-status-success/30' },
 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -156,8 +156,8 @@ export default function MyPayslips({ payslips }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-                            <Wallet className="h-5 w-5 text-emerald-600" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-success">
+                            <Wallet className="h-5 w-5 text-status-success" />
                         </div>
                         <div>
                             <h1 className="text-xl font-bold md:text-2xl">My Payslips</h1>
@@ -182,13 +182,13 @@ export default function MyPayslips({ payslips }: Props) {
                             onClick={() => latest && setExpandedId(expandedId === latest.id ? null : latest.id)}
                             className="text-left"
                         >
-                        <Card className="overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-emerald-500/40">
-                            <div className="h-1 bg-emerald-500" />
+                        <Card className="overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-status-success/40">
+                            <div className="h-1 bg-status-success" />
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground">Latest Net Pay</p>
-                                        <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                        <p className="mt-1 text-2xl font-bold text-status-success dark:text-status-success">
                                             {latest ? nzd(latest.net_pay) : '\u2014'}
                                         </p>
                                         {latest?.payment_date && (
@@ -197,8 +197,8 @@ export default function MyPayslips({ payslips }: Props) {
                                             </p>
                                         )}
                                     </div>
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 transition-transform group-hover:scale-110">
-                                        <Banknote className="h-5 w-5 text-emerald-600" />
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-success transition-transform group-hover:scale-110">
+                                        <Banknote className="h-5 w-5 text-status-success" />
                                     </div>
                                 </div>
                             </CardContent>
@@ -206,8 +206,8 @@ export default function MyPayslips({ payslips }: Props) {
                         </button>
 
                         {/* YTD Gross */}
-                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-blue-500/40">
-                            <div className="h-1 bg-blue-500" />
+                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-status-info/40">
+                            <div className="h-1 bg-status-info" />
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -217,16 +217,16 @@ export default function MyPayslips({ payslips }: Props) {
                                             {new Date().getFullYear()} year to date
                                         </p>
                                     </div>
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10">
-                                        <TrendingUp className="h-5 w-5 text-blue-600" />
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-info">
+                                        <TrendingUp className="h-5 w-5 text-status-info" />
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
 
                         {/* YTD PAYE */}
-                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-amber-500/40">
-                            <div className="h-1 bg-amber-500" />
+                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-status-warning/40">
+                            <div className="h-1 bg-status-warning" />
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -236,8 +236,8 @@ export default function MyPayslips({ payslips }: Props) {
                                             Tax paid this year
                                         </p>
                                     </div>
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10">
-                                        <Landmark className="h-5 w-5 text-amber-600" />
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-warning">
+                                        <Landmark className="h-5 w-5 text-status-warning" />
                                     </div>
                                 </div>
                             </CardContent>
@@ -378,7 +378,7 @@ export default function MyPayslips({ payslips }: Props) {
                                         key={p.id}
                                         className="overflow-hidden transition-all hover:shadow-sm"
                                     >
-                                        <div className="h-0.5 bg-emerald-500" />
+                                        <div className="h-0.5 bg-status-success" />
                                         <CardContent className="p-0">
                                             {/* Main row */}
                                             <button
@@ -416,11 +416,11 @@ export default function MyPayslips({ payslips }: Props) {
                                                 <div className="hidden lg:flex flex-1 items-center px-6">
                                                     <div className="flex h-2 w-full max-w-[200px] overflow-hidden rounded-full">
                                                         <div
-                                                            className="bg-emerald-500 rounded-l-full"
+                                                            className="bg-status-success rounded-l-full"
                                                             style={{ width: `${(Number(p.net_pay) / Number(p.gross_pay)) * 100}%` }}
                                                         />
                                                         <div
-                                                            className="bg-red-400/70 rounded-r-full"
+                                                            className="bg-status-critical rounded-r-full"
                                                             style={{ width: `${(Number(p.total_deductions) / Number(p.gross_pay)) * 100}%` }}
                                                         />
                                                     </div>
@@ -437,17 +437,17 @@ export default function MyPayslips({ payslips }: Props) {
                                                     </div>
                                                     <div>
                                                         <p className="text-[10px] text-muted-foreground">Deductions</p>
-                                                        <p className="font-medium text-sm text-red-500">{nzd(p.total_deductions)}</p>
+                                                        <p className="font-medium text-sm text-status-critical">{nzd(p.total_deductions)}</p>
                                                     </div>
                                                     <div>
                                                         <p className="text-[10px] text-muted-foreground">Net Pay</p>
-                                                        <p className="font-bold text-base text-emerald-600 dark:text-emerald-400">{nzd(p.net_pay)}</p>
+                                                        <p className="font-bold text-base text-status-success dark:text-status-success">{nzd(p.net_pay)}</p>
                                                     </div>
                                                 </div>
 
                                                 {/* Mobile net pay */}
                                                 <div className="sm:hidden text-right">
-                                                    <p className="font-bold text-emerald-600 dark:text-emerald-400">{nzd(p.net_pay)}</p>
+                                                    <p className="font-bold text-status-success dark:text-status-success">{nzd(p.net_pay)}</p>
                                                 </div>
 
                                                 <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
@@ -484,7 +484,7 @@ export default function MyPayslips({ payslips }: Props) {
                                                             <div className="space-y-1.5 text-sm">
                                                                 <div className="flex justify-between">
                                                                     <span>PAYE</span>
-                                                                    <span className="font-medium text-red-500">{nzd(p.paye)}</span>
+                                                                    <span className="font-medium text-status-critical">{nzd(p.paye)}</span>
                                                                 </div>
                                                                 <div className="flex justify-between text-muted-foreground">
                                                                     <span>ACC Levy</span>
@@ -520,11 +520,11 @@ export default function MyPayslips({ payslips }: Props) {
                                                             <div className="space-y-1.5 text-sm">
                                                                 <div className="flex justify-between">
                                                                     <span>Total Deductions</span>
-                                                                    <span className="font-medium text-red-500">{nzd(p.total_deductions)}</span>
+                                                                    <span className="font-medium text-status-critical">{nzd(p.total_deductions)}</span>
                                                                 </div>
                                                                 <div className="flex justify-between border-t pt-1.5">
                                                                     <span className="font-semibold">Net Pay</span>
-                                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{nzd(p.net_pay)}</span>
+                                                                    <span className="font-bold text-status-success dark:text-status-success">{nzd(p.net_pay)}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -542,27 +542,27 @@ export default function MyPayslips({ payslips }: Props) {
                                                         </div>
                                                         <div className="flex h-2 w-full overflow-hidden rounded-full">
                                                             <div
-                                                                className="bg-emerald-500 rounded-l-full"
+                                                                className="bg-status-success rounded-l-full"
                                                                 style={{ width: `${(Number(p.net_pay) / Number(p.gross_pay)) * 100}%` }}
                                                             />
                                                             <div
-                                                                className="bg-red-400"
+                                                                className="bg-status-critical"
                                                                 style={{ width: `${(Number(p.paye) / Number(p.gross_pay)) * 100}%` }}
                                                             />
                                                             <div
-                                                                className="bg-amber-400"
+                                                                className="bg-status-warning"
                                                                 style={{ width: `${(Number(p.kiwisaver_employee) / Number(p.gross_pay)) * 100}%` }}
                                                             />
                                                             <div
-                                                                className="bg-slate-300 dark:bg-slate-600 rounded-r-full"
+                                                                className="bg-muted dark:bg-muted-foreground/80 rounded-r-full"
                                                                 style={{ width: `${((Number(p.acc_levy) + Number(p.student_loan)) / Number(p.gross_pay)) * 100}%` }}
                                                             />
                                                         </div>
                                                         <div className="mt-1.5 flex flex-wrap gap-3 text-[10px]">
-                                                            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />Net</span>
-                                                            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-400" />PAYE</span>
-                                                            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" />KiwiSaver</span>
-                                                            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" />Other</span>
+                                                            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-status-success" />Net</span>
+                                                            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-status-critical" />PAYE</span>
+                                                            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-status-warning" />KiwiSaver</span>
+                                                            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-muted dark:bg-muted-foreground/80" />Other</span>
                                                         </div>
                                                     </div>
 

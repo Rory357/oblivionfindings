@@ -86,10 +86,10 @@ function typeBadge(type: string) {
 
 function severityBadge(severity: string) {
     switch (severity) {
-        case 'minor': return <Badge className="bg-yellow-500 text-white">Minor</Badge>;
-        case 'moderate': return <Badge className="bg-orange-500 text-white">Moderate</Badge>;
-        case 'major': return <Badge className="bg-red-600 text-white">Major</Badge>;
-        case 'critical': return <Badge className="bg-red-900 text-white">Critical</Badge>;
+        case 'minor': return <Badge className="bg-status-warning text-white">Minor</Badge>;
+        case 'moderate': return <Badge className="bg-status-warning text-white">Moderate</Badge>;
+        case 'major': return <Badge className="bg-status-critical text-white">Major</Badge>;
+        case 'critical': return <Badge className="bg-status-critical text-white">Critical</Badge>;
         default: return <Badge variant="outline">{severity}</Badge>;
     }
 }
@@ -97,8 +97,8 @@ function severityBadge(severity: string) {
 function statusBadge(status: string) {
     switch (status) {
         case 'reported': return <Badge variant="outline">Reported</Badge>;
-        case 'investigating': return <Badge variant="default" className="bg-blue-600">Investigating</Badge>;
-        case 'resolved': return <Badge variant="default" className="bg-green-600">Resolved</Badge>;
+        case 'investigating': return <Badge variant="default" className="bg-status-info">Investigating</Badge>;
+        case 'resolved': return <Badge variant="default" className="bg-status-success">Resolved</Badge>;
         case 'closed': return <Badge variant="secondary">Closed</Badge>;
         default: return <Badge variant="outline">{status}</Badge>;
     }
@@ -150,8 +150,8 @@ export default function IncidentIndex({ incidents: rawIncidents, vehicles, filte
                 {/* Dark KPI Cards + ProgressRing */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     <FleetStatCard label="TOTAL (MTD)" value={stats?.total_mtd ?? 0} icon={FileWarning} subtitle="Incidents this month" />
-                    <FleetStatCard label="OPEN INVESTIGATIONS" value={stats?.open_investigations ?? 0} icon={Search} color="blue" valueClassName="text-blue-400" subtitle="Under investigation" />
-                    <FleetStatCard label="UNRESOLVED" value={stats?.unresolved ?? 0} icon={AlertOctagon} color="amber" valueClassName="text-amber-400" subtitle="Awaiting resolution" />
+                    <FleetStatCard label="OPEN INVESTIGATIONS" value={stats?.open_investigations ?? 0} icon={Search} color="blue" valueClassName="text-status-info" subtitle="Under investigation" />
+                    <FleetStatCard label="UNRESOLVED" value={stats?.unresolved ?? 0} icon={AlertOctagon} color="amber" valueClassName="text-status-warning" subtitle="Awaiting resolution" />
                     <FleetStatCard label="INSURANCE CLAIMS" value={stats?.insurance_claims ?? 0} icon={Shield} subtitle="Claims submitted" />
                     <Card className="border bg-primary/10 dark:bg-primary/20">
                         <CardContent className="flex items-center justify-center p-4">

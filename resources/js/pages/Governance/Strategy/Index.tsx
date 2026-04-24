@@ -30,8 +30,8 @@ export default function StrategyIndex({ auth, plans }: Props) {
   const getStatusColor = (status: string) => {
     return {
       draft: 'bg-muted text-foreground',
-      consultation: 'bg-blue-100 text-blue-800',
-      approved: 'bg-green-100 text-green-800',
+      consultation: 'bg-status-info-bg text-status-info',
+      approved: 'bg-status-success-bg text-status-success',
       archived: 'bg-muted text-foreground',
     }[status] || 'bg-muted text-foreground';
   };
@@ -67,22 +67,22 @@ export default function StrategyIndex({ auth, plans }: Props) {
 
           {/* Active Plan Highlight */}
           {plans.data.find(p => p.status === 'approved') && (
-            <Card className="mb-6 border-green-200 bg-green-50/50">
+            <Card className="mb-6 border-status-success/30 bg-status-success-bg">
               <CardContent className="pt-6">
                 {plans.data.filter(p => p.status === 'approved').map(plan => (
                   <div key={plan.id} className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-3 mb-2">
-                        <Compass className="w-6 h-6 text-green-600" />
+                        <Compass className="w-6 h-6 text-status-success" />
                         <h2 className="text-xl font-semibold">{plan.title}</h2>
-                        <Badge className="bg-green-100 text-green-800">Active</Badge>
+                        <Badge className="bg-status-success-bg text-status-success">Active</Badge>
                       </div>
                       <p className="text-muted-foreground">
                         {new Date(plan.period_start).getFullYear()} - {new Date(plan.period_end).getFullYear()}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-3xl font-bold text-green-600">{plan.progress_pct}%</p>
+                      <p className="text-3xl font-bold text-status-success">{plan.progress_pct}%</p>
                       <p className="text-sm text-muted-foreground">Complete</p>
                     </div>
                   </div>
@@ -102,7 +102,7 @@ export default function StrategyIndex({ auth, plans }: Props) {
                         <h3 className="font-semibold text-lg">
                           <Link
                             href={showStrategy.url({ plan: plan.id })}
-                            className="hover:text-blue-600"
+                            className="hover:text-status-info"
                           >
                             {plan.title}
                           </Link>

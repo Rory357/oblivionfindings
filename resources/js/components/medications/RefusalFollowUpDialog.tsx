@@ -103,18 +103,18 @@ export default function RefusalFollowUpDialog({
             <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5 text-orange-500" />
+                        <AlertTriangle className="h-5 w-5 text-status-warning" />
                         Refusal / Withholding Follow-Up
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4">
                     {/* Medication Info */}
-                    <div className="rounded-md bg-orange-50 p-3">
-                        <div className="text-sm font-medium text-orange-800">
+                    <div className="rounded-md bg-status-warning-bg p-3">
+                        <div className="text-sm font-medium text-status-warning">
                             Recording follow-up for refusal/withholding of:
                         </div>
-                        <div className="mt-1 font-semibold text-orange-900">{medicationName}</div>
+                        <div className="mt-1 font-semibold text-status-warning">{medicationName}</div>
                     </div>
 
                     {/* Reason Category */}
@@ -136,7 +136,7 @@ export default function RefusalFollowUpDialog({
                             </SelectContent>
                         </Select>
                         {form.errors.reason_category && (
-                            <p className="mt-1 text-xs text-red-600">{form.errors.reason_category}</p>
+                            <p className="mt-1 text-xs text-status-critical">{form.errors.reason_category}</p>
                         )}
                     </div>
 
@@ -150,7 +150,7 @@ export default function RefusalFollowUpDialog({
                             className="min-h-[60px]"
                         />
                         {form.errors.detailed_reason && (
-                            <p className="mt-1 text-xs text-red-600">{form.errors.detailed_reason}</p>
+                            <p className="mt-1 text-xs text-status-critical">{form.errors.detailed_reason}</p>
                         )}
                     </div>
 
@@ -176,7 +176,7 @@ export default function RefusalFollowUpDialog({
                             </SelectContent>
                         </Select>
                         {form.errors.client_capacity_at_time && (
-                            <p className="mt-1 text-xs text-red-600">{form.errors.client_capacity_at_time}</p>
+                            <p className="mt-1 text-xs text-status-critical">{form.errors.client_capacity_at_time}</p>
                         )}
                     </div>
 
@@ -220,7 +220,7 @@ export default function RefusalFollowUpDialog({
                             GP notification required
                         </Label>
                         {autoGpChecked && (
-                            <span className="text-xs text-orange-600">
+                            <span className="text-xs text-status-warning">
                                 (Auto-flagged: 3+ refusals in 7 days)
                             </span>
                         )}

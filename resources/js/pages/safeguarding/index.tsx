@@ -54,22 +54,22 @@ type Props = {
 };
 
 const severityConfig: Record<string, { bg: string; text: string; border: string; darkBg: string; darkText: string }> = {
-    critical: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-l-red-600', darkBg: 'dark:bg-red-500/15', darkText: 'dark:text-red-200' },
-    high: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-l-orange-500', darkBg: 'dark:bg-orange-500/10', darkText: 'dark:text-orange-300' },
-    medium: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-l-amber-500', darkBg: 'dark:bg-amber-500/10', darkText: 'dark:text-amber-300' },
-    low: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-l-blue-500', darkBg: 'dark:bg-blue-500/10', darkText: 'dark:text-blue-300' },
+    critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical', border: 'border-l-red-600', darkBg: 'dark:bg-status-critical', darkText: 'dark:text-status-critical' },
+    high: { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-l-orange-500', darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-l-amber-500', darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
+    low: { bg: 'bg-status-info-bg', text: 'text-status-info', border: 'border-l-blue-500', darkBg: 'dark:bg-status-info', darkText: 'dark:text-status-info' },
 };
 
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock; darkBg: string; darkText: string }> = {
-    open: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock, darkBg: 'dark:bg-blue-500/10', darkText: 'dark:text-blue-300' },
-    triaged: { bg: 'bg-sky-100', text: 'text-sky-700', icon: Eye, darkBg: 'dark:bg-sky-500/10', darkText: 'dark:text-sky-300' },
+    open: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Clock, darkBg: 'dark:bg-status-info', darkText: 'dark:text-status-info' },
+    triaged: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Eye, darkBg: 'dark:bg-status-info', darkText: 'dark:text-status-info' },
     investigating: { bg: 'bg-primary/10', text: 'text-primary', icon: Search, darkBg: 'dark:bg-primary/10', darkText: 'dark:text-primary/70' },
-    action_plan: { bg: 'bg-amber-100', text: 'text-amber-700', icon: FileEdit, darkBg: 'dark:bg-amber-500/10', darkText: 'dark:text-amber-300' },
-    monitoring: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Eye, darkBg: 'dark:bg-yellow-500/10', darkText: 'dark:text-yellow-300' },
-    closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2, darkBg: 'dark:bg-green-500/10', darkText: 'dark:text-green-300' },
+    action_plan: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: FileEdit, darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
+    monitoring: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: Eye, darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
+    closed: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2, darkBg: 'dark:bg-status-success', darkText: 'dark:text-status-success' },
     referred_external: { bg: 'bg-primary/10', text: 'text-primary', icon: ExternalLink, darkBg: 'dark:bg-primary/10', darkText: 'dark:text-primary/70' },
-    no_action_required: { bg: 'bg-muted', text: 'text-foreground', icon: CheckCircle2, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-muted-foreground' },
-    reported: { bg: 'bg-muted', text: 'text-foreground', icon: Clock, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-muted-foreground' },
+    no_action_required: { bg: 'bg-muted', text: 'text-foreground', icon: CheckCircle2, darkBg: 'dark:bg-muted-foreground/80/10', darkText: 'dark:text-muted-foreground' },
+    reported: { bg: 'bg-muted', text: 'text-foreground', icon: Clock, darkBg: 'dark:bg-muted-foreground/80/10', darkText: 'dark:text-muted-foreground' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -77,10 +77,10 @@ const statusConfig: Record<string, { bg: string; text: string; icon: typeof Cloc
 /* ------------------------------------------------------------------ */
 
 const STAT_COLORS = {
-    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', icon: 'text-blue-600 dark:text-blue-400', ring: 'ring-blue-100 dark:ring-blue-500/20' },
-    red: { bg: 'bg-red-50 dark:bg-red-500/10', icon: 'text-red-600 dark:text-red-400', ring: 'ring-red-100 dark:ring-red-500/20' },
-    amber: { bg: 'bg-amber-50 dark:bg-amber-500/10', icon: 'text-amber-600 dark:text-amber-400', ring: 'ring-amber-100 dark:ring-amber-500/20' },
-    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', icon: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-100 dark:ring-emerald-500/20' },
+    blue: { bg: 'bg-status-info-bg dark:bg-status-info', icon: 'text-status-info dark:text-status-info', ring: 'ring-status-info dark:ring-status-info/20' },
+    red: { bg: 'bg-status-critical-bg dark:bg-status-critical', icon: 'text-status-critical dark:text-status-critical', ring: 'ring-status-critical dark:ring-status-critical/20' },
+    amber: { bg: 'bg-status-warning-bg dark:bg-status-warning', icon: 'text-status-warning dark:text-status-warning', ring: 'ring-status-warning dark:ring-status-warning/20' },
+    emerald: { bg: 'bg-status-success-bg dark:bg-status-success', icon: 'text-status-success dark:text-status-success', ring: 'ring-status-success dark:ring-status-success/20' },
 };
 
 function StatCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {
@@ -267,7 +267,7 @@ export default function SafeguardingIndex({ filters, concerns, stats }: Props) {
                                                             </Badge>
                                                         )}
                                                         {concern.subject_informed === false && (
-                                                            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 text-[10px]">
+                                                            <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning text-[10px]">
                                                                 Subject Not Informed
                                                             </Badge>
                                                         )}

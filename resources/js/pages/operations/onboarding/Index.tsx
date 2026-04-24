@@ -160,9 +160,9 @@ export default function OnboardingDashboard({ workflows = { data: [], links: [],
                                 const pct = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
                                 const hasOverdue = (wf.overdue_steps ?? 0) > 0;
                                 return (
-                                    <Card key={wf.id} className={`transition-all hover:border-border hover:shadow-sm ${hasOverdue ? 'border-red-200 dark:border-red-900/40' : ''}`}>
+                                    <Card key={wf.id} className={`transition-all hover:border-border hover:shadow-sm ${hasOverdue ? 'border-status-critical/30 dark:border-status-critical/40' : ''}`}>
                                         <CardContent className="flex items-center gap-4 p-4">
-                                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${hasOverdue ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}>
+                                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${hasOverdue ? 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}>
                                                 {hasOverdue ? <AlertTriangle className="h-5 w-5" /> : <ListChecks className="h-5 w-5" />}
                                             </div>
                                             <div className="min-w-0 flex-1">
@@ -187,7 +187,7 @@ export default function OnboardingDashboard({ workflows = { data: [], links: [],
                                                 <div className="mt-2 flex items-center gap-2">
                                                     <div className="h-1.5 flex-1 rounded-full bg-muted">
                                                         <div
-                                                            className={`h-1.5 rounded-full transition-all ${hasOverdue ? 'bg-red-500' : 'bg-primary'}`}
+                                                            className={`h-1.5 rounded-full transition-all ${hasOverdue ? 'bg-status-critical' : 'bg-primary'}`}
                                                             style={{ width: `${pct}%` }}
                                                         />
                                                     </div>

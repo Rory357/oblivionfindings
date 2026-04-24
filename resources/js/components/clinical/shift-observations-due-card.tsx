@@ -100,7 +100,7 @@ export default function ShiftObservationsDueCard({
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
-                        <Stethoscope className="h-4 w-4 text-emerald-600" />
+                        <Stethoscope className="h-4 w-4 text-status-success" />
                         Observations Due
                         <Badge variant="secondary" className="ml-auto text-xs">
                             {dueItems.length}

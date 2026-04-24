@@ -35,7 +35,7 @@ const providerIcons: Record<string, ComponentType<{ className?: string }>> = {
 const statusConfig: Record<string, { label: string; className: string }> = {
     active: {
         label: 'Active',
-        className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+        className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     },
     inactive: {
         label: 'Inactive',
@@ -43,7 +43,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     },
     error: {
         label: 'Error',
-        className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+        className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
 };
 

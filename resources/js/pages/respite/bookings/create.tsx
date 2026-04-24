@@ -92,7 +92,7 @@ export default function RespiteBookingCreate({ clients, requests, pendingRequest
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.client_id && <div className="mt-1 text-xs text-red-500">{errors.client_id}</div>}
+                                    {errors.client_id && <div className="mt-1 text-xs text-status-critical">{errors.client_id}</div>}
                                 </div>
                             </div>
 
@@ -100,12 +100,12 @@ export default function RespiteBookingCreate({ clients, requests, pendingRequest
                                 <div>
                                     <Label>Start *</Label>
                                     <Input type="datetime-local" value={data.start_at} onChange={(e) => setData('start_at', e.target.value)} />
-                                    {errors.start_at && <div className="mt-1 text-xs text-red-500">{errors.start_at}</div>}
+                                    {errors.start_at && <div className="mt-1 text-xs text-status-critical">{errors.start_at}</div>}
                                 </div>
                                 <div>
                                     <Label>End *</Label>
                                     <Input type="datetime-local" value={data.end_at} onChange={(e) => setData('end_at', e.target.value)} />
-                                    {errors.end_at && <div className="mt-1 text-xs text-red-500">{errors.end_at}</div>}
+                                    {errors.end_at && <div className="mt-1 text-xs text-status-critical">{errors.end_at}</div>}
                                 </div>
                             </div>
 

@@ -60,7 +60,7 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
                             </Link>
                         </Button>
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Warehouse className="w-5 h-5 text-amber-400" />
+                            <Warehouse className="w-5 h-5 text-status-warning" />
                             Facility Reports
                         </h1>
                         <p className="text-sm text-muted-foreground">
@@ -95,21 +95,21 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
                             <div className="text-sm text-muted-foreground">Assets</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-red-500/5 border-red-500/20">
+                    <Card className="bg-status-critical border-status-critical/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-red-400">{stats.open_hazards}</div>
+                            <div className="text-2xl font-bold text-status-critical">{stats.open_hazards}</div>
                             <div className="text-sm text-muted-foreground">Open Hazards</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-orange-500/5 border-orange-500/20">
+                    <Card className="bg-status-warning border-status-warning/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-orange-400">{stats.equipment_failures}</div>
+                            <div className="text-2xl font-bold text-status-warning">{stats.equipment_failures}</div>
                             <div className="text-sm text-muted-foreground">Equipment Issues</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-emerald-400">{stats.safety_walkthrough_completion}%</div>
+                            <div className="text-2xl font-bold text-status-success">{stats.safety_walkthrough_completion}%</div>
                             <div className="text-sm text-muted-foreground">Walkthroughs</div>
                         </CardContent>
                     </Card>
@@ -173,17 +173,17 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
                                         </div>
                                         <div className="flex items-center gap-3">
                                             {equipmentIssues.length > 0 && (
-                                                <Badge className="bg-orange-500/20 text-orange-400">
+                                                <Badge className="bg-status-warning-bg text-status-warning">
                                                     <AlertTriangle className="w-3 h-3 mr-1" />
                                                     {equipmentIssues.length} Equipment
                                                 </Badge>
                                             )}
                                             {openHazards.length > 0 && (
-                                                <Badge variant="outline" className="text-amber-400">
+                                                <Badge variant="outline" className="text-status-warning">
                                                     {openHazards.length} Open
                                                 </Badge>
                                             )}
-                                            <Badge variant="outline" className={completionRate >= 80 ? 'text-emerald-400' : completionRate >= 50 ? 'text-amber-400' : 'text-red-400'}>
+                                            <Badge variant="outline" className={completionRate >= 80 ? 'text-status-success' : completionRate >= 50 ? 'text-status-warning' : 'text-status-critical'}>
                                                 <CheckCircle2 className="w-3 h-3 mr-1" />
                                                 {completionRate}%
                                             </Badge>

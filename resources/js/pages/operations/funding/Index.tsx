@@ -87,7 +87,7 @@ export default function FundingIndex({ stats = {} as any, claims_by_status = {} 
                                     </span>
                                 </div>
                                 {s.expiring_soon > 0 && (
-                                    <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                                    <div className="flex items-center gap-1.5 rounded-md bg-status-warning-bg px-3 py-1.5 text-xs text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                                         <AlertTriangle className="h-3.5 w-3.5" />
                                         {s.expiring_soon} agreement{s.expiring_soon !== 1 ? 's' : ''} expiring within 30 days
                                     </div>

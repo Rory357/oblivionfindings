@@ -32,9 +32,9 @@ type Props = {
 };
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-800',
-    approved: 'bg-emerald-100 text-emerald-800',
-    declined: 'bg-red-100 text-red-800',
+    pending: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-success-bg text-status-success',
+    declined: 'bg-status-critical-bg text-status-critical',
     cancelled: 'bg-muted text-muted-foreground',
 };
 
@@ -82,7 +82,7 @@ export default function VisitRequests({ client, requests, filter, stats }: Props
 
             <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
                 {/* Hero */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/90 via-emerald-500 to-teal-500/80 p-6 text-white">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-success/90 via-status-success to-status-info/80 p-6 text-white">
                     <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
                     <div className="relative flex items-center justify-between">
                         <div>
@@ -99,13 +99,13 @@ export default function VisitRequests({ client, requests, filter, stats }: Props
 
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-yellow-50 p-4 text-center">
-                        <div className="text-2xl font-bold text-amber-700">{stats.pending}</div>
-                        <div className="text-[10px] uppercase tracking-wider text-amber-500">Pending</div>
+                    <div className="rounded-xl border bg-status-warning-bg p-4 text-center">
+                        <div className="text-2xl font-bold text-status-warning">{stats.pending}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-status-warning">Pending</div>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-4 text-center">
-                        <div className="text-2xl font-bold text-emerald-700">{stats.approved_this_month}</div>
-                        <div className="text-[10px] uppercase tracking-wider text-emerald-500">Approved This Month</div>
+                    <div className="rounded-xl border bg-status-success-bg p-4 text-center">
+                        <div className="text-2xl font-bold text-status-success">{stats.approved_this_month}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-status-success">Approved This Month</div>
                     </div>
                     <div className="rounded-xl border p-4 text-center">
                         <div className="text-2xl font-bold text-foreground">{stats.total}</div>
@@ -129,7 +129,7 @@ export default function VisitRequests({ client, requests, filter, stats }: Props
                                 {f.label}
                                 {'count' in f && f.count != null && f.count > 0 && (
                                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
-                                        filter === f.key ? 'bg-primary/10 text-primary' : 'bg-amber-100 text-amber-700'
+                                        filter === f.key ? 'bg-primary/10 text-primary' : 'bg-status-warning-bg text-status-warning'
                                     }`}>{f.count}</span>
                                 )}
                             </button>
@@ -154,12 +154,12 @@ export default function VisitRequests({ client, requests, filter, stats }: Props
                             const vt = visitTypeIcons[req.visit_type] ?? visitTypeIcons.in_person;
                             const VtIcon = vt.icon;
                             return (
-                                <Card key={req.id} className={`overflow-hidden transition-all hover:shadow-sm ${req.status === 'pending' ? 'border-amber-200' : ''}`}>
+                                <Card key={req.id} className={`overflow-hidden transition-all hover:shadow-sm ${req.status === 'pending' ? 'border-status-warning/30' : ''}`}>
                                     <CardContent className="p-4">
                                         <div className="flex items-start gap-4">
                                             {/* Requester avatar */}
                                             <Avatar className="h-10 w-10 shrink-0">
-                                                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs">
+                                                <AvatarFallback className="bg-status-success-bg text-status-success text-xs">
                                                     {getInitials(req.user?.name ?? '?')}
                                                 </AvatarFallback>
                                             </Avatar>
@@ -218,10 +218,10 @@ export default function VisitRequests({ client, requests, filter, stats }: Props
                                                             onChange={e => setReviewNotes({ ...reviewNotes, [req.id]: e.target.value })}
                                                         />
                                                         <div className="flex gap-2">
-                                                            <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700" onClick={() => approve(req.id)}>
+                                                            <Button size="sm" className="gap-1.5 bg-status-success hover:bg-status-success" onClick={() => approve(req.id)}>
                                                                 <Check className="h-3.5 w-3.5" />Approve
                                                             </Button>
-                                                            <Button size="sm" variant="outline" className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50" onClick={() => decline(req.id)}>
+                                                            <Button size="sm" variant="outline" className="gap-1.5 text-status-critical border-status-critical/30 hover:bg-status-critical-bg" onClick={() => decline(req.id)}>
                                                                 <X className="h-3.5 w-3.5" />Decline
                                                             </Button>
                                                         </div>

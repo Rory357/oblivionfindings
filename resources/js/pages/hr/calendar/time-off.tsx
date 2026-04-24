@@ -41,14 +41,14 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const leaveTypeColors: Record<string, string> = {
-    annual: 'bg-blue-200 text-blue-900',
-    sick: 'bg-red-200 text-red-900',
+    annual: 'bg-status-info-bg text-status-info',
+    sick: 'bg-status-critical-bg text-status-critical',
     personal: 'bg-primary/20 text-primary',
-    bereavement: 'bg-slate-300 text-foreground',
-    parental: 'bg-pink-200 text-pink-900',
-    public_holiday: 'bg-green-200 text-green-900',
-    unpaid: 'bg-yellow-200 text-yellow-900',
-    other: 'bg-orange-200 text-orange-900',
+    bereavement: 'bg-muted text-foreground',
+    parental: 'bg-status-critical-bg text-status-critical',
+    public_holiday: 'bg-status-success-bg text-status-success',
+    unpaid: 'bg-status-warning-bg text-status-warning',
+    other: 'bg-status-warning-bg text-status-warning',
 };
 
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -182,14 +182,14 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                                     className={`min-h-[100px] border-b border-r p-1.5 last:border-r-0 ${
                                         !day ? 'bg-muted' :
                                         day.is_weekend ? 'bg-muted' :
-                                        day.date === today ? 'bg-blue-50' :
+                                        day.date === today ? 'bg-status-info-bg' :
                                         ''
                                     }`}
                                 >
                                     {day && (
                                         <>
                                             <div className={`mb-1 text-xs font-medium ${
-                                                day.date === today ? 'text-blue-600' :
+                                                day.date === today ? 'text-status-info' :
                                                 day.is_weekend ? 'text-muted-foreground' :
                                                 'text-foreground'
                                             }`}>

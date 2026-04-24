@@ -86,21 +86,21 @@ const NONE = '__none__';
 
 const typeBadge: Record<string, string> = {
     company: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
-    team: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    individual: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    team: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    individual: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
 };
 
 const statusBadge: Record<string, string> = {
     draft: 'bg-muted text-muted-foreground',
-    active: 'bg-blue-100 text-blue-700',
-    completed: 'bg-emerald-100 text-emerald-700',
-    cancelled: 'bg-red-100 text-red-700',
+    active: 'bg-status-info-bg text-status-info',
+    completed: 'bg-status-success-bg text-status-success',
+    cancelled: 'bg-status-critical-bg text-status-critical',
 };
 
 const priorityBadge: Record<string, string> = {
     low: 'bg-muted text-muted-foreground',
-    medium: 'bg-amber-100 text-amber-700',
-    high: 'bg-red-100 text-red-700',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-critical-bg text-status-critical',
 };
 
 function formatDate(d: string | null) {
@@ -109,9 +109,9 @@ function formatDate(d: string | null) {
 }
 
 function progressColour(pct: number) {
-    if (pct >= 70) return 'bg-emerald-500';
-    if (pct >= 40) return 'bg-amber-500';
-    return 'bg-red-400';
+    if (pct >= 70) return 'bg-status-success';
+    if (pct >= 40) return 'bg-status-warning';
+    return 'bg-status-critical';
 }
 
 /* ------------------------------------------------------------------ */
@@ -394,7 +394,7 @@ export default function GoalsIndex({ goals, users, analytics, cascadeTree, filte
                                 <Card>
                                     <CardHeader className="pb-2">
                                         <CardTitle className="text-sm flex items-center gap-1.5">
-                                            <Users className="h-4 w-4 text-blue-500" /> Team Objectives
+                                            <Users className="h-4 w-4 text-status-info" /> Team Objectives
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-1">
@@ -417,7 +417,7 @@ export default function GoalsIndex({ goals, users, analytics, cascadeTree, filte
                                 <Card>
                                     <CardHeader className="pb-2">
                                         <CardTitle className="text-sm flex items-center gap-1.5">
-                                            <UserIcon className="h-4 w-4 text-emerald-500" /> Individual Objectives
+                                            <UserIcon className="h-4 w-4 text-status-success" /> Individual Objectives
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-1">
@@ -451,7 +451,7 @@ export default function GoalsIndex({ goals, users, analytics, cascadeTree, filte
                             <Card>
                                 <CardContent className="p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-emerald-500/10 p-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /></div>
+                                        <div className="rounded-lg bg-status-success p-2"><CheckCircle2 className="h-4 w-4 text-status-success" /></div>
                                         <div><p className="text-2xl font-bold">{analytics.completion_rate}%</p><p className="text-xs text-muted-foreground">Completion</p></div>
                                     </div>
                                 </CardContent>
@@ -459,7 +459,7 @@ export default function GoalsIndex({ goals, users, analytics, cascadeTree, filte
                             <Card>
                                 <CardContent className="p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-blue-500/10 p-2"><TrendingUp className="h-4 w-4 text-blue-500" /></div>
+                                        <div className="rounded-lg bg-status-info p-2"><TrendingUp className="h-4 w-4 text-status-info" /></div>
                                         <div><p className="text-2xl font-bold">{analytics.on_track}</p><p className="text-xs text-muted-foreground">On Track</p></div>
                                     </div>
                                 </CardContent>
@@ -467,7 +467,7 @@ export default function GoalsIndex({ goals, users, analytics, cascadeTree, filte
                             <Card>
                                 <CardContent className="p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-amber-500/10 p-2"><AlertTriangle className="h-4 w-4 text-amber-500" /></div>
+                                        <div className="rounded-lg bg-status-warning p-2"><AlertTriangle className="h-4 w-4 text-status-warning" /></div>
                                         <div><p className="text-2xl font-bold">{analytics.overdue}</p><p className="text-xs text-muted-foreground">Overdue</p></div>
                                     </div>
                                 </CardContent>

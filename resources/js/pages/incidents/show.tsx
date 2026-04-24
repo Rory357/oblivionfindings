@@ -113,9 +113,9 @@ const WORKFLOW_STEPS = [
 
 function severityColor(severity: string) {
     switch (severity) {
-        case 'high': return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', badge: 'destructive' as const, bar: 'bg-red-500' };
-        case 'medium': return { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300', badge: 'secondary' as const, bar: 'bg-amber-500' };
-        default: return { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300', badge: 'outline' as const, bar: 'bg-emerald-500' };
+        case 'high': return { bg: 'bg-status-critical-bg', text: 'text-status-critical', border: 'border-status-critical/30', badge: 'destructive' as const, bar: 'bg-status-critical' };
+        case 'medium': return { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-status-warning/30', badge: 'secondary' as const, bar: 'bg-status-warning' };
+        default: return { bg: 'bg-status-success-bg', text: 'text-status-success', border: 'border-status-success/30', badge: 'outline' as const, bar: 'bg-status-success' };
     }
 }
 
@@ -257,9 +257,9 @@ function FollowupList({
 
     const statusStyle = (status: string) => {
         switch (status) {
-            case 'Completed': return { dot: 'bg-emerald-500', bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' };
-            case 'Overdue': return { dot: 'bg-red-500', bg: 'bg-red-50 border-red-200', text: 'text-red-700' };
-            default: return { dot: 'bg-blue-500', bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' };
+            case 'Completed': return { dot: 'bg-status-success', bg: 'bg-status-success-bg border-status-success/30', text: 'text-status-success' };
+            case 'Overdue': return { dot: 'bg-status-critical', bg: 'bg-status-critical-bg border-status-critical/30', text: 'text-status-critical' };
+            default: return { dot: 'bg-status-info', bg: 'bg-status-info-bg border-status-info/30', text: 'text-status-info' };
         }
     };
 
@@ -626,7 +626,7 @@ export default function IncidentShow({
                                                     isActive
                                                         ? `${sev.bar} border-transparent text-white`
                                                         : isPast
-                                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-600'
+                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
                                                             : 'border-muted bg-muted/50 text-muted-foreground'
                                                 }`}>
                                                     {isPast ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
@@ -636,7 +636,7 @@ export default function IncidentShow({
                                                 </span>
                                             </div>
                                             {index < WORKFLOW_STEPS.length - 1 && (
-                                                <div className={`mx-2 h-0.5 flex-1 rounded ${isPast ? 'bg-emerald-400' : 'bg-muted'}`} />
+                                                <div className={`mx-2 h-0.5 flex-1 rounded ${isPast ? 'bg-status-success' : 'bg-muted'}`} />
                                             )}
                                         </div>
                                     );
@@ -758,8 +758,8 @@ export default function IncidentShow({
                             </div>
                         </div>
 
-                        <div className={`flex items-start gap-4 rounded-lg border p-4 ${form.data.is_notifiable ? 'border-red-200 bg-red-50' : 'bg-muted/30'}`}>
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${form.data.is_notifiable ? 'bg-red-100 text-red-600' : 'bg-muted text-muted-foreground'}`}>
+                        <div className={`flex items-start gap-4 rounded-lg border p-4 ${form.data.is_notifiable ? 'border-status-critical/30 bg-status-critical-bg' : 'bg-muted/30'}`}>
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${form.data.is_notifiable ? 'bg-status-critical-bg text-status-critical' : 'bg-muted text-muted-foreground'}`}>
                                 <ShieldAlert className="h-4 w-4" />
                             </div>
                             <div className="flex items-center gap-3 flex-1">
@@ -833,14 +833,14 @@ export default function IncidentShow({
 
                 {/* Near-miss details */}
                 {isNearMiss && (
-                    <Card className="overflow-hidden border-amber-200">
-                        <CardHeader className="border-b border-amber-200 bg-amber-50 pb-4">
+                    <Card className="overflow-hidden border-status-warning/30">
+                        <CardHeader className="border-b border-status-warning/30 bg-status-warning-bg pb-4">
                             <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                                <CardTitle className="text-base text-amber-900">Near-miss details</CardTitle>
+                                <AlertTriangle className="h-4 w-4 text-status-warning" />
+                                <CardTitle className="text-base text-status-warning">Near-miss details</CardTitle>
                             </div>
                         </CardHeader>
-                        <CardContent className="bg-amber-50/20 pt-5 space-y-4">
+                        <CardContent className="bg-status-warning-bg pt-5 space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
                                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Potential severity</Label>
@@ -870,7 +870,7 @@ export default function IncidentShow({
                             </div>
 
                             {allowCoreEdit && (
-                                <div className="flex items-center justify-end border-t border-amber-200 pt-4">
+                                <div className="flex items-center justify-end border-t border-status-warning/30 pt-4">
                                     <Button
                                         disabled={saving}
                                         onClick={() => {
@@ -1027,15 +1027,15 @@ export default function IncidentShow({
 
                 {/* WorkSafe notification */}
                 {incident.is_notifiable && (
-                    <Card className="overflow-hidden border-red-200">
-                        <div className="h-1.5 bg-red-500" />
-                        <CardHeader className="border-b border-red-100 bg-red-50 pb-4">
+                    <Card className="overflow-hidden border-status-critical/30">
+                        <div className="h-1.5 bg-status-critical" />
+                        <CardHeader className="border-b border-status-critical/30 bg-status-critical-bg pb-4">
                             <div className="flex items-center gap-2">
-                                <ShieldAlert className="h-4 w-4 text-red-600" />
-                                <CardTitle className="text-base text-red-900">WorkSafe NZ notification</CardTitle>
+                                <ShieldAlert className="h-4 w-4 text-status-critical" />
+                                <CardTitle className="text-base text-status-critical">WorkSafe NZ notification</CardTitle>
                             </div>
                         </CardHeader>
-                        <CardContent className="bg-red-50/30 pt-5 space-y-4">
+                        <CardContent className="bg-status-critical-bg pt-5 space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div className="space-y-1.5">
                                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notification status</Label>
@@ -1064,12 +1064,12 @@ export default function IncidentShow({
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div className="rounded-lg border border-red-200 bg-white p-3 space-y-1">
+                                <div className="rounded-lg border border-status-critical/30 bg-white p-3 space-y-1">
                                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Site preserved</Label>
                                     <div className="text-sm font-medium">{incident.site_preserved ? 'Yes' : 'No'}</div>
                                 </div>
                                 {incident.site_preservation_released_at && (
-                                    <div className="rounded-lg border border-red-200 bg-white p-3 space-y-1">
+                                    <div className="rounded-lg border border-status-critical/30 bg-white p-3 space-y-1">
                                         <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preservation released</Label>
                                         <div className="text-sm">
                                             {new Date(incident.site_preservation_released_at).toLocaleString()}
@@ -1217,12 +1217,12 @@ export default function IncidentShow({
                                 </div>
 
                                 {correctiveActions.map((action, index) => (
-                                    <div key={index} className={`rounded-lg border p-4 ${action.status === 'completed' ? 'bg-emerald-50 border-emerald-200' : 'bg-white'}`}>
+                                    <div key={index} className={`rounded-lg border p-4 ${action.status === 'completed' ? 'bg-status-success-bg border-status-success/30' : 'bg-white'}`}>
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
                                                     {action.status === 'completed' ? (
-                                                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                                        <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" />
                                                     ) : (
                                                         <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 shrink-0" />
                                                     )}
@@ -1448,7 +1448,7 @@ export default function IncidentShow({
                                         </Link>
                                         {allowCoreEdit ? (
                                             <button
-                                                className="rounded-md border p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                                                className="rounded-md border p-1.5 text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical hover:border-status-critical/30 transition-colors"
                                                 onClick={() =>
                                                     router.delete(
                                                         `/incidents/${incident.id}/attachments/${a.id}`,
@@ -1557,7 +1557,7 @@ export default function IncidentShow({
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning">
                                     <RotateCcw className="h-5 w-5" />
                                 </div>
                                 <div>
@@ -1584,7 +1584,7 @@ export default function IncidentShow({
                                     rows={3}
                                 />
                             </div>
-                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                            <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-xs text-status-warning">
                                 Reopening will change the incident status back to reviewed, allowing further updates.
                             </div>
                         </div>

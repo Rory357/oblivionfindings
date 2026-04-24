@@ -265,9 +265,9 @@ const typeIcons = {
 };
 
 const typeColors = {
-    head_office: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    house: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    facility: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    head_office: 'bg-status-info-bg text-status-info border-status-info/30',
+    house: 'bg-status-success-bg text-status-success border-status-success/30',
+    facility: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 function bytes(n?: number | null): string {
@@ -351,7 +351,7 @@ export default function SiteShow({
                                 {site.is_high_risk && (
                                     <Badge
                                         variant="outline"
-                                        className="border-orange-500/50 bg-orange-500/10 text-orange-400"
+                                        className="border-status-warning/50 bg-status-warning-bg text-status-warning"
                                     >
                                         <AlertTriangle className="mr-1 h-3 w-3" />
                                         High Risk
@@ -360,7 +360,7 @@ export default function SiteShow({
                                 {site.is_high_needs && (
                                     <Badge
                                         variant="outline"
-                                        className="border-yellow-500/50 bg-yellow-500/10 text-yellow-400"
+                                        className="border-status-warning/50 bg-status-warning-bg text-status-warning"
                                     >
                                         <AlertCircle className="mr-1 h-3 w-3" />
                                         High Needs
@@ -370,8 +370,8 @@ export default function SiteShow({
                                     variant="outline"
                                     className={
                                         site.is_active
-                                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                                            : 'border-slate-500/30 text-muted-foreground'
+                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                            : 'border-border/30 text-muted-foreground'
                                     }
                                 >
                                     {site.is_active ? 'Active' : 'Inactive'}
@@ -408,8 +408,8 @@ export default function SiteShow({
                                         percent >= 70
                                             ? 'bg-primary'
                                             : percent >= 40
-                                              ? 'bg-amber-500'
-                                              : 'bg-slate-400'
+                                              ? 'bg-status-warning'
+                                              : 'bg-muted'
                                     }`}
                                     style={{ width: `${percent}%` }}
                                 />
@@ -442,7 +442,7 @@ export default function SiteShow({
                                             key={item.key}
                                             className={`flex items-center gap-2 text-xs ${
                                                 item.done
-                                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                                    ? 'text-status-success dark:text-status-success'
                                                     : 'text-muted-foreground'
                                             }`}
                                         >
@@ -643,7 +643,7 @@ export default function SiteShow({
                                     <CardTitle>Contact Information</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-0 text-sm">
-                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
                                         <div className="text-muted-foreground">
                                             Phone
                                         </div>
@@ -655,7 +655,7 @@ export default function SiteShow({
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
                                         <div className="text-muted-foreground">
                                             Email
                                         </div>
@@ -667,7 +667,7 @@ export default function SiteShow({
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
                                         <div className="text-muted-foreground">
                                             Site Lead
                                         </div>
@@ -680,7 +680,7 @@ export default function SiteShow({
                                                 )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
                                         <div className="text-muted-foreground">
                                             Manager Phone
                                         </div>
@@ -692,7 +692,7 @@ export default function SiteShow({
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center justify-between border-b border-slate-700/50 py-3 last:border-0">
+                                    <div className="flex items-center justify-between border-b border-border/50 py-3 last:border-0">
                                         <div className="text-muted-foreground">
                                             After hours
                                         </div>
@@ -750,7 +750,7 @@ export default function SiteShow({
                                             <div className="text-muted-foreground">
                                                 Access Instructions
                                             </div>
-                                            <div className="mt-1 whitespace-pre-wrap text-slate-300">
+                                            <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
                                                 {site.access_instructions}
                                             </div>
                                         </div>
@@ -791,12 +791,12 @@ export default function SiteShow({
                                         site.is_high_needs) && (
                                         <>
                                             <div className="border-t pt-2">
-                                                <div className="flex items-center gap-1 font-medium text-amber-400">
+                                                <div className="flex items-center gap-1 font-medium text-status-warning">
                                                     <AlertTriangle className="h-4 w-4" />
                                                     Risk Information
                                                 </div>
                                                 {site.risk_notes && (
-                                                    <div className="mt-1 text-slate-300">
+                                                    <div className="mt-1 text-muted-foreground">
                                                         {site.risk_notes}
                                                     </div>
                                                 )}
@@ -817,7 +817,7 @@ export default function SiteShow({
                                     <CardTitle>Notes</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-sm whitespace-pre-wrap text-slate-300">
+                                    <div className="text-sm whitespace-pre-wrap text-muted-foreground">
                                         {site.notes || 'No notes recorded.'}
                                     </div>
                                 </CardContent>
@@ -859,7 +859,7 @@ export default function SiteShow({
                                                         <td className="px-4 py-3 font-medium">
                                                             {`${c.first_name} ${c.last_name}`.trim()}
                                                         </td>
-                                                        <td className="px-4 py-3 text-slate-300">
+                                                        <td className="px-4 py-3 text-muted-foreground">
                                                             {c.status}
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
@@ -948,7 +948,7 @@ export default function SiteShow({
                                                                     ) || '—'}
                                                             </div>
                                                         </td>
-                                                        <td className="px-4 py-3 text-slate-300">
+                                                        <td className="px-4 py-3 text-muted-foreground">
                                                             <Badge
                                                                 variant="outline"
                                                                 className={
@@ -956,7 +956,7 @@ export default function SiteShow({
                                                                         .type ===
                                                                     'client'
                                                                         ? 'border-primary/30 text-primary/70'
-                                                                        : 'border-slate-500/30 text-slate-300'
+                                                                        : 'border-border/30 text-muted-foreground'
                                                                 }
                                                             >
                                                                 {a.owner
@@ -966,10 +966,10 @@ export default function SiteShow({
                                                                     : 'Site-owned'}
                                                             </Badge>
                                                         </td>
-                                                        <td className="px-4 py-3 text-slate-300">
+                                                        <td className="px-4 py-3 text-muted-foreground">
                                                             {a.status}
                                                         </td>
-                                                        <td className="px-4 py-3 text-slate-300">
+                                                        <td className="px-4 py-3 text-muted-foreground">
                                                             {a.risk_level}
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
@@ -1123,7 +1123,7 @@ export default function SiteShow({
                                     <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
                                         <Card className="border">
                                             <CardContent className="p-4 text-center">
-                                                <Route className="mx-auto h-4 w-4 text-blue-500 mb-1" />
+                                                <Route className="mx-auto h-4 w-4 text-status-info mb-1" />
                                                 <div className="text-lg font-bold">{fs.trips_this_month}</div>
                                                 <div className="text-[10px] text-muted-foreground">Trips this month</div>
                                             </CardContent>
@@ -1137,15 +1137,15 @@ export default function SiteShow({
                                         </Card>
                                         <Card className="border">
                                             <CardContent className="p-4 text-center">
-                                                <Fuel className="mx-auto h-4 w-4 text-amber-500 mb-1" />
+                                                <Fuel className="mx-auto h-4 w-4 text-status-warning mb-1" />
                                                 <div className="text-lg font-bold">{formatCurrency(fs.fuel_cost_this_month)}</div>
                                                 <div className="text-[10px] text-muted-foreground">Fuel this month</div>
                                             </CardContent>
                                         </Card>
-                                        <Card className={`border ${fs.incidents_this_month > 0 ? 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : ''}`}>
+                                        <Card className={`border ${fs.incidents_this_month > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : ''}`}>
                                             <CardContent className="p-4 text-center">
-                                                <AlertTriangle className={`mx-auto h-4 w-4 mb-1 ${fs.incidents_this_month > 0 ? 'text-red-500' : 'text-muted-foreground'}`} />
-                                                <div className={`text-lg font-bold ${fs.incidents_this_month > 0 ? 'text-red-600' : ''}`}>{fs.incidents_this_month}</div>
+                                                <AlertTriangle className={`mx-auto h-4 w-4 mb-1 ${fs.incidents_this_month > 0 ? 'text-status-critical' : 'text-muted-foreground'}`} />
+                                                <div className={`text-lg font-bold ${fs.incidents_this_month > 0 ? 'text-status-critical' : ''}`}>{fs.incidents_this_month}</div>
                                                 <div className="text-[10px] text-muted-foreground">Incidents this month</div>
                                             </CardContent>
                                         </Card>
@@ -1161,7 +1161,7 @@ export default function SiteShow({
                                                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                                     {fv.map((v) => (
                                                         <Link key={v.id} href={`/fleet-assets/vehicles/${v.id}`} className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                                                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${v.fleet_status === 'online' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${v.fleet_status === 'online' ? 'bg-status-success' : 'bg-muted'}`} />
                                                             <div className="min-w-0 flex-1">
                                                                 <div className="text-sm font-medium truncate">{v.name}</div>
                                                                 <div className="text-[10px] text-muted-foreground">
@@ -1230,23 +1230,23 @@ export default function SiteShow({
 
                                     {/* Compliance Warnings */}
                                     {fc.length > 0 && (
-                                        <Card className="border-amber-300 dark:border-amber-800">
+                                        <Card className="border-status-warning/30 dark:border-status-warning/30">
                                             <CardHeader className="pb-2">
-                                                <CardTitle className="flex items-center gap-2 text-base text-amber-800 dark:text-amber-300">
+                                                <CardTitle className="flex items-center gap-2 text-base text-status-warning dark:text-status-warning">
                                                     <AlertTriangle className="h-4 w-4" /> Compliance Warnings
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="space-y-2">
                                                     {fc.map((v) => (
-                                                        <div key={v.vehicle_id} className="rounded-md border border-amber-200 dark:border-amber-800 p-3">
+                                                        <div key={v.vehicle_id} className="rounded-md border border-status-warning/30 dark:border-status-warning/30 p-3">
                                                             <Link href={`/fleet-assets/vehicles/${v.vehicle_id}`} className="text-sm font-medium text-primary hover:underline">{v.vehicle_name}</Link>
                                                             <div className="flex flex-wrap gap-1.5 mt-1.5">
                                                                 {v.items.map((item, i) => (
                                                                     <Badge
                                                                         key={i}
                                                                         variant={item.status === 'expired' ? 'destructive' : 'outline'}
-                                                                        className={`text-[10px] ${item.status === 'critical' ? 'border-red-400 text-red-700 dark:text-red-400' : item.status === 'warning' ? 'border-amber-400 text-amber-700 dark:text-amber-400' : ''}`}
+                                                                        className={`text-[10px] ${item.status === 'critical' ? 'border-status-critical/30 text-status-critical dark:text-status-critical' : item.status === 'warning' ? 'border-status-warning/30 text-status-warning dark:text-status-warning' : ''}`}
                                                                     >
                                                                         {item.type}: {item.status === 'expired' ? 'EXPIRED' : `${item.days_remaining}d remaining`}
                                                                     </Badge>
@@ -1310,7 +1310,7 @@ export default function SiteShow({
                                                                 {v.is_preferred && (
                                                                     <Badge
                                                                         variant="outline"
-                                                                        className="border-yellow-500/30 text-xs text-yellow-400"
+                                                                        className="border-status-warning/30 text-xs text-status-warning"
                                                                     >
                                                                         Preferred
                                                                     </Badge>
@@ -1361,7 +1361,7 @@ export default function SiteShow({
                                                 site.
                                             </p>
                                         ) : (
-                                            <p className="text-sm text-slate-300">
+                                            <p className="text-sm text-muted-foreground">
                                                 {credentialCount} credential
                                                 {credentialCount !== 1
                                                     ? 's'
@@ -1425,11 +1425,11 @@ export default function SiteShow({
                                                 variant="outline"
                                                 className={
                                                     i.status === 'hybrid'
-                                                        ? 'border-emerald-500/30 text-emerald-400'
+                                                        ? 'border-status-success/30 text-status-success'
                                                         : i.status ===
                                                             'tenant_only'
-                                                          ? 'border-blue-500/30 text-blue-400'
-                                                          : 'border-slate-500/30 text-muted-foreground'
+                                                          ? 'border-status-info/30 text-status-info'
+                                                          : 'border-border/30 text-muted-foreground'
                                                 }
                                             >
                                                 {i.provider
@@ -1530,7 +1530,7 @@ export default function SiteShow({
                                                             {ctx.name}
                                                         </span>
                                                         {ctx.is_active ? (
-                                                            <Badge className="bg-emerald-100 text-xs text-emerald-700">
+                                                            <Badge className="bg-status-success-bg text-xs text-status-success">
                                                                 Active
                                                             </Badge>
                                                         ) : (
@@ -1658,7 +1658,7 @@ function ContactsTab({
                                                 {c.is_primary && (
                                                     <Badge
                                                         variant="outline"
-                                                        className="ml-2 border-emerald-500/30 text-emerald-300"
+                                                        className="ml-2 border-status-success/30 text-status-success"
                                                     >
                                                         Primary
                                                     </Badge>
@@ -1684,7 +1684,7 @@ function ContactsTab({
                                             </div>
                                         )}
                                     </div>
-                                    <div className="mt-2 grid gap-1 text-slate-300">
+                                    <div className="mt-2 grid gap-1 text-muted-foreground">
                                         <div>{c.phone || '—'}</div>
                                         <div>{c.email || '—'}</div>
                                         {c.notes && (
@@ -1893,7 +1893,7 @@ function DocumentsTab({
                                             <td className="px-4 py-3 font-medium">
                                                 {d.title || d.original_name}
                                             </td>
-                                            <td className="px-4 py-3 text-slate-300">
+                                            <td className="px-4 py-3 text-muted-foreground">
                                                 {d.category || '—'}
                                             </td>
                                             <td className="px-4 py-3 text-right">
@@ -2032,7 +2032,7 @@ function TypeSpecificTab({
                                         ) : (
                                             <Badge
                                                 variant="outline"
-                                                className="mt-2 border-slate-500/30 text-muted-foreground"
+                                                className="mt-2 border-border/30 text-muted-foreground"
                                             >
                                                 Available
                                             </Badge>
@@ -2198,12 +2198,12 @@ const PRESET_REQUIREMENTS = [
 const categoryConfig = {
     mandatory: {
         label: 'Mandatory',
-        color: 'border-red-500/30 text-red-300 bg-red-500/10',
+        color: 'border-status-critical/30 text-status-critical bg-status-critical',
         icon: Shield,
     },
     recommended: {
         label: 'Recommended',
-        color: 'border-amber-500/30 text-amber-300 bg-amber-500/10',
+        color: 'border-status-warning/30 text-status-warning bg-status-warning',
         icon: Star,
     },
     specialist: {
@@ -2216,11 +2216,11 @@ const categoryConfig = {
 const coverageTypeConfig = {
     day: {
         label: 'Day',
-        color: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10',
+        color: 'border-status-success/30 text-status-success bg-status-success',
     },
     evening: {
         label: 'Evening',
-        color: 'border-amber-500/30 text-amber-300 bg-amber-500/10',
+        color: 'border-status-warning/30 text-status-warning bg-status-warning',
     },
     overnight: {
         label: 'Overnight',
@@ -2228,7 +2228,7 @@ const coverageTypeConfig = {
     },
     custom: {
         label: 'Custom',
-        color: 'border-slate-500/30 text-slate-300 bg-slate-500/10',
+        color: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
     },
 };
 
@@ -2388,7 +2388,7 @@ function CoverageRequirementsTab({
     return (
         <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
-                <Card className="overflow-hidden border-primary/60 bg-gradient-to-br from-white via-indigo-50/70 to-cyan-50/70">
+                <Card className="overflow-hidden border-primary/60 bg-gradient-to-br from-white via-primary/10/70 to-status-info-bg/70">
                     <CardHeader className="pb-3">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
@@ -2412,7 +2412,7 @@ function CoverageRequirementsTab({
                                     (sitePreview?.under_covered_windows ?? 0) >
                                     0
                                         ? ''
-                                        : 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-status-success-bg text-status-success'
                                 }
                             >
                                 {(sitePreview?.under_covered_windows ?? 0) > 0
@@ -2434,33 +2434,33 @@ function CoverageRequirementsTab({
                                     Active demand windows
                                 </p>
                             </div>
-                            <div className="rounded-2xl border border-red-200/70 bg-white/85 p-4 shadow-sm">
-                                <p className="text-[11px] font-semibold tracking-[0.16em] text-red-500 uppercase">
+                            <div className="rounded-2xl border border-status-critical/70 bg-white/85 p-4 shadow-sm">
+                                <p className="text-[11px] font-semibold tracking-[0.16em] text-status-critical uppercase">
                                     Under-covered
                                 </p>
-                                <p className="mt-2 text-3xl font-bold text-red-600">
+                                <p className="mt-2 text-3xl font-bold text-status-critical">
                                     {sitePreview?.under_covered_windows ?? 0}
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">
                                     Need action now
                                 </p>
                             </div>
-                            <div className="rounded-2xl border border-emerald-200/70 bg-white/85 p-4 shadow-sm">
-                                <p className="text-[11px] font-semibold tracking-[0.16em] text-emerald-600 uppercase">
+                            <div className="rounded-2xl border border-status-success/70 bg-white/85 p-4 shadow-sm">
+                                <p className="text-[11px] font-semibold tracking-[0.16em] text-status-success uppercase">
                                     Exact
                                 </p>
-                                <p className="mt-2 text-3xl font-bold text-emerald-600">
+                                <p className="mt-2 text-3xl font-bold text-status-success">
                                     {sitePreview?.exact_windows ?? 0}
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">
                                     Demand matched cleanly
                                 </p>
                             </div>
-                            <div className="rounded-2xl border border-amber-200/70 bg-white/85 p-4 shadow-sm">
-                                <p className="text-[11px] font-semibold tracking-[0.16em] text-amber-600 uppercase">
+                            <div className="rounded-2xl border border-status-warning/70 bg-white/85 p-4 shadow-sm">
+                                <p className="text-[11px] font-semibold tracking-[0.16em] text-status-warning uppercase">
                                     Largest gap
                                 </p>
-                                <p className="mt-2 text-3xl font-bold text-amber-600">
+                                <p className="mt-2 text-3xl font-bold text-status-warning">
                                     {sitePreview?.largest_missing_staff ?? 0}
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">
@@ -2543,7 +2543,7 @@ function CoverageRequirementsTab({
                         </div>
 
                         {!sitePreview || sitePreview.alerts.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-800">
+                            <div className="rounded-2xl border border-dashed border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success">
                                 No projected coverage gaps in the upcoming
                                 fortnight for this site.
                             </div>
@@ -3265,7 +3265,7 @@ function CoverageRequirementsTab({
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="shrink-0 text-muted-foreground hover:text-red-400"
+                                                    className="shrink-0 text-muted-foreground hover:text-status-critical"
                                                     onClick={() =>
                                                         deleteRequirement(
                                                             requirement.id,
@@ -3542,7 +3542,7 @@ function StaffRequirementsTab({
                                                         {req.certification_required && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-300"
+                                                                className="border-status-success/30 bg-status-success-bg text-xs text-status-success"
                                                             >
                                                                 <Award className="mr-1 h-3 w-3" />
                                                                 Certification
@@ -3551,7 +3551,7 @@ function StaffRequirementsTab({
                                                         {req.expiry_period_months && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="border-slate-500/30 text-xs text-muted-foreground"
+                                                                className="border-border/30 text-xs text-muted-foreground"
                                                             >
                                                                 Renew every{' '}
                                                                 {
@@ -3571,7 +3571,7 @@ function StaffRequirementsTab({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="shrink-0 text-muted-foreground hover:text-red-400"
+                                                        className="shrink-0 text-muted-foreground hover:text-status-critical"
                                                         onClick={() =>
                                                             deleteRequirement(
                                                                 req.id,

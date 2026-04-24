@@ -36,7 +36,7 @@ export default function HandoverNoteShow({ note }: Props) {
                     <CardContent className="space-y-3 text-sm text-muted-foreground">
                         <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{note.handover_type?.replace(/_/g, ' ')}</Badge>
-                            {note.sensitive_flag && <Badge className="bg-red-100 text-red-800">Sensitive</Badge>}
+                            {note.sensitive_flag && <Badge className="bg-status-critical-bg text-status-critical">Sensitive</Badge>}
                         </div>
                         <div className="whitespace-pre-wrap">{note.notes}</div>
                         <div className="text-xs text-muted-foreground">Created: {formatDateTime(note.created_at)}</div>

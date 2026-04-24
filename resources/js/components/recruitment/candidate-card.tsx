@@ -14,9 +14,9 @@ interface CandidateCardProps {
 }
 
 function getDaysColor(days: number) {
-    if (days <= 7) return 'text-green-500';
-    if (days <= 14) return 'text-amber-500';
-    return 'text-red-500';
+    if (days <= 7) return 'text-status-success';
+    if (days <= 14) return 'text-status-warning';
+    return 'text-status-critical';
 }
 
 function getInitials(name: string) {

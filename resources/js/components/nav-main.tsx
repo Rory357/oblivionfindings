@@ -89,10 +89,10 @@ function NavItemComponent({
             {isNested && (
                 <>
                     {/* Horizontal line connecting to parent */}
-                    <div className="absolute left-4 top-1/2 w-3 h-px bg-muted dark:bg-slate-700" />
+                    <div className="absolute left-4 top-1/2 w-3 h-px bg-muted dark:bg-muted" />
                     {/* Vertical line continuing down (if not last) */}
                     {!isLast && (
-                        <div className="absolute left-4 top-1/2 w-px h-[calc(100%+8px)] bg-muted dark:bg-slate-700" />
+                        <div className="absolute left-4 top-1/2 w-px h-[calc(100%+8px)] bg-muted dark:bg-muted" />
                     )}
                 </>
             )}
@@ -104,8 +104,8 @@ function NavItemComponent({
                     relative transition-all duration-200
                     ${isNested ? 'pl-8' : ''}
                     ${isActive
-                        ? 'bg-primary/10 !text-foreground dark:!text-slate-100 font-medium'
-                        : 'hover:bg-muted dark:hover:bg-slate-800'
+                        ? 'bg-primary/10 !text-foreground dark:!text-foreground font-medium'
+                        : 'hover:bg-muted dark:hover:bg-muted'
                     }
                     rounded-lg my-0.5
                 `}

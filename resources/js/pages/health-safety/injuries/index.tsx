@@ -50,11 +50,11 @@ const statusColor = (status: string) => {
     switch (status) {
         case 'active':
         case 'open':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'recovering':
-            return 'bg-blue-100 text-blue-800';
+            return 'bg-status-info-bg text-status-info';
         case 'returned_to_work':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'closed':
             return 'bg-muted text-foreground';
         default:
@@ -65,13 +65,13 @@ const statusColor = (status: string) => {
 const severityColor = (severity: string) => {
     switch (severity) {
         case 'minor':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'moderate':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'serious':
-            return 'bg-orange-100 text-orange-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'critical':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         default:
             return 'bg-muted text-foreground';
     }
@@ -198,7 +198,7 @@ export default function InjuriesIndex({ filters, stats, injuries }: Props) {
                                             <td className="py-2 pr-4">{inj.lost_time_days}</td>
                                             <td className="py-2 pr-4">
                                                 {inj.acc_claim_lodged ? (
-                                                    <Badge className="bg-blue-100 text-blue-800">
+                                                    <Badge className="bg-status-info-bg text-status-info">
                                                         {inj.acc_claim_number ?? 'Lodged'}
                                                     </Badge>
                                                 ) : (

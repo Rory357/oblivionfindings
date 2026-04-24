@@ -146,16 +146,16 @@ type Props = {
 
 const TRANSPORT_TYPE_BANNER: Record<string, string> = {
     medical:
-        'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
+        'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
     appointment:
-        'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200',
-    social: 'bg-green-50 border-green-200 text-green-900 dark:bg-green-950/30 dark:border-green-800 dark:text-green-200',
+        'bg-status-info-bg border-status-info/30 text-status-info dark:bg-status-info-bg dark:border-status-info/30 dark:text-status-info',
+    social: 'bg-status-success-bg border-status-success/30 text-status-success dark:bg-status-success-bg dark:border-status-success/30 dark:text-status-success',
     shopping:
         'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
     community:
-        'bg-teal-50 border-teal-200 text-teal-900 dark:bg-teal-950/30 dark:border-teal-800 dark:text-teal-200',
+        'bg-status-info-bg border-status-info/30 text-status-info dark:bg-teal-950/30 dark:border-status-info/30 dark:text-status-info',
     respite:
-        'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-950/30 dark:border-orange-800 dark:text-orange-200',
+        'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
     other: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
 };
 
@@ -177,11 +177,11 @@ function statusVariant(
 function transitStatusBadge(status: string) {
     switch (status) {
         case 'packed':
-            return <Badge className="bg-amber-500 text-white">Packed</Badge>;
+            return <Badge className="bg-status-warning text-white">Packed</Badge>;
         case 'administered':
-            return <Badge className="bg-blue-600 text-white">Administered</Badge>;
+            return <Badge className="bg-status-info text-white">Administered</Badge>;
         case 'returned':
-            return <Badge className="bg-emerald-600 text-white">Returned</Badge>;
+            return <Badge className="bg-status-success text-white">Returned</Badge>;
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
@@ -603,8 +603,8 @@ export default function TransportShow({
                                     className={cn(
                                         'text-xs',
                                         pre_check_status === 'completed'
-                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+                                            ? 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success'
+                                            : 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
                                     )}
                                 >
                                     <ShieldCheck className="mr-1 h-3 w-3" />
@@ -633,7 +633,7 @@ export default function TransportShow({
                                     <MapPin className="h-4 w-4" />
                                     Live Vehicle Position
                                     <span className="ml-auto flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
-                                        <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+                                        <span className="h-2 w-2 animate-pulse rounded-full bg-status-success" />
                                         Live
                                     </span>
                                 </CardTitle>
@@ -776,8 +776,8 @@ export default function TransportShow({
                                         </div>
                                     )}
                                     {t.shift && (
-                                        <div className="rounded-md bg-blue-50/60 p-3 dark:bg-blue-950/20">
-                                            <dt className="text-xs text-blue-700 dark:text-blue-300">
+                                        <div className="rounded-md bg-status-info-bg p-3 dark:bg-status-info">
+                                            <dt className="text-xs text-status-info dark:text-status-info">
                                                 Linked Shift
                                             </dt>
                                             <dd className="mt-1">
@@ -1033,9 +1033,9 @@ export default function TransportShow({
 
                         {t.status === 'in_progress' &&
                             (completion_blockers ?? []).length > 0 && (
-                                <Card className="border-amber-300 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20">
+                                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning">
                                     <CardContent className="space-y-2 p-4">
-                                        <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                        <div className="flex items-center gap-2 text-sm font-semibold text-status-warning dark:text-status-warning">
                                             <AlertTriangle className="h-4 w-4" />
                                             Cannot complete transport yet
                                         </div>
@@ -1043,7 +1043,7 @@ export default function TransportShow({
                                             (blocker, index) => (
                                                 <div
                                                     key={index}
-                                                    className="flex items-center gap-2 rounded-md bg-amber-100/50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-200"
+                                                    className="flex items-center gap-2 rounded-md bg-status-warning-bg px-3 py-2 text-xs text-status-warning dark:bg-status-warning-bg dark:text-status-warning"
                                                 >
                                                     {blocker.type ===
                                                         'unresolved_medications' && (
@@ -1056,7 +1056,7 @@ export default function TransportShow({
                                                     <span>{blocker.message}</span>
                                                     <Badge
                                                         variant="outline"
-                                                        className="ml-auto border-amber-400 text-[9px] text-amber-700"
+                                                        className="ml-auto border-status-warning/30 text-[9px] text-status-warning"
                                                     >
                                                         {blocker.count}
                                                     </Badge>

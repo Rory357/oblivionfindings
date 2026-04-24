@@ -252,7 +252,7 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                             onClick={() => setShowGeofences(!showGeofences)}
                             className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                                 showGeofences
-                                    ? 'bg-red-600 text-white'
+                                    ? 'bg-status-critical text-white'
                                     : 'bg-muted text-muted-foreground'
                             }`}
                         >
@@ -278,10 +278,10 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                                         <span
                                             className={`h-2 w-2 shrink-0 rounded-full ${
                                                 v.status === 'online'
-                                                    ? 'bg-green-500'
+                                                    ? 'bg-status-success'
                                                     : v.status === 'idle'
-                                                    ? 'bg-yellow-500'
-                                                    : 'bg-gray-400'
+                                                    ? 'bg-status-warning'
+                                                    : 'bg-muted'
                                             }`}
                                         />
                                         <div className="flex-1 min-w-0">
@@ -289,7 +289,7 @@ export default function FleetAssetsMap({ vehicle_markers, house_markers, geofenc
                                                 {v.name ?? v.asset_tag ?? `Vehicle ${v.id}`}
                                             </span>
                                             {v.consent_blocked ? (
-                                                <span className="text-[10px] text-amber-600 dark:text-amber-400">Location hidden (consent)</span>
+                                                <span className="text-[10px] text-status-warning dark:text-status-warning">Location hidden (consent)</span>
                                             ) : v.last_seen_at ? (
                                                 <span className="text-[10px] text-muted-foreground">
                                                     {formatRelativeTime(v.last_seen_at)}

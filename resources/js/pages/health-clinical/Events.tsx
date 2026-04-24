@@ -90,10 +90,10 @@ type Props = {
 const ALL_SENTINEL = '__all__';
 
 const severityColor: Record<string, string> = {
-    low: 'bg-blue-100 text-blue-800',
-    medium: 'bg-amber-100 text-amber-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
+    low: 'bg-status-info-bg text-status-info',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 function formatNzDate(iso: string): string {
@@ -172,31 +172,31 @@ export default function EventRegister({
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border bg-gradient-to-br from-rose-50 to-orange-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-500">
+                    <div className="rounded-xl border bg-primary/10 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-critical">
                             Last 7 days
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-rose-700">
+                        <p className="mt-1 text-2xl font-bold text-status-critical">
                             {stats.total_7d}
                         </p>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-yellow-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">
+                    <div className="rounded-xl border bg-status-warning-bg p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-warning">
                             Last 30 days
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-amber-700">
+                        <p className="mt-1 text-2xl font-bold text-status-warning">
                             {stats.total_30d}
                         </p>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-red-50 to-rose-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-red-500">
+                    <div className="rounded-xl border bg-status-critical-bg p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-critical">
                             Pending follow-up
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-red-700">
+                        <p className="mt-1 text-2xl font-bold text-status-critical">
                             {stats.pending_follow_ups}
                         </p>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-gray-50 p-4">
+                    <div className="rounded-xl border bg-primary/10 p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                             Unreviewed
                         </p>
@@ -427,14 +427,14 @@ export default function EventRegister({
                                             <tr
                                                 key={event.id}
                                                 className={`border-b transition-colors hover:bg-muted/20 ${
-                                                    event.severity === 'critical' ? 'bg-red-50/40' : ''
+                                                    event.severity === 'critical' ? 'bg-status-critical-bg' : ''
                                                 }`}
                                             >
                                                 <td className="px-4 py-3">
                                                     {event.client ? (
                                                         <Link
                                                             href={`/operations/clients/${event.client.id}`}
-                                                            className="font-medium text-blue-600 hover:underline"
+                                                            className="font-medium text-status-info hover:underline"
                                                         >
                                                             {event.client.first_name} {event.client.last_name}
                                                         </Link>

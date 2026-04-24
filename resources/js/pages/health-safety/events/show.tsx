@@ -166,15 +166,15 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                                     <StatusBadge status={event.severity} />
                                     <StatusBadge status={event.status} />
                                     {event.worksafe_notifiable && (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700 border border-red-200">
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2.5 py-0.5 text-xs font-semibold text-status-critical border border-status-critical/30">
                                             <ShieldAlert className="h-3 w-3" /> WorkSafe Notifiable
                                         </span>
                                     )}
                                 </div>
                                 <p className="mt-2 text-sm text-muted-foreground">
                                     {CATEGORY_LABELS[event.event_category] ?? event.event_category}
-                                    {event.site_name && <> at <Link href={`/sites/${event.site_id}`} className="text-blue-600 hover:underline">{event.site_name}</Link></>}
-                                    {event.client_name && <> involving <Link href={`/clients/${event.client_id}`} className="text-blue-600 hover:underline">{event.client_name}</Link></>}
+                                    {event.site_name && <> at <Link href={`/sites/${event.site_id}`} className="text-status-info hover:underline">{event.site_name}</Link></>}
+                                    {event.client_name && <> involving <Link href={`/clients/${event.client_id}`} className="text-status-info hover:underline">{event.client_name}</Link></>}
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
                                     {event.occurred_at && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Occurred {fmtDateTime(event.occurred_at)}</span>}
@@ -186,19 +186,19 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                             {/* Right side: what needs attention */}
                             <div className="flex shrink-0 flex-col gap-2">
                                 {overdueActions.length > 0 && (
-                                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical">
                                         <AlertTriangle className="mr-1 inline h-4 w-4" />
                                         {overdueActions.length} overdue action{overdueActions.length !== 1 ? 's' : ''}
                                     </div>
                                 )}
                                 {awaitingVerification.length > 0 && (
-                                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                                    <div className="rounded-lg border border-status-info/30 bg-status-info-bg px-3 py-2 text-sm text-status-info">
                                         <CheckCircle2 className="mr-1 inline h-4 w-4" />
                                         {awaitingVerification.length} awaiting verification
                                     </div>
                                 )}
                                 {event.investigation_required && !investigations.length && (
-                                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                                    <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning">
                                         <SearchIcon className="mr-1 inline h-4 w-4" />
                                         Investigation required
                                     </div>
@@ -233,8 +233,8 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                                 <Card>
                                     <CardHeader><CardTitle className="text-base">Context</CardTitle></CardHeader>
                                     <CardContent className="space-y-0 text-sm">
-                                        <DetailRow label="Site">{event.site_name ? <Link href={`/sites/${event.site_id}`} className="text-blue-600 hover:underline">{event.site_name}</Link> : '-'}</DetailRow>
-                                        <DetailRow label="Client">{event.client_name ? <Link href={`/clients/${event.client_id}`} className="text-blue-600 hover:underline">{event.client_name}</Link> : '-'}</DetailRow>
+                                        <DetailRow label="Site">{event.site_name ? <Link href={`/sites/${event.site_id}`} className="text-status-info hover:underline">{event.site_name}</Link> : '-'}</DetailRow>
+                                        <DetailRow label="Client">{event.client_name ? <Link href={`/clients/${event.client_id}`} className="text-status-info hover:underline">{event.client_name}</Link> : '-'}</DetailRow>
                                         <DetailRow label="Staff">{event.staff_name ?? '-'}</DetailRow>
                                         <DetailRow label="Asset">{event.asset_name ?? '-'}</DetailRow>
                                         {event.worksafe_notifiable && (
@@ -245,7 +245,7 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                                         )}
                                         {event.control_room_alert && (
                                             <DetailRow label="CR Alert">
-                                                <Link href={`/control-room/alerts/${event.control_room_alert.id}`} className="text-blue-600 hover:underline">
+                                                <Link href={`/control-room/alerts/${event.control_room_alert.id}`} className="text-status-info hover:underline">
                                                     Alert #{event.control_room_alert.id}
                                                 </Link>
                                             </DetailRow>
@@ -365,7 +365,7 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                                                 </thead>
                                                 <tbody className="divide-y">
                                                     {corrective_actions.map(action => (
-                                                        <tr key={action.id} className={`hover:bg-muted/30 ${action.is_overdue ? 'bg-red-50/50' : ''}`}>
+                                                        <tr key={action.id} className={`hover:bg-muted/30 ${action.is_overdue ? 'bg-status-critical-bg' : ''}`}>
                                                             <td className="px-4 py-3">
                                                                 <div className="font-medium">{action.reference_number}</div>
                                                                 <div className="text-muted-foreground text-xs mt-0.5 max-w-xs truncate">{action.title}</div>
@@ -378,12 +378,12 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                                                             <td className="px-4 py-3 text-muted-foreground">{fmtDate(action.due_date)}</td>
                                                             <td className="px-4 py-3">
                                                                 {action.verified_at ? (
-                                                                    <span className="flex items-center gap-1 text-green-600">
+                                                                    <span className="flex items-center gap-1 text-status-success">
                                                                         <CheckCircle2 className="h-4 w-4" />
                                                                         {action.effectiveness_confirmed ? 'Effective' : 'Ineffective'}
                                                                     </span>
                                                                 ) : action.completed_at ? (
-                                                                    <span className="text-blue-600 text-xs">Awaiting verification</span>
+                                                                    <span className="text-status-info text-xs">Awaiting verification</span>
                                                                 ) : (
                                                                     <span className="text-muted-foreground">-</span>
                                                                 )}
@@ -425,7 +425,7 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                                                     <div className="mt-3 flex gap-3 text-center">
                                                         <div>
                                                             <div className="text-xs text-muted-foreground">Inherent</div>
-                                                            <div className={`mt-1 rounded-md px-3 py-1 text-sm font-bold ${ra.risk_level === 'extreme' || ra.risk_level === 'high' ? 'bg-red-100 text-red-800' : ra.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                                                            <div className={`mt-1 rounded-md px-3 py-1 text-sm font-bold ${ra.risk_level === 'extreme' || ra.risk_level === 'high' ? 'bg-status-critical-bg text-status-critical' : ra.risk_level === 'medium' ? 'bg-status-warning-bg text-status-warning' : 'bg-status-success-bg text-status-success'}`}>
                                                                 {ra.risk_score}
                                                             </div>
                                                             <div className="mt-0.5 text-xs capitalize text-muted-foreground">{ra.risk_level}</div>
@@ -435,7 +435,7 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                                                                 <div className="flex items-center text-muted-foreground"><ChevronRight className="h-4 w-4" /></div>
                                                                 <div>
                                                                     <div className="text-xs text-muted-foreground">Residual</div>
-                                                                    <div className={`mt-1 rounded-md px-3 py-1 text-sm font-bold ${ra.residual_risk_level === 'extreme' || ra.residual_risk_level === 'high' ? 'bg-red-100 text-red-800' : ra.residual_risk_level === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                                                                    <div className={`mt-1 rounded-md px-3 py-1 text-sm font-bold ${ra.residual_risk_level === 'extreme' || ra.residual_risk_level === 'high' ? 'bg-status-critical-bg text-status-critical' : ra.residual_risk_level === 'medium' ? 'bg-status-warning-bg text-status-warning' : 'bg-status-success-bg text-status-success'}`}>
                                                                         {ra.residual_risk_score}
                                                                     </div>
                                                                     <div className="mt-0.5 text-xs capitalize text-muted-foreground">{ra.residual_risk_level}</div>

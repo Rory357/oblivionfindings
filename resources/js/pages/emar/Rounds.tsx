@@ -54,9 +54,9 @@ type Props = {
 
 const statusConfig: Record<string, { color: string; icon: any }> = {
     pending: { color: 'bg-muted text-foreground', icon: Clock },
-    in_progress: { color: 'bg-blue-100 text-blue-700', icon: Play },
-    completed: { color: 'bg-green-100 text-green-700', icon: CheckCircle },
-    partial: { color: 'bg-amber-100 text-amber-700', icon: AlertTriangle },
+    in_progress: { color: 'bg-status-info-bg text-status-info', icon: Play },
+    completed: { color: 'bg-status-success-bg text-status-success', icon: CheckCircle },
+    partial: { color: 'bg-status-warning-bg text-status-warning', icon: AlertTriangle },
 };
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -101,17 +101,17 @@ function EditTemplateDialog({ template, staff, open, onOpenChange }: { template:
                     <div>
                         <Label htmlFor="edit-tpl-name">Name</Label>
                         <Input id="edit-tpl-name" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Morning Round" />
-                        {form.errors.name && <p className="mt-1 text-xs text-red-500">{form.errors.name}</p>}
+                        {form.errors.name && <p className="mt-1 text-xs text-status-critical">{form.errors.name}</p>}
                     </div>
                     <div>
                         <Label htmlFor="edit-tpl-time">Scheduled Time</Label>
                         <Input id="edit-tpl-time" type="time" value={form.data.scheduled_time} onChange={(e) => form.setData('scheduled_time', e.target.value)} />
-                        {form.errors.scheduled_time && <p className="mt-1 text-xs text-red-500">{form.errors.scheduled_time}</p>}
+                        {form.errors.scheduled_time && <p className="mt-1 text-xs text-status-critical">{form.errors.scheduled_time}</p>}
                     </div>
                     <div>
                         <Label htmlFor="edit-tpl-window">Window (minutes)</Label>
                         <Input id="edit-tpl-window" type="number" min={0} value={form.data.window_minutes} onChange={(e) => form.setData('window_minutes', parseInt(e.target.value) || 0)} />
-                        {form.errors.window_minutes && <p className="mt-1 text-xs text-red-500">{form.errors.window_minutes}</p>}
+                        {form.errors.window_minutes && <p className="mt-1 text-xs text-status-critical">{form.errors.window_minutes}</p>}
                     </div>
                     <div>
                         <Label>Default Assigned Staff</Label>
@@ -271,17 +271,17 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
                                     <div>
                                         <Label htmlFor="tpl-name">Name</Label>
                                         <Input id="tpl-name" value={templateForm.data.name} onChange={(e) => templateForm.setData('name', e.target.value)} placeholder="e.g. Morning Round" />
-                                        {templateForm.errors.name && <p className="mt-1 text-xs text-red-500">{templateForm.errors.name}</p>}
+                                        {templateForm.errors.name && <p className="mt-1 text-xs text-status-critical">{templateForm.errors.name}</p>}
                                     </div>
                                     <div>
                                         <Label htmlFor="tpl-time">Scheduled Time</Label>
                                         <Input id="tpl-time" type="time" value={templateForm.data.scheduled_time} onChange={(e) => templateForm.setData('scheduled_time', e.target.value)} />
-                                        {templateForm.errors.scheduled_time && <p className="mt-1 text-xs text-red-500">{templateForm.errors.scheduled_time}</p>}
+                                        {templateForm.errors.scheduled_time && <p className="mt-1 text-xs text-status-critical">{templateForm.errors.scheduled_time}</p>}
                                     </div>
                                     <div>
                                         <Label htmlFor="tpl-window">Window (minutes)</Label>
                                         <Input id="tpl-window" type="number" min={0} value={templateForm.data.window_minutes} onChange={(e) => templateForm.setData('window_minutes', parseInt(e.target.value) || 0)} />
-                                        {templateForm.errors.window_minutes && <p className="mt-1 text-xs text-red-500">{templateForm.errors.window_minutes}</p>}
+                                        {templateForm.errors.window_minutes && <p className="mt-1 text-xs text-status-critical">{templateForm.errors.window_minutes}</p>}
                                     </div>
                                     <div>
                                         <Label>Default Assigned Staff</Label>
@@ -370,19 +370,19 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                                         <div>
-                                            <p className="font-bold text-green-600">{round.administered_count}</p>
+                                            <p className="font-bold text-status-success">{round.administered_count}</p>
                                             <p className="text-muted-foreground">Given</p>
                                         </div>
                                         <div>
-                                            <p className="font-bold text-orange-500">{round.refused_count}</p>
+                                            <p className="font-bold text-status-warning">{round.refused_count}</p>
                                             <p className="text-muted-foreground">Refused</p>
                                         </div>
                                         <div>
-                                            <p className="font-bold text-amber-500">{round.withheld_count}</p>
+                                            <p className="font-bold text-status-warning">{round.withheld_count}</p>
                                             <p className="text-muted-foreground">Withheld</p>
                                         </div>
                                         <div>
-                                            <p className="font-bold text-red-500">{round.missed_count}</p>
+                                            <p className="font-bold text-status-critical">{round.missed_count}</p>
                                             <p className="text-muted-foreground">Missed</p>
                                         </div>
                                     </div>
@@ -488,7 +488,7 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
                                                     <Button variant="ghost" size="icon" onClick={() => openEditTemplate(t)}>
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => deleteTemplate(t.id)}>
+                                                    <Button variant="ghost" size="icon" className="text-status-critical hover:text-status-critical" onClick={() => deleteTemplate(t.id)}>
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
                                                 </div>

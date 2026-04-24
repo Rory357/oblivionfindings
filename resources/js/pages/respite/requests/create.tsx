@@ -67,7 +67,7 @@ export default function RespiteRequestCreate({ clients, serviceContexts, default
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.client_id && <div className="mt-1 text-xs text-red-500">{errors.client_id}</div>}
+                                    {errors.client_id && <div className="mt-1 text-xs text-status-critical">{errors.client_id}</div>}
                                 </div>
                                 <div>
                                     <Label>Service Context</Label>
@@ -88,12 +88,12 @@ export default function RespiteRequestCreate({ clients, serviceContexts, default
                                 <div>
                                     <Label>Requested Start *</Label>
                                     <Input type="datetime-local" value={data.requested_start} onChange={(e) => setData('requested_start', e.target.value)} />
-                                    {errors.requested_start && <div className="mt-1 text-xs text-red-500">{errors.requested_start}</div>}
+                                    {errors.requested_start && <div className="mt-1 text-xs text-status-critical">{errors.requested_start}</div>}
                                 </div>
                                 <div>
                                     <Label>Requested End *</Label>
                                     <Input type="datetime-local" value={data.requested_end} onChange={(e) => setData('requested_end', e.target.value)} />
-                                    {errors.requested_end && <div className="mt-1 text-xs text-red-500">{errors.requested_end}</div>}
+                                    {errors.requested_end && <div className="mt-1 text-xs text-status-critical">{errors.requested_end}</div>}
                                 </div>
                             </div>
 

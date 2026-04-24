@@ -754,7 +754,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
-                                                                className="h-7 px-2 text-red-600 hover:text-red-700"
+                                                                className="h-7 px-2 text-status-critical hover:text-status-critical"
                                                                 onClick={() => submitUnlink(link.id)}
                                                                 disabled={unlinkingId === link.id}
                                                                 title="Unlink (history preserved)"
@@ -813,7 +813,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                             <label className="text-sm font-medium">Notes (optional)</label>
                                             <Input value={linkNotes} onChange={(e) => setLinkNotes(e.target.value)} placeholder="e.g. Installed in dashboard console" />
                                         </div>
-                                        {linkError && <p className="text-sm text-red-600">{linkError}</p>}
+                                        {linkError && <p className="text-sm text-status-critical">{linkError}</p>}
                                     </div>
                                     <DialogFooter>
                                         <Button variant="ghost" onClick={() => setLinkOpen(false)} disabled={linkSubmitting}>Cancel</Button>
@@ -987,8 +987,8 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                     <div
                                         key={evt.id}
                                         className={`flex items-start gap-3 rounded-md border p-3 text-sm ${
-                                            evt.severity === 'critical' ? 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30' :
-                                            evt.severity === 'warning' ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20' :
+                                            evt.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' :
+                                            evt.severity === 'warning' ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning' :
                                             ''
                                         }`}
                                     >
@@ -1029,7 +1029,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                 {maintenanceRecords.map((m) => {
                                     const isOverdue = m.status === 'scheduled' && m.scheduled_for && new Date(m.scheduled_for) < new Date();
                                     return (
-                                        <div key={m.id} className={`rounded-lg border p-4 text-sm ${isOverdue ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/10' : ''}`}>
+                                        <div key={m.id} className={`rounded-lg border p-4 text-sm ${isOverdue ? 'border-status-warning/30 bg-status-warning-bg dark:bg-status-warning' : ''}`}>
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex flex-wrap items-center gap-2">
@@ -1100,7 +1100,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
-                                                                className="h-7 px-2 text-red-600 hover:text-red-700"
+                                                                className="h-7 px-2 text-status-critical hover:text-status-critical"
                                                                 onClick={() => submitUnlinkRelationship(r.id)}
                                                                 disabled={unlinkingRelId === r.id}
                                                                 title="Remove relationship"
@@ -1125,7 +1125,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
-                                                                className="h-7 px-2 text-red-600 hover:text-red-700"
+                                                                className="h-7 px-2 text-status-critical hover:text-status-critical"
                                                                 onClick={() => submitUnlinkRelationship(r.id)}
                                                                 disabled={unlinkingRelId === r.id}
                                                                 title="Remove relationship"
@@ -1198,7 +1198,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                             <Input value={relNotes} onChange={(e) => setRelNotes(e.target.value)} placeholder="short note" />
                                         </div>
                                     </div>
-                                    {relError && <p className="text-sm text-red-600">{relError}</p>}
+                                    {relError && <p className="text-sm text-status-critical">{relError}</p>}
                                 </div>
                                 <DialogFooter>
                                     <Button variant="ghost" onClick={() => setRelOpen(false)} disabled={relSubmitting}>Cancel</Button>
@@ -1256,7 +1256,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
-                                                            className="h-7 px-2 text-red-600 hover:text-red-700"
+                                                            className="h-7 px-2 text-status-critical hover:text-status-critical"
                                                             onClick={() => submitDeleteDocument(doc.id)}
                                                             disabled={deletingDocId === doc.id}
                                                             title="Delete document"
@@ -1319,7 +1319,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                                         <label className="text-sm font-medium">Notes (optional)</label>
                                         <Input value={docNotes} onChange={(e) => setDocNotes(e.target.value)} placeholder="short note" />
                                     </div>
-                                    {docError && <p className="text-sm text-red-600">{docError}</p>}
+                                    {docError && <p className="text-sm text-status-critical">{docError}</p>}
                                 </div>
                                 <DialogFooter>
                                     <Button variant="ghost" onClick={() => setDocOpen(false)} disabled={docSubmitting}>Cancel</Button>
@@ -1394,7 +1394,7 @@ export default function DeviceShow({ device, activeAssignment, assignmentHistory
                             )}
 
                             {assignType === 'client' && (
-                                <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-xs text-amber-800 dark:text-amber-200">
+                                <div className="rounded-md border border-status-warning/30 bg-status-warning-bg dark:bg-status-warning-bg p-3 text-xs text-status-warning dark:text-status-warning">
                                     Client device assignments require a valid consent record (NZ privacy). Ensure consent has been recorded before assigning.
                                 </div>
                             )}

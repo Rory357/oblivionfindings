@@ -70,9 +70,9 @@ export default function ApplicationStatus({ application }: Props) {
                                     variant="outline"
                                     className={
                                         isTerminal
-                                            ? 'border-red-500/30 text-red-400 bg-red-500/10'
+                                            ? 'border-status-critical/30 text-status-critical bg-status-critical'
                                             : application.status === 'hired'
-                                                ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                                                ? 'border-status-success/30 text-status-success bg-status-success'
                                                 : 'border-primary/30 text-primary bg-primary/10'
                                     }
                                 >
@@ -89,7 +89,7 @@ export default function ApplicationStatus({ application }: Props) {
                                         return (
                                             <div key={stage.key} className="flex items-center gap-3">
                                                 <div className={`flex items-center justify-center h-8 w-8 rounded-full shrink-0 ${
-                                                    isCompleted ? 'bg-emerald-500/20 text-emerald-400' :
+                                                    isCompleted ? 'bg-status-success-bg text-status-success' :
                                                     isCurrent ? 'bg-primary/20 text-primary ring-2 ring-primary/30' :
                                                     'bg-muted text-muted-foreground'
                                                 }`}>

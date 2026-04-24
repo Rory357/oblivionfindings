@@ -94,9 +94,9 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                 </div>
 
                 {!request.is_actionable && request.status === 'pending' && request.is_expired && (
-                    <Card className="mb-6 border-amber-300 bg-amber-50">
+                    <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
                         <CardContent className="flex items-start gap-3 p-4">
-                            <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-600" />
+                            <ShieldAlert className="mt-0.5 h-5 w-5 text-status-warning" />
                             <div>
                                 <div className="font-medium">This request has expired.</div>
                                 <p className="text-sm text-muted-foreground">
@@ -191,7 +191,7 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                                     />
                                 </div>
 
-                                <div className="flex items-start gap-2 rounded border border-emerald-200 bg-emerald-50 p-3">
+                                <div className="flex items-start gap-2 rounded border border-status-success/30 bg-status-success-bg p-3">
                                     <Checkbox
                                         id="ack"
                                         checked={approveForm.data.acknowledge_authority}
@@ -205,7 +205,7 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                                 </div>
 
                                 {approveForm.errors.acknowledge_authority && (
-                                    <p className="text-xs text-red-600">
+                                    <p className="text-xs text-status-critical">
                                         You must confirm your authority to give consent.
                                     </p>
                                 )}
@@ -247,7 +247,7 @@ export default function PortalConsentRequestShow({ client, request }: Props) {
                                         placeholder="Tell the care team why you're declining. They'll work with you on alternatives."
                                     />
                                     {declineForm.errors.response_notes && (
-                                        <p className="mt-1 text-xs text-red-600">
+                                        <p className="mt-1 text-xs text-status-critical">
                                             {declineForm.errors.response_notes}
                                         </p>
                                     )}

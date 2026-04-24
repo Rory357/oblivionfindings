@@ -81,10 +81,10 @@ type Props = {
 };
 
 const STATUS_CONFIG: Record<string, { color: string; bgColor: string; label: string }> = {
-    planned: { color: 'text-blue-700 dark:text-blue-400', bgColor: 'bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800', label: 'Planned' },
+    planned: { color: 'text-status-info dark:text-status-info', bgColor: 'bg-status-info-bg border-status-info/30 dark:bg-status-info dark:border-status-info/30', label: 'Planned' },
     active: { color: 'text-primary dark:text-primary', bgColor: 'bg-primary/10 border-primary dark:bg-primary/30 dark:border-primary/30', label: 'Active' },
     completed: { color: 'text-foreground dark:text-muted-foreground', bgColor: 'bg-muted border-border dark:bg-muted/30 dark:border-border', label: 'Completed' },
-    cancelled: { color: 'text-red-700 dark:text-red-400', bgColor: 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800', label: 'Cancelled' },
+    cancelled: { color: 'text-status-critical dark:text-status-critical', bgColor: 'bg-status-critical-bg border-status-critical/30 dark:bg-status-critical dark:border-status-critical/30', label: 'Cancelled' },
 };
 
 const PURPOSE_LABELS: Record<string, string> = {
@@ -359,20 +359,20 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex items-center gap-1.5">
-                                                        <div className={`flex h-5 w-5 items-center justify-center rounded-full ${resident.pre_check_completed ? 'bg-green-100 text-green-600' : 'bg-muted'}`}>
+                                                        <div className={`flex h-5 w-5 items-center justify-center rounded-full ${resident.pre_check_completed ? 'bg-status-success-bg text-status-success' : 'bg-muted'}`}>
                                                             {resident.pre_check_completed && <Check className="h-3 w-3" />}
                                                         </div>
                                                         <span className="text-[10px] text-muted-foreground">Pre-check</span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5">
-                                                        <div className={`flex h-5 w-5 items-center justify-center rounded-full ${resident.medication_packed ? 'bg-green-100 text-green-600' : 'bg-muted'}`}>
+                                                        <div className={`flex h-5 w-5 items-center justify-center rounded-full ${resident.medication_packed ? 'bg-status-success-bg text-status-success' : 'bg-muted'}`}>
                                                             {resident.medication_packed && <Pill className="h-3 w-3" />}
                                                         </div>
                                                         <span className="text-[10px] text-muted-foreground">Meds</span>
                                                     </div>
                                                     {safeOuting.status === 'active' && (
                                                         resident.returned_at ? (
-                                                            <Badge className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 text-[10px] h-5">
+                                                            <Badge className="bg-status-success-bg text-status-success border-status-success/30 dark:bg-status-success-bg dark:text-status-success dark:border-status-success/30 text-[10px] h-5">
                                                                 <UserCheck className="mr-1 h-3 w-3" />
                                                                 Returned
                                                             </Badge>
@@ -391,7 +391,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                                         )
                                                     )}
                                                     {safeOuting.status === 'completed' && resident.returned_at && (
-                                                        <Badge className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 text-[10px] h-5">
+                                                        <Badge className="bg-status-success-bg text-status-success border-status-success/30 dark:bg-status-success-bg dark:text-status-success dark:border-status-success/30 text-[10px] h-5">
                                                             <UserCheck className="mr-1 h-3 w-3" />
                                                             Returned
                                                         </Badge>
@@ -437,7 +437,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                             <Card className="overflow-hidden">
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-sm flex items-center gap-2">
-                                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                                        <div className="h-2 w-2 rounded-full bg-status-success animate-pulse" />
                                         Live Tracking
                                     </CardTitle>
                                 </CardHeader>
@@ -555,7 +555,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                     router.post(`/fleet-assets/outings/${safeOuting.id}/residents/return-all`);
                                     setShowReturnAllDialog(false);
                                 }}
-                                className="bg-green-600 hover:bg-green-700"
+                                className="bg-status-success hover:bg-status-success"
                             >
                                 <UserCheck className="mr-2 h-4 w-4" />
                                 Return All ({safeResidents.filter((r) => !r.returned_at).length})

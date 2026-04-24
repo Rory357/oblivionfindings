@@ -113,7 +113,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
             <div className="flex items-center gap-2">
                 <Input value={value} readOnly className="font-mono text-xs bg-muted/50" />
                 <Button variant="outline" size="icon" className="shrink-0" onClick={handleCopy}>
-                    {copied ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    {copied ? <CheckCircle2 className="h-4 w-4 text-status-success" /> : <Copy className="h-4 w-4" />}
                 </Button>
             </div>
         </div>
@@ -151,12 +151,12 @@ function MicrosoftTab({ config }: { config: Props['sso_config'] }) {
                             </CardDescription>
                         </div>
                         {connected ? (
-                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                            <Badge className="bg-status-success-bg text-status-success border-status-success/30">
                                 <CheckCircle2 className="mr-1 h-3 w-3" />
                                 Connected
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                            <Badge variant="outline" className="bg-status-warning-bg text-status-warning border-status-warning/30">
                                 <CircleAlert className="mr-1 h-3 w-3" />
                                 Not Connected
                             </Badge>
@@ -277,7 +277,7 @@ function GoogleTab({ config }: { config: Props['sso_config'] }) {
                     <div className="flex items-center justify-between">
                         <div>
                             <CardTitle className="flex items-center gap-2">
-                                <Globe className="h-5 w-5 text-blue-500" />
+                                <Globe className="h-5 w-5 text-status-info" />
                                 Google Workspace
                             </CardTitle>
                             <CardDescription>
@@ -285,12 +285,12 @@ function GoogleTab({ config }: { config: Props['sso_config'] }) {
                             </CardDescription>
                         </div>
                         {connected ? (
-                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                            <Badge className="bg-status-success-bg text-status-success border-status-success/30">
                                 <CheckCircle2 className="mr-1 h-3 w-3" />
                                 Connected
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                            <Badge variant="outline" className="bg-status-warning-bg text-status-warning border-status-warning/30">
                                 <CircleAlert className="mr-1 h-3 w-3" />
                                 Not Connected
                             </Badge>
@@ -786,7 +786,7 @@ function GroupMappingTab({
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="h-8 w-8 text-red-500 hover:text-red-700"
+                                                className="h-8 w-8 text-status-critical hover:text-status-critical"
                                                 onClick={() => handleDelete(m.id)}
                                             >
                                                 <Trash2 className="h-4 w-4" />
@@ -897,7 +897,7 @@ function UrlsSetupTab() {
 
                     <div className="border-t pt-4">
                         <h4 className="text-sm font-medium flex items-center gap-2 mb-3">
-                            <Globe className="h-4 w-4 text-blue-500" />
+                            <Globe className="h-4 w-4 text-status-info" />
                             Google Workspace Setup
                         </h4>
                         <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">

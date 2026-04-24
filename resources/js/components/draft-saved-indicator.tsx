@@ -58,7 +58,7 @@ export default function DraftSavedIndicator({
                 </>
             ) : savedAt ? (
                 <>
-                    <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
+                    <Check className="h-3.5 w-3.5 text-status-success" aria-hidden />
                     <span>Draft saved on this device · {formatSavedLabel(savedAt, now)}</span>
                 </>
             ) : null}

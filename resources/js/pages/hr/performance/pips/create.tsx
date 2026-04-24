@@ -96,25 +96,25 @@ export default function PipCreate({ staff }: Props) {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.employee_user_id && <p className="mt-1 text-xs text-red-500">{errors.employee_user_id}</p>}
+                                    {errors.employee_user_id && <p className="mt-1 text-xs text-status-critical">{errors.employee_user_id}</p>}
                                 </div>
                                 <div>
                                     <Label>Title</Label>
                                     <Input value={data.title} onChange={(e) => setData('title', e.target.value)} placeholder="PIP title" />
-                                    {errors.title && <p className="mt-1 text-xs text-red-500">{errors.title}</p>}
+                                    {errors.title && <p className="mt-1 text-xs text-status-critical">{errors.title}</p>}
                                 </div>
                             </div>
 
                             <div>
                                 <Label>Reason / Areas of Concern</Label>
                                 <Textarea value={data.reason} onChange={(e) => setData('reason', e.target.value)} rows={3} />
-                                {errors.reason && <p className="mt-1 text-xs text-red-500">{errors.reason}</p>}
+                                {errors.reason && <p className="mt-1 text-xs text-status-critical">{errors.reason}</p>}
                             </div>
 
                             <div>
                                 <Label>Expectations / Goals</Label>
                                 <Textarea value={data.expectations} onChange={(e) => setData('expectations', e.target.value)} rows={3} />
-                                {errors.expectations && <p className="mt-1 text-xs text-red-500">{errors.expectations}</p>}
+                                {errors.expectations && <p className="mt-1 text-xs text-status-critical">{errors.expectations}</p>}
                             </div>
 
                             <div>
@@ -131,12 +131,12 @@ export default function PipCreate({ staff }: Props) {
                                 <div>
                                     <Label>Start Date</Label>
                                     <Input type="date" value={data.start_date} onChange={(e) => setData('start_date', e.target.value)} />
-                                    {errors.start_date && <p className="mt-1 text-xs text-red-500">{errors.start_date}</p>}
+                                    {errors.start_date && <p className="mt-1 text-xs text-status-critical">{errors.start_date}</p>}
                                 </div>
                                 <div>
                                     <Label>End Date</Label>
                                     <Input type="date" value={data.end_date} onChange={(e) => setData('end_date', e.target.value)} />
-                                    {errors.end_date && <p className="mt-1 text-xs text-red-500">{errors.end_date}</p>}
+                                    {errors.end_date && <p className="mt-1 text-xs text-status-critical">{errors.end_date}</p>}
                                 </div>
                                 <div>
                                     <Label>Review Date</Label>
@@ -165,7 +165,7 @@ export default function PipCreate({ staff }: Props) {
                                     <div className="flex items-start justify-between gap-2">
                                         <span className="text-sm font-medium text-muted-foreground">Milestone {index + 1}</span>
                                         <Button type="button" size="sm" variant="ghost" onClick={() => removeMilestone(index)}>
-                                            <Trash2 className="h-4 w-4 text-red-400" />
+                                            <Trash2 className="h-4 w-4 text-status-critical" />
                                         </Button>
                                     </div>
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

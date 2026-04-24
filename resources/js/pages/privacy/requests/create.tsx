@@ -58,7 +58,7 @@ export default function CreateDataSubjectRequest({ staff }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <FileText className="h-5 w-5 text-blue-500" />
+                                <FileText className="h-5 w-5 text-status-info" />
                                 Request Details
                             </CardTitle>
                         </CardHeader>
@@ -82,7 +82,7 @@ export default function CreateDataSubjectRequest({ staff }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.request_type && (
-                                        <p className="text-xs text-red-500">{errors.request_type}</p>
+                                        <p className="text-xs text-status-critical">{errors.request_type}</p>
                                     )}
                                 </div>
 
@@ -116,7 +116,7 @@ export default function CreateDataSubjectRequest({ staff }: Props) {
                                         placeholder="Full name of the data subject"
                                     />
                                     {errors.subject_name && (
-                                        <p className="text-xs text-red-500">{errors.subject_name}</p>
+                                        <p className="text-xs text-status-critical">{errors.subject_name}</p>
                                     )}
                                 </div>
 
@@ -130,7 +130,7 @@ export default function CreateDataSubjectRequest({ staff }: Props) {
                                         placeholder="email@example.com"
                                     />
                                     {errors.subject_email && (
-                                        <p className="text-xs text-red-500">{errors.subject_email}</p>
+                                        <p className="text-xs text-status-critical">{errors.subject_email}</p>
                                     )}
                                 </div>
                             </div>

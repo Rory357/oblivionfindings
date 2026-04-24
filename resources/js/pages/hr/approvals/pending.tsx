@@ -40,10 +40,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const processTypeConfig: Record<string, { className: string }> = {
-    leave: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10' },
-    expense: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
+    leave: { className: 'border-status-info/30 text-status-info bg-status-info' },
+    expense: { className: 'border-status-success/30 text-status-success bg-status-success' },
     timesheet: { className: 'border-primary/30 text-primary bg-primary/10' },
-    document: { className: 'border-amber-500/30 text-amber-400 bg-amber-500/10' },
+    document: { className: 'border-status-warning/30 text-status-warning bg-status-warning' },
 };
 
 export default function PendingApprovals({ instances, can }: Props) {

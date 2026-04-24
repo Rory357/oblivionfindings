@@ -112,7 +112,7 @@ const Footer: React.FC = () => {
                     © {year} Oblivion Findings. All rights reserved.
                 </p>
                 <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                    Made with <Heart size={12} className="text-rose-500" /> in New Zealand
+                    Made with <Heart size={12} className="text-status-critical" /> in New Zealand
                 </p>
             </div>
         </footer>

@@ -67,33 +67,33 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="title">
-                                        Title <span className="text-red-500">*</span>
+                                        Title <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="title"
                                         value={data.title}
                                         onChange={(e) => setData('title', e.target.value)}
                                         placeholder="e.g. Senior Support Worker"
-                                        className={errors.title ? 'border-red-500' : ''}
+                                        className={errors.title ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.title && (
-                                        <p className="text-sm text-red-500">{errors.title}</p>
+                                        <p className="text-sm text-status-critical">{errors.title}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="code">
-                                        Code <span className="text-red-500">*</span>
+                                        Code <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="code"
                                         value={data.code}
                                         onChange={(e) => setData('code', e.target.value)}
                                         placeholder="e.g. SSW-001"
-                                        className={errors.code ? 'border-red-500' : ''}
+                                        className={errors.code ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.code && (
-                                        <p className="text-sm text-red-500">{errors.code}</p>
+                                        <p className="text-sm text-status-critical">{errors.code}</p>
                                     )}
                                 </div>
                             </div>
@@ -111,7 +111,7 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                                         </SelectContent>
                                     </Select>
                                     {errors.department && (
-                                        <p className="text-sm text-red-500">{errors.department}</p>
+                                        <p className="text-sm text-status-critical">{errors.department}</p>
                                     )}
                                 </div>
 
@@ -124,7 +124,7 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                                         placeholder="e.g. Team A"
                                     />
                                     {errors.team && (
-                                        <p className="text-sm text-red-500">{errors.team}</p>
+                                        <p className="text-sm text-status-critical">{errors.team}</p>
                                     )}
                                 </div>
                             </div>
@@ -139,7 +139,7 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                                     rows={4}
                                 />
                                 {errors.description && (
-                                    <p className="text-sm text-red-500">{errors.description}</p>
+                                    <p className="text-sm text-status-critical">{errors.description}</p>
                                 )}
                             </div>
 
@@ -153,20 +153,20 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                                     rows={4}
                                 />
                                 {errors.requirements && (
-                                    <p className="text-sm text-red-500">{errors.requirements}</p>
+                                    <p className="text-sm text-status-critical">{errors.requirements}</p>
                                 )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="employment_type">
-                                        Employment Type <span className="text-red-500">*</span>
+                                        Employment Type <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.employment_type}
                                         onValueChange={(value) => setData('employment_type', value)}
                                     >
-                                        <SelectTrigger id="employment_type" className={errors.employment_type ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="employment_type" className={errors.employment_type ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select type" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -177,13 +177,13 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                                         </SelectContent>
                                     </Select>
                                     {errors.employment_type && (
-                                        <p className="text-sm text-red-500">{errors.employment_type}</p>
+                                        <p className="text-sm text-status-critical">{errors.employment_type}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="fte">
-                                        FTE <span className="text-red-500">*</span>
+                                        FTE <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="fte"
@@ -193,16 +193,16 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                                         step="0.01"
                                         value={data.fte}
                                         onChange={(e) => setData('fte', e.target.value)}
-                                        className={errors.fte ? 'border-red-500' : ''}
+                                        className={errors.fte ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.fte && (
-                                        <p className="text-sm text-red-500">{errors.fte}</p>
+                                        <p className="text-sm text-status-critical">{errors.fte}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="headcount_budget">
-                                        Headcount Budget <span className="text-red-500">*</span>
+                                        Headcount Budget <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="headcount_budget"
@@ -212,10 +212,10 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                                         step="1"
                                         value={data.headcount_budget}
                                         onChange={(e) => setData('headcount_budget', e.target.value)}
-                                        className={errors.headcount_budget ? 'border-red-500' : ''}
+                                        className={errors.headcount_budget ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.headcount_budget && (
-                                        <p className="text-sm text-red-500">{errors.headcount_budget}</p>
+                                        <p className="text-sm text-status-critical">{errors.headcount_budget}</p>
                                     )}
                                 </div>
                             </div>
@@ -239,7 +239,7 @@ export default function CreatePosition({ parentPositions, departments }: Props) 
                                     </SelectContent>
                                 </Select>
                                 {errors.reports_to_position_id && (
-                                    <p className="text-sm text-red-500">{errors.reports_to_position_id}</p>
+                                    <p className="text-sm text-status-critical">{errors.reports_to_position_id}</p>
                                 )}
                             </div>
 

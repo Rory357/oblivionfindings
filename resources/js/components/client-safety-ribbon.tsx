@@ -76,11 +76,11 @@ const iconMap: Record<string, LucideIcon> = {
 
 const toneClasses: Record<SafetyTone, string> = {
     danger:
-        'border-red-300 bg-red-100 text-red-900 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-100',
+        'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical',
     warning:
-        'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100',
+        'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
     info:
-        'border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-100',
+        'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info',
 };
 
 function Pill({
@@ -162,8 +162,8 @@ export default function ClientSafetyRibbon({
             className={cn(
                 'rounded-xl border-2 shadow-sm',
                 hasDanger
-                    ? 'border-red-200 bg-red-50/70 dark:border-red-500/30 dark:bg-red-500/10'
-                    : 'border-amber-200 bg-amber-50/60 dark:border-amber-500/30 dark:bg-amber-500/10',
+                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
+                    : 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning',
                 sticky && 'sticky top-2 z-20 md:top-4',
                 className,
             )}
@@ -173,8 +173,8 @@ export default function ClientSafetyRibbon({
                     className={cn(
                         'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
                         hasDanger
-                            ? 'bg-red-200 text-red-700 dark:bg-red-500/30 dark:text-red-100'
-                            : 'bg-amber-200 text-amber-700 dark:bg-amber-500/30 dark:text-amber-100',
+                            ? 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical'
+                            : 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
                     )}
                 >
                     <AlertTriangle className="h-4 w-4" aria-hidden="true" />

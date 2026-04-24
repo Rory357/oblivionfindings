@@ -65,10 +65,10 @@ type Props = {
 };
 
 const severityColor: Record<string, string> = {
-    low: 'bg-blue-100 text-blue-800 dark:bg-blue-500/10 dark:text-blue-300',
-    medium: 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300',
-    high: 'bg-orange-100 text-orange-800 dark:bg-orange-500/10 dark:text-orange-300',
-    critical: 'bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-300',
+    low: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    medium: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
 };
 
 /* ------------------------------------------------------------------ */
@@ -76,10 +76,10 @@ const severityColor: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 const STAT_COLORS = {
-    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', icon: 'text-blue-600 dark:text-blue-400', ring: 'ring-blue-100 dark:ring-blue-500/20' },
-    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', icon: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-100 dark:ring-emerald-500/20' },
-    amber: { bg: 'bg-amber-50 dark:bg-amber-500/10', icon: 'text-amber-600 dark:text-amber-400', ring: 'ring-amber-100 dark:ring-amber-500/20' },
-    red: { bg: 'bg-red-50 dark:bg-red-500/10', icon: 'text-red-600 dark:text-red-400', ring: 'ring-red-100 dark:ring-red-500/20' },
+    blue: { bg: 'bg-status-info-bg dark:bg-status-info', icon: 'text-status-info dark:text-status-info', ring: 'ring-status-info dark:ring-status-info/20' },
+    emerald: { bg: 'bg-status-success-bg dark:bg-status-success', icon: 'text-status-success dark:text-status-success', ring: 'ring-status-success dark:ring-status-success/20' },
+    amber: { bg: 'bg-status-warning-bg dark:bg-status-warning', icon: 'text-status-warning dark:text-status-warning', ring: 'ring-status-warning dark:ring-status-warning/20' },
+    red: { bg: 'bg-status-critical-bg dark:bg-status-critical', icon: 'text-status-critical dark:text-status-critical', ring: 'ring-status-critical dark:ring-status-critical/20' },
     purple: { bg: 'bg-primary/10 dark:bg-primary/10', icon: 'text-primary dark:text-primary', ring: 'ring-ring dark:ring-ring/20' },
 };
 

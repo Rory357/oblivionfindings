@@ -343,10 +343,10 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     </Card>
 
                     {/* ─── Section 2: About Me — Person-Centred ─── */}
-                    <Card className="border-rose-200 bg-rose-50/30">
+                    <Card className="border-status-critical/30 bg-status-critical-bg">
                         <SectionHeader
                             icon={Heart}
-                            iconBg="bg-pink-100 text-pink-600"
+                            iconBg="bg-status-critical-bg text-status-critical"
                             title="About Me — What Matters Most"
                             description="Capture the person's voice — their dreams, preferences, and what a good day looks like."
                         />
@@ -354,7 +354,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                             <div className="space-y-1.5">
                                 <Label className="font-medium">My Dreams & Aspirations</Label>
                                 <Textarea
-                                    className="min-h-[100px] border-rose-200 bg-white"
+                                    className="min-h-[100px] border-status-critical/30 bg-white"
                                     value={data.content.about_me?.dreams}
                                     onChange={(e) => setAboutMeField('dreams', e.target.value)}
                                     placeholder="What are their big dreams, hopes, and goals for the future?"
@@ -365,7 +365,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                 <div className="space-y-1.5">
                                     <Label className="font-medium">What{"'"}s Important TO Me</Label>
                                     <Textarea
-                                        className="min-h-[100px] border-rose-200 bg-white"
+                                        className="min-h-[100px] border-status-critical/30 bg-white"
                                         value={data.content.about_me?.important_to_me}
                                         onChange={(e) => setAboutMeField('important_to_me', e.target.value)}
                                         placeholder="Relationships, routines, interests, passions — the things that matter most to this person"
@@ -374,7 +374,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                 <div className="space-y-1.5">
                                     <Label className="font-medium">What{"'"}s Important FOR Me</Label>
                                     <Textarea
-                                        className="min-h-[100px] border-rose-200 bg-white"
+                                        className="min-h-[100px] border-status-critical/30 bg-white"
                                         value={data.content.about_me?.important_for_me}
                                         onChange={(e) => setAboutMeField('important_for_me', e.target.value)}
                                         placeholder="Health, safety, and wellbeing needs that must be maintained"
@@ -385,7 +385,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                             <div className="space-y-1.5">
                                 <Label className="font-medium">My Ideal Day</Label>
                                 <Textarea
-                                    className="min-h-[100px] border-rose-200 bg-white"
+                                    className="min-h-[100px] border-status-critical/30 bg-white"
                                     value={data.content.about_me?.ideal_day}
                                     onChange={(e) => setAboutMeField('ideal_day', e.target.value)}
                                     placeholder="Describe what a good day looks like for this person — morning routine, activities, meals, social time..."
@@ -394,18 +394,18 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
-                                    <Label className="font-medium text-emerald-700">Things I Like</Label>
+                                    <Label className="font-medium text-status-success">Things I Like</Label>
                                     <Textarea
-                                        className="min-h-[80px] border-emerald-200 bg-emerald-50/50"
+                                        className="min-h-[80px] border-status-success/30 bg-status-success-bg"
                                         value={data.content.about_me?.likes}
                                         onChange={(e) => setAboutMeField('likes', e.target.value)}
                                         placeholder="Favourite foods, activities, music, places, people..."
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="font-medium text-red-700">Things I Don{"'"}t Like</Label>
+                                    <Label className="font-medium text-status-critical">Things I Don{"'"}t Like</Label>
                                     <Textarea
-                                        className="min-h-[80px] border-red-200 bg-red-50/50"
+                                        className="min-h-[80px] border-status-critical/30 bg-status-critical-bg"
                                         value={data.content.about_me?.dislikes}
                                         onChange={(e) => setAboutMeField('dislikes', e.target.value)}
                                         placeholder="Things to avoid, triggers, dislikes..."
@@ -416,7 +416,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                             <div className="space-y-1.5">
                                 <Label className="font-medium">How to Support Me Best</Label>
                                 <Textarea
-                                    className="min-h-[100px] border-rose-200 bg-white"
+                                    className="min-h-[100px] border-status-critical/30 bg-white"
                                     value={data.content.about_me?.how_to_support}
                                     onChange={(e) => setAboutMeField('how_to_support', e.target.value)}
                                     placeholder="Tips for support workers — communication style, motivation, boundaries, things to remember..."
@@ -454,7 +454,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     <Card>
                         <SectionHeader
                             icon={Heart}
-                            iconBg="bg-rose-100 text-rose-600"
+                            iconBg="bg-status-critical-bg text-status-critical"
                             title={`Support Needs${selectedNeedsCount > 0 ? ` (${selectedNeedsCount} selected)` : ''}`}
                             description="Select the areas where support is needed. These help structure goals and service delivery."
                         />
@@ -493,7 +493,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     <Card>
                         <SectionHeader
                             icon={ShieldAlert}
-                            iconBg="bg-amber-100 text-amber-600"
+                            iconBg="bg-status-warning-bg text-status-warning"
                             title="Risk Factors"
                             description="Document known risks, triggers, and safety concerns that support workers should be aware of."
                         />
@@ -511,7 +511,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     <Card>
                         <SectionHeader
                             icon={Lightbulb}
-                            iconBg="bg-emerald-100 text-emerald-600"
+                            iconBg="bg-status-success-bg text-status-success"
                             title="Support Strategies"
                             description="Describe the approaches, methods, and frameworks used to deliver support."
                         />
@@ -529,7 +529,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     <Card>
                         <SectionHeader
                             icon={MessageCircle}
-                            iconBg="bg-blue-100 text-blue-600"
+                            iconBg="bg-status-info-bg text-status-info"
                             title="Communication Preferences"
                             description="How to communicate effectively with this person — methods, assistive technology, language."
                         />
@@ -547,7 +547,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                     <Card>
                         <SectionHeader
                             icon={CalendarClock}
-                            iconBg="bg-cyan-100 text-cyan-600"
+                            iconBg="bg-status-info-bg text-status-info"
                             title="Review Schedule"
                             description="Set how often this plan should be reviewed and updated."
                         />

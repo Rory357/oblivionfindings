@@ -70,7 +70,7 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
                     onChange={(e) => setData('title', e.target.value)}
                     placeholder="e.g., Approval of Annual Budget 2026"
                   />
-                  {errors.title && <p className="text-sm text-red-600 mt-1">{errors.title}</p>}
+                  {errors.title && <p className="text-sm text-status-critical mt-1">{errors.title}</p>}
                 </div>
 
                 <div>
@@ -82,7 +82,7 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
                     placeholder="Detailed description of the resolution..."
                     rows={4}
                   />
-                  {errors.description && <p className="text-sm text-red-600 mt-1">{errors.description}</p>}
+                  {errors.description && <p className="text-sm text-status-critical mt-1">{errors.description}</p>}
                 </div>
 
                 <div>
@@ -124,10 +124,10 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.meeting_id && <p className="text-sm text-red-600 mt-1">{errors.meeting_id}</p>}
+                  {errors.meeting_id && <p className="text-sm text-status-critical mt-1">{errors.meeting_id}</p>}
                   <p className="text-xs text-muted-foreground mt-2">
                     Need a meeting?{' '}
-                    <Link href="/governance/meetings/create" className="text-blue-600 hover:underline">
+                    <Link href="/governance/meetings/create" className="text-status-info hover:underline">
                       Create one here
                     </Link>
                     .

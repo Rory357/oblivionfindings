@@ -20,15 +20,15 @@ const toneClasses: Record<StaffStatusTone, string> = {
     neutral:
         'border-border bg-muted text-foreground dark:border-border dark:bg-muted/60 dark:text-foreground',
     info:
-        'border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-100',
+        'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info',
     progress:
-        'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100',
+        'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
     success:
-        'border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100',
+        'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/40 dark:bg-status-success-bg dark:text-status-success',
     warning:
-        'border-orange-300 bg-orange-100 text-orange-900 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-100',
+        'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
     danger:
-        'border-red-300 bg-red-100 text-red-900 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-100',
+        'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical',
 };
 
 const staffStatusVariants = cva(

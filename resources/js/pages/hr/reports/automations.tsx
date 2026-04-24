@@ -67,9 +67,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusClass: Record<string, string> = {
-    success: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-    failed: 'border-red-500/30 text-red-400 bg-red-500/10',
-    skipped: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+    success: 'border-status-success/30 text-status-success bg-status-success',
+    failed: 'border-status-critical/30 text-status-critical bg-status-critical',
+    skipped: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
 };
 
 export default function HrAutomationsPage({
@@ -274,7 +274,7 @@ export default function HrAutomationsPage({
                                 <div className="space-y-2">
                                     <Label>Name</Label>
                                     <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Escalate annual leave alerts" />
-                                    {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+                                    {errors.name && <p className="text-xs text-status-critical">{errors.name}</p>}
                                 </div>
 
                                 <div className="space-y-2">
@@ -330,7 +330,7 @@ export default function HrAutomationsPage({
                                                 rows={6}
                                                 placeholder={`[\n  {"field":"status","operator":"equals","value":"approved"},\n  {"field":"leave_type","operator":"in","value":["annual","sick"]}\n]`}
                                             />
-                                            {errors.condition_rules_json && <p className="text-xs text-red-500">{errors.condition_rules_json}</p>}
+                                            {errors.condition_rules_json && <p className="text-xs text-status-critical">{errors.condition_rules_json}</p>}
                                             <p className="text-xs text-muted-foreground">
                                                 Supported operators: {conditionOperatorOptions.map((item) => item.value).join(', ')}.
                                             </p>
@@ -343,7 +343,7 @@ export default function HrAutomationsPage({
                                                 rows={8}
                                                 placeholder={`[\n  {"type":"notify_users","title":"Leave approved","recipient_user_ids":[1,2]},\n  {"type":"queue_report_export","report_type":"leave_sla","report_date_from":"2026-01-01","report_date_to":"2026-12-31"}\n]`}
                                             />
-                                            {errors.actions_json && <p className="text-xs text-red-500">{errors.actions_json}</p>}
+                                            {errors.actions_json && <p className="text-xs text-status-critical">{errors.actions_json}</p>}
                                             <p className="text-xs text-muted-foreground">
                                                 Leave empty to use the single action fields below.
                                             </p>
@@ -455,7 +455,7 @@ export default function HrAutomationsPage({
                                                 onChange={(e) => setData('action_webhook_url', e.target.value)}
                                                 placeholder="https://*.webhook.office.com/webhookb2/..."
                                             />
-                                            {errors.action_webhook_url && <p className="text-xs text-red-500">{errors.action_webhook_url}</p>}
+                                            {errors.action_webhook_url && <p className="text-xs text-status-critical">{errors.action_webhook_url}</p>}
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Webhook Timeout (seconds)</Label>
@@ -520,7 +520,7 @@ export default function HrAutomationsPage({
                                             <div className="font-medium">{rule.name}</div>
                                             <div className="text-xs text-muted-foreground">{JSON.stringify(rule.conditions)}</div>
                                             <div className="text-xs text-muted-foreground">{JSON.stringify(rule.actions)}</div>
-                                            {rule.last_error && <div className="mt-1 text-xs text-red-500">{rule.last_error}</div>}
+                                            {rule.last_error && <div className="mt-1 text-xs text-status-critical">{rule.last_error}</div>}
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground">{rule.event_type}</td>
                                         <td className="px-4 py-3 text-muted-foreground">

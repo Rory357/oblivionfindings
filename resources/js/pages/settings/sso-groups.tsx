@@ -328,7 +328,7 @@ export default function SsoGroups({ mappings = [], roles = [], stats = { total: 
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-8 w-8 text-red-500 hover:text-red-700"
+                                                    className="h-8 w-8 text-status-critical hover:text-status-critical"
                                                     onClick={() => handleDelete(m.id)}
                                                 >
                                                     <Trash2 className="h-4 w-4" />

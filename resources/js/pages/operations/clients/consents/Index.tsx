@@ -36,21 +36,21 @@ import {
 import { useState } from 'react';
 
 const STATUS_STYLES: Record<string, { bg: string; icon: typeof CheckCircle2 }> = {
-    given: { bg: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
-    refused: { bg: 'bg-red-100 text-red-700', icon: XCircle },
+    given: { bg: 'bg-status-success-bg text-status-success', icon: CheckCircle2 },
+    refused: { bg: 'bg-status-critical-bg text-status-critical', icon: XCircle },
     withdrawn: { bg: 'bg-muted text-muted-foreground', icon: XCircle },
-    expired: { bg: 'bg-amber-100 text-amber-700', icon: Clock },
+    expired: { bg: 'bg-status-warning-bg text-status-warning', icon: Clock },
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-    medical: 'bg-red-50 border-red-200',
+    medical: 'bg-status-critical-bg border-status-critical/30',
     care: 'bg-primary/10 border-primary',
-    communication: 'bg-blue-50 border-blue-200',
+    communication: 'bg-status-info-bg border-status-info/30',
     data_protection: 'bg-primary/10 border-primary',
-    safety: 'bg-amber-50 border-amber-200',
-    activities: 'bg-emerald-50 border-emerald-200',
-    safeguarding: 'bg-orange-50 border-orange-200',
-    essential: 'bg-cyan-50 border-cyan-200',
+    safety: 'bg-status-warning-bg border-status-warning/30',
+    activities: 'bg-status-success-bg border-status-success/30',
+    safeguarding: 'bg-status-warning-bg border-status-warning/30',
+    essential: 'bg-status-info-bg border-status-info/30',
 };
 
 type Props = {
@@ -123,9 +123,9 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
             />
             <PageShell>
                 {!hasConsentTypes && (
-                    <Card className="border-amber-200 bg-amber-50/70">
-                        <CardContent className="flex items-start gap-3 p-4 text-sm text-amber-900">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <Card className="border-status-warning/30 bg-status-warning-bg">
+                        <CardContent className="flex items-start gap-3 p-4 text-sm text-status-warning">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
                             <div>
                                 Consent types have not been configured yet, so new consent records are temporarily unavailable on this page.
                             </div>
@@ -135,11 +135,11 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                     {[
-                        { label: 'Total', value: s.total, color: 'text-primary', bg: 'from-violet-50 to-purple-50' },
-                        { label: 'Active', value: s.active, color: 'text-emerald-700', bg: 'from-emerald-50 to-green-50' },
-                        { label: 'Expiring', value: s.expiring_soon, color: s.expiring_soon > 0 ? 'text-amber-700' : 'text-muted-foreground', bg: 'from-amber-50 to-yellow-50' },
-                        { label: 'Expired', value: s.expired, color: s.expired > 0 ? 'text-red-700' : 'text-muted-foreground', bg: 'from-red-50 to-rose-50' },
-                        { label: 'Withdrawn', value: s.withdrawn, color: 'text-muted-foreground', bg: 'from-slate-50 to-slate-100' },
+                        { label: 'Total', value: s.total, color: 'text-primary', bg: 'from-primary/10 to-primary/10' },
+                        { label: 'Active', value: s.active, color: 'text-status-success', bg: 'from-status-success-bg to-status-success-bg' },
+                        { label: 'Expiring', value: s.expiring_soon, color: s.expiring_soon > 0 ? 'text-status-warning' : 'text-muted-foreground', bg: 'from-status-warning-bg to-status-warning-bg' },
+                        { label: 'Expired', value: s.expired, color: s.expired > 0 ? 'text-status-critical' : 'text-muted-foreground', bg: 'from-status-critical-bg to-status-critical-bg' },
+                        { label: 'Withdrawn', value: s.withdrawn, color: 'text-muted-foreground', bg: 'from-muted to-muted' },
                     ].map(st => (
                         <div key={st.label} className={`rounded-xl border bg-gradient-to-br ${st.bg} p-3 text-center`}>
                             <div className={`text-xl font-bold ${st.color}`}>{st.value}</div>
@@ -189,23 +189,23 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                                                                 <span className="text-sm font-semibold">{c.consent_type?.name ?? c.consent_type_name ?? 'Consent'}</span>
                                                                 <Badge className={`border-0 text-[10px] capitalize ${style.bg}`}>{displayStatus}</Badge>
                                                                 {c.capacity_assessed && <Badge className="border-0 bg-primary/10 text-primary text-[10px]">Capacity Assessed</Badge>}
-                                                                {c.is_expiring_soon && !c.is_expired && <Badge className="border-0 bg-amber-100 text-amber-700 text-[10px] animate-pulse">Expiring Soon</Badge>}
+                                                                {c.is_expiring_soon && !c.is_expired && <Badge className="border-0 bg-status-warning-bg text-status-warning text-[10px] animate-pulse">Expiring Soon</Badge>}
                                                             </div>
                                                             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
                                                                 {c.given_at && <span>Given: {new Date(c.given_at).toLocaleDateString('en-NZ')}</span>}
                                                                 {c.given_method && <span>Method: {c.given_method}</span>}
                                                                 {c.expires_at && (
-                                                                    <span className={c.is_expired ? 'font-medium text-red-600' : c.is_expiring_soon ? 'font-medium text-amber-600' : ''}>
+                                                                    <span className={c.is_expired ? 'font-medium text-status-critical' : c.is_expiring_soon ? 'font-medium text-status-warning' : ''}>
                                                                         Expires: {new Date(c.expires_at).toLocaleDateString('en-NZ')}
                                                                     </span>
                                                                 )}
                                                             </div>
                                                             {c.conditions && <p className="mt-1.5 text-xs text-muted-foreground">{typeof c.conditions === 'string' ? c.conditions : JSON.stringify(c.conditions)}</p>}
-                                                            {c.withdrawal_reason && <p className="mt-1.5 text-xs text-red-600">Withdrawn: {c.withdrawal_reason}</p>}
+                                                            {c.withdrawal_reason && <p className="mt-1.5 text-xs text-status-critical">Withdrawn: {c.withdrawal_reason}</p>}
                                                         </div>
                                                     </div>
                                                     {c.status === 'given' && !c.is_expired && (
-                                                        <Button variant="outline" size="sm" className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                                                        <Button variant="outline" size="sm" className="h-7 text-xs text-status-critical border-status-critical/30 hover:bg-status-critical-bg"
                                                             onClick={() => { setShowWithdraw(c.id); setWithdrawReason(''); }}>
                                                             Withdraw
                                                         </Button>
@@ -236,7 +236,7 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                                 <SelectContent>
                                     {consent_types.map((t: any) => (
                                         <SelectItem key={t.id} value={String(t.id)}>
-                                            {t.name} {t.is_mandatory && <span className="text-red-500">*</span>}
+                                            {t.name} {t.is_mandatory && <span className="text-status-critical">*</span>}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

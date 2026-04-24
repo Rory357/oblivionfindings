@@ -90,7 +90,7 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <Label>Departing Employee <span className="text-red-500">*</span></Label>
+                                    <Label>Departing Employee <span className="text-status-critical">*</span></Label>
                                     <Select
                                         value={form.data.employee_profile_id}
                                         onValueChange={(v) => form.setData('employee_profile_id', v)}
@@ -104,10 +104,10 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.employee_profile_id && <p className="mt-1 text-xs text-red-500">{form.errors.employee_profile_id}</p>}
+                                    {form.errors.employee_profile_id && <p className="mt-1 text-xs text-status-critical">{form.errors.employee_profile_id}</p>}
                                 </div>
                                 <div>
-                                    <Label>Interviewer <span className="text-red-500">*</span></Label>
+                                    <Label>Interviewer <span className="text-status-critical">*</span></Label>
                                     <Select
                                         value={form.data.interviewer_user_id}
                                         onValueChange={(v) => form.setData('interviewer_user_id', v)}
@@ -121,22 +121,22 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.interviewer_user_id && <p className="mt-1 text-xs text-red-500">{form.errors.interviewer_user_id}</p>}
+                                    {form.errors.interviewer_user_id && <p className="mt-1 text-xs text-status-critical">{form.errors.interviewer_user_id}</p>}
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <Label>Interview Date <span className="text-red-500">*</span></Label>
+                                    <Label>Interview Date <span className="text-status-critical">*</span></Label>
                                     <Input
                                         type="date"
                                         value={form.data.interview_date}
                                         onChange={(e) => form.setData('interview_date', e.target.value)}
                                     />
-                                    {form.errors.interview_date && <p className="mt-1 text-xs text-red-500">{form.errors.interview_date}</p>}
+                                    {form.errors.interview_date && <p className="mt-1 text-xs text-status-critical">{form.errors.interview_date}</p>}
                                 </div>
                                 <div>
-                                    <Label>Primary Departure Reason <span className="text-red-500">*</span></Label>
+                                    <Label>Primary Departure Reason <span className="text-status-critical">*</span></Label>
                                     <Select
                                         value={form.data.departure_reason}
                                         onValueChange={(v) => form.setData('departure_reason', v)}
@@ -148,7 +148,7 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.departure_reason && <p className="mt-1 text-xs text-red-500">{form.errors.departure_reason}</p>}
+                                    {form.errors.departure_reason && <p className="mt-1 text-xs text-status-critical">{form.errors.departure_reason}</p>}
                                 </div>
                             </div>
                         </CardContent>
@@ -173,8 +173,8 @@ export default function ExitInterviewCreate({ employees, interviewers, departure
                                             <Star
                                                 className={`h-6 w-6 ${
                                                     star <= form.data.overall_satisfaction
-                                                        ? 'fill-yellow-400 text-yellow-400'
-                                                        : 'text-slate-300'
+                                                        ? 'fill-yellow-400 text-status-warning'
+                                                        : 'text-muted-foreground'
                                                 }`}
                                             />
                                         </button>

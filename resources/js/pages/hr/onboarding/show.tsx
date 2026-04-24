@@ -41,19 +41,19 @@ interface Props {
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     pending: {
-        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+        className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
         label: 'Pending',
     },
     in_progress: {
-        className: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+        className: 'border-status-info/30 text-status-info bg-status-info',
         label: 'In Progress',
     },
     completed: {
-        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        className: 'border-status-success/30 text-status-success bg-status-success',
         label: 'Completed',
     },
     overdue: {
-        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        className: 'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Overdue',
     },
 };

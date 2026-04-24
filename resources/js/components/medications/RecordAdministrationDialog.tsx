@@ -96,10 +96,10 @@ interface Props {
 }
 
 const statusOptions = [
-    { value: 'given', label: 'Given', color: 'text-green-600' },
-    { value: 'refused', label: 'Refused', color: 'text-orange-600' },
-    { value: 'withheld', label: 'Withheld', color: 'text-yellow-600' },
-    { value: 'missed', label: 'Missed', color: 'text-red-600' },
+    { value: 'given', label: 'Given', color: 'text-status-success' },
+    { value: 'refused', label: 'Refused', color: 'text-status-warning' },
+    { value: 'withheld', label: 'Withheld', color: 'text-status-warning' },
+    { value: 'missed', label: 'Missed', color: 'text-status-critical' },
 ];
 
 export default function RecordAdministrationDialog({
@@ -296,7 +296,7 @@ export default function RecordAdministrationDialog({
                         {medication.controlled_drug && (
                             <Badge
                                 variant="outline"
-                                className="mt-2 ml-2 bg-red-50 text-red-700"
+                                className="mt-2 ml-2 bg-status-critical-bg text-status-critical"
                             >
                                 Controlled
                             </Badge>
@@ -304,7 +304,7 @@ export default function RecordAdministrationDialog({
                         {medication.high_risk && (
                             <Badge
                                 variant="outline"
-                                className="mt-2 ml-2 bg-orange-50 text-orange-700"
+                                className="mt-2 ml-2 bg-status-warning-bg text-status-warning"
                             >
                                 High Risk
                             </Badge>
@@ -390,8 +390,8 @@ export default function RecordAdministrationDialog({
                                             <div
                                                 className={`flex items-center gap-2 text-xs ${
                                                     scanStatus === 'verified'
-                                                        ? 'text-green-700'
-                                                        : 'text-red-600'
+                                                        ? 'text-status-success'
+                                                        : 'text-status-critical'
                                                 }`}
                                             >
                                                 {scanStatus === 'verified' ? (

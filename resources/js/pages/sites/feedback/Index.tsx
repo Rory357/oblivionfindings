@@ -83,11 +83,11 @@ const typeLabels: Record<string, string> = {
 
 const typeColors: Record<string, string> = {
     whanau: 'border-primary/30 text-primary/70 bg-primary/10',
-    client: 'border-blue-500/30 text-blue-300 bg-blue-500/10',
-    staff: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10',
-    external: 'border-slate-500/30 text-slate-300 bg-slate-500/10',
-    complaint: 'border-red-500/30 text-red-300 bg-red-500/10',
-    compliment: 'border-green-500/30 text-green-300 bg-green-500/10',
+    client: 'border-status-info/30 text-status-info bg-status-info',
+    staff: 'border-status-success/30 text-status-success bg-status-success',
+    external: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    complaint: 'border-status-critical/30 text-status-critical bg-status-critical',
+    compliment: 'border-status-success/30 text-status-success bg-status-success',
 };
 
 const statusLabels: Record<string, string> = {
@@ -99,11 +99,11 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-    new: 'border-blue-500/30 text-blue-300 bg-blue-500/10',
-    acknowledged: 'border-amber-500/30 text-amber-300 bg-amber-500/10',
+    new: 'border-status-info/30 text-status-info bg-status-info',
+    acknowledged: 'border-status-warning/30 text-status-warning bg-status-warning',
     in_progress: 'border-primary/30 text-primary/70 bg-primary/10',
-    resolved: 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10',
-    closed: 'border-slate-500/30 text-slate-300 bg-slate-500/10',
+    resolved: 'border-status-success/30 text-status-success bg-status-success',
+    closed: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
 };
 
 const categoryLabels: Record<string, string> = {
@@ -124,7 +124,7 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md
     return (
         <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((i) => (
-                <Star key={i} className={`${cls} ${i <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
+                <Star key={i} className={`${cls} ${i <= rating ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground'}`} />
             ))}
         </div>
     );
@@ -135,7 +135,7 @@ function StarRatingInput({ value, onChange }: { value: number; onChange: (v: num
         <div className="flex items-center gap-1">
             {[1, 2, 3, 4, 5].map((i) => (
                 <button key={i} type="button" onClick={() => onChange(i)} className="p-0.5 hover:scale-110 transition-transform">
-                    <Star className={`w-6 h-6 ${i <= value ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground hover:text-muted-foreground'}`} />
+                    <Star className={`w-6 h-6 ${i <= value ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground hover:text-muted-foreground'}`} />
                 </button>
             ))}
         </div>
@@ -299,8 +299,8 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-500/10 p-2.5">
-                                    <MessageSquare className="w-5 h-5 text-blue-400" />
+                                <div className="rounded-lg bg-status-info p-2.5">
+                                    <MessageSquare className="w-5 h-5 text-status-info" />
                                 </div>
                                 <div>
                                     <div className="text-2xl font-bold">{stats.total}</div>
@@ -312,8 +312,8 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-amber-500/10 p-2.5">
-                                    <Star className="w-5 h-5 text-amber-400" />
+                                <div className="rounded-lg bg-status-warning p-2.5">
+                                    <Star className="w-5 h-5 text-status-warning" />
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
@@ -328,8 +328,8 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-orange-500/10 p-2.5">
-                                    <AlertCircle className="w-5 h-5 text-orange-400" />
+                                <div className="rounded-lg bg-status-warning p-2.5">
+                                    <AlertCircle className="w-5 h-5 text-status-warning" />
                                 </div>
                                 <div>
                                     <div className="text-2xl font-bold">{stats.open}</div>
@@ -341,8 +341,8 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-500/10 p-2.5">
-                                    <TrendingUp className="w-5 h-5 text-emerald-400" />
+                                <div className="rounded-lg bg-status-success p-2.5">
+                                    <TrendingUp className="w-5 h-5 text-status-success" />
                                 </div>
                                 <div>
                                     <div className="text-2xl font-bold">{stats.response_rate}%</div>
@@ -425,12 +425,12 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                     {/* Header row */}
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <Badge variant="outline" className={typeColors[item.feedback_type] || 'border-slate-500/30 text-slate-300'}>
+                                            <Badge variant="outline" className={typeColors[item.feedback_type] || 'border-border/30 text-muted-foreground'}>
                                                 {typeLabels[item.feedback_type] || item.feedback_type}
                                             </Badge>
                                             {item.rating && <StarRating rating={item.rating} />}
                                             {item.category && (
-                                                <Badge variant="outline" className="text-xs border-slate-500/30 text-muted-foreground">
+                                                <Badge variant="outline" className="text-xs border-border/30 text-muted-foreground">
                                                     {categoryLabels[item.category] || item.category}
                                                 </Badge>
                                             )}
@@ -454,7 +454,7 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
                                     </div>
 
                                     {/* Content */}
-                                    <p className="text-sm text-slate-200 whitespace-pre-wrap">{item.content}</p>
+                                    <p className="text-sm text-foreground whitespace-pre-wrap">{item.content}</p>
 
                                     {/* Submitted by */}
                                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -474,15 +474,15 @@ export default function FeedbackIndex({ site, feedback, stats, filters }: Props)
 
                                     {/* Response section */}
                                     {item.response && (
-                                        <div className="rounded-lg bg-muted/50 p-3 border-l-2 border-emerald-500/50">
+                                        <div className="rounded-lg bg-muted/50 p-3 border-l-2 border-status-success/50">
                                             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                                <CheckCircle2 className="w-3 h-3 text-status-success" />
                                                 Response from {item.responded_by?.name || 'Staff'}
                                                 {item.responded_at && (
                                                     <span> — {new Date(item.responded_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                                 )}
                                             </div>
-                                            <p className="text-sm text-slate-300 whitespace-pre-wrap">{item.response}</p>
+                                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{item.response}</p>
                                         </div>
                                     )}
 

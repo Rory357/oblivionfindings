@@ -101,7 +101,7 @@ export default function HandoverWriteForm({
 }: HandoverWriteFormProps) {
     if (alreadySubmitted) {
         return (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100">
+            <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-3 text-sm text-status-success dark:border-status-success/50 dark:bg-status-success-bg dark:text-status-success">
                 Handover saved for this shift. You're good to clock out.
             </div>
         );

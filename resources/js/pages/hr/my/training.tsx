@@ -64,33 +64,33 @@ const STATUS_CONFIG = {
     compliant: {
         label: 'Compliant',
         color: '#10b981',
-        bg: 'bg-emerald-500/10',
-        text: 'text-emerald-600 dark:text-emerald-400',
-        border: 'border-emerald-500/30',
+        bg: 'bg-status-success',
+        text: 'text-status-success dark:text-status-success',
+        border: 'border-status-success/30',
         icon: ShieldCheck,
     },
     expiring_soon: {
         label: 'Expiring Soon',
         color: '#f59e0b',
-        bg: 'bg-amber-500/10',
-        text: 'text-amber-600 dark:text-amber-400',
-        border: 'border-amber-500/30',
+        bg: 'bg-status-warning',
+        text: 'text-status-warning dark:text-status-warning',
+        border: 'border-status-warning/30',
         icon: AlertTriangle,
     },
     expired: {
         label: 'Expired',
         color: '#ef4444',
-        bg: 'bg-red-500/10',
-        text: 'text-red-600 dark:text-red-400',
-        border: 'border-red-500/30',
+        bg: 'bg-status-critical',
+        text: 'text-status-critical dark:text-status-critical',
+        border: 'border-status-critical/30',
         icon: ShieldX,
     },
     not_started: {
         label: 'Not Started',
         color: '#94a3b8',
-        bg: 'bg-slate-500/10',
+        bg: 'bg-muted-foreground/80/10',
         text: 'text-muted-foreground',
-        border: 'border-slate-500/30',
+        border: 'border-border/30',
         icon: Clock,
     },
 } as const;
@@ -171,15 +171,15 @@ export default function MyTraining({ complianceStatuses }: Props) {
 
                 {/* Urgency Banner */}
                 {urgentItems.length > 0 && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
+                    <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/50 dark:bg-status-critical">
                         <div className="flex items-start gap-3">
-                            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
                             <div>
-                                <p className="font-semibold text-red-800 dark:text-red-300">
+                                <p className="font-semibold text-status-critical dark:text-status-critical">
                                     {urgentItems.length} item{urgentItems.length !== 1 ? 's' : ''} need
                                     {urgentItems.length === 1 ? 's' : ''} your attention
                                 </p>
-                                <p className="mt-0.5 text-sm text-red-600/80 dark:text-red-400/80">
+                                <p className="mt-0.5 text-sm text-status-critical dark:text-status-critical">
                                     {summary.expired > 0 && `${summary.expired} expired`}
                                     {summary.expired > 0 && summary.expiring_soon > 0 && ' and '}
                                     {summary.expiring_soon > 0 && `${summary.expiring_soon} expiring soon`}
@@ -399,7 +399,7 @@ export default function MyTraining({ complianceStatuses }: Props) {
 
                                                         {cs.completed_at && (
                                                             <span className="flex items-center gap-1">
-                                                                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                                                <CheckCircle2 className="h-3 w-3 text-status-success" />
                                                                 Completed {formatDate(cs.completed_at)}
                                                             </span>
                                                         )}
@@ -408,9 +408,9 @@ export default function MyTraining({ complianceStatuses }: Props) {
                                                             <span
                                                                 className={`flex items-center gap-1 ${
                                                                     cs.status === 'expired'
-                                                                        ? 'font-medium text-red-500'
+                                                                        ? 'font-medium text-status-critical'
                                                                         : cs.status === 'expiring_soon'
-                                                                          ? 'font-medium text-amber-500'
+                                                                          ? 'font-medium text-status-warning'
                                                                           : ''
                                                                 }`}
                                                             >

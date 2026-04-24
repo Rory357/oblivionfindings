@@ -78,7 +78,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                                 <CardTitle className="text-sm font-medium text-muted-foreground">Active Policies</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+                                <div className="text-2xl font-bold text-status-success">{stats.active}</div>
                             </CardContent>
                         </Card>
                     </div>
@@ -133,12 +133,12 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                                                 <Badge variant="outline">
                                                     {policy.model_type}
                                                 </Badge>
-                                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                                                <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info">
                                                     <Clock className="mr-1 h-3 w-3" />
                                                     {policy.retention_period_years} year{policy.retention_period_years !== 1 ? 's' : ''} retention
                                                 </Badge>
                                                 {policy.legal_hold_exemption && (
-                                                    <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
+                                                    <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                                         Legal Hold Exempt
                                                     </Badge>
                                                 )}

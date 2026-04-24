@@ -102,13 +102,13 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
                 ) : null}
 
                 {(status === 'approved' || status === 'rejected') && timesheet.decision_notes ? (
-                    <div className={`flex items-start gap-3 rounded-xl border p-4 ${status === 'approved' ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10'}`}>
-                        {status === 'approved' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />}
+                    <div className={`flex items-start gap-3 rounded-xl border p-4 ${status === 'approved' ? 'border-status-success/30 bg-status-success' : 'border-status-critical/30 bg-status-critical'}`}>
+                        {status === 'approved' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-status-success" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-critical" />}
                         <div>
-                            <div className={`text-xs font-medium ${status === 'approved' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                            <div className={`text-xs font-medium ${status === 'approved' ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                 {status === 'approved' ? 'Approved' : 'Rejected'} — decision notes
                             </div>
-                            <div className={`mt-1 text-sm whitespace-pre-wrap ${status === 'approved' ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300'}`}>
+                            <div className={`mt-1 text-sm whitespace-pre-wrap ${status === 'approved' ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                 {timesheet.decision_notes}
                             </div>
                         </div>
@@ -117,14 +117,14 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
 
                 {/* Workflow guidance */}
                 {status === 'draft' ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
-                        <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />
-                        <span className="text-sm text-blue-800 dark:text-blue-300">This timesheet is a draft. Fill in the details and submit for approval when ready.</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-status-info/30 bg-status-info p-4">
+                        <ArrowRight className="h-4 w-4 text-status-info shrink-0" />
+                        <span className="text-sm text-status-info dark:text-status-info">This timesheet is a draft. Fill in the details and submit for approval when ready.</span>
                     </div>
                 ) : status === 'submitted' ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
-                        <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />
-                        <span className="text-sm text-blue-800 dark:text-blue-300">This timesheet has been submitted and is awaiting manager review.</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-status-info/30 bg-status-info p-4">
+                        <ArrowRight className="h-4 w-4 text-status-info shrink-0" />
+                        <span className="text-sm text-status-info dark:text-status-info">This timesheet has been submitted and is awaiting manager review.</span>
                     </div>
                 ) : null}
 
@@ -247,7 +247,7 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
                     </Card>
 
                     {Object.keys(form.errors).length > 0 && (
-                        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+                        <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                             <p className="font-medium">Please fix the following errors:</p>
                             <ul className="mt-1 list-disc pl-5">
                                 {Object.entries(form.errors).map(([field, message]) => (
@@ -300,12 +300,12 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
 
                 {/* Payroll/export info */}
                 {timesheet.exported_to_payroll_at ? (
-                    <Card className="max-w-2xl border-emerald-500/20">
+                    <Card className="max-w-2xl border-status-success/20">
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                                <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" />
                                 <div>
-                                    <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Exported to payroll</div>
+                                    <div className="text-sm font-medium text-status-success dark:text-status-success">Exported to payroll</div>
                                     <div className="text-xs text-muted-foreground">
                                         Exported {new Date(timesheet.exported_to_payroll_at).toLocaleString()}
                                         {timesheet.payroll_reference ? ` · Ref: ${timesheet.payroll_reference}` : ''}
@@ -318,12 +318,12 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
 
                 {/* Reconciliation status */}
                 {timesheet.reconciliation_status && timesheet.reconciliation_status !== 'clear' ? (
-                    <Card className={`max-w-2xl ${timesheet.reconciliation_status === 'blocked' ? 'border-red-500/20' : 'border-amber-500/20'}`}>
+                    <Card className={`max-w-2xl ${timesheet.reconciliation_status === 'blocked' ? 'border-status-critical/20' : 'border-status-warning/20'}`}>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <AlertTriangle className={`h-4 w-4 shrink-0 ${timesheet.reconciliation_status === 'blocked' ? 'text-red-600' : 'text-amber-600'}`} />
+                                <AlertTriangle className={`h-4 w-4 shrink-0 ${timesheet.reconciliation_status === 'blocked' ? 'text-status-critical' : 'text-status-warning'}`} />
                                 <div>
-                                    <div className={`text-sm font-medium ${timesheet.reconciliation_status === 'blocked' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                                    <div className={`text-sm font-medium ${timesheet.reconciliation_status === 'blocked' ? 'text-status-critical dark:text-status-critical' : 'text-status-warning dark:text-status-warning'}`}>
                                         Reconciliation: {timesheet.reconciliation_status === 'blocked' ? 'Blocked' : 'Needs review'}
                                     </div>
                                     {timesheet.reconciliation_findings?.summary ? (

@@ -365,9 +365,9 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                             <div
                                 key={step.key}
                                 className={`w-2 h-2 rounded-full ${
-                                    idx + 1 < activeStep ? 'bg-emerald-500' :
+                                    idx + 1 < activeStep ? 'bg-status-success' :
                                     idx + 1 === activeStep ? 'bg-primary' :
-                                    'bg-slate-700'
+                                    'bg-muted'
                                 }`}
                             />
                         ))}
@@ -785,7 +785,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                                     <div className="space-y-2">
                                         <h4 className="text-sm font-medium">Uploaded Documents ({uploadedDocs.length})</h4>
                                         {uploadedDocs.map((doc) => (
-                                            <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border border bg-slate-900/30">
+                                            <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border border bg-muted">
                                                 <div className="flex items-center gap-3 min-w-0">
                                                     <FileText className="w-5 h-5 text-primary flex-shrink-0" />
                                                     <div className="min-w-0">
@@ -800,7 +800,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-red-400 hover:text-red-300 flex-shrink-0"
+                                                    className="text-status-critical hover:text-status-critical flex-shrink-0"
                                                     onClick={() => handleDeleteDocument(doc.id)}
                                                 >
                                                     <Trash2 className="w-4 h-4" />

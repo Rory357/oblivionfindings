@@ -692,19 +692,19 @@ export default function ShiftShow({
 
                 {/* Workflow guidance */}
                 {shift.status === 'in_progress' ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-                        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                        <span className="text-sm text-amber-800 dark:text-amber-300">Shift is in progress. Complete the shift when finished — a timesheet will be created automatically.</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning p-4">
+                        <AlertTriangle className="h-4 w-4 text-status-warning shrink-0" />
+                        <span className="text-sm text-status-warning dark:text-status-warning">Shift is in progress. Complete the shift when finished — a timesheet will be created automatically.</span>
                     </div>
                 ) : shift.status === 'scheduled' ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
-                        <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />
-                        <span className="text-sm text-blue-800 dark:text-blue-300">Shift is scheduled. Staff can clock in or start the shift when it begins.</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-status-info/30 bg-status-info p-4">
+                        <ArrowRight className="h-4 w-4 text-status-info shrink-0" />
+                        <span className="text-sm text-status-info dark:text-status-info">Shift is scheduled. Staff can clock in or start the shift when it begins.</span>
                     </div>
                 ) : shift.status === 'cancelled' ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
-                        <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
-                        <span className="text-sm text-red-800 dark:text-red-300">This shift has been cancelled. Downstream records may have been affected.</span>
+                    <div className="flex items-center gap-3 rounded-xl border border-status-critical/30 bg-status-critical p-4">
+                        <AlertTriangle className="h-4 w-4 text-status-critical shrink-0" />
+                        <span className="text-sm text-status-critical dark:text-status-critical">This shift has been cancelled. Downstream records may have been affected.</span>
                     </div>
                 ) : null}
 
@@ -778,7 +778,7 @@ export default function ShiftShow({
                                         {new Date(linkedTimesheet.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </p>
                                     {linkedTimesheet.exported_to_payroll_at ? (
-                                        <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10 text-[10px]">Exported to payroll</Badge>
+                                        <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success text-[10px]">Exported to payroll</Badge>
                                     ) : null}
                                 </div>
                             ) : (
@@ -798,9 +798,9 @@ export default function ShiftShow({
                             {handoverSummary ? (
                                 <div className="space-y-1">
                                     <Badge variant="outline" className={
-                                        handoverSummary.status === 'acknowledged' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
-                                        handoverSummary.status === 'submitted' ? 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' :
-                                        'border-slate-500/30 text-muted-foreground bg-slate-500/10'
+                                        handoverSummary.status === 'acknowledged' ? 'border-status-success/30 text-status-success bg-status-success' :
+                                        handoverSummary.status === 'submitted' ? 'border-status-warning/30 text-status-warning bg-status-warning' :
+                                        'border-border/30 text-muted-foreground bg-muted-foreground/80/10'
                                     }>
                                         {handoverSummary.status.charAt(0).toUpperCase() + handoverSummary.status.slice(1)}
                                     </Badge>
@@ -1468,7 +1468,7 @@ export default function ShiftShow({
 
                                         {candidate.blocked_reasons.length >
                                         0 ? (
-                                            <div className="mt-2 space-y-1 text-xs text-red-700 dark:text-red-400">
+                                            <div className="mt-2 space-y-1 text-xs text-status-critical dark:text-status-critical">
                                                 {candidate.blocked_reasons.map(
                                                     (reason) => (
                                                         <div key={reason}>
@@ -1481,7 +1481,7 @@ export default function ShiftShow({
 
                                         {candidate.warning_reasons.length >
                                         0 ? (
-                                            <div className="mt-2 space-y-1 text-xs text-amber-700 dark:text-amber-400">
+                                            <div className="mt-2 space-y-1 text-xs text-status-warning dark:text-status-warning">
                                                 {candidate.warning_reasons.map(
                                                     (reason) => (
                                                         <div key={reason}>
@@ -1504,7 +1504,7 @@ export default function ShiftShow({
 
                                         {candidate.coverage_fit_bonus &&
                                         candidate.coverage_fit_bonus > 0 ? (
-                                            <div className="mt-2 text-xs text-emerald-700">
+                                            <div className="mt-2 text-xs text-status-success">
                                                 Familiarity bonus applied
                                                 because this shift sits in an
                                                 under-covered house window.
@@ -1537,7 +1537,7 @@ export default function ShiftShow({
                                                     size="sm"
                                                     disabled={isAlreadyAssigned}
                                                     variant={isAlreadyAssigned ? 'outline' : 'default'}
-                                                    className={!isAlreadyAssigned ? 'bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-700 dark:hover:bg-yellow-600' : ''}
+                                                    className={!isAlreadyAssigned ? 'bg-status-warning hover:bg-status-warning dark:bg-status-warning dark:hover:bg-status-warning' : ''}
                                                     onClick={() => {
                                                         setOverrideCandidate({
                                                             id: candidate.id,
@@ -1882,7 +1882,7 @@ export default function ShiftShow({
                                                 placeholder="Why does this shift need a replacement?"
                                             />
                                             {replacementForm.errors.reason ? (
-                                                <div className="text-xs text-red-600">
+                                                <div className="text-xs text-status-critical">
                                                     {
                                                         replacementForm.errors
                                                             .reason
@@ -2415,7 +2415,7 @@ export default function ShiftShow({
                                                 />
                                                 {completeForm.errors
                                                     .incomplete_tasks_reason ? (
-                                                    <div className="mt-1 text-xs text-red-600">
+                                                    <div className="mt-1 text-xs text-status-critical">
                                                         {
                                                             completeForm.errors
                                                                 .incomplete_tasks_reason
@@ -2427,7 +2427,7 @@ export default function ShiftShow({
 
                                         {completeForm.errors
                                             .allow_incomplete_tasks ? (
-                                            <div className="text-xs text-red-600">
+                                            <div className="text-xs text-status-critical">
                                                 {
                                                     completeForm.errors
                                                         .allow_incomplete_tasks
@@ -2460,7 +2460,7 @@ export default function ShiftShow({
                                         />
                                         {completeForm.errors
                                             .final_note_subject ? (
-                                            <div className="mt-1 text-xs text-red-600">
+                                            <div className="mt-1 text-xs text-status-critical">
                                                 {
                                                     completeForm.errors
                                                         .final_note_subject
@@ -2505,7 +2505,7 @@ export default function ShiftShow({
                                         placeholder="Summarise what happened during the shift, outcomes, any concerns, and handover items."
                                     />
                                     {completeForm.errors.final_note_body ? (
-                                        <div className="mt-1 text-xs text-red-600">
+                                        <div className="mt-1 text-xs text-status-critical">
                                             {
                                                 completeForm.errors
                                                     .final_note_body
@@ -2556,7 +2556,7 @@ export default function ShiftShow({
                                     />
                                     {completeForm.errors
                                         .handover_waiver_reason ? (
-                                        <div className="mt-1 text-xs text-red-600">
+                                        <div className="mt-1 text-xs text-status-critical">
                                             {
                                                 completeForm.errors
                                                     .handover_waiver_reason

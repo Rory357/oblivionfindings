@@ -34,18 +34,18 @@ export default function DraftResumePrompt({
             role="alertdialog"
             aria-label={title}
             className={cn(
-                'rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-sm shadow-sm',
-                'dark:border-amber-500/40 dark:bg-amber-950/30',
+                'rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm shadow-sm',
+                'dark:border-status-warning/40 dark:bg-status-warning',
                 className,
             )}
         >
             <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-warning-bg text-status-warning">
                     <AlertTriangle className="h-4 w-4" aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <div className="font-medium text-amber-900 dark:text-amber-100">{title}</div>
-                    <p className="mt-0.5 text-xs text-amber-900/80 dark:text-amber-100/80">
+                    <div className="font-medium text-status-warning dark:text-status-warning">{title}</div>
+                    <p className="mt-0.5 text-xs text-status-warning dark:text-status-warning">
                         {description}
                         {savedAt ? ` Last saved ${formatDateTime(savedAt)}.` : null}
                     </p>

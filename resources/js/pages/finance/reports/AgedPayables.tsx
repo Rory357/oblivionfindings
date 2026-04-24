@@ -42,11 +42,11 @@ const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const agingColumns = [
-    { key: 'current' as const, label: 'Current', className: 'text-emerald-700 dark:text-emerald-400' },
-    { key: 'days_1_30' as const, label: '1-30 Days', className: 'text-amber-700 dark:text-amber-400' },
-    { key: 'days_31_60' as const, label: '31-60 Days', className: 'text-orange-700 dark:text-orange-400' },
-    { key: 'days_61_90' as const, label: '61-90 Days', className: 'text-red-600 dark:text-red-400' },
-    { key: 'days_90_plus' as const, label: '90+ Days', className: 'text-red-800 dark:text-red-300' },
+    { key: 'current' as const, label: 'Current', className: 'text-status-success dark:text-status-success' },
+    { key: 'days_1_30' as const, label: '1-30 Days', className: 'text-status-warning dark:text-status-warning' },
+    { key: 'days_31_60' as const, label: '31-60 Days', className: 'text-status-warning dark:text-status-warning' },
+    { key: 'days_61_90' as const, label: '61-90 Days', className: 'text-status-critical dark:text-status-critical' },
+    { key: 'days_90_plus' as const, label: '90+ Days', className: 'text-status-critical dark:text-status-critical' },
 ];
 
 const PIE_COLORS = ['#10b981', '#f59e0b', '#f97316', '#ef4444', '#991b1b'];
@@ -121,7 +121,7 @@ export default function AgedPayables({ report }: Props) {
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Current %</p>
-                                    <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{currentPct}%</p>
+                                    <p className="text-2xl font-bold tabular-nums text-status-success dark:text-status-success">{currentPct}%</p>
                                     <p className="text-xs text-muted-foreground">{formatCurrency(grand_total.current)} current</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
@@ -135,7 +135,7 @@ export default function AgedPayables({ report }: Props) {
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Overdue (31+ Days)</p>
-                                    <p className="text-2xl font-bold tabular-nums text-red-600 dark:text-red-400">{formatCurrency(overdueAmount)}</p>
+                                    <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{formatCurrency(overdueAmount)}</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <AlertTriangle className="h-5 w-5 text-muted-foreground" />

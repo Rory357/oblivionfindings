@@ -31,9 +31,9 @@ interface Props extends PageProps {
 export default function PolicyIndex({ auth, policies, categories }: Props) {
   const getStatusColor = (status: string) => ({
     draft: 'bg-muted text-foreground',
-    active: 'bg-green-100 text-green-800',
-    under_review: 'bg-yellow-100 text-yellow-800',
-    archived: 'bg-red-100 text-red-800',
+    active: 'bg-status-success-bg text-status-success',
+    under_review: 'bg-status-warning-bg text-status-warning',
+    archived: 'bg-status-critical-bg text-status-critical',
   }[status] || 'bg-muted text-foreground');
 
   const getCategoryLabel = (value: string) =>
@@ -60,8 +60,8 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <BookOpen className="w-5 h-5 text-blue-500" />
-                      <Link href={`/governance/policies/${policy.id}`} className="text-lg font-medium hover:text-blue-600">
+                      <BookOpen className="w-5 h-5 text-status-info" />
+                      <Link href={`/governance/policies/${policy.id}`} className="text-lg font-medium hover:text-status-info">
                         {policy.title}
                       </Link>
                       <Badge variant="outline">v{policy.version}</Badge>
@@ -102,7 +102,7 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
                 href={link.url || '#'}
                 className={cn(
                   'px-3 py-1 rounded text-sm',
-                  link.active ? 'bg-blue-600 text-white' : 'bg-white text-muted-foreground hover:bg-muted',
+                  link.active ? 'bg-status-info text-white' : 'bg-white text-muted-foreground hover:bg-muted',
                   !link.url && 'opacity-50 pointer-events-none'
                 )}
                 dangerouslySetInnerHTML={{ __html: link.label }}

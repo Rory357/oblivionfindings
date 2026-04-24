@@ -64,11 +64,11 @@ const filingTypeLabels: Record<string, string> = {
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    validated: { label: 'Validated', className: 'bg-blue-500/10 text-blue-600 border-blue-500/30' },
-    submitted: { label: 'Submitted', className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' },
-    accepted: { label: 'Accepted', className: 'bg-green-500/10 text-green-600 border-green-500/30' },
-    rejected: { label: 'Rejected', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
-    error: { label: 'Error', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
+    validated: { label: 'Validated', className: 'bg-status-info-bg text-status-info border-status-info/30' },
+    submitted: { label: 'Submitted', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
+    accepted: { label: 'Accepted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
+    rejected: { label: 'Rejected', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
+    error: { label: 'Error', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
 const filingDataLabels: Record<string, string> = {
@@ -177,12 +177,12 @@ export default function IrdFilingShow({ filing }: PageProps) {
 
                 {/* Submission Info */}
                 {filing.submitted_at && (
-                    <Card className="border-green-500/30 bg-green-500/5">
+                    <Card className="border-status-success/30 bg-status-success">
                         <CardContent className="flex items-start gap-3 py-4">
-                            <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                            <CheckCircle className="h-5 w-5 text-status-success shrink-0 mt-0.5" />
                             <div>
-                                <p className="font-medium text-green-700 dark:text-green-400">Submitted to IRD</p>
-                                <p className="text-sm text-green-600 dark:text-green-500">
+                                <p className="font-medium text-status-success dark:text-status-success">Submitted to IRD</p>
+                                <p className="text-sm text-status-success dark:text-status-success">
                                     Submitted on {formatDateTime(filing.submitted_at)}
                                     {filing.ird_reference && (
                                         <> | Reference: <span className="font-mono">{filing.ird_reference}</span></>
@@ -217,7 +217,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Amount</p>
-                                <p className={`font-mono font-semibold tabular-nums ${isRefund ? 'text-green-600' : 'text-red-600'}`}>
+                                <p className={`font-mono font-semibold tabular-nums ${isRefund ? 'text-status-success' : 'text-status-critical'}`}>
                                     {formatCurrency(Math.abs(amount))}
                                     {isRefund ? ' (Refund)' : ''}
                                 </p>
@@ -277,8 +277,8 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                                         } ${
                                                             isMonetary && isHighlight
                                                                 ? Number(value) >= 0
-                                                                    ? 'text-red-600'
-                                                                    : 'text-green-600'
+                                                                    ? 'text-status-critical'
+                                                                    : 'text-status-success'
                                                                 : ''
                                                         }`}>
                                                             {isMonetary ? formatCurrency(Number(value)) : String(value)}

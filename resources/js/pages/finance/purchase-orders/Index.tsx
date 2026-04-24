@@ -27,11 +27,11 @@ const formatNZD = (amount: string | number) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
+    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info' },
     sent: { label: 'Sent', className: 'bg-primary/10 text-primary' },
-    partially_received: { label: 'Partially Received', className: 'bg-yellow-100 text-yellow-800' },
-    received: { label: 'Received', className: 'bg-green-100 text-green-800' },
-    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
+    partially_received: { label: 'Partially Received', className: 'bg-status-warning-bg text-status-warning' },
+    received: { label: 'Received', className: 'bg-status-success-bg text-status-success' },
+    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
 };
 
 function StatusBadge({ status }: { status: string }) {

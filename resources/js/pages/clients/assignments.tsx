@@ -70,7 +70,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                 )}
 
                 {status === 'error' && (
-                    <div className="rounded-md border border-red-500/40 p-3 text-sm">
+                    <div className="rounded-md border border-status-critical/40 p-3 text-sm">
                         Something went wrong saving assignments. Check the
                         network response.
                     </div>

@@ -18,29 +18,29 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const QUESTION_COLORS: Record<string, { bar: string; bg: string; text: string }> = {
-    communication: { bar: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
-    teamwork: { bar: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    communication: { bar: 'bg-status-info', bg: 'bg-status-info-bg', text: 'text-status-info' },
+    teamwork: { bar: 'bg-status-success', bg: 'bg-status-success-bg', text: 'text-status-success' },
     leadership: { bar: 'bg-primary', bg: 'bg-primary/10', text: 'text-primary' },
-    technical: { bar: 'bg-amber-500', bg: 'bg-amber-50', text: 'text-amber-700' },
-    initiative: { bar: 'bg-pink-500', bg: 'bg-pink-50', text: 'text-pink-700' },
+    technical: { bar: 'bg-status-warning', bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    initiative: { bar: 'bg-status-critical', bg: 'bg-status-critical-bg', text: 'text-status-critical' },
     overall: { bar: 'bg-primary', bg: 'bg-primary/10', text: 'text-primary' },
 };
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500'];
+const AVATAR_COLORS = ['bg-status-info', 'bg-primary', 'bg-status-success', 'bg-status-warning', 'bg-status-critical', 'bg-status-info'];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 
 function ratingColor(v: number | null): string {
     if (v === null) return 'text-muted-foreground';
-    if (v >= 4) return 'text-emerald-600';
-    if (v >= 3) return 'text-amber-600';
-    return 'text-red-600';
+    if (v >= 4) return 'text-status-success';
+    if (v >= 3) return 'text-status-warning';
+    return 'text-status-critical';
 }
 function ratingBarColor(v: number | null): string {
     if (v === null) return 'bg-muted';
-    if (v >= 4) return 'bg-emerald-500';
-    if (v >= 3) return 'bg-amber-400';
-    return 'bg-red-400';
+    if (v >= 4) return 'bg-status-success';
+    if (v >= 3) return 'bg-status-warning';
+    return 'bg-status-critical';
 }
 
 export default function FeedbackSummary({ subjectUser, summary, questions }: Props) {
@@ -56,7 +56,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
             <div className="space-y-6 p-4 lg:p-6">
 
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white shadow-lg">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
                     <div className="relative flex flex-wrap items-center justify-between gap-4">
@@ -74,7 +74,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                             <div className="flex items-center gap-6">
                                 <div className="text-center">
                                     <div className="flex items-center gap-1 text-3xl font-bold">
-                                        {overallAvg.toFixed(1)} <Star className="h-6 w-6 fill-amber-300 text-amber-300" />
+                                        {overallAvg.toFixed(1)} <Star className="h-6 w-6 fill-amber-300 text-status-warning" />
                                     </div>
                                     <div className="text-[10px] uppercase tracking-wider text-white/60">Overall</div>
                                 </div>
@@ -103,10 +103,10 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                         {/* KPI Cards */}
                         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                             {[
-                                { label: 'Total Reviews', value: summary.total_reviews, icon: Users, gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-primary/10', iconColor: 'text-primary' },
-                                { label: 'Overall Average', value: overallAvg !== null ? overallAvg.toFixed(1) : 'N/A', icon: Star, gradient: 'from-amber-500/10 to-yellow-500/5', iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
-                                { label: 'Highest Area', value: allRatings.length > 0 ? Math.max(...allRatings).toFixed(1) : 'N/A', icon: TrendingUp, gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-                                { label: 'Total Comments', value: totalComments, icon: MessageSquare, gradient: 'from-blue-500/10 to-indigo-500/5', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
+                                { label: 'Total Reviews', value: summary.total_reviews, icon: Users, gradient: 'from-primary/10 to-primary/5', iconBg: 'bg-primary/10', iconColor: 'text-primary' },
+                                { label: 'Overall Average', value: overallAvg !== null ? overallAvg.toFixed(1) : 'N/A', icon: Star, gradient: 'from-status-warning/10 to-status-warning/5', iconBg: 'bg-status-warning-bg', iconColor: 'text-status-warning' },
+                                { label: 'Highest Area', value: allRatings.length > 0 ? Math.max(...allRatings).toFixed(1) : 'N/A', icon: TrendingUp, gradient: 'from-status-success/10 to-status-success/5', iconBg: 'bg-status-success-bg', iconColor: 'text-status-success' },
+                                { label: 'Total Comments', value: totalComments, icon: MessageSquare, gradient: 'from-status-info/10 to-primary/5', iconBg: 'bg-status-info-bg', iconColor: 'text-status-info' },
                             ].map((kpi) => {
                                 const Icon = kpi.icon;
                                 return (
@@ -129,7 +129,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
 
                         {/* Ratings by Category */}
                         <Card className="overflow-hidden">
-                            <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
+                            <CardHeader className="border-b bg-gradient-to-r from-primary/10 to-transparent pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
                                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
                                         <BarChart3 className="h-4 w-4 text-primary" />
@@ -140,7 +140,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                             <CardContent className="space-y-5 pt-5">
                                 {questionKeys.map((key) => {
                                     const q = summary.questions[key];
-                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-slate-500', bg: 'bg-muted', text: 'text-foreground' };
+                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-muted-foreground/80', bg: 'bg-muted', text: 'text-foreground' };
                                     const avg = q?.average_rating;
                                     const pct = avg !== null && avg !== undefined ? (avg / 5) * 100 : 0;
                                     return (
@@ -169,10 +169,10 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
 
                         {/* Comments */}
                         <Card className="overflow-hidden">
-                            <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-transparent pb-3">
+                            <CardHeader className="border-b bg-gradient-to-r from-status-info-bg to-transparent pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
-                                        <MessageSquare className="h-4 w-4 text-blue-600" />
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-info-bg">
+                                        <MessageSquare className="h-4 w-4 text-status-info" />
                                     </div>
                                     Feedback Comments
                                     <span className="text-xs font-normal text-muted-foreground">(Anonymised)</span>
@@ -183,7 +183,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                                     const q = summary.questions[key];
                                     const comments = q?.comments ?? [];
                                     if (comments.length === 0) return null;
-                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-slate-500', bg: 'bg-muted', text: 'text-foreground' };
+                                    const colors = QUESTION_COLORS[key] || { bar: 'bg-muted-foreground/80', bg: 'bg-muted', text: 'text-foreground' };
                                     return (
                                         <div key={key}>
                                             <div className="mb-2 flex items-center gap-2">
@@ -203,7 +203,7 @@ export default function FeedbackSummary({ subjectUser, summary, questions }: Pro
                                 })}
                                 {questionKeys.every(k => (summary.questions[k]?.comments?.length ?? 0) === 0) && (
                                     <div className="flex flex-col items-center gap-2 py-6">
-                                        <MessageSquare className="h-8 w-8 text-slate-200" />
+                                        <MessageSquare className="h-8 w-8 text-foreground" />
                                         <p className="text-sm text-muted-foreground">No comments provided.</p>
                                     </div>
                                 )}

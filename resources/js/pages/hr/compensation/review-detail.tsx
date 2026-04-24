@@ -77,15 +77,15 @@ const getStatusColor = (status: string) => {
         case 'planning':
             return 'bg-muted text-foreground border-border';
         case 'in_progress':
-            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         case 'approved':
-            return 'bg-green-100 text-green-800 border-green-200';
+            return 'bg-status-success-bg text-status-success border-status-success/30';
         case 'applied':
-            return 'bg-blue-100 text-blue-800 border-blue-200';
+            return 'bg-status-info-bg text-status-info border-status-info/30';
         case 'pending':
-            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         case 'rejected':
-            return 'bg-red-100 text-red-800 border-red-200';
+            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         default:
             return 'bg-muted text-foreground border-border';
     }
@@ -387,7 +387,7 @@ export default function CompensationReviewDetail({ review, employees, reviewCycl
                                         <TableCell>{formatCurrency(item.current_salary)}</TableCell>
                                         <TableCell className="font-medium">{formatCurrency(item.proposed_salary)}</TableCell>
                                         <TableCell>
-                                            <span className={item.change_percentage > 0 ? 'text-green-600' : item.change_percentage < 0 ? 'text-red-600' : ''}>
+                                            <span className={item.change_percentage > 0 ? 'text-status-success' : item.change_percentage < 0 ? 'text-status-critical' : ''}>
                                                 {item.change_percentage > 0 ? '+' : ''}{item.change_percentage}%
                                             </span>
                                         </TableCell>

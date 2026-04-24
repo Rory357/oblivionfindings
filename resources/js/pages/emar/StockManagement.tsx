@@ -103,14 +103,14 @@ function ExpiryBadge({ item }: { item: StockItem }) {
     }
     if (item.is_expiring_soon) {
         return (
-            <Badge className="bg-amber-500 text-[10px] text-white">
+            <Badge className="bg-status-warning text-[10px] text-white">
                 Expires &lt;30d
             </Badge>
         );
     }
     if (item.is_expiring_90) {
         return (
-            <Badge className="bg-yellow-400 text-[10px] text-yellow-900">
+            <Badge className="bg-status-warning-bg text-[10px] text-status-warning">
                 Expires &lt;90d
             </Badge>
         );
@@ -389,7 +389,7 @@ export default function StockManagement({
                 <div className="mb-6 grid gap-4 sm:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/40">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-info-bg text-status-info dark:bg-status-info">
                                 <Package className="h-5 w-5" />
                             </div>
                             <div>
@@ -404,7 +404,7 @@ export default function StockManagement({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-900/40">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning">
                                 <AlertTriangle className="h-5 w-5" />
                             </div>
                             <div>
@@ -419,7 +419,7 @@ export default function StockManagement({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning">
                                 <Clock className="h-5 w-5" />
                             </div>
                             <div>
@@ -434,7 +434,7 @@ export default function StockManagement({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-700 dark:bg-red-900/40">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical dark:bg-status-critical">
                                 <Calendar className="h-5 w-5" />
                             </div>
                             <div>
@@ -502,7 +502,7 @@ export default function StockManagement({
                                             </SelectContent>
                                         </Select>
                                         {orderForm.errors.client_id && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {orderForm.errors.client_id}
                                             </p>
                                         )}
@@ -542,7 +542,7 @@ export default function StockManagement({
                                         </Select>
                                         {orderForm.errors
                                             .client_medication_id && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {
                                                     orderForm.errors
                                                         .client_medication_id
@@ -566,7 +566,7 @@ export default function StockManagement({
                                                 placeholder="Pharmacy name"
                                             />
                                             {orderForm.errors.pharmacy_name && (
-                                                <p className="text-sm text-red-600">
+                                                <p className="text-sm text-status-critical">
                                                     {
                                                         orderForm.errors
                                                             .pharmacy_name
@@ -591,7 +591,7 @@ export default function StockManagement({
                                             />
                                             {orderForm.errors
                                                 .pharmacy_phone && (
-                                                <p className="text-sm text-red-600">
+                                                <p className="text-sm text-status-critical">
                                                     {
                                                         orderForm.errors
                                                             .pharmacy_phone
@@ -633,7 +633,7 @@ export default function StockManagement({
                                                 </SelectContent>
                                             </Select>
                                             {orderForm.errors.order_type && (
-                                                <p className="text-sm text-red-600">
+                                                <p className="text-sm text-status-critical">
                                                     {
                                                         orderForm.errors
                                                             .order_type
@@ -660,7 +660,7 @@ export default function StockManagement({
                                             />
                                             {orderForm.errors
                                                 .quantity_ordered && (
-                                                <p className="text-sm text-red-600">
+                                                <p className="text-sm text-status-critical">
                                                     {
                                                         orderForm.errors
                                                             .quantity_ordered
@@ -685,7 +685,7 @@ export default function StockManagement({
                                                 placeholder="Batch number"
                                             />
                                             {orderForm.errors.batch_number && (
-                                                <p className="text-sm text-red-600">
+                                                <p className="text-sm text-status-critical">
                                                     {
                                                         orderForm.errors
                                                             .batch_number
@@ -708,7 +708,7 @@ export default function StockManagement({
                                                 }
                                             />
                                             {orderForm.errors.batch_expiry && (
-                                                <p className="text-sm text-red-600">
+                                                <p className="text-sm text-status-critical">
                                                     {
                                                         orderForm.errors
                                                             .batch_expiry
@@ -731,7 +731,7 @@ export default function StockManagement({
                                             placeholder="Any special instructions..."
                                         />
                                         {orderForm.errors.order_notes && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {orderForm.errors.order_notes}
                                             </p>
                                         )}
@@ -816,7 +816,7 @@ export default function StockManagement({
                                         </Select>
                                         {receiveForm.errors
                                             .client_medication_id && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {
                                                     receiveForm.errors
                                                         .client_medication_id
@@ -839,7 +839,7 @@ export default function StockManagement({
                                             placeholder="Quantity received"
                                         />
                                         {receiveForm.errors.quantity && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {receiveForm.errors.quantity}
                                             </p>
                                         )}
@@ -862,7 +862,7 @@ export default function StockManagement({
                                             />
                                             {receiveForm.errors
                                                 .batch_number && (
-                                                <p className="text-sm text-red-600">
+                                                <p className="text-sm text-status-critical">
                                                     {
                                                         receiveForm.errors
                                                             .batch_number
@@ -885,7 +885,7 @@ export default function StockManagement({
                                                 }
                                             />
                                             {receiveForm.errors.expiry_date && (
-                                                <p className="text-sm text-red-600">
+                                                <p className="text-sm text-status-critical">
                                                     {
                                                         receiveForm.errors
                                                             .expiry_date
@@ -907,7 +907,7 @@ export default function StockManagement({
                                             placeholder="Optional notes"
                                         />
                                         {receiveForm.errors.notes && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {receiveForm.errors.notes}
                                             </p>
                                         )}
@@ -935,7 +935,7 @@ export default function StockManagement({
                                         }}
                                     />
                                     {receiveForm.errors.scan_code && (
-                                        <p className="text-sm text-red-600">
+                                        <p className="text-sm text-status-critical">
                                             {receiveForm.errors.scan_code}
                                         </p>
                                     )}
@@ -1011,7 +1011,7 @@ export default function StockManagement({
                                         </Select>
                                         {adjustForm.errors
                                             .client_medication_id && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {
                                                     adjustForm.errors
                                                         .client_medication_id
@@ -1034,7 +1034,7 @@ export default function StockManagement({
                                             placeholder="Corrected stock count"
                                         />
                                         {adjustForm.errors.new_quantity && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {adjustForm.errors.new_quantity}
                                             </p>
                                         )}
@@ -1042,7 +1042,7 @@ export default function StockManagement({
                                     <div className="space-y-2">
                                         <Label>
                                             Reason{' '}
-                                            <span className="text-red-500">
+                                            <span className="text-status-critical">
                                                 *
                                             </span>
                                         </Label>
@@ -1059,7 +1059,7 @@ export default function StockManagement({
                                             required
                                         />
                                         {adjustForm.errors.reason && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {adjustForm.errors.reason}
                                             </p>
                                         )}
@@ -1111,7 +1111,7 @@ export default function StockManagement({
                                         placeholder="Qty received"
                                     />
                                     {advanceForm.errors.quantity_received && (
-                                        <p className="text-sm text-red-600">
+                                        <p className="text-sm text-status-critical">
                                             {
                                                 advanceForm.errors
                                                     .quantity_received
@@ -1132,7 +1132,7 @@ export default function StockManagement({
                                         placeholder="Batch number"
                                     />
                                     {advanceForm.errors.batch_number && (
-                                        <p className="text-sm text-red-600">
+                                        <p className="text-sm text-status-critical">
                                             {advanceForm.errors.batch_number}
                                         </p>
                                     )}
@@ -1150,7 +1150,7 @@ export default function StockManagement({
                                         }
                                     />
                                     {advanceForm.errors.batch_expiry && (
-                                        <p className="text-sm text-red-600">
+                                        <p className="text-sm text-status-critical">
                                             {advanceForm.errors.batch_expiry}
                                         </p>
                                     )}
@@ -1199,7 +1199,7 @@ export default function StockManagement({
                                             placeholder="Reorder when at or below"
                                         />
                                         {editForm.errors.reorder_level && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {editForm.errors.reorder_level}
                                             </p>
                                         )}
@@ -1221,7 +1221,7 @@ export default function StockManagement({
                                             placeholder="Suggested qty to order"
                                         />
                                         {editForm.errors.reorder_quantity && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {
                                                     editForm.errors
                                                         .reorder_quantity
@@ -1244,7 +1244,7 @@ export default function StockManagement({
                                             }
                                         />
                                         {editForm.errors.expiry_date && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {editForm.errors.expiry_date}
                                             </p>
                                         )}
@@ -1262,7 +1262,7 @@ export default function StockManagement({
                                             placeholder="Batch number"
                                         />
                                         {editForm.errors.batch_number && (
-                                            <p className="text-sm text-red-600">
+                                            <p className="text-sm text-status-critical">
                                                 {editForm.errors.batch_number}
                                             </p>
                                         )}
@@ -1281,7 +1281,7 @@ export default function StockManagement({
                                         placeholder="Supplier / pharmacy name"
                                     />
                                     {editForm.errors.supplier_name && (
-                                        <p className="text-sm text-red-600">
+                                        <p className="text-sm text-status-critical">
                                             {editForm.errors.supplier_name}
                                         </p>
                                     )}
@@ -1336,9 +1336,9 @@ export default function StockManagement({
                             <Card
                                 className={
                                     tab === 'low'
-                                        ? 'border-orange-200 dark:border-orange-800'
+                                        ? 'border-status-warning/30 dark:border-status-warning/30'
                                         : tab === 'expired'
-                                          ? 'border-red-200 dark:border-red-800'
+                                          ? 'border-status-critical/30 dark:border-status-critical/30'
                                           : ''
                                 }
                             >
@@ -1347,7 +1347,7 @@ export default function StockManagement({
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr
-                                                    className={`border-b ${tab === 'low' ? 'bg-orange-50 dark:bg-orange-900/10' : tab === 'expired' ? 'bg-red-50 dark:bg-red-900/10' : 'bg-muted/50'}`}
+                                                    className={`border-b ${tab === 'low' ? 'bg-status-warning-bg dark:bg-status-warning' : tab === 'expired' ? 'bg-status-critical-bg dark:bg-status-critical' : 'bg-muted/50'}`}
                                                 >
                                                     <th className="p-3 text-left font-medium">
                                                         Medication
@@ -1417,7 +1417,7 @@ export default function StockManagement({
                                                             )}
                                                         </td>
                                                         <td
-                                                            className={`p-3 font-mono ${s.is_low ? 'font-semibold text-red-600' : ''}`}
+                                                            className={`p-3 font-mono ${s.is_low ? 'font-semibold text-status-critical' : ''}`}
                                                         >
                                                             {s.on_hand} {s.unit}
                                                         </td>
@@ -1427,7 +1427,7 @@ export default function StockManagement({
                                                         </td>
                                                         <td className="space-x-1 p-3">
                                                             {s.is_low && (
-                                                                <Badge className="bg-orange-500 text-[10px] text-white">
+                                                                <Badge className="bg-status-warning text-[10px] text-white">
                                                                     Low Stock
                                                                 </Badge>
                                                             )}

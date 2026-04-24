@@ -64,7 +64,7 @@ export default function EditStrategy({ plan }: { plan: Plan }) {
                             <div>
                                 <Label>Title</Label>
                                 <Input value={data.title} onChange={(e) => setData('title', e.target.value)} />
-                                {errors.title && <p className="text-sm text-red-600 mt-1">{errors.title}</p>}
+                                {errors.title && <p className="text-sm text-status-critical mt-1">{errors.title}</p>}
                             </div>
                             <div>
                                 <Label>Planning Horizon</Label>

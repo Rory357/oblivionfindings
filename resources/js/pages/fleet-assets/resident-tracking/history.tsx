@@ -127,10 +127,10 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border bg-blue-50 dark:bg-blue-950/30">
+                    <Card className="border bg-status-info-bg dark:bg-status-info">
                         <CardContent className="flex items-center gap-4 p-4">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40">
-                                <Radio className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-info-bg dark:bg-status-info">
+                                <Radio className="h-6 w-6 text-status-info dark:text-status-info" />
                             </div>
                             <div>
                                 {tracker ? (

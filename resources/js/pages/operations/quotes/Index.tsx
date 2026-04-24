@@ -147,7 +147,7 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                                         <Badge variant={STATUS_VARIANTS[quote.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">
                                             {quote.status}
                                         </Badge>
-                                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                                        <span className="text-sm font-semibold text-status-success dark:text-status-success">
                                             {nzd.format(quote.total_amount)}
                                         </span>
                                     </div>
@@ -157,7 +157,7 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                                         )}
                                         <span>{quote.items_count} items</span>
                                         {quote.valid_until && (
-                                            <span className={new Date(quote.valid_until) < new Date() ? 'font-medium text-red-600' : ''}>
+                                            <span className={new Date(quote.valid_until) < new Date() ? 'font-medium text-status-critical' : ''}>
                                                 Valid until: {formatDate(quote.valid_until)}
                                             </span>
                                         )}

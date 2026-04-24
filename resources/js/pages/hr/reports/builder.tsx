@@ -290,7 +290,7 @@ export default function ReportBuilder({ sources }: Props) {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => removeFilter(index)}
-                                        className="text-red-400 hover:text-red-300"
+                                        className="text-status-critical hover:text-status-critical"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </Button>

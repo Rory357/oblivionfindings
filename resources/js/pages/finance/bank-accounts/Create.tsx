@@ -64,7 +64,7 @@ export default function BankAccountCreate({ glAccounts }: Props) {
                                     onChange={(e) => setData('name', e.target.value)}
                                     placeholder="e.g. ANZ Business Cheque"
                                 />
-                                {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
+                                {errors.name && <p className="text-sm text-status-critical">{errors.name}</p>}
                             </div>
 
                             <div className="space-y-2">
@@ -75,7 +75,7 @@ export default function BankAccountCreate({ glAccounts }: Props) {
                                     onChange={(e) => setData('bank_name', e.target.value)}
                                     placeholder="e.g. ANZ, Westpac, BNZ, ASB"
                                 />
-                                {errors.bank_name && <p className="text-sm text-red-600">{errors.bank_name}</p>}
+                                {errors.bank_name && <p className="text-sm text-status-critical">{errors.bank_name}</p>}
                             </div>
 
                             <div className="space-y-2">
@@ -86,7 +86,7 @@ export default function BankAccountCreate({ glAccounts }: Props) {
                                     onChange={(e) => setData('account_number', e.target.value)}
                                     placeholder="XX-XXXX-XXXXXXX-XXX"
                                 />
-                                {errors.account_number && <p className="text-sm text-red-600">{errors.account_number}</p>}
+                                {errors.account_number && <p className="text-sm text-status-critical">{errors.account_number}</p>}
                             </div>
 
                             <div className="space-y-2">
@@ -105,7 +105,7 @@ export default function BankAccountCreate({ glAccounts }: Props) {
                                         <SelectItem value="credit_card">Credit Card</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                {errors.account_type && <p className="text-sm text-red-600">{errors.account_type}</p>}
+                                {errors.account_type && <p className="text-sm text-status-critical">{errors.account_type}</p>}
                             </div>
 
                             <div className="space-y-2">
@@ -125,7 +125,7 @@ export default function BankAccountCreate({ glAccounts }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.gl_account_id && <p className="text-sm text-red-600">{errors.gl_account_id}</p>}
+                                {errors.gl_account_id && <p className="text-sm text-status-critical">{errors.gl_account_id}</p>}
                             </div>
 
                             <div className="space-y-2">
@@ -137,7 +137,7 @@ export default function BankAccountCreate({ glAccounts }: Props) {
                                     value={data.opening_balance}
                                     onChange={(e) => setData('opening_balance', e.target.value)}
                                 />
-                                {errors.opening_balance && <p className="text-sm text-red-600">{errors.opening_balance}</p>}
+                                {errors.opening_balance && <p className="text-sm text-status-critical">{errors.opening_balance}</p>}
                             </div>
 
                             <div className="flex items-center justify-between">

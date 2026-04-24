@@ -110,7 +110,7 @@ export default function RespondSurvey({ survey }: Props) {
                                                 onClick={() => setAnswer(question.id, 'answer_rating', val)}
                                                 className={`h-10 w-10 rounded-lg border text-sm font-medium transition-colors ${
                                                     answers[question.id]?.answer_rating === val
-                                                        ? 'border-blue-500 bg-blue-500 text-white'
+                                                        ? 'border-status-info/30 bg-status-info text-white'
                                                         : 'hover:bg-muted'
                                                 }`}
                                             >
@@ -132,10 +132,10 @@ export default function RespondSurvey({ survey }: Props) {
                                                     className={`h-10 w-10 rounded-lg border text-sm font-medium transition-colors ${
                                                         answers[question.id]?.answer_rating === val
                                                             ? val <= 6
-                                                                ? 'border-red-500 bg-red-500 text-white'
+                                                                ? 'border-status-critical/30 bg-status-critical text-white'
                                                                 : val <= 8
-                                                                  ? 'border-yellow-500 bg-yellow-500 text-white'
-                                                                  : 'border-emerald-500 bg-emerald-500 text-white'
+                                                                  ? 'border-status-warning/30 bg-status-warning text-white'
+                                                                  : 'border-status-success/30 bg-status-success text-white'
                                                             : 'hover:bg-muted'
                                                     }`}
                                                 >
@@ -166,7 +166,7 @@ export default function RespondSurvey({ survey }: Props) {
                                                 key={oIndex}
                                                 className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
                                                     answers[question.id]?.answer_choice === option
-                                                        ? 'border-blue-500 bg-blue-500/5'
+                                                        ? 'border-status-info/30 bg-status-info'
                                                         : 'hover:bg-muted'
                                                 }`}
                                             >

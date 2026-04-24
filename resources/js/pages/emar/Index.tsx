@@ -179,9 +179,9 @@ const severityIcon: Record<string, typeof Info> = {
 };
 
 const severityColor: Record<string, string> = {
-    info: 'text-blue-500',
-    warning: 'text-amber-500',
-    critical: 'text-red-500',
+    info: 'text-status-info',
+    warning: 'text-status-warning',
+    critical: 'text-status-critical',
 };
 
 const statusIcon: Record<string, typeof CheckCircle> = {
@@ -193,11 +193,11 @@ const statusIcon: Record<string, typeof CheckCircle> = {
 };
 
 const statusColor: Record<string, string> = {
-    given: 'text-emerald-500',
-    refused: 'text-amber-500',
-    missed: 'text-red-500',
+    given: 'text-status-success',
+    refused: 'text-status-warning',
+    missed: 'text-status-critical',
     withheld: 'text-muted-foreground',
-    pending: 'text-blue-500',
+    pending: 'text-status-info',
 };
 
 export default function EmarDashboard({ stats, trend, overdueMedications, nextRound, clientStatuses, recentActivity, activeAlertsList, compliance }: Props) {
@@ -278,16 +278,16 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                 {/* ── Overdue Medications Alert + Upcoming Round ────── */}
                 <div className="mb-6 grid gap-4 lg:grid-cols-2">
                     {overdueMedications.length > 0 && (
-                        <Card className="border-red-300 dark:border-red-800">
+                        <Card className="border-status-critical/30 dark:border-status-critical/30">
                             <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
+                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-status-critical dark:text-status-critical">
                                     <AlertCircle className="h-4 w-4" />
                                     Overdue Medications ({overdueMedications.length})
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 {overdueMedications.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-red-100 bg-red-50/50 p-2.5 dark:border-red-900/40 dark:bg-red-950/20">
+                                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-status-critical/30 bg-status-critical-bg p-2.5 dark:border-status-critical/40 dark:bg-status-critical">
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-medium">
                                                 {item.client ? `${item.client.first_name} ${item.client.last_name}` : 'Unknown Client'}
@@ -310,7 +310,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     <Card className={overdueMedications.length === 0 ? 'lg:col-span-2 max-w-md' : ''}>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <Play className="h-4 w-4 text-blue-500" />
+                                <Play className="h-4 w-4 text-status-info" />
                                 Upcoming Round
                             </CardTitle>
                         </CardHeader>
@@ -334,7 +334,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center py-4 text-center">
-                                    <CheckCircle className="mb-2 h-6 w-6 text-emerald-500" />
+                                    <CheckCircle className="mb-2 h-6 w-6 text-status-success" />
                                     <p className="text-sm text-muted-foreground">No rounds pending today</p>
                                 </div>
                             )}
@@ -419,7 +419,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                <AlertTriangle className="h-4 w-4 text-status-warning" />
                                 Needs Attention
                             </CardTitle>
                         </CardHeader>
@@ -433,8 +433,8 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                             )}
                             {totalAlerts === 0 && stats.prnNearLimit === 0 && (
                                 <div className="flex flex-col items-center py-6 text-center">
-                                    <CheckCircle className="mb-2 h-8 w-8 text-emerald-500" />
-                                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">All Clear</p>
+                                    <CheckCircle className="mb-2 h-8 w-8 text-status-success" />
+                                    <p className="text-sm font-medium text-status-success dark:text-status-success">All Clear</p>
                                     <p className="text-xs text-muted-foreground">No outstanding issues.</p>
                                 </div>
                             )}
@@ -457,10 +457,10 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                     const allDone = cs.pending_today === 0 && cs.missed_today === 0 && cs.given_today > 0;
                                     const hasMissed = cs.missed_today > 0;
                                     const borderClass = hasMissed
-                                        ? 'border-red-300 dark:border-red-800'
+                                        ? 'border-status-critical/30 dark:border-status-critical/30'
                                         : allDone
-                                          ? 'border-emerald-300 dark:border-emerald-800'
-                                          : 'border-amber-300 dark:border-amber-800';
+                                          ? 'border-status-success/30 dark:border-status-success/30'
+                                          : 'border-status-warning/30 dark:border-status-warning/30';
                                     return (
                                         <Link
                                             key={cs.id}
@@ -478,17 +478,17 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                                     {cs.active_medications_count} meds
                                                 </Badge>
                                                 {cs.given_today > 0 && (
-                                                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-[10px] px-1.5 py-0">
+                                                    <Badge className="bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success text-[10px] px-1.5 py-0">
                                                         {cs.given_today} given
                                                     </Badge>
                                                 )}
                                                 {cs.pending_today > 0 && (
-                                                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 text-[10px] px-1.5 py-0">
+                                                    <Badge className="bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning text-[10px] px-1.5 py-0">
                                                         {cs.pending_today} pending
                                                     </Badge>
                                                 )}
                                                 {cs.missed_today > 0 && (
-                                                    <Badge className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 text-[10px] px-1.5 py-0">
+                                                    <Badge className="bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical text-[10px] px-1.5 py-0">
                                                         {cs.missed_today} missed
                                                     </Badge>
                                                 )}
@@ -507,7 +507,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <Bell className="h-4 w-4 text-amber-500" />
+                                <Bell className="h-4 w-4 text-status-warning" />
                                 Active Alerts
                             </CardTitle>
                         </CardHeader>
@@ -542,7 +542,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center py-6 text-center">
-                                    <CheckCircle className="mb-2 h-6 w-6 text-emerald-500" />
+                                    <CheckCircle className="mb-2 h-6 w-6 text-status-success" />
                                     <p className="text-sm text-muted-foreground">No active alerts</p>
                                 </div>
                             )}
@@ -553,7 +553,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <Activity className="h-4 w-4 text-blue-500" />
+                                <Activity className="h-4 w-4 text-status-info" />
                                 Recent Activity
                             </CardTitle>
                         </CardHeader>
@@ -604,26 +604,26 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     <CardContent>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <Link href="/emar/competency" className="group block">
-                                <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 transition-all hover:shadow-sm dark:border-amber-800 dark:bg-amber-950/20">
-                                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{compliance.competencyExpiring}</p>
+                                <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 transition-all hover:shadow-sm dark:border-status-warning/30 dark:bg-status-warning">
+                                    <p className="text-2xl font-bold text-status-warning dark:text-status-warning">{compliance.competencyExpiring}</p>
                                     <p className="text-xs text-muted-foreground">Competency Expiring (30d)</p>
                                 </div>
                             </Link>
                             <Link href="/emar/competency" className="group block">
-                                <div className="rounded-lg border border-red-200 bg-red-50/50 p-3 transition-all hover:shadow-sm dark:border-red-800 dark:bg-red-950/20">
-                                    <p className="text-2xl font-bold text-red-700 dark:text-red-400">{compliance.competencyExpired}</p>
+                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 transition-all hover:shadow-sm dark:border-status-critical/30 dark:bg-status-critical">
+                                    <p className="text-2xl font-bold text-status-critical dark:text-status-critical">{compliance.competencyExpired}</p>
                                     <p className="text-xs text-muted-foreground">Competency Expired</p>
                                 </div>
                             </Link>
                             <Link href="/emar/reviews" className="group block">
-                                <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 transition-all hover:shadow-sm dark:border-blue-800 dark:bg-blue-950/20">
-                                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{compliance.pendingReviews}</p>
+                                <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 transition-all hover:shadow-sm dark:border-status-info/30 dark:bg-status-info">
+                                    <p className="text-2xl font-bold text-status-info dark:text-status-info">{compliance.pendingReviews}</p>
                                     <p className="text-xs text-muted-foreground">Pending Reviews</p>
                                 </div>
                             </Link>
                             <Link href="/emar/reviews" className="group block">
-                                <div className="rounded-lg border border-red-200 bg-red-50/50 p-3 transition-all hover:shadow-sm dark:border-red-800 dark:bg-red-950/20">
-                                    <p className="text-2xl font-bold text-red-700 dark:text-red-400">{compliance.overdueReviews}</p>
+                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 transition-all hover:shadow-sm dark:border-status-critical/30 dark:bg-status-critical">
+                                    <p className="text-2xl font-bold text-status-critical dark:text-status-critical">{compliance.overdueReviews}</p>
                                     <p className="text-xs text-muted-foreground">Overdue Reviews</p>
                                 </div>
                             </Link>
@@ -650,9 +650,9 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                             {[
                                 { label: 'Record Administration', href: '/emar/mar', icon: Syringe, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
                                 { label: 'PRN Review', href: '/emar/prn', icon: ClipboardCheck, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
-                                { label: 'Stock Check', href: '/emar/stock', icon: Package, color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' },
-                                { label: 'New Prescription', href: '/emar/prescriptions', icon: FileText, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
-                                { label: 'Handover', href: '/emar/handovers', icon: ArrowRightLeft, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+                                { label: 'Stock Check', href: '/emar/stock', icon: Package, color: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
+                                { label: 'New Prescription', href: '/emar/prescriptions', icon: FileText, color: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' },
+                                { label: 'Handover', href: '/emar/handovers', icon: ArrowRightLeft, color: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
                             ].map((item) => {
                                 const Icon = item.icon;
                                 return (
@@ -680,9 +680,9 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                     <CardContent>
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                             {[
-                                { title: 'Daily Overview', href: '/emar/daily', icon: Activity, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+                                { title: 'Daily Overview', href: '/emar/daily', icon: Activity, color: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
                                 { title: 'MAR Charts', href: '/emar/mar', icon: Pill, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
-                                { title: 'Controlled Drugs', href: '/emar/controlled', icon: Lock, color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+                                { title: 'Controlled Drugs', href: '/emar/controlled', icon: Lock, color: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
                                 { title: 'Reports', href: '/emar/reports', icon: TrendingUp, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
                             ].map((item) => {
                                 const Icon = item.icon;

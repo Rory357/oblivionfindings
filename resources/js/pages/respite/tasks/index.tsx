@@ -16,19 +16,19 @@ type Props = {
 
 const priorityColors: Record<string, string> = {
     low: 'bg-muted text-foreground',
-    medium: 'bg-blue-100 text-blue-800',
-    high: 'bg-orange-100 text-orange-800',
-    urgent: 'bg-red-100 text-red-800',
+    medium: 'bg-status-info-bg text-status-info',
+    high: 'bg-status-warning-bg text-status-warning',
+    urgent: 'bg-status-critical-bg text-status-critical',
 };
 
 const statusColors: Record<string, string> = {
     pending: 'bg-muted text-foreground',
-    assigned: 'bg-blue-100 text-blue-800',
+    assigned: 'bg-status-info-bg text-status-info',
     in_progress: 'bg-primary/10 text-primary',
-    completed: 'bg-green-100 text-green-800',
-    submitted_for_approval: 'bg-amber-100 text-amber-800',
-    approved: 'bg-green-100 text-green-800',
-    rejected: 'bg-red-100 text-red-800',
+    completed: 'bg-status-success-bg text-status-success',
+    submitted_for_approval: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-success-bg text-status-success',
+    rejected: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function TasksIndex({ tasks, staff, filters }: Props) {

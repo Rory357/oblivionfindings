@@ -190,7 +190,7 @@ export default function EditDisciplinary({
                         </Button>
                     </Link>
                     <div className="flex items-center gap-3">
-                        <AlertTriangle className="h-6 w-6 text-red-500" />
+                        <AlertTriangle className="h-6 w-6 text-status-critical" />
                         <div>
                             <h1 className="text-2xl font-bold">Edit Disciplinary Action</h1>
                             <p className="text-muted-foreground">
@@ -204,8 +204,8 @@ export default function EditDisciplinary({
                 </div>
 
                 {goodFaithError || stageError ? (
-                    <Card className="border-red-200 bg-red-50">
-                        <CardContent className="py-3 text-sm text-red-700">
+                    <Card className="border-status-critical/30 bg-status-critical-bg">
+                        <CardContent className="py-3 text-sm text-status-critical">
                             {Array.isArray(goodFaithError)
                                 ? goodFaithError.join(' ')
                                 : goodFaithError || (Array.isArray(stageError) ? stageError.join(' ') : stageError)}
@@ -234,7 +234,7 @@ export default function EditDisciplinary({
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.employee_user_id ? <p className="text-sm text-red-500">{errors.employee_user_id}</p> : null}
+                                    {errors.employee_user_id ? <p className="text-sm text-status-critical">{errors.employee_user_id}</p> : null}
                                 </div>
 
                                 <div className="space-y-2">
@@ -251,7 +251,7 @@ export default function EditDisciplinary({
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.action_type ? <p className="text-sm text-red-500">{errors.action_type}</p> : null}
+                                    {errors.action_type ? <p className="text-sm text-status-critical">{errors.action_type}</p> : null}
                                 </div>
                             </div>
 
@@ -263,7 +263,7 @@ export default function EditDisciplinary({
                                     value={data.allegation_summary}
                                     onChange={(event) => setData('allegation_summary', event.target.value)}
                                 />
-                                {errors.allegation_summary ? <p className="text-sm text-red-500">{errors.allegation_summary}</p> : null}
+                                {errors.allegation_summary ? <p className="text-sm text-status-critical">{errors.allegation_summary}</p> : null}
                             </div>
 
                             <div className="space-y-2">
@@ -412,7 +412,7 @@ export default function EditDisciplinary({
                                 </label>
                             ))}
                             {errors.good_faith_checklist ? (
-                                <p className="text-sm text-red-500">{errors.good_faith_checklist}</p>
+                                <p className="text-sm text-status-critical">{errors.good_faith_checklist}</p>
                             ) : null}
                         </CardContent>
                     </Card>

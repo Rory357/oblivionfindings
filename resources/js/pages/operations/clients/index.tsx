@@ -172,8 +172,8 @@ export default function ClientsIndex({ clients }) {
                                             <span
                                                 className={`inline-block h-1.5 w-1.5 rounded-full ${
                                                     isActive
-                                                        ? 'bg-emerald-500 ring-2 ring-emerald-500/20'
-                                                        : 'bg-slate-400 ring-2 ring-slate-400/20'
+                                                        ? 'bg-status-success ring-2 ring-status-success/20'
+                                                        : 'bg-muted ring-2 ring-slate-400/20'
                                                 }`}
                                             />
                                             <span className="capitalize text-muted-foreground">

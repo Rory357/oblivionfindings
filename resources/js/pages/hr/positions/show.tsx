@@ -76,11 +76,11 @@ export default function ShowPosition({ position, can }: Props) {
                             <p className="text-sm text-muted-foreground font-mono">{position.code}</p>
                         </div>
                         {position.is_active ? (
-                            <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                            <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success">
                                 Active
                             </Badge>
                         ) : (
-                            <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10">
+                            <Badge variant="outline" className="border-status-critical/30 text-status-critical bg-status-critical">
                                 Inactive
                             </Badge>
                         )}
@@ -160,7 +160,7 @@ export default function ShowPosition({ position, can }: Props) {
                                 <p className="text-sm text-muted-foreground">Vacancies</p>
                                 <p className="text-2xl font-bold">
                                     {vacancies > 0 ? (
-                                        <span className="text-blue-400">{vacancies}</span>
+                                        <span className="text-status-info">{vacancies}</span>
                                     ) : (
                                         <span className="text-muted-foreground">0</span>
                                     )}

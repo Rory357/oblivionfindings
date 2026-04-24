@@ -225,9 +225,9 @@ export default function ChecklistsIndex({ templates, recent_runs, can }: Props) 
                                     <div key={run.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
                                         <div className="flex items-center gap-3">
                                             {run.passed ? (
-                                                <CheckCircle className="h-5 w-5 text-green-500" />
+                                                <CheckCircle className="h-5 w-5 text-status-success" />
                                             ) : (
-                                                <XCircle className="h-5 w-5 text-red-500" />
+                                                <XCircle className="h-5 w-5 text-status-critical" />
                                             )}
                                             <div>
                                                 <div className="font-medium">{run.template?.name ?? 'Unknown Template'}</div>

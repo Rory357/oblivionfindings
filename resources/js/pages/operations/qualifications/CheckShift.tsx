@@ -100,7 +100,7 @@ export default function QualificationCheckShift({ shift, results = [], allMandat
                                 const Icon = result.met ? CheckCircle2 : XCircle;
                                 return (
                                     <div key={result.requirement.id} className="flex items-start gap-3 rounded-lg border p-3">
-                                        <Icon className={result.met ? 'mt-0.5 h-5 w-5 text-emerald-600' : 'mt-0.5 h-5 w-5 text-red-600'} />
+                                        <Icon className={result.met ? 'mt-0.5 h-5 w-5 text-status-success' : 'mt-0.5 h-5 w-5 text-status-critical'} />
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-medium">{result.requirement.qualification_name}</p>

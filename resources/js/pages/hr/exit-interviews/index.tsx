@@ -71,7 +71,7 @@ function SatisfactionStars({ rating }: { rating: number | null }) {
             {[1, 2, 3, 4, 5].map((star) => (
                 <Star
                     key={star}
-                    className={`h-4 w-4 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'}`}
+                    className={`h-4 w-4 ${star <= rating ? 'fill-yellow-400 text-status-warning' : 'text-muted-foreground'}`}
                 />
             ))}
         </div>
@@ -167,8 +167,8 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                                             {interview.would_recommend === null
                                                 ? '-'
                                                 : interview.would_recommend
-                                                    ? <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">Yes</Badge>
-                                                    : <Badge className="border-red-500/30 bg-red-500/10 text-red-400">No</Badge>
+                                                    ? <Badge className="border-status-success/30 bg-status-success-bg text-status-success">Yes</Badge>
+                                                    : <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">No</Badge>
                                             }
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">

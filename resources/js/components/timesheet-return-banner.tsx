@@ -58,8 +58,8 @@ export function TimesheetReturnBanner({
         <div
             role="status"
             className={cn(
-                'flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50/80 p-3 text-amber-900',
-                'dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100',
+                'flex flex-col gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-status-warning',
+                'dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
                 'sm:flex-row sm:items-start sm:justify-between',
                 className,
             )}
@@ -76,11 +76,11 @@ export function TimesheetReturnBanner({
                     </span>
                 </div>
                 {trimmedNote ? (
-                    <p className="whitespace-pre-wrap text-sm leading-snug text-amber-900/90 dark:text-amber-100/90">
+                    <p className="whitespace-pre-wrap text-sm leading-snug text-status-warning dark:text-status-warning">
                         {trimmedNote}
                     </p>
                 ) : (
-                    <p className="text-sm leading-snug text-amber-900/80 dark:text-amber-100/80">
+                    <p className="text-sm leading-snug text-status-warning dark:text-status-warning">
                         Your manager asked for a change. Open it, make the fix,
                         then resend for approval.
                     </p>
@@ -92,7 +92,7 @@ export function TimesheetReturnBanner({
                     <Button
                         asChild
                         size="sm"
-                        className="w-full bg-amber-600 text-white hover:bg-amber-700 focus-visible:ring-amber-500 sm:w-auto dark:bg-amber-500 dark:hover:bg-amber-400"
+                        className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:bg-status-warning dark:hover:bg-status-warning"
                     >
                         <Link href={href}>
                             Fix and resend

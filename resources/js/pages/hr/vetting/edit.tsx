@@ -122,13 +122,13 @@ export default function EditVetting({ check, staff, checkTypes, statuses, riskDe
 
                                 <div className="space-y-2">
                                     <Label htmlFor="check_type">
-                                        Check Type <span className="text-red-500">*</span>
+                                        Check Type <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.check_type}
                                         onValueChange={(value) => setData('check_type', value)}
                                     >
-                                        <SelectTrigger id="check_type" className={errors.check_type ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="check_type" className={errors.check_type ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select check type" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -140,19 +140,19 @@ export default function EditVetting({ check, staff, checkTypes, statuses, riskDe
                                         </SelectContent>
                                     </Select>
                                     {errors.check_type && (
-                                        <p className="text-sm text-red-500">{errors.check_type}</p>
+                                        <p className="text-sm text-status-critical">{errors.check_type}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="status">
-                                        Status <span className="text-red-500">*</span>
+                                        Status <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.status}
                                         onValueChange={(value) => setData('status', value)}
                                     >
-                                        <SelectTrigger id="status" className={errors.status ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="status" className={errors.status ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select status" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -164,7 +164,7 @@ export default function EditVetting({ check, staff, checkTypes, statuses, riskDe
                                         </SelectContent>
                                     </Select>
                                     {errors.status && (
-                                        <p className="text-sm text-red-500">{errors.status}</p>
+                                        <p className="text-sm text-status-critical">{errors.status}</p>
                                     )}
                                 </div>
 

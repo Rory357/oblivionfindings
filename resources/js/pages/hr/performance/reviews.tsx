@@ -77,10 +77,10 @@ const formatDate = (value?: string | null) => {
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-        case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
+        case 'completed': return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'scheduled': return 'bg-status-info-bg text-status-info border-status-info/30';
+        case 'in_progress': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'overdue': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         case 'draft': return 'bg-muted text-foreground border-border';
         case 'cancelled': return 'bg-muted text-muted-foreground border-border';
         default: return 'bg-muted text-foreground border-border';
@@ -94,7 +94,7 @@ const renderRating = (rating: number | null) => {
     const stars: ReactElement[] = [];
     for (let i = 1; i <= 5; i++) {
         stars.push(
-            <Star key={i} className={`h-4 w-4 ${i <= rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+            <Star key={i} className={`h-4 w-4 ${i <= rating ? 'fill-amber-400 text-status-warning' : 'text-foreground'}`} />
         );
     }
     return <div className="flex items-center gap-0.5">{stars}</div>;
@@ -102,9 +102,9 @@ const renderRating = (rating: number | null) => {
 
 const getRecommendationColor = (rec: string | null) => {
     switch (rec) {
-        case 'pass': return 'bg-green-100 text-green-800 border-green-200';
-        case 'extend': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        case 'fail': return 'bg-red-100 text-red-800 border-red-200';
+        case 'pass': return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'extend': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'fail': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         default: return 'bg-muted text-foreground border-border';
     }
 };
@@ -153,34 +153,34 @@ export default function PerformanceReviews({
                 {/* KPI Cards */}
                 {stats && (
                     <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-                        <Card className="border-l-4 border-l-blue-500 bg-blue-50/40">
+                        <Card className="border-l-4 border-l-blue-500 bg-status-info-bg">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-xs font-medium text-blue-700">Total Reviews</p>
-                                    <div className="rounded-full bg-blue-100 p-1.5"><ClipboardList className="h-4 w-4 text-blue-600" /></div>
+                                    <p className="text-xs font-medium text-status-info">Total Reviews</p>
+                                    <div className="rounded-full bg-status-info-bg p-1.5"><ClipboardList className="h-4 w-4 text-status-info" /></div>
                                 </div>
-                                <span className="mt-1.5 block text-2xl font-bold text-blue-900">{stats.total}</span>
+                                <span className="mt-1.5 block text-2xl font-bold text-status-info">{stats.total}</span>
                             </CardContent>
                         </Card>
-                        <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/40">
+                        <Card className="border-l-4 border-l-emerald-500 bg-status-success-bg">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-xs font-medium text-emerald-700">Completed</p>
-                                    <div className="rounded-full bg-emerald-100 p-1.5"><CheckCircle className="h-4 w-4 text-emerald-600" /></div>
+                                    <p className="text-xs font-medium text-status-success">Completed</p>
+                                    <div className="rounded-full bg-status-success-bg p-1.5"><CheckCircle className="h-4 w-4 text-status-success" /></div>
                                 </div>
-                                <span className="mt-1.5 block text-2xl font-bold text-emerald-900">{stats.completed}</span>
-                                {stats.total > 0 && <p className="mt-0.5 text-xs text-emerald-600">{Math.round((stats.completed / stats.total) * 100)}% completion rate</p>}
+                                <span className="mt-1.5 block text-2xl font-bold text-status-success">{stats.completed}</span>
+                                {stats.total > 0 && <p className="mt-0.5 text-xs text-status-success">{Math.round((stats.completed / stats.total) * 100)}% completion rate</p>}
                             </CardContent>
                         </Card>
-                        <Card className={`border-l-4 ${stats.overdue > 0 ? 'border-l-red-500 bg-red-50/50' : 'border-l-amber-500 bg-amber-50/40'}`}>
+                        <Card className={`border-l-4 ${stats.overdue > 0 ? 'border-l-red-500 bg-status-critical-bg' : 'border-l-amber-500 bg-status-warning-bg'}`}>
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                    <p className={`text-xs font-medium ${stats.overdue > 0 ? 'text-red-700' : 'text-amber-700'}`}>Overdue</p>
-                                    <div className={`rounded-full p-1.5 ${stats.overdue > 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
-                                        <AlertTriangle className={`h-4 w-4 ${stats.overdue > 0 ? 'text-red-600' : 'text-amber-600'}`} />
+                                    <p className={`text-xs font-medium ${stats.overdue > 0 ? 'text-status-critical' : 'text-status-warning'}`}>Overdue</p>
+                                    <div className={`rounded-full p-1.5 ${stats.overdue > 0 ? 'bg-status-critical-bg' : 'bg-status-warning-bg'}`}>
+                                        <AlertTriangle className={`h-4 w-4 ${stats.overdue > 0 ? 'text-status-critical' : 'text-status-warning'}`} />
                                     </div>
                                 </div>
-                                <span className={`mt-1.5 block text-2xl font-bold ${stats.overdue > 0 ? 'text-red-700' : 'text-amber-900'}`}>{stats.overdue}</span>
+                                <span className={`mt-1.5 block text-2xl font-bold ${stats.overdue > 0 ? 'text-status-critical' : 'text-status-warning'}`}>{stats.overdue}</span>
                             </CardContent>
                         </Card>
                         <Card className="border-l-4 border-l-slate-400 bg-muted/40">
@@ -202,7 +202,7 @@ export default function PerformanceReviews({
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                        <Star className="h-4 w-4 text-amber-500" /> Rating Distribution
+                                        <Star className="h-4 w-4 text-status-warning" /> Rating Distribution
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
@@ -226,7 +226,7 @@ export default function PerformanceReviews({
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                        <ClipboardList className="h-4 w-4 text-blue-500" /> Status Breakdown
+                                        <ClipboardList className="h-4 w-4 text-status-info" /> Status Breakdown
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
@@ -335,7 +335,7 @@ export default function PerformanceReviews({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <ShieldCheck className="h-4 w-4 text-blue-500" /> Probation Reviews
+                                <ShieldCheck className="h-4 w-4 text-status-info" /> Probation Reviews
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">

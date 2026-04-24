@@ -77,7 +77,7 @@ export default function FamilyPortalShow({ client }: Props) {
                                 const enabled = setting?.[key] ?? false;
                                 return (
                                     <div key={key} className="flex items-center gap-2">
-                                        <Icon className={`h-4 w-4 ${enabled ? 'text-green-600' : 'text-muted-foreground/40'}`} />
+                                        <Icon className={`h-4 w-4 ${enabled ? 'text-status-success' : 'text-muted-foreground/40'}`} />
                                         <span className={`text-sm ${enabled ? '' : 'text-muted-foreground/60'}`}>{label}</span>
                                         <Badge variant={enabled ? 'default' : 'outline'} className="ml-auto h-5 px-2 text-[10px]">
                                             {enabled ? 'Visible' : 'Hidden'}
@@ -97,7 +97,7 @@ export default function FamilyPortalShow({ client }: Props) {
                                 const enabled = setting?.[key] ?? false;
                                 return (
                                     <div key={key} className="flex items-center gap-2">
-                                        <Bell className={`h-4 w-4 ${enabled ? 'text-blue-600' : 'text-muted-foreground/40'}`} />
+                                        <Bell className={`h-4 w-4 ${enabled ? 'text-status-info' : 'text-muted-foreground/40'}`} />
                                         <span className={`text-sm ${enabled ? '' : 'text-muted-foreground/60'}`}>{label}</span>
                                         <Badge variant={enabled ? 'default' : 'outline'} className="ml-auto h-5 px-2 text-[10px]">
                                             {enabled ? 'On' : 'Off'}

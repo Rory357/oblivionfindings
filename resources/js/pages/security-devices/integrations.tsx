@@ -83,7 +83,7 @@ function connectionBadge(provider: Provider) {
     switch (provider.connection_status) {
         case 'connected':
             return (
-                <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600">
+                <Badge className="gap-1 bg-status-success text-white hover:bg-status-success">
                     <CheckCircle2 className="h-3 w-3" /> Connected
                 </Badge>
             );

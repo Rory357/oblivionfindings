@@ -22,12 +22,12 @@ import {
 /* ------------------------------------------------------------------ */
 
 const STAT_COLORS = {
-    blue: { bg: 'bg-blue-50 dark:bg-blue-500/10', icon: 'text-blue-600 dark:text-blue-400', ring: 'ring-blue-100 dark:ring-blue-500/20' },
-    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', icon: 'text-emerald-600 dark:text-emerald-400', ring: 'ring-emerald-100 dark:ring-emerald-500/20' },
-    amber: { bg: 'bg-amber-50 dark:bg-amber-500/10', icon: 'text-amber-600 dark:text-amber-400', ring: 'ring-amber-100 dark:ring-amber-500/20' },
-    red: { bg: 'bg-red-50 dark:bg-red-500/10', icon: 'text-red-600 dark:text-red-400', ring: 'ring-red-100 dark:ring-red-500/20' },
+    blue: { bg: 'bg-status-info-bg dark:bg-status-info', icon: 'text-status-info dark:text-status-info', ring: 'ring-status-info dark:ring-status-info/20' },
+    emerald: { bg: 'bg-status-success-bg dark:bg-status-success', icon: 'text-status-success dark:text-status-success', ring: 'ring-status-success dark:ring-status-success/20' },
+    amber: { bg: 'bg-status-warning-bg dark:bg-status-warning', icon: 'text-status-warning dark:text-status-warning', ring: 'ring-status-warning dark:ring-status-warning/20' },
+    red: { bg: 'bg-status-critical-bg dark:bg-status-critical', icon: 'text-status-critical dark:text-status-critical', ring: 'ring-status-critical dark:ring-status-critical/20' },
     purple: { bg: 'bg-primary/10 dark:bg-primary/10', icon: 'text-primary dark:text-primary', ring: 'ring-ring dark:ring-ring/20' },
-    slate: { bg: 'bg-muted dark:bg-slate-500/10', icon: 'text-muted-foreground dark:text-muted-foreground', ring: 'ring-slate-100 dark:ring-slate-500/20' },
+    slate: { bg: 'bg-muted dark:bg-muted-foreground/80/10', icon: 'text-muted-foreground dark:text-muted-foreground', ring: 'ring-slate-100 dark:ring-slate-500/20' },
 };
 
 function StatCard({ label, value, subtitle, icon: Icon, color }: { label: string; value: number | string; subtitle?: string; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {

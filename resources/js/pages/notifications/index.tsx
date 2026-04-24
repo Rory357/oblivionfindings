@@ -85,11 +85,11 @@ interface Props {
 
 const MODULE_COLOURS: Record<string, { border: string; bg: string; text: string; icon: typeof Bell; dot: string }> = {
     operations: { border: 'border-l-violet-500', bg: 'bg-primary/10 dark:bg-primary/30', text: 'text-primary dark:text-primary/70', icon: ClipboardList, dot: 'bg-primary' },
-    hr: { border: 'border-l-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', icon: Users, dot: 'bg-blue-500' },
-    governance: { border: 'border-l-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', icon: ShieldAlert, dot: 'bg-emerald-500' },
-    sites: { border: 'border-l-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', icon: Building2, dot: 'bg-amber-500' },
-    incidents: { border: 'border-l-red-500', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', icon: TriangleAlert, dot: 'bg-red-500' },
-    system: { border: 'border-l-slate-500', bg: 'bg-muted dark:bg-muted/30', text: 'text-foreground dark:text-muted-foreground', icon: Wrench, dot: 'bg-slate-500' },
+    hr: { border: 'border-l-blue-500', bg: 'bg-status-info-bg dark:bg-status-info', text: 'text-status-info dark:text-status-info', icon: Users, dot: 'bg-status-info' },
+    governance: { border: 'border-l-emerald-500', bg: 'bg-status-success-bg dark:bg-status-success', text: 'text-status-success dark:text-status-success', icon: ShieldAlert, dot: 'bg-status-success' },
+    sites: { border: 'border-l-amber-500', bg: 'bg-status-warning-bg dark:bg-status-warning', text: 'text-status-warning dark:text-status-warning', icon: Building2, dot: 'bg-status-warning' },
+    incidents: { border: 'border-l-red-500', bg: 'bg-status-critical-bg dark:bg-status-critical', text: 'text-status-critical dark:text-status-critical', icon: TriangleAlert, dot: 'bg-status-critical' },
+    system: { border: 'border-l-slate-500', bg: 'bg-muted dark:bg-muted/30', text: 'text-foreground dark:text-muted-foreground', icon: Wrench, dot: 'bg-muted-foreground/80' },
 };
 
 function getModuleStyle(module?: string) {
@@ -258,24 +258,24 @@ export default function NotificationsIndex({
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-emerald-200 dark:border-emerald-800">
+                    <Card className="border-status-success/30 dark:border-status-success/30">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                                <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success-bg dark:bg-status-success">
+                                <CheckCircle2 className="h-5 w-5 text-status-success dark:text-status-success" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{acknowledged}</p>
+                                <p className="text-2xl font-bold text-status-success dark:text-status-success">{acknowledged}</p>
                                 <p className="text-xs font-medium text-muted-foreground">Acknowledged</p>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-amber-200 dark:border-amber-800">
+                    <Card className="border-status-warning/30 dark:border-status-warning/30">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                                <TriangleAlert className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg dark:bg-status-warning">
+                                <TriangleAlert className="h-5 w-5 text-status-warning dark:text-status-warning" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{requiresAction}</p>
+                                <p className="text-2xl font-bold text-status-warning dark:text-status-warning">{requiresAction}</p>
                                 <p className="text-xs font-medium text-muted-foreground">Requires Action</p>
                             </div>
                         </CardContent>
@@ -301,7 +301,7 @@ export default function NotificationsIndex({
                                     <Megaphone className="mr-1.5 h-4 w-4" />
                                     Announcements
                                     {announcementList.length > 0 && (
-                                        <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs">
+                                        <Badge variant="secondary" className="ml-2 bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info text-xs">
                                             {announcementList.length}
                                         </Badge>
                                     )}
@@ -376,7 +376,7 @@ export default function NotificationsIndex({
                                 {/* Notification cards */}
                                 {filteredNotifData.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
-                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-900/30 dark:to-indigo-900/30">
+                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 dark:from-primary/30 dark:to-primary/30">
                                             <BellOff className="h-10 w-10 text-primary dark:text-primary" />
                                         </div>
                                         <h3 className="text-xl font-semibold text-foreground">All caught up!</h3>
@@ -441,7 +441,7 @@ export default function NotificationsIndex({
                                                                         {(n.data?.module ?? 'system').charAt(0).toUpperCase() + (n.data?.module ?? 'system').slice(1)}
                                                                     </Badge>
                                                                     {needsAck && (
-                                                                        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                                                                        <Badge className="bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                                                                             Acknowledge Required
                                                                         </Badge>
                                                                     )}
@@ -461,7 +461,7 @@ export default function NotificationsIndex({
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
-                                                                            className="h-7 border-amber-300 px-2 text-xs text-amber-700 hover:bg-amber-50"
+                                                                            className="h-7 border-status-warning/30 px-2 text-xs text-status-warning hover:bg-status-warning-bg"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 acknowledge(n.id);
@@ -520,8 +520,8 @@ export default function NotificationsIndex({
                             <TabsContent value="announcements" className="mt-6">
                                 {announcementList.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
-                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30">
-                                            <Megaphone className="h-10 w-10 text-blue-400 dark:text-blue-500" />
+                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 dark:from-status-info/30 dark:to-primary/30">
+                                            <Megaphone className="h-10 w-10 text-status-info dark:text-status-info" />
                                         </div>
                                         <h3 className="text-xl font-semibold text-foreground">No announcements</h3>
                                         <p className="mt-2 text-sm text-muted-foreground">Check back later for updates.</p>

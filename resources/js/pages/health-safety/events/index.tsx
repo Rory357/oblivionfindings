@@ -83,7 +83,7 @@ export default function HsEventsIndex({ events, filters }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-info text-white">
                             <Shield className="h-5 w-5" />
                         </div>
                         <div>
@@ -162,7 +162,7 @@ export default function HsEventsIndex({ events, filters }: Props) {
                                 {events.data.map(event => (
                                     <tr key={event.id} className="hover:bg-muted/30">
                                         <td className="px-4 py-3">
-                                            <Link href={`/health-safety/events/${event.id}`} className="font-medium text-blue-600 hover:underline">
+                                            <Link href={`/health-safety/events/${event.id}`} className="font-medium text-status-info hover:underline">
                                                 {event.reference_number}
                                             </Link>
                                         </td>
@@ -184,12 +184,12 @@ export default function HsEventsIndex({ events, filters }: Props) {
                                         <td className="px-4 py-3">
                                             <div className="flex gap-1.5">
                                                 {event.worksafe_notifiable && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 border border-red-200" title="WorkSafe Notifiable">
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2 py-0.5 text-xs font-medium text-status-critical border border-status-critical/30" title="WorkSafe Notifiable">
                                                         <ShieldAlert className="h-3 w-3" /> WorkSafe
                                                     </span>
                                                 )}
                                                 {event.has_open_actions && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 border border-amber-200" title="Has open corrective actions">
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5 text-xs font-medium text-status-warning border border-status-warning/30" title="Has open corrective actions">
                                                         <Clock className="h-3 w-3" /> Actions
                                                     </span>
                                                 )}

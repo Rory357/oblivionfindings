@@ -50,30 +50,30 @@ const HAZARD_TYPE_ICONS: Record<string, typeof AlertTriangle> = {
 };
 
 const HAZARD_TYPE_COLORS: Record<string, string> = {
-    slip_trip_fall: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
-    fire: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100',
+    slip_trip_fall: 'border-status-warning/30 bg-status-warning-bg text-status-warning hover:bg-status-warning-bg',
+    fire: 'border-status-critical/30 bg-status-critical-bg text-status-critical hover:bg-status-critical-bg',
     chemical: 'border-primary bg-primary/10 text-primary hover:bg-primary/10',
-    electrical: 'border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100',
-    manual_handling: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
-    biological: 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100',
+    electrical: 'border-status-warning/30 bg-status-warning-bg text-status-warning hover:bg-status-warning-bg',
+    manual_handling: 'border-status-info/30 bg-status-info-bg text-status-info hover:bg-status-info-bg',
+    biological: 'border-status-success/30 bg-status-success-bg text-status-success hover:bg-status-success-bg',
     vehicle: 'border-border bg-muted text-foreground hover:bg-muted',
-    environmental: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100',
+    environmental: 'border-status-info/30 bg-status-info-bg text-status-info hover:bg-status-info-bg',
     custom: 'border-border bg-muted text-foreground hover:bg-muted',
 };
 
 const SEVERITY_OPTIONS = [
-    { value: 'low', label: 'Low', color: 'border-emerald-300 bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500', selectedBg: 'bg-emerald-100 ring-2 ring-emerald-500' },
-    { value: 'medium', label: 'Medium', color: 'border-amber-300 bg-amber-50 text-amber-700', dot: 'bg-amber-500', selectedBg: 'bg-amber-100 ring-2 ring-amber-500' },
-    { value: 'high', label: 'High', color: 'border-orange-300 bg-orange-50 text-orange-700', dot: 'bg-orange-500', selectedBg: 'bg-orange-100 ring-2 ring-orange-500' },
-    { value: 'critical', label: 'Critical', color: 'border-red-300 bg-red-50 text-red-700', dot: 'bg-red-500', selectedBg: 'bg-red-100 ring-2 ring-red-500' },
+    { value: 'low', label: 'Low', color: 'border-status-success/30 bg-status-success-bg text-status-success', dot: 'bg-status-success', selectedBg: 'bg-status-success-bg ring-2 ring-status-success' },
+    { value: 'medium', label: 'Medium', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning', dot: 'bg-status-warning', selectedBg: 'bg-status-warning-bg ring-2 ring-status-warning' },
+    { value: 'high', label: 'High', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning', dot: 'bg-status-warning', selectedBg: 'bg-status-warning-bg ring-2 ring-status-warning' },
+    { value: 'critical', label: 'Critical', color: 'border-status-critical/30 bg-status-critical-bg text-status-critical', dot: 'bg-status-critical', selectedBg: 'bg-status-critical-bg ring-2 ring-status-critical' },
 ];
 
 const LIKELIHOOD_OPTIONS = [
-    { value: 'rare', label: 'Rare', color: 'border-emerald-300 bg-emerald-50 text-emerald-700', selectedBg: 'bg-emerald-100 ring-2 ring-emerald-500' },
-    { value: 'unlikely', label: 'Unlikely', color: 'border-blue-300 bg-blue-50 text-blue-700', selectedBg: 'bg-blue-100 ring-2 ring-blue-500' },
-    { value: 'possible', label: 'Possible', color: 'border-amber-300 bg-amber-50 text-amber-700', selectedBg: 'bg-amber-100 ring-2 ring-amber-500' },
-    { value: 'likely', label: 'Likely', color: 'border-orange-300 bg-orange-50 text-orange-700', selectedBg: 'bg-orange-100 ring-2 ring-orange-500' },
-    { value: 'almost_certain', label: 'Almost Certain', color: 'border-red-300 bg-red-50 text-red-700', selectedBg: 'bg-red-100 ring-2 ring-red-500' },
+    { value: 'rare', label: 'Rare', color: 'border-status-success/30 bg-status-success-bg text-status-success', selectedBg: 'bg-status-success-bg ring-2 ring-status-success' },
+    { value: 'unlikely', label: 'Unlikely', color: 'border-status-info/30 bg-status-info-bg text-status-info', selectedBg: 'bg-status-info-bg ring-2 ring-status-info' },
+    { value: 'possible', label: 'Possible', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning', selectedBg: 'bg-status-warning-bg ring-2 ring-status-warning' },
+    { value: 'likely', label: 'Likely', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning', selectedBg: 'bg-status-warning-bg ring-2 ring-status-warning' },
+    { value: 'almost_certain', label: 'Almost Certain', color: 'border-status-critical/30 bg-status-critical-bg text-status-critical', selectedBg: 'bg-status-critical-bg ring-2 ring-status-critical' },
 ];
 
 const RISK_MATRIX: Record<string, Record<string, string>> = {
@@ -84,10 +84,10 @@ const RISK_MATRIX: Record<string, Record<string, string>> = {
 };
 
 const riskRatingColors: Record<string, { bg: string; text: string; border: string }> = {
-    low: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300' },
-    medium: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300' },
-    high: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-300' },
-    extreme: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-300' },
+    low: { bg: 'bg-status-success-bg', text: 'text-status-success', border: 'border-status-success/30' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-status-warning/30' },
+    high: { bg: 'bg-status-warning-bg', text: 'text-status-warning', border: 'border-status-warning/30' },
+    extreme: { bg: 'bg-status-critical-bg', text: 'text-status-critical', border: 'border-status-critical/30' },
 };
 
 const riskRatingMessages: Record<string, string> = {
@@ -128,10 +128,10 @@ export default function CreateHazard() {
     const likKeys = ['rare', 'unlikely', 'possible', 'likely', 'almost_certain'];
     const matrixCellColor = (rating: string) => {
         switch (rating) {
-            case 'extreme': return 'bg-red-500 text-white';
-            case 'high': return 'bg-orange-400 text-white';
-            case 'medium': return 'bg-amber-300 text-amber-900';
-            default: return 'bg-emerald-200 text-emerald-900';
+            case 'extreme': return 'bg-status-critical text-white';
+            case 'high': return 'bg-status-warning text-white';
+            case 'medium': return 'bg-status-warning-bg text-status-warning';
+            default: return 'bg-status-success-bg text-status-success';
         }
     };
 
@@ -143,7 +143,7 @@ export default function CreateHazard() {
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                             <AlertTriangle className="h-5 w-5" />
                         </div>
                         <div>
@@ -198,7 +198,7 @@ export default function CreateHazard() {
                                         );
                                     })}
                                 </div>
-                                {errors.hazard_type && <p className="text-sm text-red-600">{errors.hazard_type}</p>}
+                                {errors.hazard_type && <p className="text-sm text-status-critical">{errors.hazard_type}</p>}
                             </div>
 
                             {isCustomType && (
@@ -209,7 +209,7 @@ export default function CreateHazard() {
                                         onChange={(e) => setData('custom_hazard_type', e.target.value)}
                                         placeholder="Describe the hazard type"
                                     />
-                                    {errors.custom_hazard_type && <p className="text-sm text-red-600">{errors.custom_hazard_type}</p>}
+                                    {errors.custom_hazard_type && <p className="text-sm text-status-critical">{errors.custom_hazard_type}</p>}
                                 </div>
                             )}
                         </CardContent>
@@ -346,7 +346,7 @@ export default function CreateHazard() {
                                     rows={4}
                                     placeholder="Describe the hazard in detail..."
                                 />
-                                {errors.description && <p className="text-sm text-red-600">{errors.description}</p>}
+                                {errors.description && <p className="text-sm text-status-critical">{errors.description}</p>}
                             </div>
                         </CardContent>
                     </Card>
@@ -403,7 +403,7 @@ export default function CreateHazard() {
                     </Card>
 
                     {/* Step 4: Immediate Action */}
-                    <Card className={`overflow-hidden transition-colors ${data.immediate_action_applied ? 'border-blue-300 bg-blue-50/30' : ''}`}>
+                    <Card className={`overflow-hidden transition-colors ${data.immediate_action_applied ? 'border-status-info/30 bg-status-info-bg' : ''}`}>
                         <CardHeader className="border-b bg-muted/30 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">4</div>
@@ -444,12 +444,12 @@ export default function CreateHazard() {
 
                     {/* Errors */}
                     {Object.keys(errors).length > 0 && (
-                        <div className="rounded-lg border border-red-300 bg-red-50 p-4">
+                        <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4">
                             <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-red-600" />
-                                <p className="text-sm font-semibold text-red-800">Please fix the following errors:</p>
+                                <AlertTriangle className="h-4 w-4 text-status-critical" />
+                                <p className="text-sm font-semibold text-status-critical">Please fix the following errors:</p>
                             </div>
-                            <ul className="mt-2 list-disc pl-6 text-sm text-red-700 space-y-0.5">
+                            <ul className="mt-2 list-disc pl-6 text-sm text-status-critical space-y-0.5">
                                 {Object.entries(errors).map(([field, message]) => (
                                     <li key={field}>{message}</li>
                                 ))}

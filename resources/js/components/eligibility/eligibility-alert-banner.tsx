@@ -24,7 +24,7 @@ export function EligibilityAlertBanner({
 
     if (type === 'blocked') {
         return (
-            <Alert variant="destructive" className={cn('border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/50', className)}>
+            <Alert variant="destructive" className={cn('border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical', className)}>
                 <ShieldAlert className="size-4" />
                 <AlertTitle>{title ?? 'This staff member cannot be assigned'}</AlertTitle>
                 <AlertDescription>
@@ -44,14 +44,14 @@ export function EligibilityAlertBanner({
     return (
         <Alert
             className={cn(
-                'border-yellow-300 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-300',
-                '[&>svg]:text-yellow-600 dark:[&>svg]:text-yellow-400',
+                'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning',
+                '[&>svg]:text-status-warning dark:[&>svg]:text-status-warning',
                 className,
             )}
         >
             <AlertTriangle className="size-4" />
             <AlertTitle>{title ?? 'Eligibility warnings'}</AlertTitle>
-            <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+            <AlertDescription className="text-status-warning dark:text-status-warning">
                 <ul className="mt-1 space-y-0.5">
                     {reasons.map((reason, i) => (
                         <li key={i} className="flex items-start gap-2">

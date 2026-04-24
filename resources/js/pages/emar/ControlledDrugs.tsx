@@ -924,8 +924,8 @@ export default function ControlledDrugs({
                             </div>
 
                             {hasBalanceDiscrepancy && (
-                                <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
-                                    <p className="mb-2 flex items-center gap-1 text-sm font-medium text-red-700 dark:text-red-400">
+                                <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 dark:border-status-critical/30 dark:bg-status-critical">
+                                    <p className="mb-2 flex items-center gap-1 text-sm font-medium text-status-critical dark:text-status-critical">
                                         <AlertTriangle className="h-3.5 w-3.5" />{' '}
                                         Discrepancy detected
                                     </p>
@@ -1394,9 +1394,9 @@ export default function ControlledDrugs({
 
                 {/* Discrepancy Alert */}
                 {discrepancies.length > 0 && (
-                    <Card className="mb-6 border-red-200 dark:border-red-800">
+                    <Card className="mb-6 border-status-critical/30 dark:border-status-critical/30">
                         <CardHeader className="pb-3">
-                            <CardTitle className="flex items-center gap-2 text-base text-red-700 dark:text-red-400">
+                            <CardTitle className="flex items-center gap-2 text-base text-status-critical dark:text-status-critical">
                                 <AlertTriangle className="h-4 w-4" /> Active
                                 Discrepancies ({discrepancies.length})
                             </CardTitle>
@@ -1758,7 +1758,7 @@ export default function ControlledDrugs({
                                                         </td>
                                                         <td className="p-3">
                                                             {overdue ? (
-                                                                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-300">
+                                                                <Badge className="bg-status-warning-bg text-status-warning hover:bg-status-warning-bg dark:bg-status-warning-bg dark:text-status-warning">
                                                                     <AlertTriangle className="mr-1 h-3 w-3" />
                                                                     {days !==
                                                                     null
@@ -2053,7 +2053,7 @@ export default function ControlledDrugs({
                                                     {r.reported_to_police ? (
                                                         <Badge
                                                             variant="outline"
-                                                            className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                                                            className="bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info"
                                                         >
                                                             <Shield className="mr-1 h-3 w-3" />{' '}
                                                             Yes

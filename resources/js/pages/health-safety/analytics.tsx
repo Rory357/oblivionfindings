@@ -31,19 +31,19 @@ type Props = {
 
 function severityBlockColor(s: string) {
     switch (s) {
-        case 'critical': return 'bg-red-100 border-red-300 text-red-800';
-        case 'high': return 'bg-orange-100 border-orange-300 text-orange-800';
-        case 'medium': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-        case 'low': return 'bg-blue-100 border-blue-300 text-blue-800';
+        case 'critical': return 'bg-status-critical-bg border-status-critical/30 text-status-critical';
+        case 'high': return 'bg-status-warning-bg border-status-warning/30 text-status-warning';
+        case 'medium': return 'bg-status-warning-bg border-status-warning/30 text-status-warning';
+        case 'low': return 'bg-status-info-bg border-status-info/30 text-status-info';
         default: return 'bg-muted border-border text-foreground';
     }
 }
 
 function drillStatusBadge(status: string) {
     switch (status) {
-        case 'compliant': return 'bg-green-100 text-green-800 border-green-200';
-        case 'due_soon': return 'bg-amber-100 text-amber-800 border-amber-200';
-        case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
+        case 'compliant': return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'due_soon': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'overdue': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
@@ -116,7 +116,7 @@ export default function HealthSafetyAnalytics({
                                     <span className="w-28 text-xs font-medium capitalize">{d.type.replace(/_/g, ' ')}</span>
                                     <div className="flex-1">
                                         <div
-                                            className="h-5 rounded bg-blue-500"
+                                            className="h-5 rounded bg-status-info"
                                             style={{ width: `${(d.count / maxIncidentCount) * 100}%`, minWidth: d.count > 0 ? '4px' : '0' }}
                                         />
                                     </div>
@@ -145,21 +145,21 @@ export default function HealthSafetyAnalytics({
                             {/* Near-miss vs Incident ratio */}
                             <div className="flex items-center justify-center gap-6 rounded-lg border bg-muted p-4">
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-blue-600">{nearMissCount}</div>
+                                    <div className="text-2xl font-bold text-status-info">{nearMissCount}</div>
                                     <div className="text-xs text-muted-foreground">Near Misses</div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-lg font-medium text-muted-foreground">vs</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-orange-600">{incidentCount}</div>
+                                    <div className="text-2xl font-bold text-status-warning">{incidentCount}</div>
                                     <div className="text-xs text-muted-foreground">Incidents</div>
                                 </div>
                                 <div className="text-center">
                                     <div className="text-lg font-medium text-muted-foreground">=</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-green-600">{ratio}</div>
+                                    <div className="text-2xl font-bold text-status-success">{ratio}</div>
                                     <div className="text-xs text-muted-foreground">Ratio</div>
                                 </div>
                             </div>
@@ -191,7 +191,7 @@ export default function HealthSafetyAnalytics({
                                             <td className="py-2">{d.percentage}%</td>
                                             <td className="py-2">
                                                 <div className="h-3 w-full max-w-[200px] rounded-full bg-muted">
-                                                    <div className="h-3 rounded-full bg-blue-500" style={{ width: `${d.percentage}%` }} />
+                                                    <div className="h-3 rounded-full bg-status-info" style={{ width: `${d.percentage}%` }} />
                                                 </div>
                                             </td>
                                         </tr>
@@ -238,7 +238,7 @@ export default function HealthSafetyAnalytics({
                                                 </Badge>
                                             </td>
                                             <td className="py-2">
-                                                <span className={site.compliance_score >= 90 ? 'font-semibold text-green-600' : site.compliance_score >= 70 ? 'font-semibold text-amber-600' : 'font-semibold text-red-600'}>
+                                                <span className={site.compliance_score >= 90 ? 'font-semibold text-status-success' : site.compliance_score >= 70 ? 'font-semibold text-status-warning' : 'font-semibold text-status-critical'}>
                                                     {site.compliance_score}%
                                                 </span>
                                             </td>
@@ -268,7 +268,7 @@ export default function HealthSafetyAnalytics({
                                     <span className="w-28 text-xs font-medium capitalize">{d.type.replace(/_/g, ' ')}</span>
                                     <div className="flex-1">
                                         <div
-                                            className="h-5 rounded bg-orange-500"
+                                            className="h-5 rounded bg-status-warning"
                                             style={{ width: `${(d.count / maxInjuryTypeCount) * 100}%`, minWidth: d.count > 0 ? '4px' : '0' }}
                                         />
                                     </div>

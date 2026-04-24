@@ -100,13 +100,13 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
 
                 {/* KPI Summary Cards */}
                 <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
-                    <Card className="border-l-4 border-l-blue-500 bg-blue-50/40">
+                    <Card className="border-l-4 border-l-blue-500 bg-status-info-bg">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-blue-700">Total Competencies</p>
-                                <div className="rounded-full bg-blue-100 p-1.5"><Target className="h-4 w-4 text-blue-600" /></div>
+                                <p className="text-xs font-medium text-status-info">Total Competencies</p>
+                                <div className="rounded-full bg-status-info-bg p-1.5"><Target className="h-4 w-4 text-status-info" /></div>
                             </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-blue-900">{competencies.length}</span>
+                            <span className="mt-1.5 block text-2xl font-bold text-status-info">{competencies.length}</span>
                         </CardContent>
                     </Card>
                     <Card className="border-l-4 border-l-purple-500 bg-primary/10/40">
@@ -118,13 +118,13 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                             <span className="mt-1.5 block text-2xl font-bold text-primary">{categories.length}</span>
                         </CardContent>
                     </Card>
-                    <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/40">
+                    <Card className="border-l-4 border-l-emerald-500 bg-status-success-bg">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-emerald-700">Staff Profiles</p>
-                                <div className="rounded-full bg-emerald-100 p-1.5"><Users className="h-4 w-4 text-emerald-600" /></div>
+                                <p className="text-xs font-medium text-status-success">Staff Profiles</p>
+                                <div className="rounded-full bg-status-success-bg p-1.5"><Users className="h-4 w-4 text-status-success" /></div>
                             </div>
-                            <span className="mt-1.5 block text-2xl font-bold text-emerald-900">{staff.length}</span>
+                            <span className="mt-1.5 block text-2xl font-bold text-status-success">{staff.length}</span>
                         </CardContent>
                     </Card>
                 </div>
@@ -140,12 +140,12 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                                     <div>
                                         <Label>Name</Label>
                                         <Input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
-                                        {form.errors.name && <p className="mt-1 text-xs text-red-500">{form.errors.name}</p>}
+                                        {form.errors.name && <p className="mt-1 text-xs text-status-critical">{form.errors.name}</p>}
                                     </div>
                                     <div>
                                         <Label>Category</Label>
                                         <Input value={form.data.category} onChange={(e) => form.setData('category', e.target.value)} placeholder="e.g. Technical, Leadership" />
-                                        {form.errors.category && <p className="mt-1 text-xs text-red-500">{form.errors.category}</p>}
+                                        {form.errors.category && <p className="mt-1 text-xs text-status-critical">{form.errors.category}</p>}
                                     </div>
                                 </div>
                                 <div>
@@ -172,7 +172,7 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                         <Card key={category}>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <Target className="h-5 w-5 text-blue-500" />
+                                    <Target className="h-5 w-5 text-status-info" />
                                     {category}
                                 </CardTitle>
                             </CardHeader>

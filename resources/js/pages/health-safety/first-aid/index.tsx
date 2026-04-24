@@ -127,12 +127,12 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.site_id && <p className="mt-1 text-xs text-red-600">{form.errors.site_id}</p>}
+                                        {form.errors.site_id && <p className="mt-1 text-xs text-status-critical">{form.errors.site_id}</p>}
                                     </div>
                                     <div>
                                         <Label>Treatment Date & Time</Label>
                                         <Input type="datetime-local" value={form.data.treatment_date} onChange={(e) => form.setData('treatment_date', e.target.value)} />
-                                        {form.errors.treatment_date && <p className="mt-1 text-xs text-red-600">{form.errors.treatment_date}</p>}
+                                        {form.errors.treatment_date && <p className="mt-1 text-xs text-status-critical">{form.errors.treatment_date}</p>}
                                     </div>
                                 </div>
 
@@ -140,7 +140,7 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                                     <div>
                                         <Label>Person Treated</Label>
                                         <Input value={form.data.treated_person_name} onChange={(e) => form.setData('treated_person_name', e.target.value)} placeholder="Full name" />
-                                        {form.errors.treated_person_name && <p className="mt-1 text-xs text-red-600">{form.errors.treated_person_name}</p>}
+                                        {form.errors.treated_person_name && <p className="mt-1 text-xs text-status-critical">{form.errors.treated_person_name}</p>}
                                     </div>
                                     <div>
                                         <Label>Person Type</Label>
@@ -166,7 +166,7 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.injury_illness_type && <p className="mt-1 text-xs text-red-600">{form.errors.injury_illness_type}</p>}
+                                        {form.errors.injury_illness_type && <p className="mt-1 text-xs text-status-critical">{form.errors.injury_illness_type}</p>}
                                     </div>
                                     <div>
                                         <Label>Body Part</Label>
@@ -182,7 +182,7 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                                 <div>
                                     <Label>Treatment Given</Label>
                                     <Textarea value={form.data.treatment_given} onChange={(e) => form.setData('treatment_given', e.target.value)} rows={2} />
-                                    {form.errors.treatment_given && <p className="mt-1 text-xs text-red-600">{form.errors.treatment_given}</p>}
+                                    {form.errors.treatment_given && <p className="mt-1 text-xs text-status-critical">{form.errors.treatment_given}</p>}
                                 </div>
 
                                 <div className="grid gap-3 sm:grid-cols-2">
@@ -196,7 +196,7 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.treatment_outcome && <p className="mt-1 text-xs text-red-600">{form.errors.treatment_outcome}</p>}
+                                        {form.errors.treatment_outcome && <p className="mt-1 text-xs text-status-critical">{form.errors.treatment_outcome}</p>}
                                     </div>
                                     <div>
                                         <Label>First Aider</Label>
@@ -208,7 +208,7 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.first_aider_id && <p className="mt-1 text-xs text-red-600">{form.errors.first_aider_id}</p>}
+                                        {form.errors.first_aider_id && <p className="mt-1 text-xs text-status-critical">{form.errors.first_aider_id}</p>}
                                     </div>
                                 </div>
 
@@ -266,7 +266,7 @@ export default function FirstAidIndex({ records, stats, staff, sites, can_create
                                             <td className="py-2">{r.first_aider?.name ?? '-'}</td>
                                             <td className="py-2 text-center">
                                                 {r.incident_id ? (
-                                                    <Badge className="bg-green-100 text-green-800 border-green-200">Y</Badge>
+                                                    <Badge className="bg-status-success-bg text-status-success border-status-success/30">Y</Badge>
                                                 ) : (
                                                     <Badge variant="outline" className="text-muted-foreground">N</Badge>
                                                 )}

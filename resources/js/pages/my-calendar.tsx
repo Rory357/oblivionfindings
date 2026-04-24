@@ -33,10 +33,10 @@ const views: { key: ViewKey; label: string }[] = [
 ];
 
 const categories = [
-    { bg: 'bg-blue-50 dark:bg-blue-950/40', dot: 'bg-blue-500', label: 'Shifts', icon: CalendarDays },
-    { bg: 'bg-green-50 dark:bg-green-950/40', dot: 'bg-green-500', label: 'In Progress', icon: Clock },
-    { bg: 'bg-amber-50 dark:bg-amber-950/40', dot: 'bg-amber-500', label: 'Medications', icon: Pill },
-    { bg: 'bg-emerald-50 dark:bg-emerald-950/40', dot: 'bg-emerald-500', label: 'Leave', icon: Palmtree },
+    { bg: 'bg-status-info-bg dark:bg-status-info', dot: 'bg-status-info', label: 'Shifts', icon: CalendarDays },
+    { bg: 'bg-status-success-bg dark:bg-status-success', dot: 'bg-status-success', label: 'In Progress', icon: Clock },
+    { bg: 'bg-status-warning-bg dark:bg-status-warning', dot: 'bg-status-warning', label: 'Medications', icon: Pill },
+    { bg: 'bg-status-success-bg dark:bg-status-success', dot: 'bg-status-success', label: 'Leave', icon: Palmtree },
     { bg: 'bg-primary/10 dark:bg-primary/40', dot: 'bg-primary', label: 'Tasks', icon: ListTodo },
 ];
 
@@ -444,7 +444,7 @@ export default function MyCalendar() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button onClick={() => openCreateFromCtx('shift')}>
-                            <CalendarDays className="h-4 w-4 text-blue-500" />
+                            <CalendarDays className="h-4 w-4 text-status-info" />
                             <span>New Shift</span>
                         </button>
                         <button onClick={() => openCreateFromCtx('task')}>

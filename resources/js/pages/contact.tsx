@@ -197,7 +197,7 @@ const Contact: React.FC = () => {
                                             className="block text-sm font-medium text-foreground"
                                         >
                                             Full name{' '}
-                                            <span className="text-rose-500">
+                                            <span className="text-status-critical">
                                                 *
                                             </span>
                                         </label>
@@ -222,7 +222,7 @@ const Contact: React.FC = () => {
                                             />
                                         </div>
                                         {errors.name && (
-                                            <p className="mt-1 text-xs text-rose-500">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {errors.name}
                                             </p>
                                         )}
@@ -234,7 +234,7 @@ const Contact: React.FC = () => {
                                             className="block text-sm font-medium text-foreground"
                                         >
                                             Email address{' '}
-                                            <span className="text-rose-500">
+                                            <span className="text-status-critical">
                                                 *
                                             </span>
                                         </label>
@@ -259,7 +259,7 @@ const Contact: React.FC = () => {
                                             />
                                         </div>
                                         {errors.email && (
-                                            <p className="mt-1 text-xs text-rose-500">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {errors.email}
                                             </p>
                                         )}
@@ -295,7 +295,7 @@ const Contact: React.FC = () => {
                                             />
                                         </div>
                                         {errors.company && (
-                                            <p className="mt-1 text-xs text-rose-500">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {errors.company}
                                             </p>
                                         )}
@@ -328,7 +328,7 @@ const Contact: React.FC = () => {
                                             />
                                         </div>
                                         {errors.phone && (
-                                            <p className="mt-1 text-xs text-rose-500">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {errors.phone}
                                             </p>
                                         )}
@@ -365,7 +365,7 @@ const Contact: React.FC = () => {
                                             ))}
                                         </select>
                                         {errors.service_type && (
-                                            <p className="mt-1 text-xs text-rose-500">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {errors.service_type}
                                             </p>
                                         )}
@@ -399,7 +399,7 @@ const Contact: React.FC = () => {
                                             ))}
                                         </select>
                                         {errors.residents_count && (
-                                            <p className="mt-1 text-xs text-rose-500">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {errors.residents_count}
                                             </p>
                                         )}
@@ -413,7 +413,7 @@ const Contact: React.FC = () => {
                                         className="block text-sm font-medium text-foreground"
                                     >
                                         Message{' '}
-                                        <span className="text-rose-500">*</span>
+                                        <span className="text-status-critical">*</span>
                                     </label>
                                     <textarea
                                         id="message"
@@ -427,7 +427,7 @@ const Contact: React.FC = () => {
                                         required
                                     />
                                     {errors.message && (
-                                        <p className="mt-1 text-xs text-rose-500">
+                                        <p className="mt-1 text-xs text-status-critical">
                                             {errors.message}
                                         </p>
                                     )}

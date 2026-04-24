@@ -40,11 +40,11 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-    scheduled: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    in_progress: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    completed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    overdue: 'bg-red-500/20 text-red-400 border-red-500/30',
-    skipped: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+    scheduled: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
+    completed: 'bg-status-success-bg text-status-success border-status-success/30',
+    overdue: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    skipped: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
 };
 
 export default function ChecklistRuns({ site, runs, filters }: Props) {
@@ -84,25 +84,25 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                             <div className="text-sm text-muted-foreground">Total Runs</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-yellow-500/5 border-yellow-500/20">
+                    <Card className="bg-status-warning border-status-warning/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-yellow-400">
+                            <div className="text-2xl font-bold text-status-warning">
                                 {runs.data.filter(r => r.status === 'scheduled').length}
                             </div>
                             <div className="text-sm text-muted-foreground">Scheduled</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-blue-500/5 border-blue-500/20">
+                    <Card className="bg-status-info border-status-info/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-blue-400">
+                            <div className="text-2xl font-bold text-status-info">
                                 {runs.data.filter(r => r.status === 'in_progress').length}
                             </div>
                             <div className="text-sm text-muted-foreground">In Progress</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-emerald-400">
+                            <div className="text-2xl font-bold text-status-success">
                                 {runs.data.filter(r => r.status === 'completed').length}
                             </div>
                             <div className="text-sm text-muted-foreground">Completed</div>

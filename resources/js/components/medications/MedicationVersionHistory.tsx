@@ -52,9 +52,9 @@ export default function MedicationVersionHistory({ clientId, medicationId, medic
 
     const getStateBadge = (state: string) => {
         const colors: Record<string, string> = {
-            active: 'bg-emerald-100 text-emerald-800',
-            paused: 'bg-amber-100 text-amber-800',
-            ceased: 'bg-red-100 text-red-800',
+            active: 'bg-status-success-bg text-status-success',
+            paused: 'bg-status-warning-bg text-status-warning',
+            ceased: 'bg-status-critical-bg text-status-critical',
         };
         return <Badge className={colors[state] || 'bg-muted'}>{state}</Badge>;
     };
@@ -82,7 +82,7 @@ export default function MedicationVersionHistory({ clientId, medicationId, medic
                             {versions.map((version, index) => (
                                 <div
                                     key={version.id}
-                                    className={`rounded-lg border p-3 ${index === 0 ? 'border-blue-200 bg-blue-50' : 'bg-muted'}`}
+                                    className={`rounded-lg border p-3 ${index === 0 ? 'border-status-info/30 bg-status-info-bg' : 'bg-muted'}`}
                                 >
                                     <div
                                         className="flex items-center justify-between cursor-pointer"
@@ -91,7 +91,7 @@ export default function MedicationVersionHistory({ clientId, medicationId, medic
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm font-medium">v{version.version_number}</span>
                                             {getStateBadge(version.state)}
-                                            {index === 0 && <Badge className="bg-blue-100 text-blue-800">Current</Badge>}
+                                            {index === 0 && <Badge className="bg-status-info-bg text-status-info">Current</Badge>}
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                             <span>{new Date(version.changed_at).toLocaleDateString()}</span>

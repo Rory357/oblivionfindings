@@ -95,15 +95,15 @@ const syncDirectionLabels: Record<string, string> = {
 };
 
 const statusIcons: Record<string, React.ReactNode> = {
-    success: <CheckCircle2 className="h-4 w-4 text-green-600" />,
-    failed: <XCircle className="h-4 w-4 text-red-600" />,
-    pending: <Clock className="h-4 w-4 text-yellow-600" />,
+    success: <CheckCircle2 className="h-4 w-4 text-status-success" />,
+    failed: <XCircle className="h-4 w-4 text-status-critical" />,
+    pending: <Clock className="h-4 w-4 text-status-warning" />,
 };
 
 const statusColors: Record<string, string> = {
-    success: 'bg-green-500/10 text-green-600 border-green-500/30',
-    failed: 'bg-red-500/10 text-red-600 border-red-500/30',
-    pending: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30',
+    success: 'bg-status-success-bg text-status-success border-status-success/30',
+    failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    pending: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 function CreateIntegrationDialog() {
@@ -254,11 +254,11 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                         <span className="text-muted-foreground">Token Status</span>
                         <p className="font-medium">
                             {!integration.has_token ? (
-                                <span className="text-yellow-600">Not configured</span>
+                                <span className="text-status-warning">Not configured</span>
                             ) : integration.token_expired ? (
-                                <span className="text-red-600">Expired</span>
+                                <span className="text-status-critical">Expired</span>
                             ) : (
-                                <span className="text-green-600">Valid</span>
+                                <span className="text-status-success">Valid</span>
                             )}
                         </p>
                     </div>
@@ -308,8 +308,8 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                                         </TableCell>
                                         <TableCell className="capitalize">{log.entity_type}</TableCell>
                                         <TableCell>{log.entity_count}</TableCell>
-                                        <TableCell className="text-green-600">{log.success_count}</TableCell>
-                                        <TableCell className={log.error_count > 0 ? 'text-red-600' : ''}>
+                                        <TableCell className="text-status-success">{log.success_count}</TableCell>
+                                        <TableCell className={log.error_count > 0 ? 'text-status-critical' : ''}>
                                             {log.error_count}
                                         </TableCell>
                                         <TableCell>

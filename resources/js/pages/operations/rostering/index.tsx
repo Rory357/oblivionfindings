@@ -997,7 +997,7 @@ export default function RosteringIndex(props: Props) {
                         value={props.stats.open}
                         icon={AlertTriangle}
                         description="Need assignment"
-                        color="bg-red-500/10 text-red-500"
+                        color="bg-status-critical-bg text-status-critical"
                     />
                     <KpiCard
                         label="Coverage Rate"
@@ -1005,7 +1005,7 @@ export default function RosteringIndex(props: Props) {
                         icon={TrendingUp}
                         suffix="%"
                         description="Filled / Total"
-                        color="bg-blue-500/10 text-blue-500"
+                        color="bg-status-info-bg text-status-info"
                     />
                 </div>
 
@@ -1023,21 +1023,21 @@ export default function RosteringIndex(props: Props) {
                                 label="Staff Rostered"
                                 value={props.analytics.staffRostered}
                                 icon={Users}
-                                color="bg-emerald-500/10 text-emerald-500"
+                                color="bg-status-success-bg text-status-success"
                             />
                             <KpiCard
                                 label="On Leave"
                                 value={props.analytics.onLeaveCount}
                                 icon={CalendarOff}
                                 description="Approved this week"
-                                color="bg-amber-500/10 text-amber-500"
+                                color="bg-status-warning-bg text-status-warning"
                             />
                             <KpiCard
                                 label="Coverage Gaps"
                                 value={props.stats.coverage_gaps ?? 0}
                                 icon={AlertTriangle}
                                 description="Demand exceeds supply"
-                                color="bg-red-500/10 text-red-500"
+                                color="bg-status-critical-bg text-status-critical"
                             />
                         </div>
 
@@ -1867,7 +1867,7 @@ export default function RosteringIndex(props: Props) {
                                                 className={
                                                     props.coverageAlerts
                                                         .length > 0
-                                                        ? 'border-red-500/20'
+                                                        ? 'border-status-critical/20'
                                                         : ''
                                                 }
                                             >
@@ -2132,9 +2132,9 @@ export default function RosteringIndex(props: Props) {
                                             {props.canManageAny ? (
                                                 <Card className={
                                                     props.eligibilityAlerts.counts.blocked > 0
-                                                        ? 'border-red-500/20'
+                                                        ? 'border-status-critical/20'
                                                         : props.eligibilityAlerts.counts.warnings > 0
-                                                            ? 'border-yellow-500/20'
+                                                            ? 'border-status-warning/20'
                                                             : ''
                                                 }>
                                                     <CardHeader className="pb-2">
@@ -2151,15 +2151,15 @@ export default function RosteringIndex(props: Props) {
                                                         {/* Stat row */}
                                                         <div className="grid grid-cols-4 gap-3">
                                                             <div className="rounded-md border p-2 text-center">
-                                                                <div className="text-lg font-bold text-green-600">{props.eligibilityAlerts.counts.eligible}</div>
+                                                                <div className="text-lg font-bold text-status-success">{props.eligibilityAlerts.counts.eligible}</div>
                                                                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Eligible</div>
                                                             </div>
                                                             <div className="rounded-md border p-2 text-center">
-                                                                <div className="text-lg font-bold text-yellow-600">{props.eligibilityAlerts.counts.warnings}</div>
+                                                                <div className="text-lg font-bold text-status-warning">{props.eligibilityAlerts.counts.warnings}</div>
                                                                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Warnings</div>
                                                             </div>
                                                             <div className="rounded-md border p-2 text-center">
-                                                                <div className="text-lg font-bold text-red-600">{props.eligibilityAlerts.counts.blocked}</div>
+                                                                <div className="text-lg font-bold text-status-critical">{props.eligibilityAlerts.counts.blocked}</div>
                                                                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Blocked</div>
                                                             </div>
                                                             <div className="rounded-md border p-2 text-center">
@@ -2171,17 +2171,17 @@ export default function RosteringIndex(props: Props) {
                                                         {/* Blocked shifts table */}
                                                         {props.eligibilityAlerts.blocked.length > 0 ? (
                                                             <div className="space-y-2">
-                                                                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-red-700 dark:text-red-400">
+                                                                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-status-critical dark:text-status-critical">
                                                                     <XCircle className="size-3" />
                                                                     Blocked shifts — requires action
                                                                 </div>
-                                                                <div className="divide-y rounded-md border border-red-200 dark:border-red-800">
+                                                                <div className="divide-y rounded-md border border-status-critical/30 dark:border-status-critical/30">
                                                                     {props.eligibilityAlerts.blocked.map((s) => (
                                                                         <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                                                             <div className="min-w-0 flex-1">
                                                                                 <div className="font-medium">{new Date(s.starts_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
                                                                                 <div className="truncate text-xs text-muted-foreground">{s.staff} · {s.site}</div>
-                                                                                <div className="truncate text-xs text-red-600 dark:text-red-400">{s.reason}</div>
+                                                                                <div className="truncate text-xs text-status-critical dark:text-status-critical">{s.reason}</div>
                                                                             </div>
                                                                             <Button size="sm" variant="outline" asChild>
                                                                                 <Link href={`/operations/shifts/${s.id}`}>View</Link>
@@ -2195,17 +2195,17 @@ export default function RosteringIndex(props: Props) {
                                                         {/* Warning shifts table */}
                                                         {props.eligibilityAlerts.warnings.length > 0 ? (
                                                             <div className="space-y-2">
-                                                                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-yellow-700 dark:text-yellow-400">
+                                                                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-status-warning dark:text-status-warning">
                                                                     <AlertTriangle className="size-3" />
                                                                     Warning shifts — review recommended
                                                                 </div>
-                                                                <div className="divide-y rounded-md border border-yellow-200 dark:border-yellow-800">
+                                                                <div className="divide-y rounded-md border border-status-warning/30 dark:border-status-warning/30">
                                                                     {props.eligibilityAlerts.warnings.map((s) => (
                                                                         <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                                                             <div className="min-w-0 flex-1">
                                                                                 <div className="font-medium">{new Date(s.starts_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
                                                                                 <div className="truncate text-xs text-muted-foreground">{s.staff} · {s.site}</div>
-                                                                                <div className="truncate text-xs text-yellow-600 dark:text-yellow-400">{s.reason}</div>
+                                                                                <div className="truncate text-xs text-status-warning dark:text-status-warning">{s.reason}</div>
                                                                             </div>
                                                                             <Button size="sm" variant="outline" asChild>
                                                                                 <Link href={`/operations/shifts/${s.id}`}>Review</Link>
@@ -2219,7 +2219,7 @@ export default function RosteringIndex(props: Props) {
                                                         {/* Clean state */}
                                                         {props.eligibilityAlerts.counts.blocked === 0 && props.eligibilityAlerts.counts.warnings === 0 ? (
                                                             <div className="flex items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                                                                <CheckCircle2 className="size-4 text-green-500" />
+                                                                <CheckCircle2 className="size-4 text-status-success" />
                                                                 All upcoming shifts have eligible staff assigned.
                                                             </div>
                                                         ) : null}
@@ -2231,7 +2231,7 @@ export default function RosteringIndex(props: Props) {
                                                 className={
                                                     props.replacementQueue
                                                         .length > 0
-                                                        ? 'border-amber-500/20'
+                                                        ? 'border-status-warning/20'
                                                         : ''
                                                 }
                                             >
@@ -3879,22 +3879,22 @@ export default function RosteringIndex(props: Props) {
                                                                     coverageMode ===
                                                                     'assigned'
                                                                         ? v >= 3
-                                                                            ? 'bg-blue-400/60'
+                                                                            ? 'bg-status-info'
                                                                             : v ===
                                                                                 2
-                                                                              ? 'bg-blue-300/50'
+                                                                              ? 'bg-status-info'
                                                                               : v ===
                                                                                   1
-                                                                                ? 'bg-blue-200/40'
+                                                                                ? 'bg-status-info-bg'
                                                                                 : 'bg-background'
                                                                         : v >= 3
-                                                                          ? 'bg-amber-400/60'
+                                                                          ? 'bg-status-warning'
                                                                           : v ===
                                                                               2
-                                                                            ? 'bg-amber-300/50'
+                                                                            ? 'bg-status-warning'
                                                                             : v ===
                                                                                 1
-                                                                              ? 'bg-amber-200/40'
+                                                                              ? 'bg-status-warning-bg'
                                                                               : 'bg-background';
                                                                 return (
                                                                     <div
@@ -3922,19 +3922,19 @@ export default function RosteringIndex(props: Props) {
                                             </span>
                                             <span className="flex items-center gap-1.5">
                                                 <span
-                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-blue-200/40' : 'bg-amber-200/40'}`}
+                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-status-info-bg' : 'bg-status-warning-bg'}`}
                                                 />{' '}
                                                 1 staff
                                             </span>
                                             <span className="flex items-center gap-1.5">
                                                 <span
-                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-blue-300/50' : 'bg-amber-300/50'}`}
+                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-status-info' : 'bg-status-warning'}`}
                                                 />{' '}
                                                 2 staff
                                             </span>
                                             <span className="flex items-center gap-1.5">
                                                 <span
-                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-blue-400/60' : 'bg-amber-400/60'}`}
+                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-status-info' : 'bg-status-warning'}`}
                                                 />{' '}
                                                 3+ staff
                                             </span>
@@ -4296,7 +4296,7 @@ export default function RosteringIndex(props: Props) {
                                                 className={
                                                     props.analytics
                                                         .complianceExpired > 0
-                                                        ? 'border-red-500/20'
+                                                        ? 'border-status-critical/20'
                                                         : ''
                                                 }
                                             >

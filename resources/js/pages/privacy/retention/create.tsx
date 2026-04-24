@@ -66,7 +66,7 @@ export default function CreateRetentionPolicy() {
                                         placeholder="e.g., Client Records Retention"
                                     />
                                     {errors.policy_name && (
-                                        <p className="text-xs text-red-500">{errors.policy_name}</p>
+                                        <p className="text-xs text-status-critical">{errors.policy_name}</p>
                                     )}
                                 </div>
 
@@ -79,7 +79,7 @@ export default function CreateRetentionPolicy() {
                                         placeholder="e.g., App\\Models\\Client"
                                     />
                                     {errors.model_type && (
-                                        <p className="text-xs text-red-500">{errors.model_type}</p>
+                                        <p className="text-xs text-status-critical">{errors.model_type}</p>
                                     )}
                                 </div>
                             </div>
@@ -107,7 +107,7 @@ export default function CreateRetentionPolicy() {
                                         onChange={(e) => setData('retention_period_years', e.target.value)}
                                     />
                                     {errors.retention_period_years && (
-                                        <p className="text-xs text-red-500">{errors.retention_period_years}</p>
+                                        <p className="text-xs text-status-critical">{errors.retention_period_years}</p>
                                     )}
                                 </div>
 

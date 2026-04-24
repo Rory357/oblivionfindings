@@ -70,14 +70,14 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const actionColors: Record<string, string> = {
-    created: 'border-green-500/30 text-green-400 bg-green-500/10',
-    updated: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
-    deleted: 'border-red-500/30 text-red-400 bg-red-500/10',
-    viewed: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
-    approved: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-    rejected: 'border-orange-500/30 text-orange-400 bg-orange-500/10',
+    created: 'border-status-success/30 text-status-success bg-status-success',
+    updated: 'border-status-info/30 text-status-info bg-status-info',
+    deleted: 'border-status-critical/30 text-status-critical bg-status-critical',
+    viewed: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    approved: 'border-status-success/30 text-status-success bg-status-success',
+    rejected: 'border-status-warning/30 text-status-warning bg-status-warning',
     signed: 'border-primary/30 text-primary bg-primary/10',
-    exported: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10',
+    exported: 'border-status-info/30 text-status-info bg-status-info',
 };
 
 const formatDate = (value?: string | null) => {
@@ -108,9 +108,9 @@ function ChangesViewer({ oldValues, newValues }: { oldValues: Record<string, any
                 return (
                     <div key={key} className="font-mono">
                         <span className="text-muted-foreground">{key}:</span>{' '}
-                        {oldVal !== undefined && <span className="text-red-400 line-through">{JSON.stringify(oldVal)}</span>}
+                        {oldVal !== undefined && <span className="text-status-critical line-through">{JSON.stringify(oldVal)}</span>}
                         {oldVal !== undefined && newVal !== undefined && ' -> '}
-                        {newVal !== undefined && <span className="text-green-400">{JSON.stringify(newVal)}</span>}
+                        {newVal !== undefined && <span className="text-status-success">{JSON.stringify(newVal)}</span>}
                     </div>
                 );
             })}

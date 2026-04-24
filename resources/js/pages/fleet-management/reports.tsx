@@ -336,7 +336,7 @@ export default function FleetReports({
                                             </div>
                                             <div className="mt-1 h-2 rounded-full bg-muted">
                                                 <div
-                                                    className="h-full rounded-full bg-orange-500"
+                                                    className="h-full rounded-full bg-status-warning"
                                                     style={{
                                                         width: `${(v.cost / (fuel_by_vehicle[0]?.cost || 1)) * 100}%`,
                                                     }}

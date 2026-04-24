@@ -133,11 +133,11 @@ interface Props {
 
 const scheduleStateColors: Record<string, string> = {
   upcoming: 'bg-muted text-foreground border-border',
-  due_soon: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  due: 'bg-blue-100 text-blue-800 border-blue-200',
-  late: 'bg-orange-100 text-orange-800 border-orange-200',
-  missed_auto: 'bg-red-100 text-red-800 border-red-200',
-  completed: 'bg-green-100 text-green-800 border-green-200',
+  due_soon: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  due: 'bg-status-info-bg text-status-info border-status-info/30',
+  late: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  missed_auto: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+  completed: 'bg-status-success-bg text-status-success border-status-success/30',
   future: 'bg-muted text-muted-foreground border-border',
 };
 
@@ -262,18 +262,18 @@ export default function EnhancedMar() {
 
         {/* Allergies Alert */}
         {marData?.allergies && marData.allergies.length > 0 && (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-status-critical/30 bg-status-critical-bg">
             <CardContent className="py-3">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
                 <div>
-                  <div className="font-semibold text-red-800">Allergy Alert</div>
+                  <div className="font-semibold text-status-critical">Allergy Alert</div>
                   <div className="mt-1 flex flex-wrap gap-2">
                     {marData.allergies.map((allergy) => (
                       <Badge
                         key={allergy.id}
                         variant="outline"
-                        className={allergy.is_severe ? 'border-red-300 bg-red-100 text-red-800' : 'border-yellow-300 bg-yellow-100 text-yellow-800'}
+                        className={allergy.is_severe ? 'border-status-critical/30 bg-status-critical-bg text-status-critical' : 'border-status-warning/30 bg-status-warning-bg text-status-warning'}
                       >
                         {allergy.allergen}
                         {allergy.severity && ` (${allergy.severity})`}
@@ -288,20 +288,20 @@ export default function EnhancedMar() {
 
         {/* Controlled Drug Discrepancies */}
         {marData?.controlled_discrepancies && marData.controlled_discrepancies.length > 0 && (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-status-critical/30 bg-status-critical-bg">
             <CardContent className="py-3">
               <div className="flex items-start gap-2">
-                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
                 <div className="flex-1">
-                  <div className="font-semibold text-red-800">Controlled Drug Discrepancy</div>
+                  <div className="font-semibold text-status-critical">Controlled Drug Discrepancy</div>
                   <div className="mt-1 space-y-2">
                     {marData.controlled_discrepancies.map((disc) => (
-                      <div key={disc.id} className="text-sm text-red-700">
+                      <div key={disc.id} className="text-sm text-status-critical">
                         <span className="font-medium">{disc.medication_name || 'Medication'}</span>
                         {disc.difference != null && (
                           <span className="ml-2">Difference: {disc.difference > 0 ? '+' : ''}{disc.difference}</span>
                         )}
-                        {disc.reason && <span className="ml-2 text-red-600">- {disc.reason}</span>}
+                        {disc.reason && <span className="ml-2 text-status-critical">- {disc.reason}</span>}
                       </div>
                     ))}
                   </div>
@@ -317,16 +317,16 @@ export default function EnhancedMar() {
             {marData.alerts.map((alert) => (
               <Card 
                 key={alert.id} 
-                className={alert.severity === 'critical' ? 'border-red-200 bg-red-50' : alert.severity === 'warning' ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'}
+                className={alert.severity === 'critical' ? 'border-status-critical/30 bg-status-critical-bg' : alert.severity === 'warning' ? 'border-status-warning/30 bg-status-warning-bg' : 'border-status-info/30 bg-status-info-bg'}
               >
                 <CardContent className="py-3">
                   <div className="flex items-start gap-2">
-                    <AlertCircle className={`mt-0.5 h-5 w-5 shrink-0 ${alert.severity === 'critical' ? 'text-red-600' : alert.severity === 'warning' ? 'text-amber-600' : 'text-blue-600'}`} />
+                    <AlertCircle className={`mt-0.5 h-5 w-5 shrink-0 ${alert.severity === 'critical' ? 'text-status-critical' : alert.severity === 'warning' ? 'text-status-warning' : 'text-status-info'}`} />
                     <div>
-                      <div className={`font-semibold ${alert.severity === 'critical' ? 'text-red-800' : alert.severity === 'warning' ? 'text-amber-800' : 'text-blue-800'}`}>
+                      <div className={`font-semibold ${alert.severity === 'critical' ? 'text-status-critical' : alert.severity === 'warning' ? 'text-status-warning' : 'text-status-info'}`}>
                         {alert.alert_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </div>
-                      <div className={`text-sm ${alert.severity === 'critical' ? 'text-red-700' : alert.severity === 'warning' ? 'text-amber-700' : 'text-blue-700'}`}>
+                      <div className={`text-sm ${alert.severity === 'critical' ? 'text-status-critical' : alert.severity === 'warning' ? 'text-status-warning' : 'text-status-info'}`}>
                         {alert.message}
                       </div>
                     </div>
@@ -346,28 +346,28 @@ export default function EnhancedMar() {
                 <div className="text-lg font-semibold">{marData.stats.scheduled.total}</div>
               </CardContent>
             </Card>
-            <Card className="border-green-200 bg-green-50">
+            <Card className="border-status-success/30 bg-status-success-bg">
               <CardContent className="py-3">
-                <div className="text-xs text-green-600">Completed</div>
-                <div className="text-lg font-semibold text-green-700">{marData.stats.scheduled.completed}</div>
+                <div className="text-xs text-status-success">Completed</div>
+                <div className="text-lg font-semibold text-status-success">{marData.stats.scheduled.completed}</div>
               </CardContent>
             </Card>
-            <Card className="border-blue-200 bg-blue-50">
+            <Card className="border-status-info/30 bg-status-info-bg">
               <CardContent className="py-3">
-                <div className="text-xs text-blue-600">Due</div>
-                <div className="text-lg font-semibold text-blue-700">{marData.stats.scheduled.due}</div>
+                <div className="text-xs text-status-info">Due</div>
+                <div className="text-lg font-semibold text-status-info">{marData.stats.scheduled.due}</div>
               </CardContent>
             </Card>
-            <Card className="border-orange-200 bg-orange-50">
+            <Card className="border-status-warning/30 bg-status-warning-bg">
               <CardContent className="py-3">
-                <div className="text-xs text-orange-600">Late</div>
-                <div className="text-lg font-semibold text-orange-700">{marData.stats.scheduled.late}</div>
+                <div className="text-xs text-status-warning">Late</div>
+                <div className="text-lg font-semibold text-status-warning">{marData.stats.scheduled.late}</div>
               </CardContent>
             </Card>
-            <Card className="border-red-200 bg-red-50">
+            <Card className="border-status-critical/30 bg-status-critical-bg">
               <CardContent className="py-3">
-                <div className="text-xs text-red-600">Missed</div>
-                <div className="text-lg font-semibold text-red-700">{marData.stats.scheduled.missed}</div>
+                <div className="text-xs text-status-critical">Missed</div>
+                <div className="text-lg font-semibold text-status-critical">{marData.stats.scheduled.missed}</div>
               </CardContent>
             </Card>
             <Card className="border-border">
@@ -411,13 +411,13 @@ export default function EnhancedMar() {
                           </Badge>
                         )}
                         {row.medication.controlled_drug && (
-                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                          <Badge variant="outline" className="bg-status-critical-bg text-status-critical border-status-critical/30">
                             <ShieldAlert className="mr-1 h-3 w-3" />
                             Controlled
                           </Badge>
                         )}
                         {row.medication.high_risk && (
-                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                          <Badge variant="outline" className="bg-status-warning-bg text-status-warning border-status-warning/30">
                             High Risk
                           </Badge>
                         )}
@@ -489,17 +489,17 @@ export default function EnhancedMar() {
                           PRN
                         </Badge>
                         {row.is_over_limit && (
-                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                          <Badge variant="outline" className="bg-status-critical-bg text-status-critical border-status-critical/30">
                             Limit Reached
                           </Badge>
                         )}
                         {row.is_near_limit && !row.is_over_limit && (
-                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                          <Badge variant="outline" className="bg-status-warning-bg text-status-warning border-status-warning/30">
                             Near Limit
                           </Badge>
                         )}
                         {row.medication.controlled_drug && (
-                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                          <Badge variant="outline" className="bg-status-critical-bg text-status-critical border-status-critical/30">
                             Controlled
                           </Badge>
                         )}
@@ -515,7 +515,7 @@ export default function EnhancedMar() {
                         </div>
                       )}
                       <div className="mt-2 flex items-center gap-2 text-xs">
-                        <span className={row.is_over_limit ? 'text-red-600 font-medium' : 'text-muted-foreground'}>
+                        <span className={row.is_over_limit ? 'text-status-critical font-medium' : 'text-muted-foreground'}>
                           Last 24h: {row.count_24h} given
                         </span>
                         {row.remaining_today !== undefined && (
@@ -574,7 +574,7 @@ export default function EnhancedMar() {
                         </Badge>
                       )}
                       {item.controlled_drug && (
-                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                        <Badge variant="outline" className="bg-status-critical-bg text-status-critical border-status-critical/30">
                           Controlled
                         </Badge>
                       )}

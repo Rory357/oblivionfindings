@@ -258,7 +258,7 @@ export default function GeofenceDrawMap({ center = { lat: -36.8485, lng: 174.763
                         </button>
                     ))}
                 </div>
-                <Button type="button" variant="ghost" size="sm" onClick={clearAll} className="text-red-500 hover:text-red-600">
+                <Button type="button" variant="ghost" size="sm" onClick={clearAll} className="text-status-critical hover:text-status-critical">
                     <Trash2 className="mr-1 h-3.5 w-3.5" /> Clear
                 </Button>
             </div>

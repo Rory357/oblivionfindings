@@ -67,7 +67,7 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
                                     placeholder="Jane Smith"
                                 />
                                 {form.errors.name && (
-                                    <div className="mt-1 text-xs text-red-600">{form.errors.name}</div>
+                                    <div className="mt-1 text-xs text-status-critical">{form.errors.name}</div>
                                 )}
                             </div>
 
@@ -80,7 +80,7 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
                                     placeholder="user@example.com"
                                 />
                                 {form.errors.email && (
-                                    <div className="mt-1 text-xs text-red-600">{form.errors.email}</div>
+                                    <div className="mt-1 text-xs text-status-critical">{form.errors.email}</div>
                                 )}
                             </div>
 
@@ -120,11 +120,11 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
                             </div>
 
                             {userNotFound && (
-                                <div className="md:col-span-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
-                                    <div className="font-medium text-amber-900">
+                                <div className="md:col-span-3 rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm">
+                                    <div className="font-medium text-status-warning">
                                         User not found for this email.
                                     </div>
-                                    <div className="mt-1 text-amber-800">
+                                    <div className="mt-1 text-status-warning">
                                         Do you want to create a user for this person?
                                     </div>
                                     <div className="mt-3 flex flex-wrap gap-2">

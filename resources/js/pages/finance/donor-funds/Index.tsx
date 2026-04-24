@@ -61,9 +61,9 @@ const fundTypeLabels: Record<string, string> = {
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    active: { label: 'Active', className: 'border-green-300 text-green-600' },
-    fully_spent: { label: 'Fully Spent', className: 'border-amber-300 text-amber-600' },
-    expired: { label: 'Expired', className: 'border-red-300 text-red-600' },
+    active: { label: 'Active', className: 'border-status-success/30 text-status-success' },
+    fully_spent: { label: 'Fully Spent', className: 'border-status-warning/30 text-status-warning' },
+    expired: { label: 'Expired', className: 'border-status-critical/30 text-status-critical' },
     returned: { label: 'Returned', className: 'border-border text-muted-foreground' },
 };
 
@@ -120,7 +120,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Available</p>
-                                <p className="text-xl font-bold text-emerald-600">{formatCurrency(summary.total_available)}</p>
+                                <p className="text-xl font-bold text-status-success">{formatCurrency(summary.total_available)}</p>
                             </CardContent>
                         </Card>
                         <Card>
@@ -132,7 +132,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Expiring Soon</p>
-                                <p className={`text-2xl font-bold ${summary.expiring_soon > 0 ? 'text-amber-600' : ''}`}>
+                                <p className={`text-2xl font-bold ${summary.expiring_soon > 0 ? 'text-status-warning' : ''}`}>
                                     {summary.expiring_soon}
                                 </p>
                             </CardContent>
@@ -236,7 +236,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                                                 </TableCell>
                                                 <TableCell className="text-right">{formatCurrency(fund.total_received)}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(fund.total_spent)}</TableCell>
-                                                <TableCell className="text-right font-medium text-emerald-600">
+                                                <TableCell className="text-right font-medium text-status-success">
                                                     {formatCurrency(fund.available_balance)}
                                                     {utilisation !== null && (
                                                         <span className="ml-1 text-xs text-muted-foreground">({utilisation}%)</span>
@@ -244,7 +244,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     {fund.is_restricted ? (
-                                                        <Badge variant="outline" className="border-amber-300 text-amber-600">
+                                                        <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                                             Restricted
                                                         </Badge>
                                                     ) : (
@@ -267,7 +267,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                                                         {config.label}
                                                     </Badge>
                                                     {fund.next_report_due && new Date(fund.next_report_due) <= new Date() && (
-                                                        <AlertTriangle className="ml-1 inline h-4 w-4 text-amber-500" />
+                                                        <AlertTriangle className="ml-1 inline h-4 w-4 text-status-warning" />
                                                     )}
                                                 </TableCell>
                                             </TableRow>

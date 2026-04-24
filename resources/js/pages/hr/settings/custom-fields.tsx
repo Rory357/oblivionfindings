@@ -161,7 +161,7 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                         placeholder="e.g. T-Shirt Size"
                                         required
                                     />
-                                    {form.errors.name && <p className="text-sm text-red-500 mt-1">{form.errors.name}</p>}
+                                    {form.errors.name && <p className="text-sm text-status-critical mt-1">{form.errors.name}</p>}
                                 </div>
 
                                 <div>
@@ -297,7 +297,7 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
                                                     <Button variant="ghost" size="sm" onClick={() => deleteDefinition(def.id)} title="Delete">
-                                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                                        <Trash2 className="h-4 w-4 text-status-critical" />
                                                     </Button>
                                                 </div>
                                             </TableCell>

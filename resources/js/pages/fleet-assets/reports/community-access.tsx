@@ -191,20 +191,20 @@ export default function CommunityAccess({ by_resident: rawResident, weekly_trend
                                             <tr
                                                 key={r.id}
                                                 className={`border-b last:border-b-0 transition-colors hover:bg-muted/30 ${
-                                                    r.outings === 0 ? 'bg-red-50 dark:bg-red-950/20' : ''
+                                                    r.outings === 0 ? 'bg-status-critical-bg dark:bg-status-critical' : ''
                                                 }`}
                                             >
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-2">
                                                         {r.outings === 0 && (
-                                                            <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" title="No outings in period" />
+                                                            <span className="h-2 w-2 rounded-full bg-status-critical shrink-0" title="No outings in period" />
                                                         )}
                                                         <span className="font-medium">{r.name}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-3 py-2 text-muted-foreground">{r.house || '---'}</td>
                                                 <td className="px-3 py-2 text-right tabular-nums">
-                                                    <span className={r.outings === 0 ? 'text-red-600 dark:text-red-400 font-semibold' : ''}>
+                                                    <span className={r.outings === 0 ? 'text-status-critical dark:text-status-critical font-semibold' : ''}>
                                                         {r.outings}
                                                     </span>
                                                 </td>

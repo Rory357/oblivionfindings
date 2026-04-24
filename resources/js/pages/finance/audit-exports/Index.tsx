@@ -62,9 +62,9 @@ const formatFileSize = (bytes: number | null) => {
 
 const statusConfig: Record<string, { label: string; className: string; icon: typeof Clock }> = {
     pending: { label: 'Pending', className: 'bg-muted text-muted-foreground border-border', icon: Clock },
-    generating: { label: 'Generating', className: 'bg-blue-500/10 text-blue-600 border-blue-500/30', icon: Loader2 },
-    completed: { label: 'Completed', className: 'bg-green-500/10 text-green-600 border-green-500/30', icon: CheckCircle },
-    failed: { label: 'Failed', className: 'bg-red-500/10 text-red-600 border-red-500/30', icon: XCircle },
+    generating: { label: 'Generating', className: 'bg-status-info-bg text-status-info border-status-info/30', icon: Loader2 },
+    completed: { label: 'Completed', className: 'bg-status-success-bg text-status-success border-status-success/30', icon: CheckCircle },
+    failed: { label: 'Failed', className: 'bg-status-critical-bg text-status-critical border-status-critical/30', icon: XCircle },
 };
 
 const getSections = (exp: AuditExport): string[] => {

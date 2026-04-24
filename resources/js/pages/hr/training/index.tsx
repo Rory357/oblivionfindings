@@ -82,10 +82,10 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     {[
-                        { label: 'Total Records', value: stats.totalRecords, icon: Users, color: 'violet', gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-primary/10', iconColor: 'text-primary', borderColor: 'hover:border-primary' },
-                        { label: 'Completed This Month', value: stats.completedThisMonth, icon: CheckCircle2, color: 'emerald', gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', borderColor: 'hover:border-emerald-300' },
-                        { label: 'Due Soon (60 days)', value: stats.dueSoonCount, icon: Clock, color: 'amber', gradient: 'from-amber-500/10 to-yellow-500/5', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', borderColor: 'hover:border-amber-300' },
-                        { label: 'Expired', value: stats.expiredCount, icon: AlertTriangle, color: 'red', gradient: 'from-red-500/10 to-rose-500/5', iconBg: 'bg-red-100', iconColor: 'text-red-600', borderColor: 'hover:border-red-300' },
+                        { label: 'Total Records', value: stats.totalRecords, icon: Users, color: 'violet', gradient: 'from-primary/10 to-primary/5', iconBg: 'bg-primary/10', iconColor: 'text-primary', borderColor: 'hover:border-primary' },
+                        { label: 'Completed This Month', value: stats.completedThisMonth, icon: CheckCircle2, color: 'emerald', gradient: 'from-status-success/10 to-status-success/5', iconBg: 'bg-status-success-bg', iconColor: 'text-status-success', borderColor: 'hover:border-status-success/30' },
+                        { label: 'Due Soon (60 days)', value: stats.dueSoonCount, icon: Clock, color: 'amber', gradient: 'from-status-warning/10 to-status-warning/5', iconBg: 'bg-status-warning-bg', iconColor: 'text-status-warning', borderColor: 'hover:border-status-warning/30' },
+                        { label: 'Expired', value: stats.expiredCount, icon: AlertTriangle, color: 'red', gradient: 'from-status-critical/10 to-status-critical/5', iconBg: 'bg-status-critical-bg', iconColor: 'text-status-critical', borderColor: 'hover:border-status-critical/30' },
                     ].map((kpi) => {
                         const Icon = kpi.icon;
                         return (
@@ -109,12 +109,12 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                 {/* Overdue & Due Soon */}
                 <div className="grid gap-4 lg:grid-cols-2">
                     {/* Overdue */}
-                    <Card className="overflow-hidden border-red-100">
-                        <CardHeader className="border-b bg-gradient-to-r from-red-50 to-transparent pb-3">
+                    <Card className="overflow-hidden border-status-critical/30">
+                        <CardHeader className="border-b bg-gradient-to-r from-status-critical-bg to-transparent pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100">
-                                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-critical-bg">
+                                        <AlertTriangle className="h-4 w-4 text-status-critical" />
                                     </div>
                                     Overdue Training
                                     {overdue.length > 0 && <Badge variant="destructive" className="ml-1 text-[10px]">{overdue.length}</Badge>}
@@ -124,18 +124,18 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                         <CardContent className="p-0">
                             {overdue.length === 0 ? (
                                 <div className="flex flex-col items-center gap-2 py-12">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
-                                        <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-status-success-bg">
+                                        <CheckCircle2 className="h-6 w-6 text-status-success" />
                                     </div>
-                                    <p className="text-sm font-medium text-emerald-600">All clear!</p>
+                                    <p className="text-sm font-medium text-status-success">All clear!</p>
                                     <p className="text-xs text-muted-foreground">No overdue training records</p>
                                 </div>
                             ) : (
                                 <div className="divide-y">
                                     {overdue.map((r) => (
-                                        <div key={r.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-red-50/50">
+                                        <div key={r.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-status-critical-bg">
                                             <div className="flex items-center gap-3">
-                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-600">
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-critical-bg text-xs font-bold text-status-critical">
                                                     {(r.user?.name ?? '?')[0]}
                                                 </div>
                                                 <div>
@@ -143,7 +143,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                                                     <p className="text-[10px] text-muted-foreground">{r.training_course?.name ?? '\u2014'}</p>
                                                 </div>
                                             </div>
-                                            <span className="text-xs font-medium text-red-600">{formatDate(r.expires_at)}</span>
+                                            <span className="text-xs font-medium text-status-critical">{formatDate(r.expires_at)}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -152,15 +152,15 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                     </Card>
 
                     {/* Due Soon */}
-                    <Card className="overflow-hidden border-amber-100">
-                        <CardHeader className="border-b bg-gradient-to-r from-amber-50 to-transparent pb-3">
+                    <Card className="overflow-hidden border-status-warning/30">
+                        <CardHeader className="border-b bg-gradient-to-r from-status-warning-bg to-transparent pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
-                                        <Clock className="h-4 w-4 text-amber-600" />
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-warning-bg">
+                                        <Clock className="h-4 w-4 text-status-warning" />
                                     </div>
                                     Due Soon
-                                    {dueSoon.length > 0 && <Badge className="ml-1 border-0 bg-amber-100 text-[10px] text-amber-700">{dueSoon.length}</Badge>}
+                                    {dueSoon.length > 0 && <Badge className="ml-1 border-0 bg-status-warning-bg text-[10px] text-status-warning">{dueSoon.length}</Badge>}
                                 </CardTitle>
                                 <span className="text-[10px] text-muted-foreground">Next 60 days</span>
                             </div>
@@ -169,7 +169,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                             {dueSoon.length === 0 ? (
                                 <div className="flex flex-col items-center gap-2 py-12">
                                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                                        <Calendar className="h-6 w-6 text-slate-300" />
+                                        <Calendar className="h-6 w-6 text-muted-foreground" />
                                     </div>
                                     <p className="text-sm text-muted-foreground">No records expiring soon</p>
                                 </div>
@@ -178,9 +178,9 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                                     {dueSoon.map((r) => {
                                         const days = daysUntil(r.expires_at);
                                         return (
-                                            <div key={r.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-amber-50/50">
+                                            <div key={r.id} className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-status-warning-bg">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700">
+                                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-warning-bg text-xs font-bold text-status-warning">
                                                         {(r.user?.name ?? '?')[0]}
                                                     </div>
                                                     <div>
@@ -189,7 +189,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className={`text-xs font-medium ${days !== null && days <= 14 ? 'text-amber-600' : 'text-muted-foreground'}`}>{formatDate(r.expires_at)}</span>
+                                                    <span className={`text-xs font-medium ${days !== null && days <= 14 ? 'text-status-warning' : 'text-muted-foreground'}`}>{formatDate(r.expires_at)}</span>
                                                     {days !== null && days > 0 && <p className="text-[10px] text-muted-foreground">{days} days</p>}
                                                 </div>
                                             </div>
@@ -203,7 +203,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
 
                 {/* Course Renewal Pressure */}
                 <Card className="overflow-hidden">
-                    <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
+                    <CardHeader className="border-b bg-gradient-to-r from-primary/10 to-transparent pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
@@ -263,10 +263,10 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                 {/* By Site & Courses Needing Renewal */}
                 <div className="grid gap-4 lg:grid-cols-2">
                     <Card className="overflow-hidden">
-                        <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-transparent pb-3">
+                        <CardHeader className="border-b bg-gradient-to-r from-status-info-bg to-transparent pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
-                                    <MapPin className="h-4 w-4 text-blue-600" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-info-bg">
+                                    <MapPin className="h-4 w-4 text-status-info" />
                                 </div>
                                 By Site
                             </CardTitle>
@@ -277,7 +277,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                             ) : bySite.map((site) => {
                                 const pct = site.total > 0 ? Math.round(((site.total - site.expired) / site.total) * 100) : 100;
                                 return (
-                                    <div key={site.site_id} className="group rounded-xl border p-3 transition-all hover:shadow-sm hover:border-blue-200">
+                                    <div key={site.site_id} className="group rounded-xl border p-3 transition-all hover:shadow-sm hover:border-status-info/30">
                                         <div className="flex items-center justify-between">
                                             <div>
                                                 <p className="text-sm font-medium">{site.site_name}</p>
@@ -288,7 +288,7 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                                             </Badge>
                                         </div>
                                         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                                            <div className={`h-full rounded-full transition-all duration-700 ${site.expired > 0 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${pct}%` }} />
+                                            <div className={`h-full rounded-full transition-all duration-700 ${site.expired > 0 ? 'bg-status-warning' : 'bg-status-success'}`} style={{ width: `${pct}%` }} />
                                         </div>
                                     </div>
                                 );
@@ -297,10 +297,10 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                     </Card>
 
                     <Card className="overflow-hidden">
-                        <CardHeader className="border-b bg-gradient-to-r from-amber-50 to-transparent pb-3">
+                        <CardHeader className="border-b bg-gradient-to-r from-status-warning-bg to-transparent pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
-                                    <GraduationCap className="h-4 w-4 text-amber-600" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-warning-bg">
+                                    <GraduationCap className="h-4 w-4 text-status-warning" />
                                 </div>
                                 Courses Needing Renewal
                             </CardTitle>
@@ -308,21 +308,21 @@ export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix,
                         <CardContent className="space-y-2 pt-4">
                             {renewalNeeded.length === 0 ? (
                                 <div className="flex flex-col items-center gap-2 py-6">
-                                    <CheckCircle2 className="h-8 w-8 text-emerald-300" />
+                                    <CheckCircle2 className="h-8 w-8 text-status-success" />
                                     <p className="text-sm text-muted-foreground">No courses currently need renewal</p>
                                 </div>
                             ) : renewalNeeded.map((course) => (
-                                <div key={course.id} className="group flex items-center justify-between rounded-xl border p-3 transition-all hover:shadow-sm hover:border-amber-200">
+                                <div key={course.id} className="group flex items-center justify-between rounded-xl border p-3 transition-all hover:shadow-sm hover:border-status-warning/30">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50">
-                                            <BookOpen className="h-4 w-4 text-amber-500" />
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-warning-bg">
+                                            <BookOpen className="h-4 w-4 text-status-warning" />
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium">{course.name}</p>
                                             <p className="text-[10px] text-muted-foreground">{course.category || '\u2014'}{course.code ? ` \u00b7 ${course.code}` : ''}</p>
                                         </div>
                                     </div>
-                                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-xs text-amber-700">
+                                    <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-xs text-status-warning">
                                         {course.training_records_count ?? 0} expired
                                     </Badge>
                                 </div>

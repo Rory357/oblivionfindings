@@ -59,7 +59,7 @@ export default function EvidencePackCreate({ stays, stayId }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.stay_id && <div className="mt-1 text-xs text-red-500">{errors.stay_id}</div>}
+                                {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
                             </div>
                             <div>
                                 <Label>Title</Label>
@@ -68,7 +68,7 @@ export default function EvidencePackCreate({ stays, stayId }: Props) {
                                     onChange={(e) => setData('title', e.target.value)}
                                     placeholder="Evidence pack title"
                                 />
-                                {errors.title && <div className="mt-1 text-xs text-red-500">{errors.title}</div>}
+                                {errors.title && <div className="mt-1 text-xs text-status-critical">{errors.title}</div>}
                             </div>
                             <div>
                                 <Label>Description</Label>
@@ -77,7 +77,7 @@ export default function EvidencePackCreate({ stays, stayId }: Props) {
                                     onChange={(e) => setData('description', e.target.value)}
                                     rows={4}
                                 />
-                                {errors.description && <div className="mt-1 text-xs text-red-500">{errors.description}</div>}
+                                {errors.description && <div className="mt-1 text-xs text-status-critical">{errors.description}</div>}
                             </div>
                         </CardContent>
                     </Card>

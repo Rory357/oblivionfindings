@@ -62,10 +62,10 @@ const formatDateTime = (date: string | null) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    sent: { label: 'Sent', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
+    sent: { label: 'Sent', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
     viewed: { label: 'Viewed', className: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70' },
-    paid: { label: 'Paid', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
-    overdue: { label: 'Overdue', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
+    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
+    overdue: { label: 'Overdue', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
     cancelled: { label: 'Cancelled', className: 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground' },
 };
 
@@ -107,7 +107,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                 {statusConfig[invoice.status]?.label ?? invoice.status}
                             </Badge>
                             {isOverdue && (
-                                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+                                <Badge className="bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical">
                                     <AlertTriangle className="w-3 h-3 mr-1" />
                                     Overdue
                                 </Badge>
@@ -158,7 +158,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Due Date</span>
-                                <span className={cn('font-medium', isOverdue && 'text-red-600 dark:text-red-400')}>
+                                <span className={cn('font-medium', isOverdue && 'text-status-critical dark:text-status-critical')}>
                                     {formatDate(invoice.due_date)}
                                 </span>
                             </div>
@@ -242,7 +242,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                 </div>
                             )}
                             {invoice.paid_at && (
-                                <div className="flex justify-between text-green-700 dark:text-green-400">
+                                <div className="flex justify-between text-status-success dark:text-status-success">
                                     <span>Paid At</span>
                                     <span className="font-medium">{formatDateTime(invoice.paid_at)}</span>
                                 </div>

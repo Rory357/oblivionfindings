@@ -37,7 +37,7 @@ export default function StepDescribe({ data, onChange, errors }: Props) {
                     className="text-base"
                     autoFocus
                 />
-                {errors?.description && <p className="text-xs text-red-600">{errors.description}</p>}
+                {errors?.description && <p className="text-xs text-status-critical">{errors.description}</p>}
                 <p className="text-xs text-muted-foreground">
                     Tap <span className="font-medium">Save and continue</span> and we&rsquo;ll save the incident so you don&rsquo;t lose it.
                 </p>

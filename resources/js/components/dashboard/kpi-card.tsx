@@ -51,8 +51,8 @@ export function KpiCard({
                         <div
                             className={cn(
                                 'flex items-center gap-1 text-xs font-medium',
-                                trend.direction === 'up' && 'text-emerald-500',
-                                trend.direction === 'down' && 'text-red-500',
+                                trend.direction === 'up' && 'text-status-success',
+                                trend.direction === 'down' && 'text-status-critical',
                                 trend.direction === 'neutral' && 'text-muted-foreground',
                             )}
                         >

@@ -22,7 +22,7 @@ export default function CareersShow({ posting }: Props) {
                 </Link>
 
                 {flash?.success && (
-                    <div className="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-400">
+                    <div className="mb-6 rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success">
                         {flash.success}
                     </div>
                 )}
@@ -39,7 +39,7 @@ export default function CareersShow({ posting }: Props) {
                             <Badge variant="outline" className="text-sm"><MapPin className="mr-1 h-3.5 w-3.5" />{posting.location}</Badge>
                         )}
                         {posting.is_remote && (
-                            <Badge variant="outline" className="text-sm gap-1 border-blue-500/30 text-blue-400 bg-blue-500/10">
+                            <Badge variant="outline" className="text-sm gap-1 border-status-info/30 text-status-info bg-status-info">
                                 <Wifi className="h-3 w-3" /> Remote
                             </Badge>
                         )}

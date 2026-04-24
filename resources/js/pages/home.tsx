@@ -69,12 +69,12 @@ const Home: React.FC = () => {
                 {/* Background effects */}
                 <div className="pointer-events-none absolute inset-0">
                     <div className="absolute -top-20 -right-20 h-[400px] w-[400px] rounded-full bg-primary/10 blur-3xl dark:bg-primary/10" />
-                    <div className="absolute -bottom-20 -left-20 h-[300px] w-[300px] rounded-full bg-emerald-500/10 blur-3xl dark:bg-emerald-500/10" />
+                    <div className="absolute -bottom-20 -left-20 h-[300px] w-[300px] rounded-full bg-status-success blur-3xl dark:bg-status-success" />
                 </div>
 
                 <div className="relative mx-auto max-w-4xl text-center">
                     <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm text-primary">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-status-success" />
                         <span>
                             Built for New Zealand supported living providers
                         </span>
@@ -123,7 +123,7 @@ const Home: React.FC = () => {
                             >
                                 <CheckCircle2
                                     size={16}
-                                    className="text-emerald-500"
+                                    className="text-status-success"
                                 />
                                 <span>{benefit}</span>
                             </div>
@@ -168,7 +168,7 @@ const Home: React.FC = () => {
                                     >
                                         <CheckCircle2
                                             size={18}
-                                            className="mt-0.5 shrink-0 text-emerald-500"
+                                            className="mt-0.5 shrink-0 text-status-success"
                                         />
                                         <span className="text-muted-foreground">
                                             {item}
@@ -189,7 +189,7 @@ const Home: React.FC = () => {
 
                         {/* Control Room Preview - Shows alerts/detections only, no camera feeds */}
                         <div className="relative">
-                            <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-purple-500/20 blur-2xl" />
+                            <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-primary/20 blur-2xl" />
                             <div className="relative rounded-2xl border border-border bg-background p-4 shadow-2xl">
                                 <div className="mb-4 flex items-center justify-between">
                                     <div className="flex items-center gap-2">
@@ -202,7 +202,7 @@ const Home: React.FC = () => {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                                        <span className="h-2 w-2 animate-pulse rounded-full bg-status-success" />
                                         <span className="text-xs text-muted-foreground">
                                             Active
                                         </span>
@@ -213,7 +213,7 @@ const Home: React.FC = () => {
                                 <div className="space-y-3">
                                     <div className="rounded-lg border border-border bg-muted/50 p-3">
                                         <div className="mb-2 flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                            <div className="h-2 w-2 rounded-full bg-status-success" />
                                             <span className="text-xs font-medium text-foreground">
                                                 Location Status
                                             </span>
@@ -226,7 +226,7 @@ const Home: React.FC = () => {
                                                 <span className="text-muted-foreground">
                                                     Main Entrance
                                                 </span>
-                                                <span className="text-emerald-500">
+                                                <span className="text-status-success">
                                                     Normal
                                                 </span>
                                             </div>
@@ -234,7 +234,7 @@ const Home: React.FC = () => {
                                                 <span className="text-muted-foreground">
                                                     Lounge
                                                 </span>
-                                                <span className="text-emerald-500">
+                                                <span className="text-status-success">
                                                     Normal
                                                 </span>
                                             </div>
@@ -242,7 +242,7 @@ const Home: React.FC = () => {
                                                 <span className="text-muted-foreground">
                                                     Kitchen
                                                 </span>
-                                                <span className="text-amber-500">
+                                                <span className="text-status-warning">
                                                     Activity
                                                 </span>
                                             </div>
@@ -250,7 +250,7 @@ const Home: React.FC = () => {
                                                 <span className="text-muted-foreground">
                                                     Garden
                                                 </span>
-                                                <span className="text-emerald-500">
+                                                <span className="text-status-success">
                                                     Normal
                                                 </span>
                                             </div>
@@ -258,12 +258,12 @@ const Home: React.FC = () => {
                                     </div>
 
                                     {/* Alert Panel */}
-                                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                                    <div className="rounded-lg border border-status-warning/30 bg-status-warning p-3">
                                         <div className="flex items-start gap-3">
-                                            <div className="mt-0.5 flex h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                                            <div className="mt-0.5 flex h-2 w-2 shrink-0 rounded-full bg-status-warning" />
                                             <div className="flex-1">
                                                 <div className="flex items-center justify-between">
-                                                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                                                    <p className="text-xs font-medium text-status-warning dark:text-status-warning">
                                                         Activity Detected
                                                     </p>
                                                     <span className="text-[10px] text-muted-foreground">
@@ -276,10 +276,10 @@ const Home: React.FC = () => {
                                                     typically quiet period
                                                 </p>
                                                 <div className="mt-2 flex gap-2">
-                                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] text-amber-600">
+                                                    <span className="rounded bg-status-warning-bg px-1.5 py-0.5 text-[9px] text-status-warning">
                                                         Kitchen
                                                     </span>
-                                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] text-amber-600">
+                                                    <span className="rounded bg-status-warning-bg px-1.5 py-0.5 text-[9px] text-status-warning">
                                                         Motion
                                                     </span>
                                                 </div>
@@ -300,7 +300,7 @@ const Home: React.FC = () => {
                                                 <span className="w-12 text-muted-foreground">
                                                     14:32
                                                 </span>
-                                                <span className="text-emerald-500">
+                                                <span className="text-status-success">
                                                     ●
                                                 </span>
                                                 <span className="text-foreground">
@@ -314,7 +314,7 @@ const Home: React.FC = () => {
                                                 <span className="w-12 text-muted-foreground">
                                                     14:33
                                                 </span>
-                                                <span className="text-emerald-500">
+                                                <span className="text-status-success">
                                                     ●
                                                 </span>
                                                 <span className="text-foreground">
@@ -328,7 +328,7 @@ const Home: React.FC = () => {
                                                 <span className="w-12 text-muted-foreground">
                                                     14:35
                                                 </span>
-                                                <span className="text-amber-500">
+                                                <span className="text-status-warning">
                                                     ●
                                                 </span>
                                                 <span className="text-foreground">
@@ -451,10 +451,10 @@ const Home: React.FC = () => {
                                             key={index}
                                             className="flex items-start gap-3"
                                         >
-                                            <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10">
+                                            <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-status-success">
                                                 <CheckCircle2
                                                     size={14}
-                                                    className="text-emerald-500"
+                                                    className="text-status-success"
                                                 />
                                             </div>
                                             <span className="text-sm text-muted-foreground">
@@ -467,13 +467,13 @@ const Home: React.FC = () => {
 
                             {/* Mock Dashboard */}
                             <div className="relative">
-                                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/10 to-emerald-500/10 blur-2xl" />
+                                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/10 to-status-success/10 blur-2xl" />
                                 <div className="relative rounded-2xl border border-border bg-background p-4 shadow-2xl">
                                     <div className="mb-4 flex items-center gap-2">
                                         <div className="flex gap-1.5">
-                                            <div className="h-3 w-3 rounded-full bg-rose-500/80" />
-                                            <div className="h-3 w-3 rounded-full bg-amber-500/80" />
-                                            <div className="h-3 w-3 rounded-full bg-emerald-500/80" />
+                                            <div className="h-3 w-3 rounded-full bg-status-critical" />
+                                            <div className="h-3 w-3 rounded-full bg-status-warning" />
+                                            <div className="h-3 w-3 rounded-full bg-status-success" />
                                         </div>
                                         <div className="flex-1 text-center text-xs text-muted-foreground">
                                             Dashboard Preview
@@ -492,7 +492,7 @@ const Home: React.FC = () => {
                                                     <div className="text-xl font-semibold text-foreground">
                                                         42
                                                     </div>
-                                                    <div className="text-[10px] text-emerald-500">
+                                                    <div className="text-[10px] text-status-success">
                                                         +4 this month
                                                     </div>
                                                 </div>

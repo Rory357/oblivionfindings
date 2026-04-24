@@ -108,13 +108,13 @@ export default function MedicationsDashboard() {
   const getSeverityBadgeClass = (severity: string) => {
     switch (severity) {
       case 'critical':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-status-critical-bg text-status-critical border-status-critical/30';
       case 'warning':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-status-warning-bg text-status-warning border-status-warning/30';
       case 'caution':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+        return 'bg-status-warning-bg text-status-warning border-status-warning/30';
       default:
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-status-info-bg text-status-info border-status-info/30';
     }
   };
 
@@ -164,7 +164,7 @@ export default function MedicationsDashboard() {
           <CardContent>
             {alerts.length === 0 ? (
               <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
-                <CheckCircle className="h-5 w-5 text-green-500" />
+                <CheckCircle className="h-5 w-5 text-status-success" />
                 <span>No active alerts</span>
               </div>
             ) : (

@@ -141,8 +141,8 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                 </div>
 
                 {postingError && (
-                    <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-4">
-                        <p className="text-sm text-red-800">{postingError}</p>
+                    <div className="mb-4 rounded-md bg-status-critical-bg border border-status-critical/30 p-4">
+                        <p className="text-sm text-status-critical">{postingError}</p>
                     </div>
                 )}
 
@@ -163,7 +163,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                         onChange={(e) => setData('journal_date', e.target.value)}
                                     />
                                     {errors.journal_date && (
-                                        <p className="text-sm text-red-600 mt-1">{errors.journal_date}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.journal_date}</p>
                                     )}
                                 </div>
 
@@ -180,7 +180,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                         </SelectContent>
                                     </Select>
                                     {errors.type && (
-                                        <p className="text-sm text-red-600 mt-1">{errors.type}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.type}</p>
                                     )}
                                 </div>
 
@@ -193,7 +193,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                         placeholder="Optional reference"
                                     />
                                     {errors.reference && (
-                                        <p className="text-sm text-red-600 mt-1">{errors.reference}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.reference}</p>
                                     )}
                                 </div>
 
@@ -207,7 +207,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                         rows={1}
                                     />
                                     {errors.description && (
-                                        <p className="text-sm text-red-600 mt-1">{errors.description}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.description}</p>
                                     )}
                                 </div>
                             </div>
@@ -225,7 +225,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                         </CardHeader>
                         <CardContent className="p-0">
                             {errors.lines && (
-                                <p className="text-sm text-red-600 px-6 py-2">{errors.lines}</p>
+                                <p className="text-sm text-status-critical px-6 py-2">{errors.lines}</p>
                             )}
                             <Table>
                                 <TableHeader>
@@ -259,7 +259,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                                     </SelectContent>
                                                 </Select>
                                                 {errors[`lines.${index}.account_id` as keyof typeof errors] && (
-                                                    <p className="text-xs text-red-600 mt-1">
+                                                    <p className="text-xs text-status-critical mt-1">
                                                         {errors[`lines.${index}.account_id` as keyof typeof errors]}
                                                     </p>
                                                 )}
@@ -334,7 +334,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                                     size="sm"
                                                     onClick={() => removeLine(index)}
                                                     disabled={data.lines.length <= 2}
-                                                    className="text-muted-foreground hover:text-red-600"
+                                                    className="text-muted-foreground hover:text-status-critical"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
@@ -363,7 +363,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                                             colSpan={2}
                                             className={cn(
                                                 'text-right font-mono font-semibold',
-                                                difference !== 0 ? 'text-red-600' : 'text-green-600',
+                                                difference !== 0 ? 'text-status-critical' : 'text-status-success',
                                             )}
                                         >
                                             {formatNZD(Math.abs(difference))}

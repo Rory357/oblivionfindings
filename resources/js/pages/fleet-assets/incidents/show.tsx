@@ -61,24 +61,24 @@ type Props = {
 };
 
 const severityBannerColors: Record<string, string> = {
-    minor: 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200',
-    moderate: 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-950/30 dark:border-orange-800 dark:text-orange-200',
-    major: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
-    critical: 'bg-red-100 border-red-300 text-red-950 dark:bg-red-950/50 dark:border-red-700 dark:text-red-100',
+    minor: 'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
+    moderate: 'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
+    major: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
+    critical: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
 };
 
 const severityIconColors: Record<string, string> = {
-    minor: 'text-amber-600',
-    moderate: 'text-orange-600',
-    major: 'text-red-600',
-    critical: 'text-red-800 dark:text-red-400',
+    minor: 'text-status-warning',
+    moderate: 'text-status-warning',
+    major: 'text-status-critical',
+    critical: 'text-status-critical dark:text-status-critical',
 };
 
 function statusBadge(status: string) {
     switch (status) {
         case 'reported': return <Badge variant="outline">Reported</Badge>;
-        case 'investigating': return <Badge variant="default" className="bg-blue-600">Investigating</Badge>;
-        case 'resolved': return <Badge variant="default" className="bg-green-600">Resolved</Badge>;
+        case 'investigating': return <Badge variant="default" className="bg-status-info">Investigating</Badge>;
+        case 'resolved': return <Badge variant="default" className="bg-status-success">Resolved</Badge>;
         case 'closed': return <Badge variant="secondary">Closed</Badge>;
         default: return <Badge variant="outline">{status}</Badge>;
     }
@@ -219,7 +219,7 @@ export default function IncidentShow({ incident: inc, can }: Props) {
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="text-base flex items-center gap-2">
-                                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" />
                                         Damage Details
                                     </CardTitle>
                                 </CardHeader>

@@ -72,28 +72,28 @@ const vendorTypeLabels: Record<string, string> = {
 };
 
 const vendorTypeColors: Record<string, string> = {
-    supplier: 'bg-blue-100 text-blue-800',
+    supplier: 'bg-status-info-bg text-status-info',
     contractor: 'bg-primary/10 text-primary',
-    utility: 'bg-amber-100 text-amber-800',
-    government: 'bg-teal-100 text-teal-800',
+    utility: 'bg-status-warning-bg text-status-warning',
+    government: 'bg-status-info-bg text-status-info',
     other: 'bg-muted text-foreground',
 };
 
 const billStatusColors: Record<string, string> = {
     draft: 'bg-muted text-foreground',
-    pending: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-blue-100 text-blue-800',
-    paid: 'bg-green-100 text-green-800',
-    overdue: 'bg-red-100 text-red-800',
+    pending: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-info-bg text-status-info',
+    paid: 'bg-status-success-bg text-status-success',
+    overdue: 'bg-status-critical-bg text-status-critical',
     cancelled: 'bg-muted text-muted-foreground',
 };
 
 const poStatusColors: Record<string, string> = {
     draft: 'bg-muted text-foreground',
-    pending_approval: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-blue-100 text-blue-800',
+    pending_approval: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-info-bg text-status-info',
     sent: 'bg-primary/10 text-primary',
-    received: 'bg-green-100 text-green-800',
+    received: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
 };
 
@@ -147,7 +147,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                     variant={vendor.is_active ? 'default' : 'secondary'}
                                     className={
                                         vendor.is_active
-                                            ? 'bg-green-100 text-green-800'
+                                            ? 'bg-status-success-bg text-status-success'
                                             : 'bg-muted text-muted-foreground'
                                     }
                                 >
@@ -284,7 +284,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                     </TableCell>
                                                     <TableCell>
                                                         {contact.is_primary && (
-                                                            <Badge className="bg-blue-100 text-blue-800">
+                                                            <Badge className="bg-status-info-bg text-status-info">
                                                                 Primary
                                                             </Badge>
                                                         )}

@@ -407,7 +407,7 @@ export default function VehicleShow({
                                         <Select value={assignDriverForm.data.primary_driver_user_id} onValueChange={(v) => { const d = (eligible_drivers ?? []).find((d) => String(d.id) === v); if (d?.licence_expires_at && isExpired(d.licence_expires_at)) return; assignDriverForm.setData('primary_driver_user_id', v); }}>
                                             <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue placeholder="Select driver..." /></SelectTrigger>
                                             <SelectContent>
-                                                {(eligible_drivers ?? []).map((driver) => { const exp = driver.licence_expires_at ? isExpired(driver.licence_expires_at) : false; return (<SelectItem key={driver.id} value={String(driver.id)} disabled={exp}><span className="flex items-center gap-1">{driver.name}{exp && <span className="text-[9px] text-red-500">(Expired)</span>}</span></SelectItem>); })}
+                                                {(eligible_drivers ?? []).map((driver) => { const exp = driver.licence_expires_at ? isExpired(driver.licence_expires_at) : false; return (<SelectItem key={driver.id} value={String(driver.id)} disabled={exp}><span className="flex items-center gap-1">{driver.name}{exp && <span className="text-[9px] text-status-critical">(Expired)</span>}</span></SelectItem>); })}
                                             </SelectContent>
                                         </Select>
                                         <Button type="submit" size="sm" className="h-8" disabled={assignDriverForm.processing || !assignDriverForm.data.primary_driver_user_id}>Assign</Button>
@@ -462,8 +462,8 @@ export default function VehicleShow({
                                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Next Inspection Due</p>
                                     {vehicle.inspection_due_at ? (
                                         <p className={`text-sm font-bold ${
-                                            new Date(vehicle.inspection_due_at) < new Date() ? 'text-red-600' :
-                                            new Date(vehicle.inspection_due_at) < new Date(Date.now() + 30 * 86400000) ? 'text-amber-600' :
+                                            new Date(vehicle.inspection_due_at) < new Date() ? 'text-status-critical' :
+                                            new Date(vehicle.inspection_due_at) < new Date(Date.now() + 30 * 86400000) ? 'text-status-warning' :
                                             'text-primary'
                                         }`}>
                                             {formatDate(vehicle.inspection_due_at)}
@@ -553,8 +553,8 @@ export default function VehicleShow({
                                 <div className="rounded-lg border bg-primary/10/50 p-3 dark:bg-primary/20">
                                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Est. Next Service</p>
                                     <p className={`text-lg font-bold ${
-                                        service_prediction.predicted_days != null && service_prediction.predicted_days <= 7 ? 'text-red-600' :
-                                        service_prediction.predicted_days != null && service_prediction.predicted_days <= 30 ? 'text-amber-600' :
+                                        service_prediction.predicted_days != null && service_prediction.predicted_days <= 7 ? 'text-status-critical' :
+                                        service_prediction.predicted_days != null && service_prediction.predicted_days <= 30 ? 'text-status-warning' :
                                         'text-primary'
                                     }`}>
                                         {service_prediction.predicted_days != null
@@ -658,7 +658,7 @@ export default function VehicleShow({
                                                 }, { preserveScroll: true });
                                             }}
                                             className={`h-7 w-12 rounded-full transition-colors ${
-                                                (vehicle as Record<string, unknown>)[item.key] ? 'bg-primary' : 'bg-slate-300'
+                                                (vehicle as Record<string, unknown>)[item.key] ? 'bg-primary' : 'bg-muted'
                                             }`}
                                         >
                                             <span

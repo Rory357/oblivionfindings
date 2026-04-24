@@ -77,7 +77,7 @@ export default function InvoiceShow({ invoice }: Props) {
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <CalendarDays className="h-3 w-3" /> Issued: {formatDate(invoice.issue_date)}
                     </span>
-                    <span className={`text-xs ${isOverdue ? 'font-medium text-red-600' : 'text-muted-foreground'}`}>
+                    <span className={`text-xs ${isOverdue ? 'font-medium text-status-critical' : 'text-muted-foreground'}`}>
                         Due: {formatDate(invoice.due_date)}
                     </span>
                     {invoice.payment_terms && (
@@ -110,14 +110,14 @@ export default function InvoiceShow({ invoice }: Props) {
                             <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{clientDisplay}</span></div>
                             {invoice.funding_body && <div className="flex justify-between"><span className="text-muted-foreground">Funding Body</span><span>{invoice.funding_body}</span></div>}
                             <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{formatDate(invoice.created_at)}</span></div>
-                            {invoice.paid_at && <div className="flex justify-between"><span className="text-muted-foreground">Paid</span><span className="font-medium text-emerald-600">{formatDate(invoice.paid_at)}</span></div>}
+                            {invoice.paid_at && <div className="flex justify-between"><span className="text-muted-foreground">Paid</span><span className="font-medium text-status-success">{formatDate(invoice.paid_at)}</span></div>}
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Dates</CardTitle></CardHeader>
                         <CardContent className="space-y-1 text-xs">
                             <div className="flex justify-between"><span className="text-muted-foreground">Issue Date</span><span>{formatDate(invoice.issue_date)}</span></div>
-                            <div className="flex justify-between"><span className="text-muted-foreground">Due Date</span><span className={isOverdue ? 'font-medium text-red-600' : ''}>{formatDate(invoice.due_date)}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Due Date</span><span className={isOverdue ? 'font-medium text-status-critical' : ''}>{formatDate(invoice.due_date)}</span></div>
                             {invoice.payment_terms && <div className="flex justify-between"><span className="text-muted-foreground">Terms</span><span className="capitalize">{invoice.payment_terms.replace(/_/g, ' ')}</span></div>}
                         </CardContent>
                     </Card>

@@ -229,7 +229,7 @@ export default function CalendarIndex({ events, leaveEvents, sites, can }: Props
                                     value={form.data.title}
                                     onChange={(e) => form.setData('title', e.target.value)}
                                 />
-                                {form.errors.title && <p className="mt-1 text-xs text-red-500">{form.errors.title}</p>}
+                                {form.errors.title && <p className="mt-1 text-xs text-status-critical">{form.errors.title}</p>}
                             </div>
 
                             <div>

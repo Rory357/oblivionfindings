@@ -95,7 +95,7 @@ const formatDate = (dateStr: string) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    final: { label: 'Final', className: 'bg-green-100 text-green-700 border-green-300' },
+    final: { label: 'Final', className: 'bg-status-success-bg text-status-success border-status-success/30' },
 };
 
 const periodTypeLabels: Record<string, string> = {
@@ -206,25 +206,25 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Inflows</p>
-                                <p className="text-2xl font-bold mt-1 text-green-600">{formatCurrency(totalInflows)}</p>
+                                <p className="text-2xl font-bold mt-1 text-status-success">{formatCurrency(totalInflows)}</p>
                             </div>
-                            <TrendingUp className="h-8 w-8 text-green-500/50" />
+                            <TrendingUp className="h-8 w-8 text-status-success" />
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Outflows</p>
-                                <p className="text-2xl font-bold mt-1 text-red-600">{formatCurrency(Math.abs(totalOutflows))}</p>
+                                <p className="text-2xl font-bold mt-1 text-status-critical">{formatCurrency(Math.abs(totalOutflows))}</p>
                             </div>
-                            <TrendingDown className="h-8 w-8 text-red-500/50" />
+                            <TrendingDown className="h-8 w-8 text-status-critical" />
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Net Cash Flow</p>
-                                <p className={`text-2xl font-bold mt-1 ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <p className={`text-2xl font-bold mt-1 ${netCashFlow >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                     {formatCurrency(netCashFlow)}
                                 </p>
                             </div>
@@ -235,7 +235,7 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                         <CardContent className="flex items-center justify-between p-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Final Balance</p>
-                                <p className={`text-2xl font-bold mt-1 ${finalBalance >= 0 ? 'text-foreground' : 'text-red-600'}`}>
+                                <p className={`text-2xl font-bold mt-1 ${finalBalance >= 0 ? 'text-foreground' : 'text-status-critical'}`}>
                                     {formatCurrency(finalBalance)}
                                 </p>
                             </div>
@@ -371,31 +371,31 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                                 <TableCell className="text-right font-mono tabular-nums">
                                                     {formatNZD(period.opening_balance)}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-green-600">
+                                                <TableCell className="text-right font-mono tabular-nums text-status-success">
                                                     {formatNZD(period.inflows.invoice_receipts)}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-green-600">
+                                                <TableCell className="text-right font-mono tabular-nums text-status-success">
                                                     {formatNZD(period.inflows.overdue_collections)}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-green-600">
+                                                <TableCell className="text-right font-mono tabular-nums text-status-success">
                                                     {formatNZD(period.inflows.recurring_income)}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-red-600">
+                                                <TableCell className="text-right font-mono tabular-nums text-status-critical">
                                                     {formatNZD(period.outflows.bill_payments)}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-red-600">
+                                                <TableCell className="text-right font-mono tabular-nums text-status-critical">
                                                     {formatNZD(period.outflows.overdue_bills)}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-red-600">
+                                                <TableCell className="text-right font-mono tabular-nums text-status-critical">
                                                     {formatNZD(period.outflows.recurring_expenses)}
                                                 </TableCell>
-                                                <TableCell className="text-right font-mono tabular-nums text-red-600">
+                                                <TableCell className="text-right font-mono tabular-nums text-status-critical">
                                                     {formatNZD(period.outflows.gst_payments)}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono font-semibold tabular-nums ${netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                <TableCell className={`text-right font-mono font-semibold tabular-nums ${netFlow >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                     {formatNZD(netFlow)}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono font-semibold tabular-nums ${closingBal >= 0 ? '' : 'text-red-600'}`}>
+                                                <TableCell className={`text-right font-mono font-semibold tabular-nums ${closingBal >= 0 ? '' : 'text-status-critical'}`}>
                                                     {formatNZD(closingBal)}
                                                 </TableCell>
                                             </TableRow>
@@ -447,13 +447,13 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                                                     <TableCell className="text-muted-foreground">
                                                         {scenario.adjustments.description}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-mono font-semibold tabular-nums ${scenarioFinalBalance >= 0 ? '' : 'text-red-600'}`}>
+                                                    <TableCell className={`text-right font-mono font-semibold tabular-nums ${scenarioFinalBalance >= 0 ? '' : 'text-status-critical'}`}>
                                                         {formatNZD(scenarioFinalBalance)}
                                                     </TableCell>
-                                                    <TableCell className="text-right font-mono tabular-nums text-green-600">
+                                                    <TableCell className="text-right font-mono tabular-nums text-status-success">
                                                         {formatNZD(scenarioTotalInflows)}
                                                     </TableCell>
-                                                    <TableCell className="text-right font-mono tabular-nums text-red-600">
+                                                    <TableCell className="text-right font-mono tabular-nums text-status-critical">
                                                         {formatNZD(scenarioTotalOutflows)}
                                                     </TableCell>
                                                 </TableRow>

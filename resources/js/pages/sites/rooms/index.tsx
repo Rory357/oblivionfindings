@@ -136,9 +136,9 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                             <div className="text-sm text-muted-foreground">Total Bedrooms</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-emerald-400">{activeRooms.length}</div>
+                            <div className="text-2xl font-bold text-status-success">{activeRooms.length}</div>
                             <div className="text-sm text-muted-foreground">Active</div>
                         </CardContent>
                     </Card>
@@ -260,7 +260,7 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                                                                                             {entry.assigned_from && `From: ${entry.assigned_from}`}
                                                                                             {entry.assigned_until && ` • To: ${entry.assigned_until}`}
                                                                                         </div>
-                                                                                        {entry.notes && <div className="text-xs mt-1 text-slate-300">{entry.notes}</div>}
+                                                                                        {entry.notes && <div className="text-xs mt-1 text-muted-foreground">{entry.notes}</div>}
                                                                                     </div>
                                                                                 ) : (
                                                                                     <div className="text-muted-foreground">No assignment data</div>
@@ -278,7 +278,7 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                        className="text-status-critical hover:text-status-critical hover:bg-status-critical"
                                                         onClick={() => handleDeactivate(room)}
                                                         disabled={deleteForm.processing}
                                                     >

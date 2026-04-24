@@ -25,11 +25,11 @@ interface Props extends PageProps {
 
 const severityColor = (level: string) => {
     switch (level) {
-        case 'critical': return 'bg-red-500 text-white';
-        case 'high': return 'bg-orange-500 text-white';
-        case 'medium': return 'bg-yellow-500 text-black';
-        case 'low': return 'bg-green-500 text-white';
-        default: return 'bg-gray-500 text-white';
+        case 'critical': return 'bg-status-critical text-white';
+        case 'high': return 'bg-status-warning text-white';
+        case 'medium': return 'bg-status-warning text-black';
+        case 'low': return 'bg-status-success text-white';
+        default: return 'bg-muted-foreground/80 text-white';
     }
 };
 
@@ -65,47 +65,47 @@ export default function RiskTrends({ auth, snapshots }: Props) {
                 {/* Current Summary */}
                 {latest && (
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                        <Card className="border-red-200">
+                        <Card className="border-status-critical/30">
                             <CardContent className="pt-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-red-600">Critical</p>
-                                        <p className="text-3xl font-bold text-red-600">{latest.summary.critical}</p>
+                                        <p className="text-sm text-status-critical">Critical</p>
+                                        <p className="text-3xl font-bold text-status-critical">{latest.summary.critical}</p>
                                     </div>
-                                    <AlertTriangle className="w-8 h-8 text-red-500" />
+                                    <AlertTriangle className="w-8 h-8 text-status-critical" />
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-orange-200">
+                        <Card className="border-status-warning/30">
                             <CardContent className="pt-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-orange-600">High</p>
-                                        <p className="text-3xl font-bold text-orange-600">{latest.summary.high}</p>
+                                        <p className="text-sm text-status-warning">High</p>
+                                        <p className="text-3xl font-bold text-status-warning">{latest.summary.high}</p>
                                     </div>
-                                    <AlertCircle className="w-8 h-8 text-orange-500" />
+                                    <AlertCircle className="w-8 h-8 text-status-warning" />
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-yellow-200">
+                        <Card className="border-status-warning/30">
                             <CardContent className="pt-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-yellow-600">Medium</p>
-                                        <p className="text-3xl font-bold text-yellow-600">{latest.summary.medium}</p>
+                                        <p className="text-sm text-status-warning">Medium</p>
+                                        <p className="text-3xl font-bold text-status-warning">{latest.summary.medium}</p>
                                     </div>
-                                    <Shield className="w-8 h-8 text-yellow-500" />
+                                    <Shield className="w-8 h-8 text-status-warning" />
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-green-200">
+                        <Card className="border-status-success/30">
                             <CardContent className="pt-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-green-600">Low</p>
-                                        <p className="text-3xl font-bold text-green-600">{latest.summary.low}</p>
+                                        <p className="text-sm text-status-success">Low</p>
+                                        <p className="text-3xl font-bold text-status-success">{latest.summary.low}</p>
                                     </div>
-                                    <Shield className="w-8 h-8 text-green-500" />
+                                    <Shield className="w-8 h-8 text-status-success" />
                                 </div>
                             </CardContent>
                         </Card>
@@ -141,7 +141,7 @@ export default function RiskTrends({ auth, snapshots }: Props) {
                                         <div key={snap.id} className="flex-1 group relative">
                                             <div className="flex flex-col items-center">
                                                 <div
-                                                    className="w-full rounded-t bg-red-500 transition-all min-w-[12px]"
+                                                    className="w-full rounded-t bg-status-critical transition-all min-w-[12px]"
                                                     style={{ height: `${Math.max(pct, 4)}%` }}
                                                 />
                                             </div>

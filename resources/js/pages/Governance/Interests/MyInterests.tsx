@@ -134,7 +134,7 @@ export default function MyInterests({ auth, interests, boardMember, canDeclare }
                     <p className="text-sm text-muted-foreground mt-1">{interest.description}</p>
                     {interest.organization_name && <p className="text-sm text-muted-foreground">{interest.organization_name}</p>}
                   </div>
-                  <Badge className={interest.is_active ? 'bg-green-100 text-green-800' : 'bg-muted text-foreground'}>
+                  <Badge className={interest.is_active ? 'bg-status-success-bg text-status-success' : 'bg-muted text-foreground'}>
                     {interest.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>

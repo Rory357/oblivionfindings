@@ -78,7 +78,7 @@ const connectionStatusConfig: Record<
     connected: {
         label: 'Connected',
         className:
-            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
         icon: CheckCircle,
     },
     disconnected: {
@@ -90,7 +90,7 @@ const connectionStatusConfig: Record<
     error: {
         label: 'Error',
         className:
-            'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
         icon: ShieldAlert,
     },
 };
@@ -159,9 +159,9 @@ export default function MilesightIntegration({
                 </div>
 
                 {/* ── Scaffold state banner ───────────────────────────── */}
-                <Card className="border-amber-300 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/20">
+                <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning">
                     <CardContent className="flex items-start gap-3 p-4 text-sm">
-                        <Clock className="mt-0.5 h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <Clock className="mt-0.5 h-4 w-4 text-status-warning dark:text-status-warning" />
                         <div className="space-y-1 leading-6">
                             <p className="font-medium">
                                 Scaffold stage — credential management only.
@@ -293,7 +293,7 @@ export default function MilesightIntegration({
                                     </p>
                                 </div>
                                 {tenantSecret?.last_error && (
-                                    <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                                    <div className="flex items-start gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-xs text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                         <span>{tenantSecret.last_error}</span>
                                     </div>
@@ -340,7 +340,7 @@ export default function MilesightIntegration({
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-red-600 hover:text-red-700"
+                                        className="text-status-critical hover:text-status-critical"
                                         onClick={() => {
                                             if (
                                                 !confirm(
@@ -460,7 +460,7 @@ export default function MilesightIntegration({
                                                         {log.status}
                                                     </Badge>
                                                     {log.error_message && (
-                                                        <p className="mt-1 text-xs text-red-400">
+                                                        <p className="mt-1 text-xs text-status-critical">
                                                             {log.error_message}
                                                         </p>
                                                     )}

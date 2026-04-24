@@ -50,7 +50,7 @@ export default function EditRisk({ auth, risk }: { auth: any; risk: Risk }) {
             <Head title={`Edit: ${risk.title}`} />
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-3 mb-6">
-                    <AlertTriangle className="w-8 h-8 text-orange-500" />
+                    <AlertTriangle className="w-8 h-8 text-status-warning" />
                     <h1 className="text-3xl font-bold text-foreground">Edit Risk</h1>
                 </div>
                 <Card>
@@ -60,7 +60,7 @@ export default function EditRisk({ auth, risk }: { auth: any; risk: Risk }) {
                             <div>
                                 <Label htmlFor="title">Risk Title</Label>
                                 <Input id="title" value={data.title} onChange={(e) => setData('title', e.target.value)} />
-                                {errors.title && <p className="text-sm text-red-600 mt-1">{errors.title}</p>}
+                                {errors.title && <p className="text-sm text-status-critical mt-1">{errors.title}</p>}
                             </div>
                             <div>
                                 <Label htmlFor="category">Category</Label>

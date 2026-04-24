@@ -67,11 +67,11 @@ const typeLabels: Record<string, string> = {
 };
 
 const typeColors: Record<string, string> = {
-    asset: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-    liability: 'bg-red-500/10 text-red-600 border-red-500/30',
+    asset: 'bg-status-info-bg text-status-info border-status-info/30',
+    liability: 'bg-status-critical-bg text-status-critical border-status-critical/30',
     equity: 'bg-primary/10 text-primary border-primary/30',
-    revenue: 'bg-green-500/10 text-green-600 border-green-500/30',
-    expense: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+    revenue: 'bg-status-success-bg text-status-success border-status-success/30',
+    expense: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 export default function AccountShow({ account, ledger, filters }: PageProps) {

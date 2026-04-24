@@ -316,7 +316,7 @@ export default function FleetReports({
                                     <div className="text-xs text-muted-foreground">Completed</div>
                                 </div>
                                 <div className="rounded-md border p-3 text-center">
-                                    <div className="text-2xl font-bold text-amber-600">{maintenance_stats.open_count ?? 0}</div>
+                                    <div className="text-2xl font-bold text-status-warning">{maintenance_stats.open_count ?? 0}</div>
                                     <div className="text-xs text-muted-foreground">Open</div>
                                 </div>
                             </div>
@@ -337,7 +337,7 @@ export default function FleetReports({
                                         return (
                                             <div key={`${id}-${item.type}-${i}`} className="flex items-center justify-between rounded-md border p-2 text-sm">
                                                 <div className="flex items-center gap-2">
-                                                    <AlertTriangle className={`h-4 w-4 ${item.status === 'expired' ? 'text-red-500' : item.status === 'critical' ? 'text-orange-500' : 'text-amber-500'}`} />
+                                                    <AlertTriangle className={`h-4 w-4 ${item.status === 'expired' ? 'text-status-critical' : item.status === 'critical' ? 'text-status-warning' : 'text-status-warning'}`} />
                                                     <div>
                                                         <Link href={`/fleet-assets/assets/${id}`} className="font-medium text-primary hover:underline">
                                                             {name}
@@ -383,7 +383,7 @@ export default function FleetReports({
                                         <div className="text-xs text-muted-foreground">Total Incidents</div>
                                     </div>
                                     <div className="rounded-md border p-3 text-center">
-                                        <div className="text-2xl font-bold text-amber-600">{incidentStats.open}</div>
+                                        <div className="text-2xl font-bold text-status-warning">{incidentStats.open}</div>
                                         <div className="text-xs text-muted-foreground">Open / Investigating</div>
                                     </div>
                                     {Object.keys(incidentStats.by_severity).length > 0 && (
@@ -496,12 +496,12 @@ export default function FleetReports({
                                                 <td className="py-2 pr-3 text-right">{v.cost_per_km != null ? formatCurrency(v.cost_per_km) : '—'}</td>
                                                 <td className="py-2">
                                                     {v.flag === 'underused' && (
-                                                        <Badge className="text-[9px] bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300">
+                                                        <Badge className="text-[9px] bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                                             <TrendingDown className="mr-0.5 h-2.5 w-2.5" /> Underused
                                                         </Badge>
                                                     )}
                                                     {v.flag === 'overused' && (
-                                                        <Badge className="text-[9px] bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300">
+                                                        <Badge className="text-[9px] bg-status-critical-bg text-status-critical border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                                             <TrendingUp className="mr-0.5 h-2.5 w-2.5" /> Overused
                                                         </Badge>
                                                     )}
@@ -539,11 +539,11 @@ export default function FleetReports({
                                                 <td className="py-2 pr-3 font-medium">{d.name}</td>
                                                 <td className="py-2 pr-3 text-right">{d.sessions}</td>
                                                 <td className="py-2 pr-3 text-right">
-                                                    <span className={d.incidents > 0 ? 'text-red-600 font-semibold' : ''}>{d.incidents}</span>
+                                                    <span className={d.incidents > 0 ? 'text-status-critical font-semibold' : ''}>{d.incidents}</span>
                                                 </td>
                                                 <td className="py-2 pr-3 text-right">
                                                     {d.safety_score != null ? (
-                                                        <span className={d.safety_score < 60 ? 'text-red-600 font-semibold' : d.safety_score < 80 ? 'text-amber-600' : 'text-green-600'}>{d.safety_score}/100</span>
+                                                        <span className={d.safety_score < 60 ? 'text-status-critical font-semibold' : d.safety_score < 80 ? 'text-status-warning' : 'text-status-success'}>{d.safety_score}/100</span>
                                                     ) : '—'}
                                                 </td>
                                                 <td className="py-2">

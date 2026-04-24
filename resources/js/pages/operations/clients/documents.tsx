@@ -46,16 +46,16 @@ import { useMemo, useState } from 'react';
 // ---------------------------------------------------------------------------
 
 const FILE_ICONS: Record<string, { icon: typeof File; color: string; bg: string }> = {
-    pdf: { icon: FileText, color: 'text-red-600', bg: 'bg-red-100' },
-    doc: { icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100' },
-    docx: { icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100' },
-    xls: { icon: FileSpreadsheet, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    xlsx: { icon: FileSpreadsheet, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    csv: { icon: FileSpreadsheet, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    jpg: { icon: FileImage, color: 'text-amber-600', bg: 'bg-amber-100' },
-    jpeg: { icon: FileImage, color: 'text-amber-600', bg: 'bg-amber-100' },
-    png: { icon: FileImage, color: 'text-amber-600', bg: 'bg-amber-100' },
-    gif: { icon: FileImage, color: 'text-amber-600', bg: 'bg-amber-100' },
+    pdf: { icon: FileText, color: 'text-status-critical', bg: 'bg-status-critical-bg' },
+    doc: { icon: FileText, color: 'text-status-info', bg: 'bg-status-info-bg' },
+    docx: { icon: FileText, color: 'text-status-info', bg: 'bg-status-info-bg' },
+    xls: { icon: FileSpreadsheet, color: 'text-status-success', bg: 'bg-status-success-bg' },
+    xlsx: { icon: FileSpreadsheet, color: 'text-status-success', bg: 'bg-status-success-bg' },
+    csv: { icon: FileSpreadsheet, color: 'text-status-success', bg: 'bg-status-success-bg' },
+    jpg: { icon: FileImage, color: 'text-status-warning', bg: 'bg-status-warning-bg' },
+    jpeg: { icon: FileImage, color: 'text-status-warning', bg: 'bg-status-warning-bg' },
+    png: { icon: FileImage, color: 'text-status-warning', bg: 'bg-status-warning-bg' },
+    gif: { icon: FileImage, color: 'text-status-warning', bg: 'bg-status-warning-bg' },
 };
 
 function getFileInfo(mime?: string, name?: string) {
@@ -84,10 +84,10 @@ function isExpiringSoon(date?: string | null) {
 
 const CATEGORIES = [
     { value: 'care_plan', label: 'Care Plans', color: 'bg-primary/10 text-primary' },
-    { value: 'assessment', label: 'Assessments', color: 'bg-blue-100 text-blue-700' },
-    { value: 'medical', label: 'Medical', color: 'bg-red-100 text-red-700' },
-    { value: 'legal', label: 'Legal', color: 'bg-amber-100 text-amber-700' },
-    { value: 'policy', label: 'Policies', color: 'bg-emerald-100 text-emerald-700' },
+    { value: 'assessment', label: 'Assessments', color: 'bg-status-info-bg text-status-info' },
+    { value: 'medical', label: 'Medical', color: 'bg-status-critical-bg text-status-critical' },
+    { value: 'legal', label: 'Legal', color: 'bg-status-warning-bg text-status-warning' },
+    { value: 'policy', label: 'Policies', color: 'bg-status-success-bg text-status-success' },
     { value: 'consent', label: 'Consents', color: 'bg-primary/10 text-primary' },
     { value: 'other', label: 'Other', color: 'bg-muted text-foreground' },
 ];
@@ -225,20 +225,20 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
 
                 {/* Stats Bar */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
                         <div className="text-xl font-bold text-primary">{stats.total}</div>
                         <div className="text-[10px] uppercase tracking-wider text-primary">Total</div>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                        <div className="text-xl font-bold text-blue-600">{stats.portal}</div>
+                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
+                        <div className="text-xl font-bold text-status-info">{stats.portal}</div>
                         <div className="text-[10px] uppercase tracking-wider text-primary">Shared</div>
                     </div>
                     <div className="rounded-xl border p-3 text-center">
-                        <div className={`text-xl font-bold ${stats.expiring > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>{stats.expiring}</div>
+                        <div className={`text-xl font-bold ${stats.expiring > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>{stats.expiring}</div>
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Expiring</div>
                     </div>
                     <div className="rounded-xl border p-3 text-center">
-                        <div className={`text-xl font-bold ${stats.expired > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{stats.expired}</div>
+                        <div className={`text-xl font-bold ${stats.expired > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}>{stats.expired}</div>
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Expired</div>
                     </div>
                 </div>
@@ -313,7 +313,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                     {Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)).map(([folder, count]) => (
                                         <button key={folder} onClick={() => setCurrentFolder(folder)}
                                             className="flex flex-col items-center rounded-xl border bg-white p-4 transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-primary">
-                                            <FolderOpen className="h-10 w-10 text-amber-500" />
+                                            <FolderOpen className="h-10 w-10 text-status-warning" />
                                             <span className="mt-2 text-xs font-medium">{folder}</span>
                                             <span className="text-[10px] text-muted-foreground">{count} file{count !== 1 ? 's' : ''}</span>
                                         </button>
@@ -337,7 +337,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                         const expired = isExpired(d.expiry_date);
                                         const expiring = isExpiringSoon(d.expiry_date);
                                         return (
-                                            <div key={d.id} className={`group relative rounded-xl border bg-white p-4 transition-all hover:shadow-md hover:-translate-y-0.5 ${expired ? 'border-red-200' : expiring ? 'border-amber-200' : ''}`}>
+                                            <div key={d.id} className={`group relative rounded-xl border bg-white p-4 transition-all hover:shadow-md hover:-translate-y-0.5 ${expired ? 'border-status-critical/30' : expiring ? 'border-status-warning/30' : ''}`}>
                                                 {/* File icon */}
                                                 <div className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl ${fi.bg}`}>
                                                     <IconComp className={`h-7 w-7 ${fi.color}`} />
@@ -346,9 +346,9 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                                 <h3 className="text-center text-xs font-medium leading-tight line-clamp-2">{d.title || d.original_name}</h3>
                                                 {/* Meta */}
                                                 <div className="mt-2 flex items-center justify-center gap-1">
-                                                    {d.portal_visible && <span title="Shared in portal"><Globe className="h-3 w-3 text-blue-500" /></span>}
-                                                    {expired && <Badge className="h-4 border-0 bg-red-100 px-1 text-[8px] text-red-600">Expired</Badge>}
-                                                    {expiring && !expired && <Badge className="h-4 border-0 bg-amber-100 px-1 text-[8px] text-amber-600">Expiring</Badge>}
+                                                    {d.portal_visible && <span title="Shared in portal"><Globe className="h-3 w-3 text-status-info" /></span>}
+                                                    {expired && <Badge className="h-4 border-0 bg-status-critical-bg px-1 text-[8px] text-status-critical">Expired</Badge>}
+                                                    {expiring && !expired && <Badge className="h-4 border-0 bg-status-warning-bg px-1 text-[8px] text-status-warning">Expiring</Badge>}
                                                     {d.version && <span className="text-[9px] text-muted-foreground">{d.version}</span>}
                                                 </div>
                                                 {/* Hover actions */}
@@ -361,7 +361,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                                             <button onClick={() => openEdit(d)} className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted">
                                                                 <Pencil className="h-3.5 w-3.5" />
                                                             </button>
-                                                            <button onClick={() => { if (confirm('Delete this document?')) uploadForm.delete(`/operations/clients/${client.id}/documents/${d.id}`, { preserveScroll: true }); }} className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-red-600 hover:bg-red-200">
+                                                            <button onClick={() => { if (confirm('Delete this document?')) uploadForm.delete(`/operations/clients/${client.id}/documents/${d.id}`, { preserveScroll: true }); }} className="flex h-7 w-7 items-center justify-center rounded-full bg-status-critical-bg text-status-critical hover:bg-status-critical-bg">
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </button>
                                                         </>
@@ -386,8 +386,8 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                             <tr key={folder} className="border-b hover:bg-muted cursor-pointer" onClick={() => setCurrentFolder(folder)}>
                                                 <td className="px-4 py-2.5" colSpan={6}>
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100">
-                                                            <FolderOpen className="h-4 w-4 text-amber-600" />
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg">
+                                                            <FolderOpen className="h-4 w-4 text-status-warning" />
                                                         </div>
                                                         <div>
                                                             <p className="font-medium">{folder}</p>
@@ -438,13 +438,13 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                                 <td className="px-4 py-2.5 text-muted-foreground">{d.version || '—'}</td>
                                                 <td className="px-4 py-2.5">
                                                     {d.expiry_date ? (
-                                                        <span className={expired ? 'font-medium text-red-600' : expiring ? 'font-medium text-amber-600' : 'text-muted-foreground'}>
+                                                        <span className={expired ? 'font-medium text-status-critical' : expiring ? 'font-medium text-status-warning' : 'text-muted-foreground'}>
                                                             {new Date(d.expiry_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                         </span>
                                                     ) : <span className="text-muted-foreground">—</span>}
                                                 </td>
                                                 <td className="px-4 py-2.5">
-                                                    {d.portal_visible ? <Globe className="h-4 w-4 text-blue-500" /> : <span className="text-muted-foreground">—</span>}
+                                                    {d.portal_visible ? <Globe className="h-4 w-4 text-status-info" /> : <span className="text-muted-foreground">—</span>}
                                                 </td>
                                                 <td className="px-4 py-2.5">
                                                     <div className="flex items-center justify-end gap-1">
@@ -456,8 +456,8 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                                                 <button onClick={() => openEdit(d)} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted">
                                                                     <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                                                                 </button>
-                                                                <button onClick={() => { if (confirm('Delete?')) uploadForm.delete(`/operations/clients/${client.id}/documents/${d.id}`, { preserveScroll: true }); }} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-red-50">
-                                                                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                                                <button onClick={() => { if (confirm('Delete?')) uploadForm.delete(`/operations/clients/${client.id}/documents/${d.id}`, { preserveScroll: true }); }} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-status-critical-bg">
+                                                                    <Trash2 className="h-3.5 w-3.5 text-status-critical" />
                                                                 </button>
                                                             </>
                                                         )}

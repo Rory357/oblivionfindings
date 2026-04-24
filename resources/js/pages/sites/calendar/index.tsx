@@ -226,10 +226,10 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                                 <div
                                                     key={event.id}
                                                     className={`text-xs p-1 rounded truncate ${
-                                                        event.event_type === 'maintenance' ? 'bg-amber-500/20 text-amber-300' :
+                                                        event.event_type === 'maintenance' ? 'bg-status-warning-bg text-status-warning' :
                                                         event.event_type === 'inspection' ? 'bg-primary/20 text-primary/70' :
-                                                        event.event_type === 'site_visit' ? 'bg-emerald-500/20 text-emerald-300' :
-                                                        'bg-slate-700 text-slate-300'
+                                                        event.event_type === 'site_visit' ? 'bg-status-success-bg text-status-success' :
+                                                        'bg-muted text-muted-foreground'
                                                     }`}
                                                 >
                                                     {event.title}
@@ -249,7 +249,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                 {/* Event Type Legend */}
                 <div className="flex flex-wrap gap-3 text-sm">
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-amber-500/30" />
+                        <div className="w-3 h-3 rounded bg-status-warning" />
                         <span className="text-muted-foreground">Maintenance</span>
                     </div>
                     <div className="flex items-center gap-1">
@@ -257,11 +257,11 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                         <span className="text-muted-foreground">Inspection</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-emerald-500/30" />
+                        <div className="w-3 h-3 rounded bg-status-success" />
                         <span className="text-muted-foreground">Site Visit</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-blue-500/30" />
+                        <div className="w-3 h-3 rounded bg-status-info" />
                         <span className="text-muted-foreground">Contractor</span>
                     </div>
                 </div>
@@ -292,7 +292,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                 placeholder="Event title"
                                 required
                             />
-                            {form.errors.title && <p className="text-sm text-red-500 mt-1">{form.errors.title}</p>}
+                            {form.errors.title && <p className="text-sm text-status-critical mt-1">{form.errors.title}</p>}
                         </div>
 
                         <div>
@@ -309,7 +309,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                 <option value="site_visit">Site Visit</option>
                                 <option value="contractor">Contractor</option>
                             </select>
-                            {form.errors.event_type && <p className="text-sm text-red-500 mt-1">{form.errors.event_type}</p>}
+                            {form.errors.event_type && <p className="text-sm text-status-critical mt-1">{form.errors.event_type}</p>}
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -322,7 +322,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                     onChange={(e) => form.setData('start_at', e.target.value)}
                                     required
                                 />
-                                {form.errors.start_at && <p className="text-sm text-red-500 mt-1">{form.errors.start_at}</p>}
+                                {form.errors.start_at && <p className="text-sm text-status-critical mt-1">{form.errors.start_at}</p>}
                             </div>
                             <div>
                                 <Label htmlFor="event_end_at">End</Label>
@@ -332,7 +332,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                     value={form.data.end_at}
                                     onChange={(e) => form.setData('end_at', e.target.value)}
                                 />
-                                {form.errors.end_at && <p className="text-sm text-red-500 mt-1">{form.errors.end_at}</p>}
+                                {form.errors.end_at && <p className="text-sm text-status-critical mt-1">{form.errors.end_at}</p>}
                             </div>
                         </div>
 
@@ -345,7 +345,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                 onChange={(e) => form.setData('description', e.target.value)}
                                 placeholder="Optional details"
                             />
-                            {form.errors.description && <p className="text-sm text-red-500 mt-1">{form.errors.description}</p>}
+                            {form.errors.description && <p className="text-sm text-status-critical mt-1">{form.errors.description}</p>}
                         </div>
 
                         <DialogFooter>

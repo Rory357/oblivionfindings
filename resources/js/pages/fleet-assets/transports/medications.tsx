@@ -108,9 +108,9 @@ type Props = {
 function statusBadge(status: string) {
     switch (status) {
         case 'packed':
-            return <Badge className="bg-amber-500 text-white">Packed</Badge>;
+            return <Badge className="bg-status-warning text-white">Packed</Badge>;
         case 'administered':
-            return <Badge className="bg-blue-600 text-white">Administered</Badge>;
+            return <Badge className="bg-status-info text-white">Administered</Badge>;
         case 'returned':
             return <Badge className="bg-primary text-white">Returned</Badge>;
         default:

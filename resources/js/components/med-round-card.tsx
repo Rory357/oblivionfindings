@@ -91,7 +91,7 @@ export default function MedRoundCard({
                 </div>
 
                 {instructions && (
-                    <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                    <div className="mt-3 rounded-md bg-status-warning-bg p-3 text-sm text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                         <div className="flex gap-2">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <p className="whitespace-pre-line">{instructions}</p>
@@ -110,8 +110,8 @@ export default function MedRoundCard({
                             variant="outline"
                             className={
                                 flag.tone === 'danger'
-                                    ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100'
-                                    : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100'
+                                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical'
+                                    : 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning'
                             }
                         >
                             <ShieldAlert className="mr-1 h-3 w-3" />

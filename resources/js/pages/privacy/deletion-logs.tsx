@@ -88,7 +88,7 @@ export default function DeletionLogs({ logs, filters }: Props) {
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
-                                            <Trash2 className="h-4 w-4 text-red-500" />
+                                            <Trash2 className="h-4 w-4 text-status-critical" />
                                             <span className="font-medium">{log.model_type ?? 'Unknown'}</span>
                                             {log.model_id && (
                                                 <Badge variant="outline">#{log.model_id}</Badge>

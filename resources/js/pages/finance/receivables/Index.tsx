@@ -293,8 +293,8 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                             className={
                                                 invoice.is_overdue
                                                     ? invoice.days_overdue > 60
-                                                        ? 'bg-red-50 dark:bg-red-950/20'
-                                                        : 'bg-amber-50 dark:bg-amber-950/20'
+                                                        ? 'bg-status-critical-bg dark:bg-status-critical'
+                                                        : 'bg-status-warning-bg dark:bg-status-warning'
                                                     : ''
                                             }
                                         >

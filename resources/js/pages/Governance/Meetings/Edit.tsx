@@ -78,7 +78,7 @@ export default function MeetingEdit({ auth, meeting, boardMembers }: Props) {
                   value={data.title}
                   onChange={(e) => setData('title', e.target.value)}
                 />
-                {errors.title && <p className="text-sm text-red-600">{errors.title}</p>}
+                {errors.title && <p className="text-sm text-status-critical">{errors.title}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -91,7 +91,7 @@ export default function MeetingEdit({ auth, meeting, boardMembers }: Props) {
                     onChange={(e) => setData('scheduled_at', e.target.value)}
                   />
                   {errors.scheduled_at && (
-                    <p className="text-sm text-red-600">{errors.scheduled_at}</p>
+                    <p className="text-sm text-status-critical">{errors.scheduled_at}</p>
                   )}
                 </div>
                 <div className="space-y-2">

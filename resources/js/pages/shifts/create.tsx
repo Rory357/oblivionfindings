@@ -262,7 +262,7 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                                                     type="button"
                                                     key={d}
                                                     onClick={() => toggleWeekday(d)}
-                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-slate-900 text-white dark:bg-white dark:text-foreground' : ''}`}
+                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-muted text-white dark:bg-white dark:text-foreground' : ''}`}
                                                 >
                                                     {d.toUpperCase()}
                                                 </button>
@@ -287,7 +287,7 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                     </div>
 
                     {Object.keys(form.errors).length > 0 && (
-                        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                        <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                             <p className="font-medium">Please fix the following errors:</p>
                             <ul className="mt-1 list-disc pl-5">
                                 {Object.entries(form.errors).map(([field, message]) => (

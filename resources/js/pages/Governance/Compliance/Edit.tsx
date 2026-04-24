@@ -45,7 +45,7 @@ export default function EditCompliance({ auth, obligation }: { auth: any; obliga
             <Head title={`Edit: ${obligation.obligation_title}`} />
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-3 mb-6">
-                    <ShieldCheck className="w-8 h-8 text-green-600" />
+                    <ShieldCheck className="w-8 h-8 text-status-success" />
                     <h1 className="text-3xl font-bold text-foreground">Edit Obligation</h1>
                 </div>
                 <Card>
@@ -55,7 +55,7 @@ export default function EditCompliance({ auth, obligation }: { auth: any; obliga
                             <div>
                                 <Label>Title</Label>
                                 <Input value={data.obligation_title} onChange={(e) => setData('obligation_title', e.target.value)} />
-                                {errors.obligation_title && <p className="text-sm text-red-600 mt-1">{errors.obligation_title}</p>}
+                                {errors.obligation_title && <p className="text-sm text-status-critical mt-1">{errors.obligation_title}</p>}
                             </div>
                             <div>
                                 <Label>Framework</Label>

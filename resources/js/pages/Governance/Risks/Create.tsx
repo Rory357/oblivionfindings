@@ -45,7 +45,7 @@ export default function CreateRisk({ auth }: Props) {
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-6">
-            <AlertTriangle className="w-8 h-8 text-orange-500" />
+            <AlertTriangle className="w-8 h-8 text-status-warning" />
             <h1 className="text-3xl font-bold text-foreground">New Risk</h1>
           </div>
 
@@ -63,7 +63,7 @@ export default function CreateRisk({ auth }: Props) {
                     onChange={(e) => setData('title', e.target.value)}
                     placeholder="e.g., Data Breach Risk"
                   />
-                  {errors.title && <p className="text-sm text-red-600 mt-1">{errors.title}</p>}
+                  {errors.title && <p className="text-sm text-status-critical mt-1">{errors.title}</p>}
                 </div>
 
                 <div>
@@ -82,7 +82,7 @@ export default function CreateRisk({ auth }: Props) {
                       <SelectItem value="compliance">Compliance</SelectItem>
                     </SelectContent>
                   </Select>
-                  {errors.category && <p className="text-sm text-red-600 mt-1">{errors.category}</p>}
+                  {errors.category && <p className="text-sm text-status-critical mt-1">{errors.category}</p>}
                 </div>
 
                 <div>
@@ -94,7 +94,7 @@ export default function CreateRisk({ auth }: Props) {
                     placeholder="Describe the risk..."
                     rows={4}
                   />
-                  {errors.description && <p className="text-sm text-red-600 mt-1">{errors.description}</p>}
+                  {errors.description && <p className="text-sm text-status-critical mt-1">{errors.description}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

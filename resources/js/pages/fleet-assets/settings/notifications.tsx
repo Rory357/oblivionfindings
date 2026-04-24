@@ -289,7 +289,7 @@ export default function NotificationSettings() {
                     </p>
                     <div className="flex items-center gap-3">
                         {saved && (
-                            <span className="text-sm text-green-600 dark:text-green-400">Settings saved</span>
+                            <span className="text-sm text-status-success dark:text-status-success">Settings saved</span>
                         )}
                         <Button onClick={handleSave}>
                             Save Preferences

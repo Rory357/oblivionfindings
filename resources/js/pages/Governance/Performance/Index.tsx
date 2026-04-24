@@ -32,19 +32,19 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
   const getStatusColor = (status: string) => {
     return {
       drafting: 'bg-muted text-foreground',
-      self_review: 'bg-blue-100 text-blue-800',
+      self_review: 'bg-status-info-bg text-status-info',
       peer_review: 'bg-primary/10 text-primary',
-      board_review: 'bg-yellow-100 text-yellow-800',
-      completed: 'bg-green-100 text-green-800',
+      board_review: 'bg-status-warning-bg text-status-warning',
+      completed: 'bg-status-success-bg text-status-success',
     }[status] || 'bg-muted text-foreground';
   };
 
   const getRatingColor = (rating: string | null) => {
     return {
-      exceeds: 'bg-green-100 text-green-800',
-      meets: 'bg-blue-100 text-blue-800',
-      needs_improvement: 'bg-yellow-100 text-yellow-800',
-      unsatisfactory: 'bg-red-100 text-red-800',
+      exceeds: 'bg-status-success-bg text-status-success',
+      meets: 'bg-status-info-bg text-status-info',
+      needs_improvement: 'bg-status-warning-bg text-status-warning',
+      unsatisfactory: 'bg-status-critical-bg text-status-critical',
     }[rating || ''] || 'bg-muted text-foreground';
   };
 
@@ -83,7 +83,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
                       {reviews.data.filter(r => r.status !== 'completed').length}
                     </p>
                   </div>
-                  <Target className="w-8 h-8 text-blue-500" />
+                  <Target className="w-8 h-8 text-status-info" />
                 </div>
               </CardContent>
             </Card>
@@ -96,7 +96,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
                       {reviews.data.filter(r => r.status === 'completed').length}
                     </p>
                   </div>
-                  <Star className="w-8 h-8 text-green-500" />
+                  <Star className="w-8 h-8 text-status-success" />
                 </div>
               </CardContent>
             </Card>
@@ -109,7 +109,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
                       {reviews.data.filter(r => r.status === 'board_review').length}
                     </p>
                   </div>
-                  <TrendingUp className="w-8 h-8 text-yellow-500" />
+                  <TrendingUp className="w-8 h-8 text-status-warning" />
                 </div>
               </CardContent>
             </Card>
@@ -143,7 +143,7 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
                         <h3 className="font-semibold text-foreground">
                           <Link
                             href={showPerformance.url({ review: review.id })}
-                            className="hover:text-blue-600"
+                            className="hover:text-status-info"
                           >
                             {review.reviewee.name} - {review.review_cycle}
                           </Link>

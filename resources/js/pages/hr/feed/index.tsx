@@ -83,10 +83,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const postTypeBadge: Record<string, { className: string; label: string }> = {
-    update: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Update' },
-    milestone: { className: 'border-amber-500/30 text-amber-400 bg-amber-500/10', label: 'Milestone' },
-    kudos: { className: 'border-pink-500/30 text-pink-400 bg-pink-500/10', label: 'Kudos' },
-    announcement: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Announcement' },
+    update: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Update' },
+    milestone: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Milestone' },
+    kudos: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Kudos' },
+    announcement: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Announcement' },
 };
 
 export default function FeedIndex({ posts, milestones, leaderboard, filters, kudosCategories, employees }: Props) {
@@ -222,7 +222,7 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Gift className="h-4 w-4 text-pink-400" />
+                                    <Gift className="h-4 w-4 text-status-critical" />
                                     Upcoming Birthdays
                                 </CardTitle>
                             </CardHeader>
@@ -245,7 +245,7 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Star className="h-4 w-4 text-amber-400" />
+                                    <Star className="h-4 w-4 text-status-warning" />
                                     Work Anniversaries
                                 </CardTitle>
                             </CardHeader>
@@ -268,7 +268,7 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Briefcase className="h-4 w-4 text-emerald-400" />
+                                    <Briefcase className="h-4 w-4 text-status-success" />
                                     New Hires
                                 </CardTitle>
                             </CardHeader>
@@ -360,7 +360,7 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                                                         {badge.label}
                                                     </Badge>
                                                     {post.is_pinned && (
-                                                        <Pin className="h-3.5 w-3.5 text-amber-400" />
+                                                        <Pin className="h-3.5 w-3.5 text-status-warning" />
                                                     )}
                                                     <span className="text-xs text-muted-foreground">
                                                         {post.created_at}
@@ -368,7 +368,7 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                                                 </div>
 
                                                 {post.post_type === 'kudos' && post.kudos && (
-                                                    <div className="mt-1 flex items-center gap-1 text-sm text-pink-400">
+                                                    <div className="mt-1 flex items-center gap-1 text-sm text-status-critical">
                                                         <Heart className="h-3.5 w-3.5" />
                                                         <span>
                                                             gave kudos to{' '}
@@ -410,7 +410,7 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Trophy className="h-4 w-4 text-amber-400" />
+                                    <Trophy className="h-4 w-4 text-status-warning" />
                                     Kudos Leaderboard
                                 </CardTitle>
                             </CardHeader>

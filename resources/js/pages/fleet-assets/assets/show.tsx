@@ -327,7 +327,7 @@ export default function AssetShow({
                 <div className={cn(
                     'rounded-lg border px-5 py-4',
                     asset.status === 'active' ? 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70' :
-                    asset.status === 'out_of_service' ? 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200' :
+                    asset.status === 'out_of_service' ? 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical' :
                     'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground'
                 )}>
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -386,13 +386,13 @@ export default function AssetShow({
                 {asset.category === 'vehicle' && (isExpired(asset.wof_expires_at) || isExpiringSoon(asset.wof_expires_at) || isExpired(asset.registration_expires_at) || isExpiringSoon(asset.registration_expires_at)) && (
                     <div className="flex flex-wrap gap-2">
                         {asset.wof_expires_at && (isExpired(asset.wof_expires_at) || isExpiringSoon(asset.wof_expires_at)) && (
-                            <div className={cn('flex items-center gap-2 rounded-md border px-3 py-2 text-sm', isExpired(asset.wof_expires_at) ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400' : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400')}>
+                            <div className={cn('flex items-center gap-2 rounded-md border px-3 py-2 text-sm', isExpired(asset.wof_expires_at) ? 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical' : 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning')}>
                                 <AlertTriangle className="h-4 w-4" />
                                 WOF {isExpired(asset.wof_expires_at) ? 'Expired' : 'Expiring soon'}: {formatDate(asset.wof_expires_at)}
                             </div>
                         )}
                         {asset.registration_expires_at && (isExpired(asset.registration_expires_at) || isExpiringSoon(asset.registration_expires_at)) && (
-                            <div className={cn('flex items-center gap-2 rounded-md border px-3 py-2 text-sm', isExpired(asset.registration_expires_at) ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400' : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400')}>
+                            <div className={cn('flex items-center gap-2 rounded-md border px-3 py-2 text-sm', isExpired(asset.registration_expires_at) ? 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical' : 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning')}>
                                 <AlertTriangle className="h-4 w-4" />
                                 Rego {isExpired(asset.registration_expires_at) ? 'Expired' : 'Expiring soon'}: {formatDate(asset.registration_expires_at)}
                             </div>
@@ -894,9 +894,9 @@ export default function AssetShow({
                                                 <div key={insp.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
                                                     <div className="flex items-center gap-3">
                                                         {insp.result === 'pass' ? (
-                                                            <CheckCircle className="h-5 w-5 text-green-500" />
+                                                            <CheckCircle className="h-5 w-5 text-status-success" />
                                                         ) : (
-                                                            <XCircle className="h-5 w-5 text-red-500" />
+                                                            <XCircle className="h-5 w-5 text-status-critical" />
                                                         )}
                                                         <div>
                                                             <div className="font-medium">{insp.type}</div>
@@ -945,7 +945,7 @@ export default function AssetShow({
                                                     className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50 transition-colors"
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <Cpu className={`h-5 w-5 ${device.status === 'active' ? 'text-green-500' : 'text-muted-foreground'}`} />
+                                                        <Cpu className={`h-5 w-5 ${device.status === 'active' ? 'text-status-success' : 'text-muted-foreground'}`} />
                                                         <div>
                                                             <div className="font-medium">{device.name ?? device.vendor ?? 'Device'}</div>
                                                             <div className="text-xs text-muted-foreground font-mono">

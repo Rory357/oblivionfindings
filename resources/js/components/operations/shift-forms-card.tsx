@@ -165,7 +165,7 @@ export default function ShiftFormsCard({
                         }
                     />
                     {error ? (
-                        <div className="text-xs text-red-600">{error}</div>
+                        <div className="text-xs text-status-critical">{error}</div>
                     ) : null}
                 </div>
             );
@@ -234,7 +234,7 @@ export default function ShiftFormsCard({
                         </SelectContent>
                     </Select>
                     {error ? (
-                        <div className="text-xs text-red-600">{error}</div>
+                        <div className="text-xs text-status-critical">{error}</div>
                     ) : null}
                 </div>
             );
@@ -267,7 +267,7 @@ export default function ShiftFormsCard({
                     }
                 />
                 {error ? (
-                    <div className="text-xs text-red-600">{error}</div>
+                    <div className="text-xs text-status-critical">{error}</div>
                 ) : null}
             </div>
         );

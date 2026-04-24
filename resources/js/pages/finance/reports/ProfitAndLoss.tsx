@@ -95,12 +95,12 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-emerald-100 p-3 dark:bg-emerald-900/30">
-                                <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                            <div className="rounded-full bg-status-success-bg p-3 dark:bg-status-success">
+                                <TrendingUp className="h-5 w-5 text-status-success dark:text-status-success" />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Revenue</p>
-                                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                <p className="text-2xl font-bold text-status-success dark:text-status-success">
                                     {formatCurrency(report.total_revenue)}
                                 </p>
                             </div>
@@ -108,12 +108,12 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
-                                <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+                            <div className="rounded-full bg-status-critical-bg p-3 dark:bg-status-critical">
+                                <TrendingDown className="h-5 w-5 text-status-critical dark:text-status-critical" />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Expenses</p>
-                                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                <p className="text-2xl font-bold text-status-critical dark:text-status-critical">
                                     {formatCurrency(report.total_expenses)}
                                 </p>
                             </div>
@@ -124,15 +124,15 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.net_profit >= 0
-                                        ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                                        : 'bg-red-100 dark:bg-red-900/30'
+                                        ? 'bg-status-success-bg dark:bg-status-success'
+                                        : 'bg-status-critical-bg dark:bg-status-critical'
                                 }`}
                             >
                                 <DollarSign
                                     className={`h-5 w-5 ${
                                         report.net_profit >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 />
                             </div>
@@ -143,8 +143,8 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.net_profit >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
                                     {formatCurrency(report.net_profit)}
@@ -208,10 +208,10 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                             </div>
                             <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-emerald-500" /> Revenue
+                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-success" /> Revenue
                                 </span>
                                 <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-red-500" /> Expense
+                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-critical" /> Expense
                                 </span>
                             </div>
                         </CardContent>
@@ -295,7 +295,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
                                         {report.net_profit >= 0 ? 'Net Profit' : 'Net Loss'}
                                     </TableCell>
                                     <TableCell
-                                        className={`text-right ${report.net_profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+                                        className={`text-right ${report.net_profit >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}
                                     >
                                         {formatCurrency(report.net_profit)}
                                     </TableCell>

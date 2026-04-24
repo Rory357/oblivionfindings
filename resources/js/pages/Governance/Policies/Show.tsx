@@ -53,9 +53,9 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
 
   const getStatusColor = (status: string) => ({
     draft: 'bg-muted text-foreground',
-    active: 'bg-green-100 text-green-800',
-    under_review: 'bg-yellow-100 text-yellow-800',
-    archived: 'bg-red-100 text-red-800',
+    active: 'bg-status-success-bg text-status-success',
+    under_review: 'bg-status-warning-bg text-status-warning',
+    archived: 'bg-status-critical-bg text-status-critical',
   }[status] || 'bg-muted text-foreground');
 
   return (
@@ -169,7 +169,7 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
                     <div
-                      className="bg-green-600 h-2 rounded-full transition-all"
+                      className="bg-status-success h-2 rounded-full transition-all"
                       style={{ width: `${attestationStats.total_required > 0 ? (attestationStats.completed / attestationStats.total_required) * 100 : 0}%` }}
                     />
                   </div>
@@ -177,7 +177,7 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
                     <div className="mt-4 space-y-2">
                       {policy.attestations.map(att => (
                         <div key={att.id} className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <CheckCircle className="w-4 h-4 text-status-success" />
                           <span>{att.user.name}</span>
                           <span className="text-muted-foreground ml-auto">{new Date(att.attested_at).toLocaleDateString('en-NZ')}</span>
                         </div>

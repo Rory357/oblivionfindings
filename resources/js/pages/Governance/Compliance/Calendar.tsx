@@ -30,10 +30,10 @@ export default function ComplianceCalendar({ auth, events }: Props) {
 
   const getStatusColor = (status: string) => {
     return {
-      complete: 'bg-green-100 text-green-800',
-      not_due: 'bg-blue-100 text-blue-800',
-      due_soon: 'bg-yellow-100 text-yellow-800',
-      overdue: 'bg-red-100 text-red-800',
+      complete: 'bg-status-success-bg text-status-success',
+      not_due: 'bg-status-info-bg text-status-info',
+      due_soon: 'bg-status-warning-bg text-status-warning',
+      overdue: 'bg-status-critical-bg text-status-critical',
     }[status] || 'bg-muted text-foreground';
   };
 
@@ -69,8 +69,8 @@ export default function ComplianceCalendar({ auth, events }: Props) {
                         key={event.id}
                         className={cn(
                           "flex items-center justify-between p-4 rounded-lg border",
-                          event.status === 'overdue' && "bg-red-50 border-red-200",
-                          event.status === 'due_soon' && "bg-yellow-50 border-yellow-200"
+                          event.status === 'overdue' && "bg-status-critical-bg border-status-critical/30",
+                          event.status === 'due_soon' && "bg-status-warning-bg border-status-warning/30"
                         )}
                       >
                         <div className="flex items-center gap-4">

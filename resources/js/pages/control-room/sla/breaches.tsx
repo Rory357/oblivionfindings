@@ -81,16 +81,16 @@ interface Props {
 // --- Constants ---
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-white',
-    low: 'bg-blue-500 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-white',
+    low: 'bg-status-info text-white',
 };
 
 const breachTypeColors: Record<string, string> = {
-    acknowledge: 'bg-amber-100 text-amber-800 border-amber-200',
-    response: 'bg-orange-100 text-orange-800 border-orange-200',
-    resolution: 'bg-red-100 text-red-800 border-red-200',
+    acknowledge: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    response: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    resolution: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 // --- Helpers ---
@@ -181,7 +181,7 @@ export default function SlaBreaches({ breaches, stats, filters }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className={`text-2xl font-bold ${stats.total > 0 ? 'text-red-600' : ''}`}>
+                            <p className={`text-2xl font-bold ${stats.total > 0 ? 'text-status-critical' : ''}`}>
                                 {stats.total}
                             </p>
                         </CardContent>
@@ -193,7 +193,7 @@ export default function SlaBreaches({ breaches, stats, filters }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className={`text-2xl font-bold ${stats.acknowledge > 0 ? 'text-amber-600' : ''}`}>
+                            <p className={`text-2xl font-bold ${stats.acknowledge > 0 ? 'text-status-warning' : ''}`}>
                                 {stats.acknowledge}
                             </p>
                         </CardContent>
@@ -205,7 +205,7 @@ export default function SlaBreaches({ breaches, stats, filters }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className={`text-2xl font-bold ${stats.response > 0 ? 'text-orange-600' : ''}`}>
+                            <p className={`text-2xl font-bold ${stats.response > 0 ? 'text-status-warning' : ''}`}>
                                 {stats.response}
                             </p>
                         </CardContent>
@@ -217,7 +217,7 @@ export default function SlaBreaches({ breaches, stats, filters }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className={`text-2xl font-bold ${stats.resolution > 0 ? 'text-red-600' : ''}`}>
+                            <p className={`text-2xl font-bold ${stats.resolution > 0 ? 'text-status-critical' : ''}`}>
                                 {stats.resolution}
                             </p>
                         </CardContent>
@@ -295,7 +295,7 @@ export default function SlaBreaches({ breaches, stats, filters }: Props) {
                 {breaches.data.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16">
-                            <ShieldAlert className="mb-4 h-12 w-12 text-green-400" />
+                            <ShieldAlert className="mb-4 h-12 w-12 text-status-success" />
                             <p className="text-lg font-medium text-muted-foreground">No breaches found</p>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 No SLA breaches match the current filters. Great work!
@@ -424,11 +424,11 @@ function BreachRow({ breach }: { breach: BreachRecord }) {
             </td>
             <td className="px-4 py-3">
                 {varianceMap[primaryBreach] !== null ? (
-                    <span className="text-xs font-semibold text-red-600">
+                    <span className="text-xs font-semibold text-status-critical">
                         {formatVariance(varianceMap[primaryBreach])}
                     </span>
                 ) : (
-                    <span className="text-xs text-red-600 font-semibold">Ongoing</span>
+                    <span className="text-xs text-status-critical font-semibold">Ongoing</span>
                 )}
             </td>
             <td className="px-4 py-3">

@@ -256,7 +256,7 @@ const Pricing: React.FC = () => {
                                         >
                                             <Check
                                                 size={18}
-                                                className="mt-0.5 shrink-0 text-emerald-500"
+                                                className="mt-0.5 shrink-0 text-status-success"
                                             />
                                             <span className="text-sm text-muted-foreground">
                                                 {feature}
@@ -333,7 +333,7 @@ const Pricing: React.FC = () => {
                                             row.starter ? (
                                                 <Check
                                                     size={18}
-                                                    className="mx-auto text-emerald-500"
+                                                    className="mx-auto text-status-success"
                                                 />
                                             ) : (
                                                 <X
@@ -353,7 +353,7 @@ const Pricing: React.FC = () => {
                                             row.professional ? (
                                                 <Check
                                                     size={18}
-                                                    className="mx-auto text-emerald-500"
+                                                    className="mx-auto text-status-success"
                                                 />
                                             ) : (
                                                 <X
@@ -372,7 +372,7 @@ const Pricing: React.FC = () => {
                                             row.enterprise ? (
                                                 <Check
                                                     size={18}
-                                                    className="mx-auto text-emerald-500"
+                                                    className="mx-auto text-status-success"
                                                 />
                                             ) : (
                                                 <X

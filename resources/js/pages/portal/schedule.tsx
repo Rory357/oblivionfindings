@@ -78,13 +78,13 @@ function formatDate(dateStr: string): string {
 }
 
 const statusColors: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-amber-100 text-amber-800',
-    completed: 'bg-emerald-100 text-emerald-800',
+    scheduled: 'bg-status-info-bg text-status-info',
+    in_progress: 'bg-status-warning-bg text-status-warning',
+    completed: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
-    pending: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-emerald-100 text-emerald-800',
-    declined: 'bg-red-100 text-red-800',
+    pending: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-success-bg text-status-success',
+    declined: 'bg-status-critical-bg text-status-critical',
 };
 
 const shiftTypeLabels: Record<string, string> = {
@@ -391,7 +391,7 @@ export default function Schedule({
                                             }
                                         />
                                         {form.errors.requested_date && (
-                                            <p className="mt-1 text-xs text-red-500">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {form.errors.requested_date}
                                             </p>
                                         )}
@@ -568,7 +568,7 @@ export default function Schedule({
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                                                        className="h-7 w-7 p-0 text-muted-foreground hover:text-status-critical"
                                                         onClick={() =>
                                                             cancelVisit(
                                                                 visit.id,

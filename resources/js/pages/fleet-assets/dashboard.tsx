@@ -472,26 +472,26 @@ export default function FleetAssetsDashboard({
                 {/*  ALERT BANNER                                                 */}
                 {/* ============================================================ */}
                 {((stats.overdue_count ?? 0) > 0 || (stats.critical_alerts ?? 0) > 0 || (stats.outings_past_return ?? 0) > 0) && (
-                    <div className="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 px-4 py-3">
+                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical px-4 py-3">
                         <div className="flex items-start gap-3">
-                            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                            <AlertTriangle className="h-5 w-5 text-status-critical dark:text-status-critical shrink-0 mt-0.5" />
                             <div className="flex-1 space-y-1">
-                                <div className="text-sm font-semibold text-red-800 dark:text-red-300">Attention Required</div>
+                                <div className="text-sm font-semibold text-status-critical dark:text-status-critical">Attention Required</div>
                                 <div className="flex flex-wrap gap-2">
                                     {(stats.overdue_count ?? 0) > 0 && (
-                                        <Link href="/fleet-assets/bookings" className="inline-flex items-center gap-1.5 rounded-full bg-red-100 dark:bg-red-900/40 px-3 py-1 text-xs font-medium text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors">
+                                        <Link href="/fleet-assets/bookings" className="inline-flex items-center gap-1.5 rounded-full bg-status-critical-bg dark:bg-status-critical-bg px-3 py-1 text-xs font-medium text-status-critical dark:text-status-critical hover:bg-status-critical-bg dark:hover:bg-status-critical transition-colors">
                                             <Car className="h-3 w-3" />
                                             {stats.overdue_count} overdue vehicle return{stats.overdue_count !== 1 ? 's' : ''}
                                         </Link>
                                     )}
                                     {(stats.critical_alerts ?? 0) > 0 && (
-                                        <Link href="/fleet-assets/alerts" className="inline-flex items-center gap-1.5 rounded-full bg-red-100 dark:bg-red-900/40 px-3 py-1 text-xs font-medium text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors">
+                                        <Link href="/fleet-assets/alerts" className="inline-flex items-center gap-1.5 rounded-full bg-status-critical-bg dark:bg-status-critical-bg px-3 py-1 text-xs font-medium text-status-critical dark:text-status-critical hover:bg-status-critical-bg dark:hover:bg-status-critical transition-colors">
                                             <AlertTriangle className="h-3 w-3" />
                                             {stats.critical_alerts} critical alert{stats.critical_alerts !== 1 ? 's' : ''}
                                         </Link>
                                     )}
                                     {(stats.outings_past_return ?? 0) > 0 && (
-                                        <Link href="/fleet-assets/outings" className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors">
+                                        <Link href="/fleet-assets/outings" className="inline-flex items-center gap-1.5 rounded-full bg-status-warning-bg dark:bg-status-warning-bg px-3 py-1 text-xs font-medium text-status-warning dark:text-status-warning hover:bg-status-warning-bg dark:hover:bg-status-warning transition-colors">
                                             <Clock className="h-3 w-3" />
                                             {stats.outings_past_return} outing{stats.outings_past_return !== 1 ? 's' : ''} past return time
                                         </Link>
@@ -525,12 +525,12 @@ export default function FleetAssetsDashboard({
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-2xl font-bold">{stats.active_alerts ?? 0}</span>
                                         {(stats.critical_alerts ?? 0) > 0 && (
-                                            <Badge className="bg-red-500/20 text-red-400 border-0 text-[9px] px-1 h-4">{stats.critical_alerts} crit</Badge>
+                                            <Badge className="bg-status-critical-bg text-status-critical border-0 text-[9px] px-1 h-4">{stats.critical_alerts} crit</Badge>
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20">
-                                    <AlertTriangle className="h-4 w-4 text-amber-400" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-warning">
+                                    <AlertTriangle className="h-4 w-4 text-status-warning" />
                                 </div>
                             </div>
                             <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -810,7 +810,7 @@ export default function FleetAssetsDashboard({
                                                     <tr key={site.id} className="border-b border-border/50 last:border-0">
                                                         <td className="py-2 pr-3"><Link href={`/fleet-assets?site=${site.id}`} className="font-medium text-primary hover:underline text-xs">{site.name}</Link></td>
                                                         <td className="py-2 pr-3 text-right tabular-nums">{site.vehicle_count}</td>
-                                                        <td className="py-2 pr-3 text-right"><span className="inline-flex items-center gap-1">{site.online_count > 0 && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}<span className="tabular-nums">{site.online_count}</span></span></td>
+                                                        <td className="py-2 pr-3 text-right"><span className="inline-flex items-center gap-1">{site.online_count > 0 && <span className="h-1.5 w-1.5 rounded-full bg-status-success" />}<span className="tabular-nums">{site.online_count}</span></span></td>
                                                         <td className="py-2 pr-3 text-right">{site.active_alerts > 0 ? <Badge variant="destructive" className="text-[9px] h-4 px-1">{site.active_alerts}</Badge> : <span className="text-muted-foreground">0</span>}</td>
                                                         <td className="py-2 text-right tabular-nums text-muted-foreground">${(site.fuel_cost_mtd ?? 0).toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
                                                     </tr>
@@ -825,15 +825,15 @@ export default function FleetAssetsDashboard({
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex items-center gap-2 text-sm">
-                                        <AlertTriangle className="h-4 w-4 text-amber-500" /> After-Hours Activity
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" /> After-Hours Activity
                                         <Badge variant="outline" className="ml-auto text-[10px]">7 days</Badge>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-1.5">
                                         {(after_hours_trips ?? []).slice(0, 6).map((trip) => (
-                                            <div key={trip.id} className="flex items-center gap-2 rounded border border-amber-200 bg-amber-50/50 px-2.5 py-1.5 text-xs dark:border-amber-900/30 dark:bg-amber-950/20">
-                                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                            <div key={trip.id} className="flex items-center gap-2 rounded border border-status-warning/30 bg-status-warning-bg px-2.5 py-1.5 text-xs dark:border-status-warning/30 dark:bg-status-warning">
+                                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-status-warning" />
                                                 <span className="font-medium truncate">{trip.vehicle}</span>
                                                 <span className="text-muted-foreground truncate">{trip.driver}</span>
                                                 <span className="ml-auto shrink-0 tabular-nums text-[10px]">{trip.time}</span>

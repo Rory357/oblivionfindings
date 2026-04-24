@@ -45,16 +45,16 @@ export default function TwoFactor({
             <SettingsLayout>
                 {/* Status banner */}
                 {twoFactorEnabled ? (
-                    <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-900/50 dark:bg-green-950/30">
-                        <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
-                        <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                    <div className="flex items-center gap-3 rounded-lg border border-status-success/30 bg-status-success-bg px-4 py-3 dark:border-status-success/50 dark:bg-status-success">
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-status-success" />
+                        <p className="text-sm font-medium text-status-success dark:text-status-success">
                             Two-factor authentication is enabled
                         </p>
                     </div>
                 ) : (
-                    <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/30">
-                        <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
-                        <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    <div className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/50 dark:bg-status-warning">
+                        <AlertCircle className="h-5 w-5 shrink-0 text-status-warning" />
+                        <p className="text-sm font-medium text-status-warning dark:text-status-warning">
                             Two-factor authentication is not enabled
                         </p>
                     </div>

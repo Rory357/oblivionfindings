@@ -47,10 +47,10 @@ type Props = {
 };
 
 const priorityBannerColors: Record<string, string> = {
-    critical: 'bg-red-100 border-red-300 text-red-900 dark:bg-red-950/40 dark:border-red-700 dark:text-red-100',
-    high: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
-    medium: 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200',
-    low: 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200',
+    critical: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
+    high: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
+    medium: 'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
+    low: 'bg-status-info-bg border-status-info/30 text-status-info dark:bg-status-info-bg dark:border-status-info/30 dark:text-status-info',
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -177,7 +177,7 @@ export default function WorkOrderShow({ work_order }: Props) {
                                         </div>
                                         {wo.completed_at && (
                                             <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
-                                                <Calendar className="h-4 w-4 text-green-600" />
+                                                <Calendar className="h-4 w-4 text-status-success" />
                                                 <div>
                                                     <dt className="text-xs text-muted-foreground">Completed</dt>
                                                     <dd className="font-medium">{formatDate(wo.completed_at)}</dd>
@@ -245,8 +245,8 @@ export default function WorkOrderShow({ work_order }: Props) {
                                     <div className={cn(
                                         'mt-3 rounded-md border p-2 text-center text-sm font-medium',
                                         wo.actual_cost <= wo.estimated_cost
-                                            ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-400'
-                                            : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400'
+                                            ? 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success'
+                                            : 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical'
                                     )}>
                                         {wo.actual_cost <= wo.estimated_cost
                                             ? `{formatCurrency((wo.estimated_cost - wo.actual_cost))} under budget`

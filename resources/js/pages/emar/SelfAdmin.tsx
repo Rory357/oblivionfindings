@@ -42,10 +42,10 @@ type Props = {
 };
 
 const outcomeLabels: Record<string, { label: string; color: string }> = {
-    independent: { label: 'Cat 1: Independent', color: 'bg-green-100 text-green-700' },
-    prompted: { label: 'Cat 2: Prompted', color: 'bg-blue-100 text-blue-700' },
-    supervised: { label: 'Cat 3: Supervised', color: 'bg-amber-100 text-amber-700' },
-    administered: { label: 'Cat 4: Staff Administered', color: 'bg-red-100 text-red-700' },
+    independent: { label: 'Cat 1: Independent', color: 'bg-status-success-bg text-status-success' },
+    prompted: { label: 'Cat 2: Prompted', color: 'bg-status-info-bg text-status-info' },
+    supervised: { label: 'Cat 3: Supervised', color: 'bg-status-warning-bg text-status-warning' },
+    administered: { label: 'Cat 4: Staff Administered', color: 'bg-status-critical-bg text-status-critical' },
 };
 
 const SCORE_CRITERIA = [
@@ -79,7 +79,7 @@ function computeOutcome(scores: Record<string, number>, booleans: Record<string,
 function ScoreBar({ value, max = 5 }: { value: number | null; max?: number }) {
     if (value === null) return <span className="text-muted-foreground">—</span>;
     const pct = (value / max) * 100;
-    const color = pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-500';
+    const color = pct >= 80 ? 'bg-status-success' : pct >= 60 ? 'bg-status-warning' : 'bg-status-critical';
     return (
         <div className="flex items-center gap-2">
             <div className="h-2 w-16 rounded-full bg-muted">
@@ -153,9 +153,9 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
                 />
                 {/* Due Reassessments */}
                 {dueReassessments.length > 0 && (
-                    <Card className="mb-6 border-amber-200 dark:border-amber-800">
+                    <Card className="mb-6 border-status-warning/30 dark:border-status-warning/30">
                         <CardHeader className="pb-3">
-                            <CardTitle className="flex items-center gap-2 text-base text-amber-700 dark:text-amber-400">
+                            <CardTitle className="flex items-center gap-2 text-base text-status-warning dark:text-status-warning">
                                 <AlertTriangle className="h-4 w-4" /> Reassessments Due ({dueReassessments.length})
                             </CardTitle>
                         </CardHeader>
@@ -164,7 +164,7 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
                                 {dueReassessments.map((a) => (
                                     <div key={a.id} className="flex items-center justify-between p-3">
                                         <span className="font-medium">{a.client?.last_name}, {a.client?.first_name}</span>
-                                        <span className="text-xs text-amber-600">Due: {a.reassessment_date ? new Date(a.reassessment_date).toLocaleDateString('en-NZ') : '—'}</span>
+                                        <span className="text-xs text-status-warning">Due: {a.reassessment_date ? new Date(a.reassessment_date).toLocaleDateString('en-NZ') : '—'}</span>
                                     </div>
                                 ))}
                             </div>
@@ -206,7 +206,7 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.client_id && <p className="mt-1 text-xs text-red-500">{form.errors.client_id}</p>}
+                                        {form.errors.client_id && <p className="mt-1 text-xs text-status-critical">{form.errors.client_id}</p>}
                                     </div>
 
                                     {/* Scored Criteria */}
@@ -224,7 +224,7 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
                                                         value={form.data[c.key]}
                                                         onChange={(e) => form.setData(c.key as any, parseInt(e.target.value) || 1)}
                                                     />
-                                                    {(form.errors as any)[c.key] && <p className="mt-1 text-xs text-red-500">{(form.errors as any)[c.key]}</p>}
+                                                    {(form.errors as any)[c.key] && <p className="mt-1 text-xs text-status-critical">{(form.errors as any)[c.key]}</p>}
                                                 </div>
                                             ))}
                                         </div>
@@ -280,7 +280,7 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
                                     <div>
                                         <Label htmlFor="sa-redate">Reassessment Date</Label>
                                         <Input id="sa-redate" type="date" value={form.data.reassessment_date} onChange={(e) => form.setData('reassessment_date', e.target.value)} className="w-48" />
-                                        {form.errors.reassessment_date && <p className="mt-1 text-xs text-red-500">{form.errors.reassessment_date}</p>}
+                                        {form.errors.reassessment_date && <p className="mt-1 text-xs text-status-critical">{form.errors.reassessment_date}</p>}
                                     </div>
 
                                     <div className="flex justify-end gap-2">
@@ -329,7 +329,7 @@ export default function SelfAdmin({ assessments, dueReassessments, clients, filt
                                             </td>
                                             <td className="p-3 text-xs">{a.assessor?.name ?? '—'}</td>
                                             <td className="p-3 text-right">
-                                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => router.delete(`/emar/self-admin/${a.id}`)}>
+                                                <Button variant="ghost" size="sm" className="text-status-critical hover:text-status-critical" onClick={() => router.delete(`/emar/self-admin/${a.id}`)}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </td>

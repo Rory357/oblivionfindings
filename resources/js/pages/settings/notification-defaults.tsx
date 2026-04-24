@@ -92,13 +92,13 @@ const MODULE_CONFIG: Record<string, { label: string; icon: typeof Clock; keys: s
 
 const ROLE_COLORS: string[] = [
     'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
-    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-    'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-    'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-    'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
-    'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+    'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
+    'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
-    'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
 ];
 
 function humanize(key: string): string {
@@ -132,10 +132,10 @@ function groupByModule(allKeys: string[]): { moduleKey: string; label: string; i
 function ChannelDot({ active, channel }: { active: boolean; channel: 'inapp' | 'email' | 'push' }) {
     const colors = active
         ? channel === 'inapp'
-            ? 'bg-emerald-500'
+            ? 'bg-status-success'
             : channel === 'email'
-                ? 'bg-blue-500'
-                : 'bg-amber-500'
+                ? 'bg-status-info'
+                : 'bg-status-warning'
         : 'bg-muted-foreground/30';
     return <div className={`h-2 w-2 rounded-full ${colors}`} />;
 }
@@ -282,15 +282,15 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <span className="font-medium">Channel dots:</span>
                         <div className="flex items-center gap-1.5">
-                            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                            <div className="h-2 w-2 rounded-full bg-status-success" />
                             <span>In-App</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <div className="h-2 w-2 rounded-full bg-blue-500" />
+                            <div className="h-2 w-2 rounded-full bg-status-info" />
                             <span>Email</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <div className="h-2 w-2 rounded-full bg-amber-500" />
+                            <div className="h-2 w-2 rounded-full bg-status-warning" />
                             <span>Push</span>
                         </div>
                         <span className="text-muted-foreground/50">Click a cell to configure channels</span>

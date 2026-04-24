@@ -38,7 +38,7 @@ export default function PolicyCreate({ auth }: PageProps) {
               <div>
                 <Label htmlFor="title">Policy Title</Label>
                 <Input id="title" value={data.title} onChange={e => setData('title', e.target.value)} />
-                {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
+                {errors.title && <p className="text-status-critical text-sm mt-1">{errors.title}</p>}
               </div>
 
               <div>
@@ -66,7 +66,7 @@ export default function PolicyCreate({ auth }: PageProps) {
               <div>
                 <Label htmlFor="content">Policy Content</Label>
                 <Textarea id="content" value={data.content} onChange={e => setData('content', e.target.value)} rows={12} />
-                {errors.content && <p className="text-red-500 text-sm mt-1">{errors.content}</p>}
+                {errors.content && <p className="text-status-critical text-sm mt-1">{errors.content}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

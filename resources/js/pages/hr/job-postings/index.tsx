@@ -88,7 +88,7 @@ export default function JobPostingIndex({ postings, stats, filters, can }: Props
                     <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => onFilter({ status: 'published' })}>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-500/10 p-2"><Globe className="h-4 w-4 text-emerald-500" /></div>
+                                <div className="rounded-lg bg-status-success p-2"><Globe className="h-4 w-4 text-status-success" /></div>
                                 <div>
                                     <p className="text-2xl font-bold">{stats.published}</p>
                                     <p className="text-xs text-muted-foreground">Published</p>
@@ -99,7 +99,7 @@ export default function JobPostingIndex({ postings, stats, filters, can }: Props
                     <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => onFilter({ status: 'draft' })}>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-slate-500/10 p-2"><FileText className="h-4 w-4 text-muted-foreground" /></div>
+                                <div className="rounded-lg bg-muted-foreground/80/10 p-2"><FileText className="h-4 w-4 text-muted-foreground" /></div>
                                 <div>
                                     <p className="text-2xl font-bold">{stats.draft}</p>
                                     <p className="text-xs text-muted-foreground">Draft</p>
@@ -110,7 +110,7 @@ export default function JobPostingIndex({ postings, stats, filters, can }: Props
                     <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => onFilter({ status: 'pending_approval' })}>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-amber-500/10 p-2"><Clock className="h-4 w-4 text-amber-500" /></div>
+                                <div className="rounded-lg bg-status-warning p-2"><Clock className="h-4 w-4 text-status-warning" /></div>
                                 <div>
                                     <p className="text-2xl font-bold">{stats.pending_approval}</p>
                                     <p className="text-xs text-muted-foreground">Pending</p>
@@ -121,7 +121,7 @@ export default function JobPostingIndex({ postings, stats, filters, can }: Props
                     <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => onFilter({ status: 'closed' })}>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-red-500/10 p-2"><XCircle className="h-4 w-4 text-red-500" /></div>
+                                <div className="rounded-lg bg-status-critical p-2"><XCircle className="h-4 w-4 text-status-critical" /></div>
                                 <div>
                                     <p className="text-2xl font-bold">{stats.closed}</p>
                                     <p className="text-xs text-muted-foreground">Closed</p>
@@ -174,7 +174,7 @@ export default function JobPostingIndex({ postings, stats, filters, can }: Props
                                                 <Badge variant="outline" className={config.className}>{config.label}</Badge>
                                                 <Badge variant="secondary" className="text-xs">{employmentTypeLabels[posting.employment_type] || posting.employment_type}</Badge>
                                                 {posting.is_remote && (
-                                                    <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-400 bg-blue-500/10">
+                                                    <Badge variant="outline" className="text-xs gap-1 border-status-info/30 text-status-info bg-status-info">
                                                         <Wifi className="h-3 w-3" /> Remote
                                                     </Badge>
                                                 )}
@@ -192,7 +192,7 @@ export default function JobPostingIndex({ postings, stats, filters, can }: Props
                                                 {posting.hiring_manager && <span>Manager: {posting.hiring_manager}</span>}
                                                 {posting.published_at && <span>Published: {posting.published_at}</span>}
                                                 {closing && (
-                                                    <span className={closing.urgent ? 'text-amber-400 font-medium' : ''}>
+                                                    <span className={closing.urgent ? 'text-status-warning font-medium' : ''}>
                                                         {closing.text}
                                                     </span>
                                                 )}

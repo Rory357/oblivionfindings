@@ -132,8 +132,8 @@ const formatDateTime = (dateStr: string) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    filed: { label: 'Filed', className: 'bg-green-100 text-green-700 border-green-300' },
-    amended: { label: 'Amended', className: 'bg-blue-100 text-blue-700 border-blue-300' },
+    filed: { label: 'Filed', className: 'bg-status-success-bg text-status-success border-status-success/30' },
+    amended: { label: 'Amended', className: 'bg-status-info-bg text-status-info border-status-info/30' },
 };
 
 const frequencyLabels: Record<string, string> = {
@@ -176,7 +176,7 @@ function IrdFormBox({
                     highlight
                         ? amount >= 0
                             ? 'text-destructive'
-                            : 'text-emerald-600'
+                            : 'text-status-success'
                         : ''
                 }`}
             >

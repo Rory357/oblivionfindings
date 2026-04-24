@@ -47,19 +47,19 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    not_started: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Not Started' },
-    in_progress: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'In Progress' },
-    blocked: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Blocked' },
-    completed: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Completed' },
-    cancelled: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Cancelled' },
+    not_started: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Not Started' },
+    in_progress: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'In Progress' },
+    blocked: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Blocked' },
+    completed: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Completed' },
+    cancelled: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Cancelled' },
 };
 
 const categoryConfig: Record<string, string> = {
     growth: 'bg-primary/10 text-primary',
-    performance: 'bg-blue-100 text-blue-800',
-    leadership: 'bg-amber-100 text-amber-800',
-    compliance: 'bg-red-100 text-red-800',
-    capability: 'bg-teal-100 text-teal-800',
+    performance: 'bg-status-info-bg text-status-info',
+    leadership: 'bg-status-warning-bg text-status-warning',
+    compliance: 'bg-status-critical-bg text-status-critical',
+    capability: 'bg-status-info-bg text-status-info',
 };
 
 function GoalCard({ goal }: { goal: Goal }) {
@@ -83,7 +83,7 @@ function GoalCard({ goal }: { goal: Goal }) {
     };
 
     return (
-        <Card className={isOverdue ? 'border-red-300' : undefined}>
+        <Card className={isOverdue ? 'border-status-critical/30' : undefined}>
             <Collapsible>
                 <CollapsibleTrigger className="w-full text-left">
                     <CardHeader className="pb-3">

@@ -50,16 +50,16 @@ interface Props {
 }
 
 const statusColors: Record<string, string> = {
-    active: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-yellow-100 text-yellow-800',
-    completed: 'bg-green-100 text-green-800',
+    active: 'bg-status-info-bg text-status-info',
+    in_progress: 'bg-status-warning-bg text-status-warning',
+    completed: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-foreground',
 };
 
 const milestoneIcons: Record<string, React.ReactNode> = {
     pending: <Clock className="h-5 w-5 text-muted-foreground" />,
-    met: <CheckCircle2 className="h-5 w-5 text-green-500" />,
-    not_met: <XCircle className="h-5 w-5 text-red-500" />,
+    met: <CheckCircle2 className="h-5 w-5 text-status-success" />,
+    not_met: <XCircle className="h-5 w-5 text-status-critical" />,
 };
 
 const formatDate = (value?: string | null) => {
@@ -162,7 +162,7 @@ export default function PipShow({ pip, can }: Props) {
                             </div>
                             <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
                                 <div
-                                    className="h-full rounded-full bg-green-500 transition-all"
+                                    className="h-full rounded-full bg-status-success transition-all"
                                     style={{ width: `${progressPct}%` }}
                                 />
                             </div>
@@ -250,7 +250,7 @@ export default function PipShow({ pip, can }: Props) {
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
-                                                                className="text-green-600"
+                                                                className="text-status-success"
                                                                 onClick={() => handleMilestoneUpdate(milestone.id, 'met')}
                                                             >
                                                                 Met
@@ -260,7 +260,7 @@ export default function PipShow({ pip, can }: Props) {
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
-                                                                className="text-red-600"
+                                                                className="text-status-critical"
                                                                 onClick={() => handleMilestoneUpdate(milestone.id, 'not_met')}
                                                             >
                                                                 Not Met

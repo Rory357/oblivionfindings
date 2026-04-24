@@ -759,19 +759,19 @@ export default function Data() {
         switch (status) {
             case 'completed':
                 return (
-                    <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                    <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
                         <CheckCircle className="mr-1 h-3 w-3" /> Completed
                     </Badge>
                 );
             case 'processing':
                 return (
-                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400">
+                    <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                         <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Processing
                     </Badge>
                 );
             case 'failed':
                 return (
-                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                    <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                         <XCircle className="mr-1 h-3 w-3" /> Failed
                     </Badge>
                 );
@@ -781,18 +781,18 @@ export default function Data() {
     function dsarStatusBadge(status: DsarRequest['status']) {
         switch (status) {
             case 'new':
-                return <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400">New</Badge>;
+                return <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">New</Badge>;
             case 'in_progress':
-                return <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">In Progress</Badge>;
+                return <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">In Progress</Badge>;
             case 'completed':
                 return (
-                    <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                    <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
                         <CheckCircle className="mr-1 h-3 w-3" /> Completed
                     </Badge>
                 );
             case 'rejected':
                 return (
-                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                    <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                         Rejected
                     </Badge>
                 );
@@ -804,7 +804,7 @@ export default function Data() {
                 );
             case 'overdue':
                 return (
-                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                    <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                         <AlertTriangle className="mr-1 h-3 w-3" /> Overdue
                     </Badge>
                 );
@@ -814,26 +814,26 @@ export default function Data() {
     function severityBadge(severity: DataBreach['severity']) {
         switch (severity) {
             case 'low':
-                return <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">Low</Badge>;
+                return <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">Low</Badge>;
             case 'medium':
-                return <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">Medium</Badge>;
+                return <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">Medium</Badge>;
             case 'high':
-                return <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-400">High</Badge>;
+                return <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">High</Badge>;
             case 'critical':
-                return <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">Critical</Badge>;
+                return <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">Critical</Badge>;
         }
     }
 
     function agreementBadge(status: DataProcessor['agreementStatus']) {
         switch (status) {
             case 'dpa_signed':
-                return <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">DPA Signed</Badge>;
+                return <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">DPA Signed</Badge>;
             case 'standard_terms':
-                return <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400">Standard Terms</Badge>;
+                return <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">Standard Terms</Badge>;
             case 'negotiating':
-                return <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">Under Negotiation</Badge>;
+                return <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">Under Negotiation</Badge>;
             case 'no_agreement':
-                return <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">No Agreement</Badge>;
+                return <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">No Agreement</Badge>;
         }
     }
 
@@ -887,7 +887,7 @@ export default function Data() {
                     <Card className="mb-6">
                         <CardContent
                             dusk="data-status-message"
-                            className={`py-4 text-sm font-medium ${statusMessage.type === 'success' ? 'text-emerald-700' : 'text-red-700'}`}
+                            className={`py-4 text-sm font-medium ${statusMessage.type === 'success' ? 'text-status-success' : 'text-status-critical'}`}
                         >
                             {statusMessage.text}
                         </CardContent>
@@ -941,10 +941,10 @@ export default function Data() {
                                     {exportCategories.map((category) => (
                                         <div key={category.name}>
                                             <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                                {category.encrypted && <Lock className="h-3.5 w-3.5 text-amber-500" />}
+                                                {category.encrypted && <Lock className="h-3.5 w-3.5 text-status-warning" />}
                                                 {category.name}
                                                 {category.encrypted && (
-                                                    <span className="text-[10px] font-normal normal-case tracking-normal text-amber-600 dark:text-amber-400">
+                                                    <span className="text-[10px] font-normal normal-case tracking-normal text-status-warning dark:text-status-warning">
                                                         Encrypted export
                                                     </span>
                                                 )}
@@ -960,7 +960,7 @@ export default function Data() {
                                                             onCheckedChange={() => toggleModule(mod.id)}
                                                         />
                                                         <span className="flex flex-1 items-center gap-1.5 text-sm">
-                                                            {mod.encrypted && <Lock className="h-3 w-3 shrink-0 text-amber-500" />}
+                                                            {mod.encrypted && <Lock className="h-3 w-3 shrink-0 text-status-warning" />}
                                                             {mod.label}
                                                         </span>
                                                         <Badge variant="secondary" className="text-xs tabular-nums">
@@ -975,7 +975,7 @@ export default function Data() {
 
                                 {/* Medical data warning */}
                                 {hasMedicalSelected && (
-                                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400">
+                                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                         <Lock className="mt-0.5 h-4 w-4 shrink-0" />
                                         <span>
                                             Health data exports are encrypted and require Privacy Officer approval
@@ -1062,7 +1062,7 @@ export default function Data() {
                             {!bulkExportAvailable && (
                                 <div
                                     dusk="data-export-unavailable"
-                                    className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                                    className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
                                 >
                                     Bulk export is not available from this screen yet. Use Privacy Requests for subject-level exports until the export queue is wired here.
                                 </div>
@@ -1115,7 +1115,7 @@ export default function Data() {
                             </div>
 
                             {/* Privacy notice */}
-                            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400">
+                            <div className="flex items-start gap-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
                                     Exported data may contain personal information. Handle in accordance with the Privacy Act 2020.
@@ -1177,13 +1177,13 @@ export default function Data() {
                             {!bulkImportAvailable && (
                                 <div
                                     dusk="data-import-unavailable"
-                                    className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                                    className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
                                 >
                                     Bulk import is not yet available from this screen. The cards are shown for roadmap visibility, but upload flows are still pending backend wiring.
                                 </div>
                             )}
 
-                            <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
+                            <div className="flex items-start gap-2 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
                                     Data imports are validated before processing. You'll be able to review and confirm before any
@@ -1227,17 +1227,17 @@ export default function Data() {
                         <CardContent className="space-y-6">
                             {/* Stats row */}
                             <div className="grid grid-cols-3 gap-4">
-                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-800 dark:bg-amber-950/30">
-                                    <p className="text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-400">{dsarOpen}</p>
-                                    <p className="text-xs text-amber-600 dark:text-amber-500">Open Requests</p>
+                                <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-center dark:border-status-warning/30 dark:bg-status-warning">
+                                    <p className="text-2xl font-bold tabular-nums text-status-warning dark:text-status-warning">{dsarOpen}</p>
+                                    <p className="text-xs text-status-warning dark:text-status-warning">Open Requests</p>
                                 </div>
-                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center dark:border-emerald-800 dark:bg-emerald-950/30">
-                                    <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{dsarCompleted}</p>
-                                    <p className="text-xs text-emerald-600 dark:text-emerald-500">Completed</p>
+                                <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-center dark:border-status-success/30 dark:bg-status-success">
+                                    <p className="text-2xl font-bold tabular-nums text-status-success dark:text-status-success">{dsarCompleted}</p>
+                                    <p className="text-xs text-status-success dark:text-status-success">Completed</p>
                                 </div>
-                                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center dark:border-red-800 dark:bg-red-950/30">
-                                    <p className="text-2xl font-bold tabular-nums text-red-700 dark:text-red-400">{dsarOverdue}</p>
-                                    <p className="text-xs text-red-600 dark:text-red-500">Overdue (&gt;20 working days)</p>
+                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-center dark:border-status-critical/30 dark:bg-status-critical">
+                                    <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{dsarOverdue}</p>
+                                    <p className="text-xs text-status-critical dark:text-status-critical">Overdue (&gt;20 working days)</p>
                                 </div>
                             </div>
 
@@ -1267,10 +1267,10 @@ export default function Data() {
                                                 <td className="px-4 py-2.5">{req.requester}</td>
                                                 <td className="whitespace-nowrap px-4 py-2.5">{req.dateReceived}</td>
                                                 <td className="whitespace-nowrap px-4 py-2.5">
-                                                    <span className={req.workingDaysLeft <= 0 ? 'font-semibold text-red-600' : req.workingDaysLeft <= 5 ? 'font-semibold text-amber-600' : ''}>
+                                                    <span className={req.workingDaysLeft <= 0 ? 'font-semibold text-status-critical' : req.workingDaysLeft <= 5 ? 'font-semibold text-status-warning' : ''}>
                                                         {req.dueDate}
                                                     </span>
-                                                    <span className={`ml-1.5 text-xs ${req.workingDaysLeft <= 0 ? 'text-red-500' : req.workingDaysLeft <= 5 ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                                                    <span className={`ml-1.5 text-xs ${req.workingDaysLeft <= 0 ? 'text-status-critical' : req.workingDaysLeft <= 5 ? 'text-status-warning' : 'text-muted-foreground'}`}>
                                                         ({req.workingDaysLeft <= 0 ? `${Math.abs(req.workingDaysLeft)}d overdue` : `${req.workingDaysLeft}d left`})
                                                     </span>
                                                 </td>
@@ -1291,8 +1291,8 @@ export default function Data() {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/40">
-                                        <ShieldAlert className="h-5 w-5 text-red-600" />
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical-bg dark:bg-status-critical">
+                                        <ShieldAlert className="h-5 w-5 text-status-critical" />
                                     </div>
                                     <div>
                                         <CardTitle>Data Breach Management</CardTitle>
@@ -1332,7 +1332,7 @@ export default function Data() {
                                                 <td className="px-4 py-2.5 text-right tabular-nums">{breach.individualsAffected}</td>
                                                 <td className="px-4 py-2.5">
                                                     {breach.commissionerNotified ? (
-                                                        <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
+                                                        <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
                                                             <CheckCircle className="mr-1 h-3 w-3" /> Notified
                                                         </Badge>
                                                     ) : breach.commissionerNotificationRequired === false ? (
@@ -1353,7 +1353,7 @@ export default function Data() {
                             </div>
 
                             {/* 72 hour warning */}
-                            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+                            <div className="flex items-start gap-2 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
                                     Under the Privacy Act 2020, serious breaches must be notified to the Privacy Commissioner as soon as practicable (within 72 hours of discovery).
@@ -1434,7 +1434,7 @@ export default function Data() {
                                 {savingRetention ? 'Saving…' : 'Save Retention Policies'}
                             </Button>
 
-                            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400">
+                            <div className="flex items-start gap-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
                                     Changes to retention policies will take effect on the next scheduled cleanup. Data deleted by retention policies cannot be recovered.
@@ -1446,21 +1446,21 @@ export default function Data() {
                     {/* ==========================================================
                         SECTION 6 — Danger Zone
                     ========================================================== */}
-                    <Card className="border-red-200 dark:border-red-900">
+                    <Card className="border-status-critical/30 dark:border-status-critical/30">
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/40">
-                                    <Trash2 className="h-5 w-5 text-red-600" />
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical-bg dark:bg-status-critical">
+                                    <Trash2 className="h-5 w-5 text-status-critical" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-red-600">Danger Zone</CardTitle>
+                                    <CardTitle className="text-status-critical">Danger Zone</CardTitle>
                                     <CardDescription>Irreversible actions that affect all organisation data</CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* Purge deleted records */}
-                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
+                            <div className="flex items-center justify-between rounded-lg border border-status-critical/30 p-4 dark:border-status-critical/30">
                                 <div>
                                     <p className="text-sm font-medium">Purge All Deleted Records</p>
                                     <p className="text-xs text-muted-foreground">
@@ -1470,7 +1470,7 @@ export default function Data() {
                                 <Button
                                     dusk="data-danger-purge-open"
                                     variant="outline"
-                                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30"
+                                    className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg hover:text-status-critical dark:border-status-critical/30 dark:hover:bg-status-critical"
                                     disabled={!dangerZoneAvailable}
                                     onClick={() => setShowPurgeDialog(true)}
                                 >
@@ -1479,7 +1479,7 @@ export default function Data() {
                             </div>
 
                             {/* Reset demo data */}
-                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
+                            <div className="flex items-center justify-between rounded-lg border border-status-critical/30 p-4 dark:border-status-critical/30">
                                 <div>
                                     <p className="text-sm font-medium">Reset Demo Data</p>
                                     <p className="text-xs text-muted-foreground">
@@ -1489,7 +1489,7 @@ export default function Data() {
                                 <Button
                                     dusk="data-danger-reset-demo"
                                     variant="outline"
-                                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30"
+                                    className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg hover:text-status-critical dark:border-status-critical/30 dark:hover:bg-status-critical"
                                     disabled={!dangerZoneAvailable}
                                 >
                                     Reset Demo
@@ -1497,7 +1497,7 @@ export default function Data() {
                             </div>
 
                             {/* Delete organisation */}
-                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
+                            <div className="flex items-center justify-between rounded-lg border border-status-critical/30 p-4 dark:border-status-critical/30">
                                 <div>
                                     <p className="text-sm font-medium">Delete Organisation</p>
                                     <p className="text-xs text-muted-foreground">
@@ -1517,7 +1517,7 @@ export default function Data() {
                             {!dangerZoneAvailable && (
                                 <div
                                     dusk="data-danger-unavailable"
-                                    className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                                    className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
                                 >
                                     High-impact maintenance actions are not available from the web UI in this environment.
                                 </div>
@@ -1760,14 +1760,14 @@ export default function Data() {
                             </div>
 
                             {/* Breach notification info banner */}
-                            <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
+                            <div className="flex items-start gap-2 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
                                     NZ organisations must notify the Privacy Commissioner of serious breaches within 72 hours. Use the Data Breach Management section above to track incidents.
                                 </span>
                             </div>
 
-                            <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
+                            <div className="flex items-start gap-2 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
                                     Under the Privacy Act 2020, individuals have the right to access, correct, and request deletion
@@ -1820,7 +1820,7 @@ export default function Data() {
                                     <div
                                         dusk={`data-processor-row-${proc.id}`}
                                         key={proc.id}
-                                        className={`rounded-lg border p-4 ${proc.overdue ? 'border-red-200 dark:border-red-900' : ''}`}
+                                        className={`rounded-lg border p-4 ${proc.overdue ? 'border-status-critical/30 dark:border-status-critical/30' : ''}`}
                                     >
                                         <div className="mb-3 flex items-start justify-between">
                                             <div>
@@ -1849,7 +1849,7 @@ export default function Data() {
                                         <div className="flex items-center justify-between">
                                             <div className="space-y-1">
                                                 {agreementBadge(proc.agreementStatus)}
-                                                <p className={`text-xs ${proc.overdue ? 'font-semibold text-red-600' : 'text-muted-foreground'}`}>
+                                                <p className={`text-xs ${proc.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}>
                                                     Review: {proc.reviewDate}
                                                     {proc.overdue && ' (overdue)'}
                                                 </p>
@@ -1868,7 +1868,7 @@ export default function Data() {
                                                     dusk={`data-processor-remove-${proc.id}`}
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-auto px-2 py-1 text-xs text-red-600"
+                                                    className="h-auto px-2 py-1 text-xs text-status-critical"
                                                     onClick={() => removeProcessor(proc.id)}
                                                     disabled={removingProcessorId === proc.id}
                                                 >
@@ -1894,7 +1894,7 @@ export default function Data() {
                 <Dialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle className="text-red-600">Purge All Deleted Records</DialogTitle>
+                            <DialogTitle className="text-status-critical">Purge All Deleted Records</DialogTitle>
                             <DialogDescription>
                                 This will permanently remove all soft-deleted records across all modules. This action cannot be
                                 undone.
@@ -1939,7 +1939,7 @@ export default function Data() {
                 <Dialog open={showDeleteOrgDialog} onOpenChange={setShowDeleteOrgDialog}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle className="text-red-600">Delete Organisation</DialogTitle>
+                            <DialogTitle className="text-status-critical">Delete Organisation</DialogTitle>
                             <DialogDescription>
                                 This will permanently delete your entire organisation including all clients, staff, records, and
                                 configurations. This action cannot be undone.
@@ -2127,7 +2127,7 @@ export default function Data() {
                 >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
-                            <DialogTitle className="text-red-600">Report Data Breach</DialogTitle>
+                            <DialogTitle className="text-status-critical">Report Data Breach</DialogTitle>
                             <DialogDescription>
                                 Record a data breach incident. Serious breaches must be reported to the Privacy Commissioner within 72 hours.
                             </DialogDescription>
@@ -2220,7 +2220,7 @@ export default function Data() {
                             </div>
 
                             {breachDiscoveryDate && (
-                                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+                                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                     <strong>Notification deadline:</strong> {calc72HourDeadline(breachDiscoveryDate)} (72 hours from discovery)
                                 </div>
                             )}

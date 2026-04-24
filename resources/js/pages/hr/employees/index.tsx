@@ -84,13 +84,13 @@ function getInitials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-    'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+    'bg-status-info-bg text-status-info dark:text-status-info',
     'bg-primary/15 text-primary dark:text-primary/70',
-    'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-    'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-    'bg-pink-500/15 text-pink-700 dark:text-pink-300',
-    'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
-    'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+    'bg-status-success-bg text-status-success dark:text-status-success',
+    'bg-status-warning-bg text-status-warning dark:text-status-warning',
+    'bg-status-critical-bg text-status-critical dark:text-status-critical',
+    'bg-status-info-bg text-status-info dark:text-status-info',
+    'bg-status-critical-bg text-status-critical dark:text-status-critical',
     'bg-primary/15 text-primary dark:text-primary/70',
 ];
 
@@ -99,19 +99,19 @@ function getAvatarColor(id: number): string {
 }
 
 const TYPE_STYLES: Record<string, string> = {
-    full_time: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30',
-    part_time: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
+    full_time: 'bg-status-info-bg text-status-info border-status-info/30 dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
+    part_time: 'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
     casual: 'bg-primary/10 text-primary border-primary dark:bg-primary/10 dark:text-primary/70 dark:border-primary/30',
-    fixed_term: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/30',
-    contractor: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30',
+    fixed_term: 'bg-status-info-bg text-status-info border-status-info/30 dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
+    contractor: 'bg-status-warning-bg text-status-warning border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
 };
 
 const TYPE_BAR_COLORS: Record<string, string> = {
-    full_time: 'bg-blue-500',
-    part_time: 'bg-amber-500',
+    full_time: 'bg-status-info',
+    part_time: 'bg-status-warning',
     casual: 'bg-primary',
-    fixed_term: 'bg-cyan-500',
-    contractor: 'bg-orange-500',
+    fixed_term: 'bg-status-info',
+    contractor: 'bg-status-warning',
 };
 
 function formatLabel(s: string): string {
@@ -140,24 +140,24 @@ interface StatCardProps {
 
 const STAT_COLORS = {
     blue: {
-        bg: 'bg-blue-50 dark:bg-blue-500/10',
-        icon: 'text-blue-600 dark:text-blue-400',
-        ring: 'ring-blue-100 dark:ring-blue-500/20',
+        bg: 'bg-status-info-bg dark:bg-status-info',
+        icon: 'text-status-info dark:text-status-info',
+        ring: 'ring-status-info dark:ring-status-info/20',
     },
     emerald: {
-        bg: 'bg-emerald-50 dark:bg-emerald-500/10',
-        icon: 'text-emerald-600 dark:text-emerald-400',
-        ring: 'ring-emerald-100 dark:ring-emerald-500/20',
+        bg: 'bg-status-success-bg dark:bg-status-success',
+        icon: 'text-status-success dark:text-status-success',
+        ring: 'ring-status-success dark:ring-status-success/20',
     },
     amber: {
-        bg: 'bg-amber-50 dark:bg-amber-500/10',
-        icon: 'text-amber-600 dark:text-amber-400',
-        ring: 'ring-amber-100 dark:ring-amber-500/20',
+        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        icon: 'text-status-warning dark:text-status-warning',
+        ring: 'ring-status-warning dark:ring-status-warning/20',
     },
     red: {
-        bg: 'bg-red-50 dark:bg-red-500/10',
-        icon: 'text-red-600 dark:text-red-400',
-        ring: 'ring-red-100 dark:ring-red-500/20',
+        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        icon: 'text-status-critical dark:text-status-critical',
+        ring: 'ring-status-critical dark:ring-status-critical/20',
     },
 };
 
@@ -249,7 +249,7 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                                 {Object.entries(summary.type_counts).map(([type, count]) => (
                                     <div
                                         key={type}
-                                        className={`${TYPE_BAR_COLORS[type] || 'bg-slate-400'} transition-all`}
+                                        className={`${TYPE_BAR_COLORS[type] || 'bg-muted'} transition-all`}
                                         style={{ width: `${(count / typeTotal) * 100}%` }}
                                         title={`${formatLabel(type)}: ${count}`}
                                     />
@@ -258,7 +258,7 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                                 {Object.entries(summary.type_counts).map(([type, count]) => (
                                     <div key={type} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                        <span className={`inline-block h-2.5 w-2.5 rounded-full ${TYPE_BAR_COLORS[type] || 'bg-slate-400'}`} />
+                                        <span className={`inline-block h-2.5 w-2.5 rounded-full ${TYPE_BAR_COLORS[type] || 'bg-muted'}`} />
                                         {formatLabel(type)} <span className="font-medium text-foreground">{count}</span>
                                     </div>
                                 ))}
@@ -414,8 +414,8 @@ export default function EmployeesIndex({ profiles, sites, departments, filters, 
                                                     variant="outline"
                                                     className={
                                                         p.is_active
-                                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                                            : 'border-border bg-muted text-muted-foreground dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-muted-foreground'
+                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success'
+                                                            : 'border-border bg-muted text-muted-foreground dark:border-border/30 dark:bg-muted-foreground/80/10 dark:text-muted-foreground'
                                                     }
                                                 >
                                                     {p.is_active ? 'Active' : 'Inactive'}

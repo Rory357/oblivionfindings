@@ -102,10 +102,10 @@ interface Props {
 
 const noteTypeColors: Record<string, string> = {
     note: 'bg-muted text-foreground border-border',
-    action: 'bg-blue-100 text-blue-700 border-blue-200',
-    escalation: 'bg-orange-100 text-orange-700 border-orange-200',
+    action: 'bg-status-info-bg text-status-info border-status-info/30',
+    escalation: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     decision: 'bg-primary/10 text-primary border-primary',
-    handover: 'bg-green-100 text-green-700 border-green-200',
+    handover: 'bg-status-success-bg text-status-success border-status-success/30',
 };
 
 function formatRelativeTime(isoString: string | null): string {
@@ -390,7 +390,7 @@ export default function ControlRoomShifts({
                                 <div>
                                     <CardTitle className="flex items-center gap-2">
                                         {activeShift.name}
-                                        <Badge className="bg-green-100 text-green-700 border-green-200">
+                                        <Badge className="bg-status-success-bg text-status-success border-status-success/30">
                                             Active
                                         </Badge>
                                     </CardTitle>
@@ -749,7 +749,7 @@ export default function ControlRoomShifts({
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 <div className="rounded-lg border bg-muted/30 p-3">
                                     <div className="flex items-center gap-2">
-                                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" />
                                         <span className="text-xs text-muted-foreground">
                                             Alerts Created
                                         </span>
@@ -760,7 +760,7 @@ export default function ControlRoomShifts({
                                 </div>
                                 <div className="rounded-lg border bg-muted/30 p-3">
                                     <div className="flex items-center gap-2">
-                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                        <CheckCircle className="h-4 w-4 text-status-success" />
                                         <span className="text-xs text-muted-foreground">
                                             Alerts Resolved
                                         </span>
@@ -771,7 +771,7 @@ export default function ControlRoomShifts({
                                 </div>
                                 <div className="rounded-lg border bg-muted/30 p-3">
                                     <div className="flex items-center gap-2">
-                                        <TrendingUp className="h-4 w-4 text-orange-500" />
+                                        <TrendingUp className="h-4 w-4 text-status-warning" />
                                         <span className="text-xs text-muted-foreground">
                                             Alerts Escalated
                                         </span>
@@ -782,7 +782,7 @@ export default function ControlRoomShifts({
                                 </div>
                                 <div className="rounded-lg border bg-muted/30 p-3">
                                     <div className="flex items-center gap-2">
-                                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                                        <AlertTriangle className="h-4 w-4 text-status-critical" />
                                         <span className="text-xs text-muted-foreground">
                                             Open Alerts Now
                                         </span>
@@ -790,7 +790,7 @@ export default function ControlRoomShifts({
                                     <div className="mt-1 text-2xl font-bold">
                                         {openAlertsCount}
                                         {criticalAlertsCount > 0 && (
-                                            <span className="ml-2 text-sm font-normal text-red-600">
+                                            <span className="ml-2 text-sm font-normal text-status-critical">
                                                 ({criticalAlertsCount} critical)
                                             </span>
                                         )}
@@ -942,14 +942,14 @@ export default function ControlRoomShifts({
                                         key={note.id}
                                         className={`rounded-lg border p-3 ${
                                             note.is_pinned
-                                                ? 'border-yellow-300 bg-yellow-50/50 dark:border-yellow-800 dark:bg-yellow-950/20'
+                                                ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
                                                 : 'bg-card'
                                         }`}
                                     >
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex items-center gap-2">
                                                 {note.is_pinned && (
-                                                    <Pin className="h-3.5 w-3.5 text-yellow-600" />
+                                                    <Pin className="h-3.5 w-3.5 text-status-warning" />
                                                 )}
                                                 <Badge
                                                     variant="outline"
@@ -964,7 +964,7 @@ export default function ControlRoomShifts({
                                                 {note.requires_followup && (
                                                     <Badge
                                                         variant="outline"
-                                                        className="border-red-200 text-red-600"
+                                                        className="border-status-critical/30 text-status-critical"
                                                     >
                                                         Follow-up required
                                                     </Badge>

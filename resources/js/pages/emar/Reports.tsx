@@ -380,10 +380,10 @@ export default function EmarReports({
                                                 {clientBreakdown.map((row) => (
                                                     <tr key={row.client_id} className="border-b last:border-0">
                                                         <td className="py-2 pr-4 font-medium">{row.client_name}</td>
-                                                        <td className="py-2 pr-4 text-right tabular-nums text-emerald-600">{row.given}</td>
-                                                        <td className="py-2 pr-4 text-right tabular-nums text-amber-600">{row.refused}</td>
+                                                        <td className="py-2 pr-4 text-right tabular-nums text-status-success">{row.given}</td>
+                                                        <td className="py-2 pr-4 text-right tabular-nums text-status-warning">{row.refused}</td>
                                                         <td className="py-2 pr-4 text-right tabular-nums text-muted-foreground">{row.withheld}</td>
-                                                        <td className="py-2 pr-4 text-right tabular-nums text-red-600">{row.missed}</td>
+                                                        <td className="py-2 pr-4 text-right tabular-nums text-status-critical">{row.missed}</td>
                                                         <td className="py-2 pr-4 text-right tabular-nums font-medium">{row.total}</td>
                                                         <td className="py-2 text-right tabular-nums">
                                                             <Badge variant={row.compliance >= 90 ? 'default' : row.compliance >= 75 ? 'secondary' : 'destructive'}>

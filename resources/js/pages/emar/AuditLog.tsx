@@ -79,44 +79,44 @@ const EVENT_CONFIG: Record<
     medication_started: {
         label: 'Medication Started',
         icon: Pill,
-        color: 'text-emerald-600 dark:text-emerald-400',
-        bg: 'bg-emerald-100 dark:bg-emerald-900/40',
-        badgeVariant: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+        color: 'text-status-success dark:text-status-success',
+        bg: 'bg-status-success-bg dark:bg-status-success',
+        badgeVariant: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     },
     medication_ceased: {
         label: 'Medication Ceased',
         icon: XCircle,
-        color: 'text-red-600 dark:text-red-400',
-        bg: 'bg-red-100 dark:bg-red-900/40',
-        badgeVariant: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+        color: 'text-status-critical dark:text-status-critical',
+        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        badgeVariant: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
     medication_changed: {
         label: 'Medication Changed',
         icon: Edit,
-        color: 'text-amber-600 dark:text-amber-400',
-        bg: 'bg-amber-100 dark:bg-amber-900/40',
-        badgeVariant: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+        color: 'text-status-warning dark:text-status-warning',
+        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        badgeVariant: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     },
     dose_administered: {
         label: 'Dose Administered',
         icon: Check,
-        color: 'text-blue-600 dark:text-blue-400',
-        bg: 'bg-blue-100 dark:bg-blue-900/40',
-        badgeVariant: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+        color: 'text-status-info dark:text-status-info',
+        bg: 'bg-status-info-bg dark:bg-status-info',
+        badgeVariant: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     },
     dose_refused: {
         label: 'Dose Refused',
         icon: XCircle,
-        color: 'text-orange-600 dark:text-orange-400',
-        bg: 'bg-orange-100 dark:bg-orange-900/40',
-        badgeVariant: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+        color: 'text-status-warning dark:text-status-warning',
+        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        badgeVariant: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     },
     dose_missed: {
         label: 'Dose Missed',
         icon: AlertTriangle,
-        color: 'text-red-600 dark:text-red-400',
-        bg: 'bg-red-100 dark:bg-red-900/40',
-        badgeVariant: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+        color: 'text-status-critical dark:text-status-critical',
+        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        badgeVariant: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
     prescriber_order: {
         label: 'Prescriber Order',
@@ -128,30 +128,30 @@ const EVENT_CONFIG: Record<
     review_completed: {
         label: 'Review Completed',
         icon: ClipboardCheck,
-        color: 'text-teal-600 dark:text-teal-400',
-        bg: 'bg-teal-100 dark:bg-teal-900/40',
-        badgeVariant: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+        color: 'text-status-info dark:text-status-info',
+        bg: 'bg-status-info-bg dark:bg-status-info',
+        badgeVariant: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     },
     stock_received: {
         label: 'Stock Received',
         icon: Package,
-        color: 'text-emerald-600 dark:text-emerald-400',
-        bg: 'bg-emerald-100 dark:bg-emerald-900/40',
-        badgeVariant: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+        color: 'text-status-success dark:text-status-success',
+        bg: 'bg-status-success-bg dark:bg-status-success',
+        badgeVariant: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     },
     destruction: {
         label: 'Medication Destroyed',
         icon: Trash2,
-        color: 'text-red-600 dark:text-red-400',
-        bg: 'bg-red-100 dark:bg-red-900/40',
-        badgeVariant: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+        color: 'text-status-critical dark:text-status-critical',
+        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        badgeVariant: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
     error_reported: {
         label: 'Error Reported',
         icon: AlertOctagon,
-        color: 'text-red-600 dark:text-red-400',
-        bg: 'bg-red-100 dark:bg-red-900/40',
-        badgeVariant: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+        color: 'text-status-critical dark:text-status-critical',
+        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        badgeVariant: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     },
 };
 
@@ -319,8 +319,8 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                 <div className="mb-6 grid gap-3 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                                <FileText className="h-5 w-5 text-blue-600" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-info-bg dark:bg-status-info">
+                                <FileText className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{stats.total.toLocaleString()}</p>
@@ -330,8 +330,8 @@ export default function AuditLog({ events, stats, hasMore, currentPage, clients,
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-                                <Calendar className="h-5 w-5 text-emerald-600" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-success-bg dark:bg-status-success">
+                                <Calendar className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{stats.this_week.toLocaleString()}</p>

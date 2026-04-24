@@ -138,7 +138,7 @@ export default function ProcedureEdit({ procedure }: Props) {
 
             <div className="space-y-6">
                 <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-blue-600" />
+                    <FileText className="h-5 w-5 text-status-info" />
                     <h1 className="text-lg font-semibold">Edit Safe Work Procedure</h1>
                 </div>
 
@@ -152,12 +152,12 @@ export default function ProcedureEdit({ procedure }: Props) {
                                 <div>
                                     <Label>Title</Label>
                                     <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="Procedure title" />
-                                    {form.errors.title && <p className="mt-1 text-xs text-red-600">{form.errors.title}</p>}
+                                    {form.errors.title && <p className="mt-1 text-xs text-status-critical">{form.errors.title}</p>}
                                 </div>
                                 <div>
                                     <Label>Reference Number</Label>
                                     <Input value={form.data.reference_number} onChange={(e) => form.setData('reference_number', e.target.value)} placeholder="e.g. SWP-001" />
-                                    {form.errors.reference_number && <p className="mt-1 text-xs text-red-600">{form.errors.reference_number}</p>}
+                                    {form.errors.reference_number && <p className="mt-1 text-xs text-status-critical">{form.errors.reference_number}</p>}
                                 </div>
                             </div>
 
@@ -171,19 +171,19 @@ export default function ProcedureEdit({ procedure }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {form.errors.category && <p className="mt-1 text-xs text-red-600">{form.errors.category}</p>}
+                                {form.errors.category && <p className="mt-1 text-xs text-status-critical">{form.errors.category}</p>}
                             </div>
 
                             <div>
                                 <Label>Purpose</Label>
                                 <Textarea value={form.data.purpose} onChange={(e) => form.setData('purpose', e.target.value)} rows={3} placeholder="What is the purpose of this procedure?" />
-                                {form.errors.purpose && <p className="mt-1 text-xs text-red-600">{form.errors.purpose}</p>}
+                                {form.errors.purpose && <p className="mt-1 text-xs text-status-critical">{form.errors.purpose}</p>}
                             </div>
 
                             <div>
                                 <Label>Scope</Label>
                                 <Textarea value={form.data.scope} onChange={(e) => form.setData('scope', e.target.value)} rows={3} placeholder="What does this procedure cover?" />
-                                {form.errors.scope && <p className="mt-1 text-xs text-red-600">{form.errors.scope}</p>}
+                                {form.errors.scope && <p className="mt-1 text-xs text-status-critical">{form.errors.scope}</p>}
                             </div>
                         </CardContent>
                     </Card>
@@ -205,7 +205,7 @@ export default function ProcedureEdit({ procedure }: Props) {
                                         <span className="text-sm font-semibold">Step {step.step_number}</span>
                                         {form.data.steps.length > 1 && (
                                             <Button type="button" size="sm" variant="ghost" onClick={() => removeStep(index)}>
-                                                <Trash2 className="h-4 w-4 text-red-500" />
+                                                <Trash2 className="h-4 w-4 text-status-critical" />
                                             </Button>
                                         )}
                                     </div>
@@ -231,7 +231,7 @@ export default function ProcedureEdit({ procedure }: Props) {
                                     </div>
                                 </div>
                             ))}
-                            {(form.errors as any).steps && <p className="text-xs text-red-600">{(form.errors as any).steps}</p>}
+                            {(form.errors as any).steps && <p className="text-xs text-status-critical">{(form.errors as any).steps}</p>}
                         </CardContent>
                     </Card>
 
@@ -250,7 +250,7 @@ export default function ProcedureEdit({ procedure }: Props) {
                                             onClick={() => togglePpe(item)}
                                             className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                                                 form.data.ppe_required.includes(item)
-                                                    ? 'border-blue-300 bg-blue-100 text-blue-800'
+                                                    ? 'border-status-info/30 bg-status-info-bg text-status-info'
                                                     : 'border-border bg-white text-muted-foreground hover:bg-muted'
                                             }`}
                                         >

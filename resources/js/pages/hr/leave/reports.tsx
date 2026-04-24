@@ -79,10 +79,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const riskColors: Record<string, string> = {
-    low: 'bg-green-100 text-green-800',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
+    low: 'bg-status-success-bg text-status-success',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function LeaveReports({ absenteeism, bradfordFactor, utilization, year, can }: Props) {
@@ -151,7 +151,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                                     {absenteeism.monthly.map((m) => (
                                         <div key={m.month} className="flex flex-1 flex-col items-center gap-1">
                                             <div
-                                                className="w-full rounded-t bg-blue-500 transition-all"
+                                                className="w-full rounded-t bg-status-info transition-all"
                                                 style={{ height: `${(m.count / maxCount) * 160}px`, minHeight: m.count > 0 ? 4 : 0 }}
                                                 title={`${m.count} occurrences, ${m.total_hours}h`}
                                             />
@@ -270,7 +270,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
                                                     <div className="flex items-center gap-2">
                                                         <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
                                                             <div
-                                                                className={`h-full rounded-full ${e.overall_pct >= 90 ? 'bg-red-500' : e.overall_pct >= 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                                                className={`h-full rounded-full ${e.overall_pct >= 90 ? 'bg-status-critical' : e.overall_pct >= 70 ? 'bg-status-warning' : 'bg-status-success'}`}
                                                                 style={{ width: `${Math.min(100, e.overall_pct)}%` }}
                                                             />
                                                         </div>

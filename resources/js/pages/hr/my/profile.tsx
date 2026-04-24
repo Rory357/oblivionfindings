@@ -237,7 +237,7 @@ export default function MyProfile({ profile }: Props) {
                                     {form.processing ? 'Saving...' : 'Save Changes'}
                                 </Button>
                                 {form.recentlySuccessful && (
-                                    <span className="text-sm text-emerald-500">Saved successfully.</span>
+                                    <span className="text-sm text-status-success">Saved successfully.</span>
                                 )}
                             </div>
                         </form>

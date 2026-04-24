@@ -297,11 +297,11 @@ function CommentRow({
                         <span className="font-medium">{comment.user_name}</span>
                         {showStaffBadge && (
                             comment.is_staff ? (
-                                <Badge variant="outline" className="ml-1 text-[9px] border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
+                                <Badge variant="outline" className="ml-1 text-[9px] border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                                     Staff
                                 </Badge>
                             ) : (
-                                <Badge variant="outline" className="ml-1 text-[9px] border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                                <Badge variant="outline" className="ml-1 text-[9px] border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                     Family
                                 </Badge>
                             )
@@ -315,8 +315,8 @@ function CommentRow({
                             onClick={() => onToggleLike(comment.id)}
                             className={`inline-flex items-center gap-1 text-[11px] transition-colors ${
                                 isLiked
-                                    ? 'text-rose-500'
-                                    : 'text-muted-foreground hover:text-rose-500'
+                                    ? 'text-status-critical'
+                                    : 'text-muted-foreground hover:text-status-critical'
                             }`}
                         >
                             <Heart className={`h-3 w-3 ${isLiked ? 'fill-rose-500' : ''}`} />
@@ -336,7 +336,7 @@ function CommentRow({
                 {comment.user_id === currentUserId && (
                     <button
                         onClick={() => onDelete(comment.id)}
-                        className="shrink-0 text-muted-foreground/50 transition-colors hover:text-red-500"
+                        className="shrink-0 text-muted-foreground/50 transition-colors hover:text-status-critical"
                     >
                         <Trash2 className="h-3 w-3" />
                     </button>

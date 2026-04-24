@@ -20,10 +20,10 @@ const COMMITTEE_LABELS: Record<string, string> = {
 };
 
 const getSeverityColor = (score: number) => {
-    if (score >= 20) return 'bg-red-500 text-white';
-    if (score >= 15) return 'bg-orange-500 text-white';
-    if (score >= 10) return 'bg-yellow-500 text-black';
-    return 'bg-green-500 text-white';
+    if (score >= 20) return 'bg-status-critical text-white';
+    if (score >= 15) return 'bg-status-warning text-white';
+    if (score >= 10) return 'bg-status-warning text-black';
+    return 'bg-status-success text-white';
 };
 
 const getSeverityBorder = (score: number) => {
@@ -85,7 +85,7 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
                                             {risk.within_appetite !== undefined && (
                                                 <span className="flex items-center gap-1">
                                                     {risk.within_appetite ? (
-                                                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                                        <CheckCircle2 className="w-3 h-3 text-status-success" />
                                                     ) : (
                                                         <AlertTriangle className="w-3 h-3 text-primary" />
                                                     )}

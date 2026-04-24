@@ -126,8 +126,8 @@ const breadcrumbs = [
 type StatusVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
 const statusConfig: Record<string, { variant: StatusVariant; className: string; label: string }> = {
-    pending: { variant: 'outline', className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Pending' },
-    approved: { variant: 'outline', className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Approved' },
+    pending: { variant: 'outline', className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Pending' },
+    approved: { variant: 'outline', className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
     declined: { variant: 'destructive', className: '', label: 'Declined' },
     cancelled: { variant: 'secondary', className: '', label: 'Cancelled' },
 };
@@ -155,7 +155,7 @@ function SlaBadge({ request }: { request: LeaveRequest }) {
         return <Badge variant="destructive" className="ml-2 gap-1"><AlertTriangle className="h-3 w-3" /> Overdue</Badge>;
     }
     if (request.due_within_24h) {
-        return <Badge variant="outline" className="ml-2 gap-1 border-amber-500/30 text-amber-400 bg-amber-500/10"><Clock className="h-3 w-3" /> Due in 24h</Badge>;
+        return <Badge variant="outline" className="ml-2 gap-1 border-status-warning/30 text-status-warning bg-status-warning"><Clock className="h-3 w-3" /> Due in 24h</Badge>;
     }
     return null;
 }
@@ -250,11 +250,11 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, dashb
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                    <KpiCard label="Pending Queue" value={sla.pending_total} icon={Clock} color="bg-amber-500/10 text-amber-500" />
-                    <KpiCard label="On Leave Today" value={dd.onLeaveToday.length} icon={Users} description={`of ${dd.totalActiveStaff} staff`} color="bg-blue-500/10 text-blue-500" />
-                    <KpiCard label="Absence Rate" value={dd.absenceRate} icon={TrendingDown} suffix="%" decimals={1} description="Sick leave (30d)" color="bg-red-500/10 text-red-500" />
+                    <KpiCard label="Pending Queue" value={sla.pending_total} icon={Clock} color="bg-status-warning-bg text-status-warning" />
+                    <KpiCard label="On Leave Today" value={dd.onLeaveToday.length} icon={Users} description={`of ${dd.totalActiveStaff} staff`} color="bg-status-info-bg text-status-info" />
+                    <KpiCard label="Absence Rate" value={dd.absenceRate} icon={TrendingDown} suffix="%" decimals={1} description="Sick leave (30d)" color="bg-status-critical-bg text-status-critical" />
                     <KpiCard label="Avg Decision" value={sla.avg_decision_hours_30d} icon={Timer} suffix="h" decimals={1} description="Last 30 days" color="bg-primary/10 text-primary" />
-                    <KpiCard label="Roster Impact" value={dd.rosterImpact} icon={AlertTriangle} description="Shifts affected" color="bg-orange-500/10 text-orange-500" />
+                    <KpiCard label="Roster Impact" value={dd.rosterImpact} icon={AlertTriangle} description="Shifts affected" color="bg-status-warning-bg text-status-warning" />
                 </div>
 
                 {/* Tabs */}
@@ -264,7 +264,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, dashb
                         <TabsTrigger value="requests" className="relative">
                             <List className="mr-1.5 h-3.5 w-3.5" /> Requests
                             {sla.pending_total > 0 && (
-                                <Badge className="ml-1.5 h-5 min-w-[20px] rounded-full bg-amber-500 px-1.5 text-[10px] text-white">{sla.pending_total}</Badge>
+                                <Badge className="ml-1.5 h-5 min-w-[20px] rounded-full bg-status-warning px-1.5 text-[10px] text-white">{sla.pending_total}</Badge>
                             )}
                         </TabsTrigger>
                         <TabsTrigger value="balances"><BarChart3 className="mr-1.5 h-3.5 w-3.5" /> Balances</TabsTrigger>
@@ -403,7 +403,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, dashb
                                     <Card>
                                         <CardHeader className="pb-3">
                                             <CardTitle className="flex items-center gap-2 text-base">
-                                                <Clock className="h-4 w-4 text-amber-500" /> Longest Waiting
+                                                <Clock className="h-4 w-4 text-status-warning" /> Longest Waiting
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-2">
@@ -413,7 +413,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, dashb
                                                         <p className="font-medium">{row.staff_name}</p>
                                                         <p className="text-xs capitalize text-muted-foreground">{row.leave_type.replace('_', ' ')}</p>
                                                     </div>
-                                                    <Badge variant="outline" className={row.hours_waiting > 48 ? 'border-red-500/30 text-red-400 bg-red-500/10' : 'border-amber-500/30 text-amber-400 bg-amber-500/10'}>
+                                                    <Badge variant="outline" className={row.hours_waiting > 48 ? 'border-status-critical/30 text-status-critical bg-status-critical' : 'border-status-warning/30 text-status-warning bg-status-warning'}>
                                                         {row.hours_waiting.toFixed(0)}h
                                                     </Badge>
                                                 </div>
@@ -450,18 +450,18 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, dashb
                     <TabsContent value="requests" className="space-y-4">
                         {/* Pending Approval Section */}
                         {can.approve && pendingRequests.length > 0 && (
-                            <Card className="border-yellow-500/20 bg-yellow-500/5">
+                            <Card className="border-status-warning/20 bg-status-warning">
                                 <CardHeader>
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <CardTitle className="flex items-center gap-2">
-                                            <Clock className="h-5 w-5 text-yellow-400" /> Pending Approval ({pendingRequests.length})
+                                            <Clock className="h-5 w-5 text-status-warning" /> Pending Approval ({pendingRequests.length})
                                         </CardTitle>
                                         <div className="flex items-center gap-2">
                                             <Button variant="outline" size="sm" onClick={handleBulkApprove} disabled={selectedPendingIds.length === 0 || processing}>
                                                 {processing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
                                                 Approve Selected ({selectedPendingIds.length})
                                             </Button>
-                                            <Button variant="outline" size="sm" className="border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={handleBulkDecline} disabled={selectedPendingIds.length === 0 || processing}>
+                                            <Button variant="outline" size="sm" className="border-status-critical/30 text-status-critical hover:bg-status-critical" onClick={handleBulkDecline} disabled={selectedPendingIds.length === 0 || processing}>
                                                 Decline Selected
                                             </Button>
                                         </div>
@@ -494,8 +494,8 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, dashb
                                                         <td className="px-4 py-3"><SlaBadge request={r} /></td>
                                                         <td className="px-4 py-3 text-right">
                                                             <div className="flex items-center justify-end gap-1">
-                                                                <Button variant="outline" size="sm" className="h-7 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleApprove(r.id)} disabled={processing}><CheckCircle2 className="h-3 w-3 mr-1" /> Approve</Button>
-                                                                <Button variant="outline" size="sm" className="h-7 border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => handleDecline(r.id)} disabled={processing}><XCircle className="h-3 w-3 mr-1" /> Decline</Button>
+                                                                <Button variant="outline" size="sm" className="h-7 border-status-success/30 text-status-success hover:bg-status-success" onClick={() => handleApprove(r.id)} disabled={processing}><CheckCircle2 className="h-3 w-3 mr-1" /> Approve</Button>
+                                                                <Button variant="outline" size="sm" className="h-7 border-status-critical/30 text-status-critical hover:bg-status-critical" onClick={() => handleDecline(r.id)} disabled={processing}><XCircle className="h-3 w-3 mr-1" /> Decline</Button>
                                                                 <Button variant="ghost" size="sm" className="h-7" onClick={() => extendSlaByHours(r.id, 24)} disabled={processing}>+24h</Button>
                                                             </div>
                                                         </td>
@@ -577,8 +577,8 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, dashb
                                                                 <Button variant="ghost" size="sm" className="h-7" asChild><Link href={`/hr/leave/${r.id}`}>View</Link></Button>
                                                                 {can.approve && r.status === 'pending' && (
                                                                     <>
-                                                                        <Button variant="outline" size="sm" className="h-7 border-emerald-500/30 text-emerald-400" onClick={() => handleApprove(r.id)} disabled={processing}>Approve</Button>
-                                                                        <Button variant="outline" size="sm" className="h-7 border-red-500/30 text-red-400" onClick={() => handleDecline(r.id)} disabled={processing}>Decline</Button>
+                                                                        <Button variant="outline" size="sm" className="h-7 border-status-success/30 text-status-success" onClick={() => handleApprove(r.id)} disabled={processing}>Approve</Button>
+                                                                        <Button variant="outline" size="sm" className="h-7 border-status-critical/30 text-status-critical" onClick={() => handleDecline(r.id)} disabled={processing}>Decline</Button>
                                                                     </>
                                                                 )}
                                                             </div>

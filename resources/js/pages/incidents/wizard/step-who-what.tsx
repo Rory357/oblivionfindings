@@ -30,11 +30,11 @@ const INCIDENT_TYPES: Array<{
     icon: ComponentType<{ className?: string }>;
     color: string;
 }> = [
-    { value: 'injury', label: 'Injury', icon: Activity, color: 'border-red-300 bg-red-50 text-red-700' },
-    { value: 'behaviour', label: 'Behaviour', icon: User, color: 'border-blue-300 bg-blue-50 text-blue-700' },
+    { value: 'injury', label: 'Injury', icon: Activity, color: 'border-status-critical/30 bg-status-critical-bg text-status-critical' },
+    { value: 'behaviour', label: 'Behaviour', icon: User, color: 'border-status-info/30 bg-status-info-bg text-status-info' },
     { value: 'medication', label: 'Medication', icon: Pill, color: 'border-primary bg-primary/10 text-primary' },
-    { value: 'safeguarding', label: 'Safeguarding', icon: Shield, color: 'border-orange-300 bg-orange-50 text-orange-700' },
-    { value: 'near_miss', label: 'Near miss', icon: Eye, color: 'border-amber-300 bg-amber-50 text-amber-700' },
+    { value: 'safeguarding', label: 'Safeguarding', icon: Shield, color: 'border-status-warning/30 bg-status-warning-bg text-status-warning' },
+    { value: 'near_miss', label: 'Near miss', icon: Eye, color: 'border-status-warning/30 bg-status-warning-bg text-status-warning' },
     { value: 'other', label: 'Other', icon: HelpCircle, color: 'border-border bg-muted text-foreground' },
 ];
 
@@ -45,9 +45,9 @@ const SEVERITY_OPTIONS: Array<{
     ring: string;
     dot: string;
 }> = [
-    { value: 'low', label: 'Low', hint: 'Minor, no lasting impact', ring: 'ring-emerald-500 bg-emerald-50 text-emerald-800', dot: 'bg-emerald-500' },
-    { value: 'medium', label: 'Medium', hint: 'Needs a follow-up', ring: 'ring-amber-500 bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
-    { value: 'high', label: 'High', hint: 'Serious — tell a manager now', ring: 'ring-red-500 bg-red-50 text-red-800', dot: 'bg-red-500' },
+    { value: 'low', label: 'Low', hint: 'Minor, no lasting impact', ring: 'ring-status-success bg-status-success-bg text-status-success', dot: 'bg-status-success' },
+    { value: 'medium', label: 'Medium', hint: 'Needs a follow-up', ring: 'ring-status-warning bg-status-warning-bg text-status-warning', dot: 'bg-status-warning' },
+    { value: 'high', label: 'High', hint: 'Serious — tell a manager now', ring: 'ring-status-critical bg-status-critical-bg text-status-critical', dot: 'bg-status-critical' },
 ];
 
 function nowLocalInputValue() {
@@ -82,7 +82,7 @@ export default function StepWhoWhat({ data, onChange, clients, clientLabel, erro
                         ))}
                     </SelectContent>
                 </Select>
-                {errors?.client_id && <p className="text-xs text-red-600">{errors.client_id}</p>}
+                {errors?.client_id && <p className="text-xs text-status-critical">{errors.client_id}</p>}
             </div>
 
             <div className="space-y-2">

@@ -90,7 +90,7 @@ export default function RecruitmentKanban({ columns, stages, can }: Props) {
                                         <div className="flex items-center gap-1.5">
                                             <Badge variant="secondary" className="text-xs h-5">{cards.length}</Badge>
                                             {avgDays > 0 && (
-                                                <Badge variant="outline" className={`text-[10px] h-5 ${avgDays > 14 ? 'text-red-400 border-red-500/30' : avgDays > 7 ? 'text-amber-400 border-amber-500/30' : 'text-muted-foreground'}`}>
+                                                <Badge variant="outline" className={`text-[10px] h-5 ${avgDays > 14 ? 'text-status-critical border-status-critical/30' : avgDays > 7 ? 'text-status-warning border-status-warning/30' : 'text-muted-foreground'}`}>
                                                     ~{avgDays}d
                                                 </Badge>
                                             )}

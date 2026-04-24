@@ -36,11 +36,11 @@ type Props = { interview: Interview; existing: ExistingScorecard };
 
 const defaultCriteria = ['Communication', 'Technical Skills', 'Cultural Fit', 'Problem Solving', 'Leadership'];
 const recommendations = [
-    { value: 'strong_yes', label: 'Strong Yes', color: 'text-green-500' },
-    { value: 'yes', label: 'Yes', color: 'text-emerald-500' },
-    { value: 'neutral', label: 'Neutral', color: 'text-amber-500' },
-    { value: 'no', label: 'No', color: 'text-orange-500' },
-    { value: 'strong_no', label: 'Strong No', color: 'text-red-500' },
+    { value: 'strong_yes', label: 'Strong Yes', color: 'text-status-success' },
+    { value: 'yes', label: 'Yes', color: 'text-status-success' },
+    { value: 'neutral', label: 'Neutral', color: 'text-status-warning' },
+    { value: 'no', label: 'No', color: 'text-status-warning' },
+    { value: 'strong_no', label: 'Strong No', color: 'text-status-critical' },
 ];
 
 function StarRating({ value, onChange, size = 'md' }: { value: number; onChange: (v: number) => void; size?: 'sm' | 'md' | 'lg' }) {
@@ -49,7 +49,7 @@ function StarRating({ value, onChange, size = 'md' }: { value: number; onChange:
         <div className="flex gap-1">
             {[1, 2, 3, 4, 5].map((star) => (
                 <button key={star} type="button" onClick={() => onChange(star)} className="focus:outline-none hover:scale-110 transition-transform">
-                    <Star className={`${sizeClass} transition-colors ${star <= value ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/20 hover:text-muted-foreground/50'}`} />
+                    <Star className={`${sizeClass} transition-colors ${star <= value ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground/20 hover:text-muted-foreground/50'}`} />
                 </button>
             ))}
         </div>
@@ -115,7 +115,7 @@ export default function ScorecardForm({ interview, existing }: Props) {
                         <div className="text-right shrink-0">
                             <div className="text-xs text-muted-foreground mb-1">{ratedCount} of {criteria.length} rated</div>
                             <div className="w-24 h-2 bg-muted/30 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full transition-all duration-300 ${progressPct === 100 ? 'bg-green-500' : 'bg-primary'}`} style={{ width: `${progressPct}%` }} />
+                                <div className={`h-full rounded-full transition-all duration-300 ${progressPct === 100 ? 'bg-status-success' : 'bg-primary'}`} style={{ width: `${progressPct}%` }} />
                             </div>
                         </div>
                     </CardContent>
@@ -128,7 +128,7 @@ export default function ScorecardForm({ interview, existing }: Props) {
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
-                                        {criterion.rating > 0 && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                                        {criterion.rating > 0 && <CheckCircle2 className="h-4 w-4 text-status-success" />}
                                         <label className="font-medium">{criterion.name}</label>
                                     </div>
                                     <StarRating value={criterion.rating} onChange={(v) => updateCriterion(idx, 'rating', v)} size="lg" />

@@ -122,7 +122,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                         </Button>
                     </Link>
                     <div className="flex items-center gap-3">
-                        <FileText className="h-6 w-6 text-blue-500" />
+                        <FileText className="h-6 w-6 text-status-info" />
                         <div>
                             <h1 className="text-2xl font-bold">Create New Policy</h1>
                             <p className="text-muted-foreground">Add a new policy to the library</p>
@@ -138,17 +138,17 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="title">
-                                    Policy Title <span className="text-red-500">*</span>
+                                    Policy Title <span className="text-status-critical">*</span>
                                 </Label>
                                 <Input
                                     id="title"
                                     placeholder="e.g., Staff Code of Conduct"
                                     value={data.title}
                                     onChange={(e) => setData('title', e.target.value)}
-                                    className={errors.title ? 'border-red-500' : ''}
+                                    className={errors.title ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.title && (
-                                    <p className="text-sm text-red-500">{errors.title}</p>
+                                    <p className="text-sm text-status-critical">{errors.title}</p>
                                 )}
                             </div>
 
@@ -173,7 +173,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                             value={data.category}
                                             onValueChange={(value) => setData('category', value)}
                                         >
-                                            <SelectTrigger className={errors.category ? 'border-red-500' : ''}>
+                                            <SelectTrigger className={errors.category ? 'border-status-critical/30' : ''}>
                                                 <SelectValue placeholder="Select a category" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -185,7 +185,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                             </SelectContent>
                                         </Select>
                                         {errors.category && (
-                                            <p className="text-sm text-red-500">{errors.category}</p>
+                                            <p className="text-sm text-status-critical">{errors.category}</p>
                                         )}
                                     </div>
                                 ) : (
@@ -194,10 +194,10 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                             placeholder="Enter custom category"
                                             value={data.custom_category}
                                             onChange={(e) => setData('custom_category', e.target.value)}
-                                            className={errors.category ? 'border-red-500' : ''}
+                                            className={errors.category ? 'border-status-critical/30' : ''}
                                         />
                                         {errors.category && (
-                                            <p className="text-sm text-red-500">{errors.category}</p>
+                                            <p className="text-sm text-status-critical">{errors.category}</p>
                                         )}
                                     </div>
                                 )}
@@ -211,10 +211,10 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                         type="date"
                                         value={data.effective_from}
                                         onChange={(e) => setData('effective_from', e.target.value)}
-                                        className={errors.effective_from ? 'border-red-500' : ''}
+                                        className={errors.effective_from ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.effective_from && (
-                                        <p className="text-sm text-red-500">{errors.effective_from}</p>
+                                        <p className="text-sm text-status-critical">{errors.effective_from}</p>
                                     )}
                                 </div>
                             </div>
@@ -306,7 +306,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                             {/* File Upload */}
                             <div className="space-y-2">
                                 <Label htmlFor="document">
-                                    PDF Document <span className="text-red-500">*</span>
+                                    PDF Document <span className="text-status-critical">*</span>
                                 </Label>
                                 <div className="flex items-center gap-4">
                                     <input
@@ -328,7 +328,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                     </Button>
                                     {data.document ? (
                                         <div className="flex items-center gap-2 text-sm">
-                                            <FileCheck className="h-4 w-4 text-green-500" />
+                                            <FileCheck className="h-4 w-4 text-status-success" />
                                             <span className="font-medium">{data.document.name}</span>
                                             <span className="text-muted-foreground">
                                                 ({formatFileSize(data.document.size)})
@@ -338,7 +338,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={clearFile}
-                                                className="h-auto p-1 text-red-500 hover:text-red-600"
+                                                className="h-auto p-1 text-status-critical hover:text-status-critical"
                                             >
                                                 <X className="h-4 w-4" />
                                             </Button>
@@ -348,7 +348,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                     )}
                                 </div>
                                 {errors.document && (
-                                    <p className="text-sm text-red-500">{errors.document}</p>
+                                    <p className="text-sm text-status-critical">{errors.document}</p>
                                 )}
                                 <p className="text-xs text-muted-foreground">
                                     Accepted format: PDF only. Maximum file size: 8MB.
@@ -359,7 +359,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                             {data.content_mode === 'pdf_and_summary' && (
                                 <div className="space-y-2">
                                     <Label htmlFor="content_summary">
-                                        Content Summary <span className="text-red-500">*</span>
+                                        Content Summary <span className="text-status-critical">*</span>
                                     </Label>
                                     <Textarea
                                         id="content_summary"
@@ -367,10 +367,10 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                         rows={6}
                                         value={data.content_summary}
                                         onChange={(e) => setData('content_summary', e.target.value)}
-                                        className={errors.content_summary ? 'border-red-500' : ''}
+                                        className={errors.content_summary ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.content_summary && (
-                                        <p className="text-sm text-red-500">{errors.content_summary}</p>
+                                        <p className="text-sm text-status-critical">{errors.content_summary}</p>
                                     )}
                                     <p className="text-xs text-muted-foreground">
                                         This summary will be displayed alongside the PDF for quick reference.
@@ -383,7 +383,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                 <div className="space-y-2">
                                     <div className="h-2 w-full rounded-full bg-muted">
                                         <div
-                                            className="h-full rounded-full bg-blue-500 transition-all"
+                                            className="h-full rounded-full bg-status-info transition-all"
                                             style={{ width: `${progress.percentage}%` }}
                                         />
                                     </div>

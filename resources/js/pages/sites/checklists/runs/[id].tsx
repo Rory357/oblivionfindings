@@ -217,7 +217,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                 type="button"
                                 variant={value === opt ? 'default' : 'outline'}
                                 size="sm"
-                                className={opt === 'fail' && value === opt ? 'bg-red-500 hover:bg-red-600' : opt === 'pass' && value === opt ? 'bg-green-600 hover:bg-green-700' : ''}
+                                className={opt === 'fail' && value === opt ? 'bg-status-critical hover:bg-status-critical' : opt === 'pass' && value === opt ? 'bg-status-success hover:bg-status-success' : ''}
                                 onClick={() => updateResponse(item.id, {
                                     response_value: opt,
                                     is_failed: opt === 'fail',
@@ -254,12 +254,12 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
 
             case 'photo':
                 return (
-                    <div className="border-2 border-dashed border-slate-500/30 rounded-lg p-6 text-center hover:border-slate-400/50 transition">
+                    <div className="border-2 border-dashed border-border/30 rounded-lg p-6 text-center hover:border-border/50 transition">
                         <div className="flex flex-col items-center gap-2">
                             {value ? (
                                 <>
-                                    <Camera className="w-8 h-8 text-green-400" />
-                                    <span className="text-sm text-green-400">Photo uploaded</span>
+                                    <Camera className="w-8 h-8 text-status-success" />
+                                    <span className="text-sm text-status-success">Photo uploaded</span>
                                 </>
                             ) : (
                                 <>
@@ -320,7 +320,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-sm font-medium">Progress</span>
-                                <span className="text-sm font-bold text-blue-400">{completedCount} of {requiredItems.length} items ({progressPercentage}%)</span>
+                                <span className="text-sm font-bold text-status-info">{completedCount} of {requiredItems.length} items ({progressPercentage}%)</span>
                             </div>
                             <Progress value={progressPercentage} className="h-2" />
                         </div>
@@ -329,11 +329,11 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
 
                 {/* Failed Items Warning */}
                 {failedItems.length > 0 && (
-                    <Card className="border-red-500/30 bg-red-500/5">
+                    <Card className="border-status-critical/30 bg-status-critical">
                         <CardContent className="flex items-center gap-3 py-4">
-                            <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0" />
+                            <AlertTriangle className="w-6 h-6 text-status-critical flex-shrink-0" />
                             <div>
-                                <div className="font-medium text-red-400">
+                                <div className="font-medium text-status-critical">
                                     {failedItems.length} item(s) marked as failed
                                 </div>
                                 <div className="text-sm text-muted-foreground">
@@ -354,7 +354,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                         return (
                             <Card
                                 key={item.id}
-                                className={isFailed ? 'border-red-500/30 bg-red-500/5' : ''}
+                                className={isFailed ? 'border-status-critical/30 bg-status-critical' : ''}
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-start gap-3">
@@ -367,7 +367,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                                 <div className="font-medium flex items-center gap-2">
                                                     <span>{item.question}</span>
                                                     {item.is_required && (
-                                                        <span className="text-red-400 text-sm">*</span>
+                                                        <span className="text-status-critical text-sm">*</span>
                                                     )}
                                                     {isFailed && (
                                                         <Badge variant="destructive" className="text-xs">Failed</Badge>
@@ -389,7 +389,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="h-auto p-0 text-muted-foreground hover:text-slate-200"
+                                                        className="h-auto p-0 text-muted-foreground hover:text-foreground"
                                                     >
                                                         {isNotesExpanded ? (
                                                             <ChevronUp className="w-4 h-4 mr-1" />
@@ -412,7 +412,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
 
                                             {/* Create Hazard Option */}
                                             {isFailed && item.failure_creates_hazard && (
-                                                <div className="flex items-center gap-2 p-2 rounded border border-orange-500/30 bg-orange-500/5">
+                                                <div className="flex items-center gap-2 p-2 rounded border border-status-warning/30 bg-status-warning">
                                                     <Checkbox
                                                         id={`hazard-${item.id}`}
                                                         checked={response?.create_hazard || false}
@@ -422,7 +422,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                                     />
                                                     <Label
                                                         htmlFor={`hazard-${item.id}`}
-                                                        className="flex-1 cursor-pointer text-sm text-orange-400"
+                                                        className="flex-1 cursor-pointer text-sm text-status-warning"
                                                     >
                                                         Create hazard for this failure
                                                     </Label>
@@ -452,7 +452,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                 </Card>
 
                 {/* Signature Section */}
-                <Card className="border-slate-600">
+                <Card className="border-border">
                     <CardHeader>
                         <CardTitle className="text-sm">Completion Confirmation</CardTitle>
                     </CardHeader>
@@ -470,7 +470,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                 className="font-medium"
                             />
                         </div>
-                        <div className="flex items-center gap-3 p-3 rounded border border-slate-600 bg-slate-900/50">
+                        <div className="flex items-center gap-3 p-3 rounded border border-border bg-muted">
                             <Checkbox
                                 id="confirm-accuracy"
                                 checked={signatureConfirmed}
@@ -508,9 +508,9 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
 
                 {/* Completion Requirements */}
                 {!canComplete && (
-                    <Card className="border-yellow-500/30 bg-yellow-500/5">
+                    <Card className="border-status-warning/30 bg-status-warning">
                         <CardContent className="p-3">
-                            <div className="text-sm text-yellow-400">
+                            <div className="text-sm text-status-warning">
                                 <p className="font-medium mb-2">To complete this checklist:</p>
                                 <ul className="space-y-1 text-xs ml-4 list-disc">
                                     {!allRequiredAnswered && (

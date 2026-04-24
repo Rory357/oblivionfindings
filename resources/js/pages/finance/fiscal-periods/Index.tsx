@@ -40,9 +40,9 @@ type PageProps = {
 };
 
 const statusColors: Record<string, string> = {
-    open: 'bg-green-500/10 text-green-600 border-green-500/30',
-    closed: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30',
-    locked: 'bg-red-500/10 text-red-600 border-red-500/30',
+    open: 'bg-status-success-bg text-status-success border-status-success/30',
+    closed: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    locked: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 function CreatePeriodDialog() {

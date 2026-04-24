@@ -92,7 +92,7 @@ export default function EvaluationCreate({ auth }: PageProps) {
                   </div>
                   {data.questions.length > 1 && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => removeQuestion(i)}>
-                      <Trash2 className="w-4 h-4 text-red-500" />
+                      <Trash2 className="w-4 h-4 text-status-critical" />
                     </Button>
                   )}
                 </div>

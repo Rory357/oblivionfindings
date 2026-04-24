@@ -84,9 +84,9 @@ function statusVariant(status: string): 'default' | 'secondary' | 'destructive' 
 function categoryColor(category: string): string {
     switch (category) {
         case 'vehicle':
-            return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+            return 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info';
         case 'equipment':
-            return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300';
+            return 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning';
         case 'property':
             return 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70';
         default:
@@ -252,7 +252,7 @@ export default function AssetsIndex({ assets, filters, sites, categories }: Prop
                                     )}
                                     {asset.tracker_count != null && (
                                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                            <Wifi className={`h-3 w-3 ${asset.tracker_count > 0 ? 'text-green-500' : 'text-muted-foreground'}`} />
+                                            <Wifi className={`h-3 w-3 ${asset.tracker_count > 0 ? 'text-status-success' : 'text-muted-foreground'}`} />
                                             {asset.tracker_count > 0 ? `${asset.tracker_count} tracker(s)` : 'No trackers'}
                                         </span>
                                     )}

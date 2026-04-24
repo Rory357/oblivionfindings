@@ -160,13 +160,13 @@ export default function PurchaseOrderEdit() {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors?.vendor_id && <p className="text-sm text-red-600">{errors.vendor_id}</p>}
+                                {errors?.vendor_id && <p className="text-sm text-status-critical">{errors.vendor_id}</p>}
                             </div>
 
                             <div className="space-y-1">
                                 <Label>Order Date *</Label>
                                 <Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
-                                {errors?.order_date && <p className="text-sm text-red-600">{errors.order_date}</p>}
+                                {errors?.order_date && <p className="text-sm text-status-critical">{errors.order_date}</p>}
                             </div>
 
                             <div className="space-y-1">
@@ -223,7 +223,7 @@ export default function PurchaseOrderEdit() {
                             </Button>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {errors?.lines && <p className="text-sm text-red-600">{errors.lines}</p>}
+                            {errors?.lines && <p className="text-sm text-status-critical">{errors.lines}</p>}
 
                             <div className="hidden md:grid md:grid-cols-12 md:gap-2 md:text-xs md:font-medium md:text-muted-foreground">
                                 <div className="col-span-3">Description</div>
@@ -247,7 +247,7 @@ export default function PurchaseOrderEdit() {
                                                 placeholder="Description"
                                             />
                                             {errors?.[`lines.${idx}.description`] && (
-                                                <p className="text-xs text-red-600">{errors[`lines.${idx}.description`]}</p>
+                                                <p className="text-xs text-status-critical">{errors[`lines.${idx}.description`]}</p>
                                             )}
                                         </div>
                                         <div className="md:col-span-1">
@@ -302,7 +302,7 @@ export default function PurchaseOrderEdit() {
                                         </div>
                                         <div className="md:col-span-1 md:text-center">
                                             {lines.length > 1 && (
-                                                <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(idx)} className="text-red-600 hover:text-red-700">
+                                                <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(idx)} className="text-status-critical hover:text-status-critical">
                                                     Remove
                                                 </Button>
                                             )}

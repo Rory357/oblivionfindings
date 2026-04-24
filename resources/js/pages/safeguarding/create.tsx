@@ -33,24 +33,24 @@ type Props = {
 };
 
 const SUBJECT_TYPES = [
-    { value: 'client', label: 'Client', icon: Users, color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
+    { value: 'client', label: 'Client', icon: Users, color: 'border-status-info/30 bg-status-info-bg text-status-info hover:bg-status-info-bg' },
     { value: 'staff', label: 'Staff Member', icon: Briefcase, color: 'border-primary bg-primary/10 text-primary hover:bg-primary/10' },
     { value: 'other', label: 'Other Person', icon: User, color: 'border-border bg-muted text-foreground hover:bg-muted' },
 ];
 
 const CONCERN_TYPES = [
-    { value: 'concern', label: 'Concern', color: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
-    { value: 'allegation', label: 'Allegation', color: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100' },
+    { value: 'concern', label: 'Concern', color: 'border-status-info/30 bg-status-info-bg text-status-info hover:bg-status-info-bg' },
+    { value: 'allegation', label: 'Allegation', color: 'border-status-critical/30 bg-status-critical-bg text-status-critical hover:bg-status-critical-bg' },
     { value: 'disclosure', label: 'Disclosure', color: 'border-primary bg-primary/10 text-primary hover:bg-primary/10' },
-    { value: 'observation', label: 'Observation', color: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' },
+    { value: 'observation', label: 'Observation', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning hover:bg-status-warning-bg' },
     { value: 'third_party_report', label: 'Third Party Report', color: 'border-primary bg-primary/10 text-primary hover:bg-primary/10' },
 ];
 
 const SEVERITY_OPTIONS = [
-    { value: 'low', label: 'Low', color: 'border-blue-300 bg-blue-50 text-blue-700', dot: 'bg-blue-500', selectedBg: 'bg-blue-100 ring-2 ring-blue-500' },
-    { value: 'medium', label: 'Medium', color: 'border-amber-300 bg-amber-50 text-amber-700', dot: 'bg-amber-500', selectedBg: 'bg-amber-100 ring-2 ring-amber-500' },
-    { value: 'high', label: 'High', color: 'border-orange-300 bg-orange-50 text-orange-700', dot: 'bg-orange-500', selectedBg: 'bg-orange-100 ring-2 ring-orange-500' },
-    { value: 'critical', label: 'Critical', color: 'border-red-300 bg-red-50 text-red-700', dot: 'bg-red-500', selectedBg: 'bg-red-100 ring-2 ring-red-500' },
+    { value: 'low', label: 'Low', color: 'border-status-info/30 bg-status-info-bg text-status-info', dot: 'bg-status-info', selectedBg: 'bg-status-info-bg ring-2 ring-status-info' },
+    { value: 'medium', label: 'Medium', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning', dot: 'bg-status-warning', selectedBg: 'bg-status-warning-bg ring-2 ring-status-warning' },
+    { value: 'high', label: 'High', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning', dot: 'bg-status-warning', selectedBg: 'bg-status-warning-bg ring-2 ring-status-warning' },
+    { value: 'critical', label: 'Critical', color: 'border-status-critical/30 bg-status-critical-bg text-status-critical', dot: 'bg-status-critical', selectedBg: 'bg-status-critical-bg ring-2 ring-status-critical' },
 ];
 
 const ABUSE_CATEGORIES = [
@@ -204,7 +204,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             );
                                         })}
                                     </div>
-                                    {errors.subject_type && <div className="mt-1 text-xs text-red-500">{errors.subject_type}</div>}
+                                    {errors.subject_type && <div className="mt-1 text-xs text-status-critical">{errors.subject_type}</div>}
                                 </div>
 
                                 {data.subject_type === 'client' && (
@@ -220,7 +220,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {errors.subject_id && <div className="mt-1 text-xs text-red-500">{errors.subject_id}</div>}
+                                        {errors.subject_id && <div className="mt-1 text-xs text-status-critical">{errors.subject_id}</div>}
                                     </div>
                                 )}
 
@@ -240,7 +240,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                                 })}
                                             </SelectContent>
                                         </Select>
-                                        {errors.subject_id && <div className="mt-1 text-xs text-red-500">{errors.subject_id}</div>}
+                                        {errors.subject_id && <div className="mt-1 text-xs text-status-critical">{errors.subject_id}</div>}
                                     </div>
                                 )}
 
@@ -252,7 +252,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             onChange={(e) => setData('other_subject_name', e.target.value)}
                                             placeholder="Enter the person's full name"
                                         />
-                                        {errors.other_subject_name && <div className="mt-1 text-xs text-red-500">{errors.other_subject_name}</div>}
+                                        {errors.other_subject_name && <div className="mt-1 text-xs text-status-critical">{errors.other_subject_name}</div>}
                                     </div>
                                 )}
                             </div>
@@ -290,7 +290,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             );
                                         })}
                                     </div>
-                                    {errors.concern_type && <div className="mt-1 text-xs text-red-500">{errors.concern_type}</div>}
+                                    {errors.concern_type && <div className="mt-1 text-xs text-status-critical">{errors.concern_type}</div>}
                                 </div>
 
                                 {/* Abuse category */}
@@ -304,7 +304,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.abuse_category && <div className="mt-1 text-xs text-red-500">{errors.abuse_category}</div>}
+                                    {errors.abuse_category && <div className="mt-1 text-xs text-status-critical">{errors.abuse_category}</div>}
                                 </div>
 
                                 {/* Severity buttons */}
@@ -328,7 +328,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             );
                                         })}
                                     </div>
-                                    {errors.severity && <div className="mt-1 text-xs text-red-500">{errors.severity}</div>}
+                                    {errors.severity && <div className="mt-1 text-xs text-status-critical">{errors.severity}</div>}
                                 </div>
 
                                 {/* Description */}
@@ -346,7 +346,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                         placeholder="Provide a detailed description of the concern, including what happened, when, where, and who was involved..."
                                         className="mt-1"
                                     />
-                                    {errors.description && <div className="mt-1 text-xs text-red-500">{errors.description}</div>}
+                                    {errors.description && <div className="mt-1 text-xs text-status-critical">{errors.description}</div>}
                                 </div>
 
                                 {/* Date/time and location */}
@@ -364,7 +364,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             onChange={(e) => setData('occurred_at', e.target.value)}
                                             className="mt-1"
                                         />
-                                        {errors.occurred_at && <div className="mt-1 text-xs text-red-500">{errors.occurred_at}</div>}
+                                        {errors.occurred_at && <div className="mt-1 text-xs text-status-critical">{errors.occurred_at}</div>}
                                     </div>
 
                                     <div>
@@ -380,7 +380,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             onChange={(e) => setData('reported_at', e.target.value)}
                                             className="mt-1"
                                         />
-                                        {errors.reported_at && <div className="mt-1 text-xs text-red-500">{errors.reported_at}</div>}
+                                        {errors.reported_at && <div className="mt-1 text-xs text-status-critical">{errors.reported_at}</div>}
                                     </div>
 
                                     <div>
@@ -412,7 +412,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                                 <SelectItem value="other">Other (not listed)</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        {errors.site_id && <div className="mt-1 text-xs text-red-500">{errors.site_id}</div>}
+                                        {errors.site_id && <div className="mt-1 text-xs text-status-critical">{errors.site_id}</div>}
                                     </div>
                                 </div>
 
@@ -424,7 +424,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                             onChange={(e) => setData('location', e.target.value)}
                                             placeholder="Enter location details"
                                         />
-                                        {errors.location && <div className="mt-1 text-xs text-red-500">{errors.location}</div>}
+                                        {errors.location && <div className="mt-1 text-xs text-status-critical">{errors.location}</div>}
                                     </div>
                                 )}
                             </div>
@@ -627,7 +627,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                                         placeholder="Names and details of any witnesses..."
                                         className="mt-1"
                                     />
-                                    {errors.witnesses && <div className="mt-1 text-xs text-red-500">{errors.witnesses}</div>}
+                                    {errors.witnesses && <div className="mt-1 text-xs text-status-critical">{errors.witnesses}</div>}
                                 </div>
                             </div>
                         </CardContent>

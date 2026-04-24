@@ -275,7 +275,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                             <div
                                                 className={cn(
                                                     "absolute bottom-0 w-full transition-all duration-300",
-                                                    level.pct > 50 ? 'bg-green-500' : level.pct > 25 ? 'bg-amber-500' : 'bg-red-500'
+                                                    level.pct > 50 ? 'bg-status-success' : level.pct > 25 ? 'bg-status-warning' : 'bg-status-critical'
                                                 )}
                                                 style={{ height: `${level.pct}%` }}
                                             />
@@ -302,8 +302,8 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                 <div className="grid grid-cols-3 gap-3">
                                     {[
                                         { value: 'good', label: 'Good', borderColor: 'border-primary', bgColor: 'bg-primary/10 dark:bg-primary/20', textColor: 'text-primary dark:text-primary' },
-                                        { value: 'minor_damage', label: 'Minor Damage', borderColor: 'border-amber-500', bgColor: 'bg-amber-50 dark:bg-amber-900/20', textColor: 'text-amber-700 dark:text-amber-400' },
-                                        { value: 'significant_damage', label: 'Significant Damage', borderColor: 'border-red-600', bgColor: 'bg-red-50 dark:bg-red-900/20', textColor: 'text-red-700 dark:text-red-400' },
+                                        { value: 'minor_damage', label: 'Minor Damage', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg dark:bg-status-warning', textColor: 'text-status-warning dark:text-status-warning' },
+                                        { value: 'significant_damage', label: 'Significant Damage', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg dark:bg-status-critical', textColor: 'text-status-critical dark:text-status-critical' },
                                     ].map((opt) => (
                                         <button
                                             key={opt.value}
@@ -334,8 +334,8 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                 <div className="grid grid-cols-3 gap-3">
                                     {[
                                         { value: 'clean', label: 'Clean', borderColor: 'border-primary', bgColor: 'bg-primary/10 dark:bg-primary/20', textColor: 'text-primary dark:text-primary' },
-                                        { value: 'acceptable', label: 'Acceptable', borderColor: 'border-amber-500', bgColor: 'bg-amber-50 dark:bg-amber-900/20', textColor: 'text-amber-700 dark:text-amber-400' },
-                                        { value: 'needs_cleaning', label: 'Needs Cleaning', borderColor: 'border-red-600', bgColor: 'bg-red-50 dark:bg-red-900/20', textColor: 'text-red-700 dark:text-red-400' },
+                                        { value: 'acceptable', label: 'Acceptable', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg dark:bg-status-warning', textColor: 'text-status-warning dark:text-status-warning' },
+                                        { value: 'needs_cleaning', label: 'Needs Cleaning', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg dark:bg-status-critical', textColor: 'text-status-critical dark:text-status-critical' },
                                     ].map((opt) => (
                                         <button
                                             key={opt.value}
@@ -381,20 +381,20 @@ export default function HandoverCreate({ vehicles, users, current_user_id, can }
                                             "flex items-center justify-between rounded-xl border-2 p-4 transition-all",
                                             form.data[item.key]
                                                 ? "border-primary bg-primary/10/50 dark:border-primary/30 dark:bg-primary/10"
-                                                : "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-900/10"
+                                                : "border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical"
                                         )}>
                                             <div className="flex items-center gap-3">
                                                 <div className={cn(
                                                     "flex h-9 w-9 items-center justify-center rounded-lg",
                                                     form.data[item.key]
                                                         ? "bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary"
-                                                        : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                                                        : "bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical"
                                                 )}>
                                                     <IconComp className="h-4 w-4" />
                                                 </div>
                                                 <Label htmlFor={item.key} className="cursor-pointer font-medium">{item.label}</Label>
                                             </div>
-                                            <button type="button" onClick={() => form.setData(item.key, !form.data[item.key])} className={cn("h-7 w-12 rounded-full transition-colors", form.data[item.key] ? "bg-primary" : "bg-slate-300")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data[item.key] ? "translate-x-6" : "translate-x-1")} /></button>
+                                            <button type="button" onClick={() => form.setData(item.key, !form.data[item.key])} className={cn("h-7 w-12 rounded-full transition-colors", form.data[item.key] ? "bg-primary" : "bg-muted")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data[item.key] ? "translate-x-6" : "translate-x-1")} /></button>
                                         </div>
                                     );
                                 })}

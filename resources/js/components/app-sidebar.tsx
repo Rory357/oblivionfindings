@@ -2646,7 +2646,7 @@ export function AppSidebar() {
                                                 <item.icon className="h-6 w-6" />
                                                 {item.badge != null &&
                                                     item.badge > 0 && (
-                                                        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                                                        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-status-critical px-1 text-[9px] font-bold text-white">
                                                             {item.badge > 9
                                                                 ? '9+'
                                                                 : item.badge}
@@ -2698,7 +2698,7 @@ export function AppSidebar() {
                                                         src={auth.user.avatar}
                                                         alt={auth.user.name}
                                                     />
-                                                    <AvatarFallback className="rounded-full bg-muted text-xs text-black dark:bg-neutral-700 dark:text-white">
+                                                    <AvatarFallback className="rounded-full bg-muted text-xs text-black dark:bg-muted dark:text-white">
                                                         {getInitials(
                                                             auth.user.name,
                                                         )}

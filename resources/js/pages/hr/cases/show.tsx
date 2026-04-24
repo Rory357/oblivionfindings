@@ -78,26 +78,26 @@ const requiredGoodFaithChecks = [
 ];
 
 const badgeClassByStatus: Record<string, string> = {
-    open: 'bg-blue-100 text-blue-800 border-blue-200',
+    open: 'bg-status-info-bg text-status-info border-status-info/30',
     under_investigation: 'bg-primary/10 text-primary border-primary',
-    awaiting_response: 'bg-amber-100 text-amber-800 border-amber-200',
-    resolved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    awaiting_response: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    resolved: 'bg-status-success-bg text-status-success border-status-success/30',
     closed: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassByCaseType: Record<string, string> = {
-    disciplinary: 'bg-red-100 text-red-800 border-red-200',
-    grievance: 'bg-orange-100 text-orange-800 border-orange-200',
+    disciplinary: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    grievance: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     investigation: 'bg-primary/10 text-primary border-primary',
-    welfare: 'bg-green-100 text-green-800 border-green-200',
-    complaint: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    welfare: 'bg-status-success-bg text-status-success border-status-success/30',
+    complaint: 'bg-status-info-bg text-status-info border-status-info/30',
     other: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassBySeverity: Record<string, string> = {
-    critical: 'bg-red-100 text-red-800 border-red-200',
-    high: 'bg-orange-100 text-orange-800 border-orange-200',
-    medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    medium: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     low: 'bg-muted text-foreground border-border',
 };
 
@@ -130,9 +130,9 @@ const formatDateTime = (value?: string | null) => {
 const getEventDotClass = (eventType: string) => {
     switch (eventType) {
         case 'note':
-            return 'bg-blue-500';
+            return 'bg-status-info';
         case 'meeting':
-            return 'bg-green-500';
+            return 'bg-status-success';
         case 'phone_call':
         case 'email':
             return 'bg-primary';
@@ -140,9 +140,9 @@ const getEventDotClass = (eventType: string) => {
             return 'bg-primary';
         case 'letter':
         case 'document':
-            return 'bg-amber-500';
+            return 'bg-status-warning';
         default:
-            return 'bg-slate-400';
+            return 'bg-muted';
     }
 };
 
@@ -152,8 +152,8 @@ type VisibilityFilter = (typeof visibilityFilterValues)[number];
 
 const visibilityBadgeClass: Record<'internal' | 'restricted' | 'full', string> = {
     internal: 'bg-muted text-foreground border-border',
-    restricted: 'bg-amber-100 text-amber-800 border-amber-200',
-    full: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    restricted: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    full: 'bg-status-success-bg text-status-success border-status-success/30',
 };
 
 const normalizeVisibility = (value?: string): 'internal' | 'restricted' | 'full' => {
@@ -250,7 +250,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-red-200 text-red-600 hover:bg-red-50"
+                                    className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
                                     onClick={closeCase}
                                 >
                                     <XCircle className="mr-1.5 h-4 w-4" />
@@ -262,8 +262,8 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                 </div>
 
                 {goodFaithError || stageError ? (
-                    <Card className="border-red-200 bg-red-50">
-                        <CardContent className="py-3 text-sm text-red-700">
+                    <Card className="border-status-critical/30 bg-status-critical-bg">
+                        <CardContent className="py-3 text-sm text-status-critical">
                             {Array.isArray(goodFaithError)
                                 ? goodFaithError.join(' ')
                                 : goodFaithError || (Array.isArray(stageError) ? stageError.join(' ') : stageError)}
@@ -275,7 +275,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Briefcase className="h-5 w-5 text-blue-500" />
+                                <Briefcase className="h-5 w-5 text-status-info" />
                                 Case Details
                             </CardTitle>
                         </CardHeader>
@@ -311,7 +311,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <User className="h-5 w-5 text-green-500" />
+                                <User className="h-5 w-5 text-status-success" />
                                 People
                             </CardTitle>
                         </CardHeader>
@@ -398,7 +398,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <AlertTriangle className="h-5 w-5 text-red-500" />
+                                    <AlertTriangle className="h-5 w-5 text-status-critical" />
                                     Disciplinary Actions
                                 </CardTitle>
                                 {can.disciplinary && !isClosed ? (
@@ -451,7 +451,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                                         </div>
 
                                         {outcomeStages.includes(action.stage) ? (
-                                            <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                                            <div className="mt-2 rounded border border-status-warning/30 bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
                                                 Good-faith checklist: {missingChecks.length === 0 ? 'complete' : `${missingChecks.length} item(s) missing`}
                                             </div>
                                         ) : null}

@@ -151,14 +151,14 @@ export default function SchedulesIndex({
 
     // Timeline dot color helper
     function timelineDotColor(type: string): string {
-        if (type === 'overdue') return 'bg-red-500';
-        if (type === 'soon') return 'bg-amber-500';
+        if (type === 'overdue') return 'bg-status-critical';
+        if (type === 'soon') return 'bg-status-warning';
         return 'bg-primary';
     }
 
     function timelineIndicator(type: string): string {
-        if (type === 'overdue') return 'text-red-500';
-        if (type === 'soon') return 'text-amber-500';
+        if (type === 'overdue') return 'text-status-critical';
+        if (type === 'soon') return 'text-status-warning';
         return 'text-primary';
     }
 
@@ -373,7 +373,7 @@ export default function SchedulesIndex({
                                         key={schedule.id}
                                         className={`border-b transition-colors hover:bg-muted/30 ${
                                             schedule.is_overdue
-                                                ? 'bg-red-50/60 dark:bg-red-950/20 border-l-4 border-l-red-500'
+                                                ? 'bg-status-critical-bg dark:bg-status-critical border-l-4 border-l-red-500'
                                                 : dueSoon
                                                     ? 'border-l-4 border-l-amber-500'
                                                     : ''
@@ -419,8 +419,8 @@ export default function SchedulesIndex({
                                         <td className="px-4 py-3">
                                             {days !== null ? (
                                                 <span className={`text-xs font-medium ${
-                                                    schedule.is_overdue ? 'text-red-600 dark:text-red-400' :
-                                                    dueSoon ? 'text-amber-600 dark:text-amber-400' :
+                                                    schedule.is_overdue ? 'text-status-critical dark:text-status-critical' :
+                                                    dueSoon ? 'text-status-warning dark:text-status-warning' :
                                                     'text-muted-foreground'
                                                 }`}>
                                                     {daysUntilLabel(days, schedule.is_overdue)}

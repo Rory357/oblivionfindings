@@ -82,9 +82,9 @@ const formatDate = (value: string | null) =>
         : '-';
 
 const statusStyles: Record<string, string> = {
-    unreconciled: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
-    reconciled: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30',
-    matched: 'bg-blue-500/10 text-blue-700 border-blue-500/30',
+    unreconciled: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    reconciled: 'bg-status-success-bg text-status-success border-status-success/30',
+    matched: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
 export default function BankTransactionsIndex({ transactions, bankAccounts, filters }: Props) {
@@ -494,7 +494,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        <div className={`inline-flex items-center gap-2 font-mono tabular-nums ${isIncoming ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        <div className={`inline-flex items-center gap-2 font-mono tabular-nums ${isIncoming ? 'text-status-success' : 'text-status-critical'}`}>
                                                             {isIncoming ? (
                                                                 <ArrowDownToLine className="h-4 w-4" />
                                                             ) : (

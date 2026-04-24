@@ -21,9 +21,9 @@ interface Props extends PageProps {
 }
 
 const typeConfig: Record<string, { label: string; color: string; icon: typeof Plus; badgeClass: string }> = {
-    added: { label: 'Added', color: 'text-green-700', icon: Plus, badgeClass: 'bg-green-100 text-green-800 border-green-200' },
-    updated: { label: 'Updated', color: 'text-amber-700', icon: Pencil, badgeClass: 'bg-amber-100 text-amber-800 border-amber-200' },
-    removed: { label: 'Removed', color: 'text-red-700', icon: Trash2, badgeClass: 'bg-red-100 text-red-800 border-red-200' },
+    added: { label: 'Added', color: 'text-status-success', icon: Plus, badgeClass: 'bg-status-success-bg text-status-success border-status-success/30' },
+    updated: { label: 'Updated', color: 'text-status-warning', icon: Pencil, badgeClass: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
+    removed: { label: 'Removed', color: 'text-status-critical', icon: Trash2, badgeClass: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
 export default function StrategyChanges({ auth, plan, changes }: Props) {

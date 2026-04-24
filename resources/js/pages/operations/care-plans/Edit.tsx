@@ -151,10 +151,10 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Complete Review Banner */}
                     {care_plan?.status === 'review' && (
-                        <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+                        <div className="flex items-center justify-between rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 dark:border-status-warning/30 dark:bg-status-warning">
                             <div>
-                                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Plan Under Review</p>
-                                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                                <p className="text-sm font-medium text-status-warning dark:text-status-warning">Plan Under Review</p>
+                                <p className="mt-0.5 text-xs text-status-warning dark:text-status-warning">
                                     This plan is currently under review. Make any updates and complete the review when ready.
                                 </p>
                             </div>

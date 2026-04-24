@@ -271,22 +271,22 @@ export default function ClockInCard({
                     id="clock"
                     aria-label="Current shift"
                     className={cn(
-                        'scroll-mt-20 rounded-xl border border-emerald-300 bg-emerald-50/80 p-4 shadow-sm',
-                        'dark:border-emerald-500/40 dark:bg-emerald-950/30',
+                        'scroll-mt-20 rounded-xl border border-status-success/30 bg-status-success-bg p-4 shadow-sm',
+                        'dark:border-status-success/40 dark:bg-status-success',
                     )}
                 >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
                                 <span className="relative flex h-2.5 w-2.5" aria-hidden>
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-success" />
                                 </span>
-                                <h2 className="text-base font-semibold text-emerald-900 dark:text-emerald-100">
+                                <h2 className="text-base font-semibold text-status-success dark:text-status-success">
                                     Shift in progress
                                 </h2>
                             </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-emerald-900/90 dark:text-emerald-100/90">
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-status-success dark:text-status-success">
                                 <span className="inline-flex items-center gap-1.5 font-medium">
                                     <User className="h-4 w-4" />
                                     {clientLabel}
@@ -305,10 +305,10 @@ export default function ClockInCard({
                                 )}
                             </div>
                             <div className="mt-3 flex items-baseline gap-2">
-                                <span className="text-3xl font-semibold tabular-nums text-emerald-900 dark:text-emerald-50">
+                                <span className="text-3xl font-semibold tabular-nums text-status-success dark:text-status-success">
                                     {elapsed ?? '—'}
                                 </span>
-                                <span className="text-xs text-emerald-800/80 dark:text-emerald-100/70">
+                                <span className="text-xs text-status-success dark:text-status-success">
                                     since {formatTime(openSession.clock_in_at)}
                                 </span>
                             </div>

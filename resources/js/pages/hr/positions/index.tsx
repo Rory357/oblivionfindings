@@ -215,22 +215,22 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {position.vacancies > 0 ? (
-                                                        <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
+                                                        <Badge variant="outline" className="border-status-info/30 text-status-info bg-status-info">
                                                             {position.vacancies} open
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
+                                                        <Badge variant="outline" className="border-border/30 text-muted-foreground">
                                                             Filled
                                                         </Badge>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {position.is_active ? (
-                                                        <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                                                        <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success">
                                                             Active
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10">
+                                                        <Badge variant="outline" className="border-status-critical/30 text-status-critical bg-status-critical">
                                                             Inactive
                                                         </Badge>
                                                     )}

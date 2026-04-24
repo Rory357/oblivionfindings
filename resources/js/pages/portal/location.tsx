@@ -182,12 +182,12 @@ export default function PortalLocation({ client, tracker, currentLocation, track
 
                 {/* Consent Warning */}
                 {!hasConsent && (
-                    <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+                    <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <ShieldOff className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <ShieldOff className="h-5 w-5 text-status-warning dark:text-status-warning shrink-0" />
                             <div>
-                                <p className="font-medium text-amber-800 dark:text-amber-200">Location Tracking Consent Not Active</p>
-                                <p className="text-sm text-amber-700 dark:text-amber-300">
+                                <p className="font-medium text-status-warning dark:text-status-warning">Location Tracking Consent Not Active</p>
+                                <p className="text-sm text-status-warning dark:text-status-warning">
                                     Location tracking requires active consent. Please contact the care team to update consent status.
                                 </p>
                             </div>
@@ -197,12 +197,12 @@ export default function PortalLocation({ client, tracker, currentLocation, track
 
                 {/* No Tracker */}
                 {hasConsent && !hasTracker && (
-                    <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+                    <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30 dark:bg-status-info">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <Radio className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                            <Radio className="h-5 w-5 text-status-info dark:text-status-info shrink-0" />
                             <div>
-                                <p className="font-medium text-blue-800 dark:text-blue-200">No Tracker Assigned</p>
-                                <p className="text-sm text-blue-700 dark:text-blue-300">
+                                <p className="font-medium text-status-info dark:text-status-info">No Tracker Assigned</p>
+                                <p className="text-sm text-status-info dark:text-status-info">
                                     A personal tracker has not been assigned yet. Please contact the care team to set up a tracker device.
                                 </p>
                             </div>
@@ -217,12 +217,12 @@ export default function PortalLocation({ client, tracker, currentLocation, track
                         <Card>
                             <CardContent className="flex items-center gap-3 p-4">
                                 {isOnline ? (
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                                        <Wifi className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-bg dark:bg-status-success">
+                                        <Wifi className="h-5 w-5 text-status-success dark:text-status-success" />
                                     </div>
                                 ) : (
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                                        <WifiOff className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-critical-bg dark:bg-status-critical">
+                                        <WifiOff className="h-5 w-5 text-status-critical dark:text-status-critical" />
                                     </div>
                                 )}
                                 <div>
@@ -240,13 +240,13 @@ export default function PortalLocation({ client, tracker, currentLocation, track
                             <CardContent className="flex items-center gap-3 p-4">
                                 <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
                                     (tracker.battery ?? 100) < 20
-                                        ? 'bg-red-100 dark:bg-red-900/30'
-                                        : 'bg-green-100 dark:bg-green-900/30'
+                                        ? 'bg-status-critical-bg dark:bg-status-critical'
+                                        : 'bg-status-success-bg dark:bg-status-success'
                                 }`}>
                                     {(tracker.battery ?? 100) < 20 ? (
-                                        <BatteryLow className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                        <BatteryLow className="h-5 w-5 text-status-critical dark:text-status-critical" />
                                     ) : (
-                                        <Battery className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                        <Battery className="h-5 w-5 text-status-success dark:text-status-success" />
                                     )}
                                 </div>
                                 <div>
@@ -261,8 +261,8 @@ export default function PortalLocation({ client, tracker, currentLocation, track
                         {/* Last Seen */}
                         <Card>
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
-                                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-bg dark:bg-status-info">
+                                    <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">Last Seen</p>
@@ -281,7 +281,7 @@ export default function PortalLocation({ client, tracker, currentLocation, track
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">Consent</p>
-                                    <Badge variant="default" className="text-[10px] capitalize bg-green-600">
+                                    <Badge variant="default" className="text-[10px] capitalize bg-status-success">
                                         {trackingConsent?.status ?? 'Active'}
                                     </Badge>
                                     {trackingConsent?.expires_at && (

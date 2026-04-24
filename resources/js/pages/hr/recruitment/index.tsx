@@ -167,10 +167,10 @@ export default function RecruitmentIndex({ candidates, pipeline, sourceBreakdown
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <KpiCard label="Active Candidates" value={todayStats.total_active} icon={Users} color="bg-blue-500/10 text-blue-500" />
+                    <KpiCard label="Active Candidates" value={todayStats.total_active} icon={Users} color="bg-status-info-bg text-status-info" />
                     <KpiCard label="New This Week" value={todayStats.new_this_week} icon={UserPlus} color="bg-primary/10 text-primary" />
-                    <KpiCard label="Interviews Today" value={todayStats.interviews_today} icon={CalendarDays} color="bg-amber-500/10 text-amber-500" />
-                    <KpiCard label="Offers Pending" value={todayStats.offers_pending} icon={Send} color="bg-emerald-500/10 text-emerald-500" />
+                    <KpiCard label="Interviews Today" value={todayStats.interviews_today} icon={CalendarDays} color="bg-status-warning-bg text-status-warning" />
+                    <KpiCard label="Offers Pending" value={todayStats.offers_pending} icon={Send} color="bg-status-success-bg text-status-success" />
                     <KpiCard label="Avg Days in Stage" value={todayStats.avg_days_in_stage} icon={Clock} decimals={1} color="bg-primary/10 text-primary" />
                 </div>
 
@@ -383,7 +383,7 @@ export default function RecruitmentIndex({ candidates, pipeline, sourceBreakdown
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="text-base flex items-center gap-2">
-                                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" />
                                         Needs Attention
                                     </CardTitle>
                                 </CardHeader>
@@ -391,8 +391,8 @@ export default function RecruitmentIndex({ candidates, pipeline, sourceBreakdown
                                     {urgentItems.map((item, i) => (
                                         <div key={i} className={`rounded-lg p-2.5 text-xs ${
                                             item.severity === 'danger'
-                                                ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                ? 'bg-status-critical-bg text-status-critical border border-status-critical/20'
+                                                : 'bg-status-warning-bg text-status-warning border border-status-warning/20'
                                         }`}>
                                             {item.description}
                                         </div>

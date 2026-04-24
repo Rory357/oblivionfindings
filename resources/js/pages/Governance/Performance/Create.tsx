@@ -73,7 +73,7 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.reviewee_id && <p className="text-sm text-red-600 mt-1">{errors.reviewee_id}</p>}
+                  {errors.reviewee_id && <p className="text-sm text-status-critical mt-1">{errors.reviewee_id}</p>}
                 </div>
 
                 <div>
@@ -94,7 +94,7 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
                       <SelectItem value="ad_hoc">Ad-hoc</SelectItem>
                     </SelectContent>
                   </Select>
-                  {errors.review_type && <p className="text-sm text-red-600 mt-1">{errors.review_type}</p>}
+                  {errors.review_type && <p className="text-sm text-status-critical mt-1">{errors.review_type}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -106,7 +106,7 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
                       value={data.period_start}
                       onChange={(e) => setData('period_start', e.target.value)}
                     />
-                    {errors.period_start && <p className="text-sm text-red-600 mt-1">{errors.period_start}</p>}
+                    {errors.period_start && <p className="text-sm text-status-critical mt-1">{errors.period_start}</p>}
                   </div>
                   <div>
                     <Label htmlFor="period_end">Period End</Label>
@@ -116,7 +116,7 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
                       value={data.period_end}
                       onChange={(e) => setData('period_end', e.target.value)}
                     />
-                    {errors.period_end && <p className="text-sm text-red-600 mt-1">{errors.period_end}</p>}
+                    {errors.period_end && <p className="text-sm text-status-critical mt-1">{errors.period_end}</p>}
                   </div>
                 </div>
 

@@ -156,7 +156,7 @@ export default function VoiceInputButton({
             className={cn(
                 'frontline-focus inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                 listening
-                    ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/60 dark:bg-status-critical-bg dark:text-status-critical'
                     : 'border-border bg-background text-muted-foreground hover:bg-muted/50',
                 className,
             )}

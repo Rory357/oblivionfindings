@@ -38,16 +38,16 @@ interface Props extends PageProps {
 }
 
 const statusStyles: Record<string, string> = {
-  good: 'bg-green-100 text-green-800 border-green-200',
-  warning: 'bg-amber-100 text-amber-800 border-amber-200',
-  critical: 'bg-red-100 text-red-800 border-red-200',
+  good: 'bg-status-success-bg text-status-success border-status-success/30',
+  warning: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
   unknown: 'bg-muted text-foreground border-border',
 };
 
 const toneStyles: Record<string, string> = {
   default: 'text-foreground',
-  warning: 'text-amber-700',
-  critical: 'text-red-700',
+  warning: 'text-status-warning',
+  critical: 'text-status-critical',
   muted: 'text-muted-foreground',
 };
 

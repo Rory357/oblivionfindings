@@ -54,15 +54,15 @@ const formatDate = (value?: string | null) => {
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'clear':
-            return 'bg-green-100 text-green-800 border-green-200';
+            return 'bg-status-success-bg text-status-success border-status-success/30';
         case 'pending':
         case 'requested':
-            return 'bg-blue-100 text-blue-800 border-blue-200';
+            return 'bg-status-info-bg text-status-info border-status-info/30';
         case 'renewal_due':
-            return 'bg-amber-100 text-amber-800 border-amber-200';
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         case 'flagged':
         case 'adverse':
-            return 'bg-red-100 text-red-800 border-red-200';
+            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         default:
             return 'bg-muted text-foreground border-border';
     }
@@ -112,19 +112,19 @@ export default function VettingShow({ check, can }: Props) {
                                 {check.status.replace(/_/g, ' ')}
                             </Badge>
                             {expired && (
-                                <Badge className="bg-red-100 text-red-800 border-red-200">
+                                <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">
                                     <AlertTriangle className="mr-1 h-3 w-3" />
                                     Expired
                                 </Badge>
                             )}
                             {expiringSoon && !expired && (
-                                <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                                <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">
                                     <Clock className="mr-1 h-3 w-3" />
                                     Expiring Soon
                                 </Badge>
                             )}
                             {consentRecorded && (
-                                <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                                <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Consent Recorded
                                 </Badge>
@@ -163,7 +163,7 @@ export default function VettingShow({ check, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <User className="h-5 w-5 text-blue-500" />
+                                <User className="h-5 w-5 text-status-info" />
                                 Staff Details
                             </CardTitle>
                         </CardHeader>
@@ -194,7 +194,7 @@ export default function VettingShow({ check, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <FileText className="h-5 w-5 text-green-500" />
+                                <FileText className="h-5 w-5 text-status-success" />
                                 Check Details
                             </CardTitle>
                         </CardHeader>
@@ -251,9 +251,9 @@ export default function VettingShow({ check, can }: Props) {
                                     <div className="text-xs text-muted-foreground">Expires</div>
                                     <div className={
                                         expired
-                                            ? 'font-semibold text-red-600'
+                                            ? 'font-semibold text-status-critical'
                                             : expiringSoon
-                                                ? 'font-medium text-amber-600'
+                                                ? 'font-medium text-status-warning'
                                                 : ''
                                     }>
                                         {formatDate(check.expires_at)}
@@ -266,7 +266,7 @@ export default function VettingShow({ check, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Shield className="h-5 w-5 text-amber-500" />
+                                <Shield className="h-5 w-5 text-status-warning" />
                                 Consent Information
                             </CardTitle>
                         </CardHeader>
@@ -275,11 +275,11 @@ export default function VettingShow({ check, can }: Props) {
                                 <div className="text-xs text-muted-foreground">Consent Recorded</div>
                                 <div className="font-medium">
                                     {consentRecorded ? (
-                                        <span className="flex items-center gap-1 text-green-600">
+                                        <span className="flex items-center gap-1 text-status-success">
                                             <CheckCircle className="h-4 w-4" /> Yes
                                         </span>
                                     ) : (
-                                        <span className="text-red-600">No</span>
+                                        <span className="text-status-critical">No</span>
                                     )}
                                 </div>
                             </div>
@@ -305,10 +305,10 @@ export default function VettingShow({ check, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <AlertTriangle className="h-5 w-5 text-red-500" />
+                                <AlertTriangle className="h-5 w-5 text-status-critical" />
                                 Disclosure Information
                             </CardTitle>
-                            <div className="text-xs text-red-500">
+                            <div className="text-xs text-status-critical">
                                 Sensitive - access restricted
                             </div>
                         </CardHeader>
@@ -320,7 +320,7 @@ export default function VettingShow({ check, can }: Props) {
                             {check.disclosure_details && (
                                 <div className="text-sm">
                                     <div className="text-xs text-muted-foreground">Disclosure Details</div>
-                                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-foreground whitespace-pre-wrap">
+                                    <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-foreground whitespace-pre-wrap">
                                         {check.disclosure_details}
                                     </div>
                                 </div>
@@ -351,7 +351,7 @@ export default function VettingShow({ check, can }: Props) {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                className="text-status-critical border-status-critical/30 hover:bg-status-critical-bg"
                                 onClick={() => {
                                     if (confirm('Are you sure you want to delete this vetting record?')) {
                                         router.delete(`/hr/compliance/vetting/${check.id}`);

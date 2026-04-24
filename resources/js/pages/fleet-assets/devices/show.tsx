@@ -51,7 +51,7 @@ type Props = {
 const statusBannerColors: Record<string, string> = {
     paired: 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
     unpaired: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
-    offline: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
+    offline: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
 };
 
 export default function DeviceShow({ tracker }: Props) {

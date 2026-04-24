@@ -33,9 +33,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    pending: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Pending' },
-    signed: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Signed' },
-    declined: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Declined' },
+    pending: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Pending' },
+    signed: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Signed' },
+    declined: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Declined' },
 };
 
 export default function SignDocument({ signature, can }: Props) {
@@ -190,10 +190,10 @@ export default function SignDocument({ signature, can }: Props) {
                             <Badge variant="outline" className={config.className}>{config.label}</Badge>
                         </div>
                         {signature.signed_at && (
-                            <p className="text-sm text-emerald-400">Signed on {signature.signed_at}</p>
+                            <p className="text-sm text-status-success">Signed on {signature.signed_at}</p>
                         )}
                         {signature.declined_reason && (
-                            <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400">
+                            <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical">
                                 <strong>Decline reason:</strong> {signature.declined_reason}
                             </div>
                         )}
@@ -250,7 +250,7 @@ export default function SignDocument({ signature, can }: Props) {
                                             className="h-24"
                                         />
                                         {declineForm.errors.reason && (
-                                            <p className="text-sm text-red-500">{declineForm.errors.reason}</p>
+                                            <p className="text-sm text-status-critical">{declineForm.errors.reason}</p>
                                         )}
                                     </div>
                                     <div className="flex gap-2">

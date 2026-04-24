@@ -117,15 +117,15 @@ function SummaryPill({
 }) {
     const ring =
         tone === 'danger'
-            ? 'border-red-300 bg-red-50/70 dark:border-red-800/60 dark:bg-red-950/20'
+            ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/60 dark:bg-status-critical'
             : tone === 'warn'
-                ? 'border-amber-300 bg-amber-50/70 dark:border-amber-800/60 dark:bg-amber-950/20'
+                ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/60 dark:bg-status-warning'
                 : 'border-border bg-card';
     const iconTone =
         tone === 'danger'
-            ? 'text-red-600 dark:text-red-400'
+            ? 'text-status-critical dark:text-status-critical'
             : tone === 'warn'
-                ? 'text-amber-600 dark:text-amber-400'
+                ? 'text-status-warning dark:text-status-warning'
                 : 'text-muted-foreground';
     return (
         <div className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${ring}`}>
@@ -149,9 +149,9 @@ function MedRow({ med }: { med: MedDue }) {
     // "due" and "upcoming" are normal states, not errors, so we stay calm.
     const pill =
         med.status === 'overdue'
-            ? { label: 'Overdue', className: 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100' }
+            ? { label: 'Overdue', className: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical' }
             : med.status === 'due'
-                ? { label: 'Due', className: 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100' }
+                ? { label: 'Due', className: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning' }
                 : { label: 'Later', className: 'border-border bg-muted text-foreground dark:border-border dark:bg-muted/60 dark:text-foreground' };
 
     return (
@@ -285,9 +285,9 @@ export default function MedsToday({
                             ? 'Give as-needed med — none set up'
                             : `Give as-needed med (${prn_medications.length} available)`
                     }
-                    className="frontline-focus group flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800/60 dark:bg-amber-950/20"
+                    className="frontline-focus group flex w-full items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
                 >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
                         <Zap className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -306,10 +306,10 @@ export default function MedsToday({
                     <Link
                         href={active_round.url}
                         aria-label={`${active_round.status === 'in_progress' ? 'Resume' : 'Start'} ${active_round.name}`}
-                        className="frontline-focus group block rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 transition-shadow hover:shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/20"
+                        className="frontline-focus group block rounded-xl border border-status-success/30 bg-status-success-bg p-4 transition-shadow hover:shadow-sm dark:border-status-success/60 dark:bg-status-success"
                     >
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-success text-white">
                                 <Pill className="h-5 w-5" />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -391,7 +391,7 @@ export default function MedsToday({
                                                         {isActive && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="shrink-0 border-emerald-300 text-[10px] uppercase tracking-wide text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                                                                className="shrink-0 border-status-success/30 text-[10px] uppercase tracking-wide text-status-success dark:border-status-success/30 dark:text-status-success"
                                                             >
                                                                 In progress
                                                             </Badge>
@@ -451,7 +451,7 @@ export default function MedsToday({
                 {nothingToShow && (
                     <Card>
                         <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-                            <CheckCircle2 className="h-8 w-8 text-green-500" />
+                            <CheckCircle2 className="h-8 w-8 text-status-success" />
                             <p className="text-sm font-medium">Nothing due right now</p>
                             <p className="max-w-sm text-xs text-muted-foreground">
                                 {has_shift_context
@@ -470,13 +470,13 @@ export default function MedsToday({
 
                 {/* ── Safety / follow-up hint ─────────────────────────── */}
                 {stats.meds_overdue > 0 && (
-                    <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50/70 p-3 text-sm dark:border-red-900 dark:bg-red-950/20">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm dark:border-status-critical/30 dark:bg-status-critical">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-critical dark:text-status-critical" />
                         <div className="min-w-0">
-                            <p className="font-medium text-red-800 dark:text-red-100">
+                            <p className="font-medium text-status-critical dark:text-status-critical">
                                 {stats.meds_overdue} dose{stats.meds_overdue === 1 ? '' : 's'} past due
                             </p>
-                            <p className="mt-0.5 text-xs text-red-700 dark:text-red-200">
+                            <p className="mt-0.5 text-xs text-status-critical dark:text-status-critical">
                                 Give now if safe, or tell your supervisor. Don&rsquo;t skip a dose
                                 without writing down why.
                             </p>

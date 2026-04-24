@@ -67,8 +67,8 @@ export function getStatusColor(status: string): string {
  * tokens — matches the rest of the app when branding changes.
  */
 export const riskScoreColor = (score: number): string => {
-    if (score >= 20) return 'bg-status-critical text-status-critical-foreground';
-    if (score >= 15) return 'bg-status-warning text-status-warning-foreground';
+    if (score >= 20) return 'bg-status-critical-bg text-status-critical-foreground';
+    if (score >= 15) return 'bg-status-warning-bg text-status-warning-foreground';
     if (score >= 10) return 'bg-status-warning-bg text-status-warning';
-    return 'bg-status-success text-status-success-foreground';
+    return 'bg-status-success-bg text-status-success-foreground';
 };

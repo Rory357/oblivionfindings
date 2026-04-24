@@ -90,31 +90,31 @@ const sevKeys = ['low', 'medium', 'high', 'critical'];
 const likKeys = ['rare', 'unlikely', 'possible', 'likely', 'almost_certain'];
 
 const riskBarColors: Record<string, string> = {
-    extreme: 'bg-red-500',
-    high: 'bg-orange-500',
-    medium: 'bg-amber-500',
-    low: 'bg-emerald-500',
+    extreme: 'bg-status-critical',
+    high: 'bg-status-warning',
+    medium: 'bg-status-warning',
+    low: 'bg-status-success',
 };
 
 const severityConfig: Record<string, { bg: string; text: string }> = {
-    low: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
-    medium: { bg: 'bg-amber-50', text: 'text-amber-700' },
-    high: { bg: 'bg-orange-50', text: 'text-orange-700' },
-    critical: { bg: 'bg-red-100', text: 'text-red-800' },
+    low: { bg: 'bg-status-success-bg', text: 'text-status-success' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    high: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical' },
 };
 
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
-    open: { bg: 'bg-red-100', text: 'text-red-700', icon: AlertTriangle },
-    in_progress: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
+    open: { bg: 'bg-status-critical-bg', text: 'text-status-critical', icon: AlertTriangle },
+    in_progress: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Clock },
     mitigated: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2 },
-    closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
+    closed: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2 },
 };
 
 const riskConfig: Record<string, { bg: string; text: string }> = {
-    low: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
-    medium: { bg: 'bg-amber-100', text: 'text-amber-800' },
-    high: { bg: 'bg-orange-100', text: 'text-orange-800' },
-    extreme: { bg: 'bg-red-100', text: 'text-red-800' },
+    low: { bg: 'bg-status-success-bg', text: 'text-status-success' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    high: { bg: 'bg-status-warning-bg', text: 'text-status-warning' },
+    extreme: { bg: 'bg-status-critical-bg', text: 'text-status-critical' },
 };
 
 const WORKFLOW_STEPS = [
@@ -126,10 +126,10 @@ const WORKFLOW_STEPS = [
 
 function matrixCellColor(rating: string) {
     switch (rating) {
-        case 'extreme': return 'bg-red-500 text-white';
-        case 'high': return 'bg-orange-400 text-white';
-        case 'medium': return 'bg-amber-300 text-amber-900';
-        default: return 'bg-emerald-200 text-emerald-900';
+        case 'extreme': return 'bg-status-critical text-white';
+        case 'high': return 'bg-status-warning text-white';
+        case 'medium': return 'bg-status-warning-bg text-status-warning';
+        default: return 'bg-status-success-bg text-status-success';
     }
 }
 
@@ -168,13 +168,13 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
 
                 {/* Header card */}
                 <Card className="overflow-hidden">
-                    <div className={`h-2 ${riskBarColors[hazard.risk_rating] ?? 'bg-slate-300'}`} />
+                    <div className={`h-2 ${riskBarColors[hazard.risk_rating] ?? 'bg-muted'}`} />
                     <CardContent className="pt-5">
                         <div className="flex items-start justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2 flex-wrap mb-2">
                                     <span className="text-lg font-semibold">{hazard.reference_number}</span>
-                                    <span className="text-slate-300">|</span>
+                                    <span className="text-muted-foreground">|</span>
                                     <span className="text-lg capitalize">{hazard.custom_hazard_type || hazard.hazard_type.replace(/_/g, ' ')}</span>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -189,7 +189,7 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                                         {hazard.risk_rating} risk
                                     </Badge>
                                     {isOverdue && (
-                                        <Badge className="bg-red-100 text-red-700 border-0 text-[10px] font-medium">
+                                        <Badge className="bg-status-critical-bg text-status-critical border-0 text-[10px] font-medium">
                                             <Clock className="mr-1 h-3 w-3" />
                                             Overdue
                                         </Badge>
@@ -342,7 +342,7 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                                 <span>{formatDateTime(hazard.created_at)}</span>
                             </div>
                             {hazard.due_date && (
-                                <div className={`flex items-center gap-2 text-sm ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                                <div className={`flex items-center gap-2 text-sm ${isOverdue ? 'text-status-critical font-medium' : ''}`}>
                                     <Clock className="h-4 w-4" />
                                     <span>Due {new Date(hazard.due_date).toLocaleDateString()}</span>
                                 </div>
@@ -381,7 +381,7 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="flex items-center gap-3">
-                                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${hazard.assigned_to ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>
+                                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${hazard.assigned_to ? 'bg-status-info-bg text-status-info' : 'bg-muted text-muted-foreground'}`}>
                                     <User className="h-5 w-5" />
                                 </div>
                                 <div>
@@ -420,9 +420,9 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
 
                     {/* Resolution */}
                     {hazard.resolution_summary && (
-                        <Card className="border-green-200 bg-green-50/30">
+                        <Card className="border-status-success/30 bg-status-success-bg">
                             <CardHeader>
-                                <CardTitle className="text-sm flex items-center gap-2 text-green-800">
+                                <CardTitle className="text-sm flex items-center gap-2 text-status-success">
                                     <CheckCircle2 className="h-4 w-4" />
                                     Resolution
                                 </CardTitle>

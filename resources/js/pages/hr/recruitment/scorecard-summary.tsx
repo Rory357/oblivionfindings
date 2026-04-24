@@ -40,18 +40,18 @@ type Props = {
 };
 
 const recLabels: Record<string, { label: string; color: string }> = {
-    strong_yes: { label: 'Strong Yes', color: 'bg-green-500/10 text-green-500 border-green-500/30' },
-    yes: { label: 'Yes', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' },
-    neutral: { label: 'Neutral', color: 'bg-amber-500/10 text-amber-500 border-amber-500/30' },
-    no: { label: 'No', color: 'bg-orange-500/10 text-orange-500 border-orange-500/30' },
-    strong_no: { label: 'Strong No', color: 'bg-red-500/10 text-red-500 border-red-500/30' },
+    strong_yes: { label: 'Strong Yes', color: 'bg-status-success-bg text-status-success border-status-success/30' },
+    yes: { label: 'Yes', color: 'bg-status-success-bg text-status-success border-status-success/30' },
+    neutral: { label: 'Neutral', color: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
+    no: { label: 'No', color: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
+    strong_no: { label: 'Strong No', color: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
 function Stars({ count, max = 5 }: { count: number; max?: number }) {
     return (
         <div className="flex gap-0.5">
             {Array.from({ length: max }, (_, i) => (
-                <Star key={i} className={`h-4 w-4 ${i < count ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/20'}`} />
+                <Star key={i} className={`h-4 w-4 ${i < count ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground/20'}`} />
             ))}
         </div>
     );
@@ -219,13 +219,13 @@ export default function ScorecardSummary({ application, scorecards, criteriaAver
                                                 </div>
                                                 {sc.strengths && (
                                                     <div className="rounded-lg border-l-2 border-l-green-500/50 pl-3 py-1">
-                                                        <span className="text-xs font-semibold text-green-500">Strengths:</span>
+                                                        <span className="text-xs font-semibold text-status-success">Strengths:</span>
                                                         <p className="text-sm text-muted-foreground">{sc.strengths}</p>
                                                     </div>
                                                 )}
                                                 {sc.concerns && (
                                                     <div className="rounded-lg border-l-2 border-l-red-500/50 pl-3 py-1">
-                                                        <span className="text-xs font-semibold text-red-400">Concerns:</span>
+                                                        <span className="text-xs font-semibold text-status-critical">Concerns:</span>
                                                         <p className="text-sm text-muted-foreground">{sc.concerns}</p>
                                                     </div>
                                                 )}

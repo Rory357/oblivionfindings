@@ -58,17 +58,17 @@ type Props = {
 };
 
 const severityConfig: Record<string, { bg: string; text: string; dot: string; border: string; darkBg: string; darkText: string }> = {
-    low: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-l-emerald-500', darkBg: 'dark:bg-emerald-500/10', darkText: 'dark:text-emerald-300' },
-    medium: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500', border: 'border-l-amber-500', darkBg: 'dark:bg-amber-500/10', darkText: 'dark:text-amber-300' },
-    high: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500', border: 'border-l-red-500', darkBg: 'dark:bg-red-500/10', darkText: 'dark:text-red-300' },
-    critical: { bg: 'bg-red-100', text: 'text-red-800', dot: 'bg-red-600', border: 'border-l-red-600', darkBg: 'dark:bg-red-500/15', darkText: 'dark:text-red-200' },
+    low: { bg: 'bg-status-success-bg', text: 'text-status-success', dot: 'bg-status-success', border: 'border-l-emerald-500', darkBg: 'dark:bg-status-success', darkText: 'dark:text-status-success' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning', dot: 'bg-status-warning', border: 'border-l-amber-500', darkBg: 'dark:bg-status-warning', darkText: 'dark:text-status-warning' },
+    high: { bg: 'bg-status-critical-bg', text: 'text-status-critical', dot: 'bg-status-critical', border: 'border-l-red-500', darkBg: 'dark:bg-status-critical', darkText: 'dark:text-status-critical' },
+    critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical', dot: 'bg-status-critical', border: 'border-l-red-600', darkBg: 'dark:bg-status-critical', darkText: 'dark:text-status-critical' },
 };
 
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock; darkBg: string; darkText: string }> = {
-    draft: { bg: 'bg-muted', text: 'text-foreground', icon: FileEdit, darkBg: 'dark:bg-slate-500/10', darkText: 'dark:text-muted-foreground' },
-    submitted: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock, darkBg: 'dark:bg-blue-500/10', darkText: 'dark:text-blue-300' },
+    draft: { bg: 'bg-muted', text: 'text-foreground', icon: FileEdit, darkBg: 'dark:bg-muted-foreground/80/10', darkText: 'dark:text-muted-foreground' },
+    submitted: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Clock, darkBg: 'dark:bg-status-info', darkText: 'dark:text-status-info' },
     reviewed: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2, darkBg: 'dark:bg-primary/10', darkText: 'dark:text-primary/70' },
-    closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2, darkBg: 'dark:bg-green-500/10', darkText: 'dark:text-green-300' },
+    closed: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2, darkBg: 'dark:bg-status-success', darkText: 'dark:text-status-success' },
 };
 
 const typeIcons: Record<string, typeof AlertTriangle> = {
@@ -97,24 +97,24 @@ interface StatCardProps {
 
 const STAT_COLORS = {
     blue: {
-        bg: 'bg-blue-50 dark:bg-blue-500/10',
-        icon: 'text-blue-600 dark:text-blue-400',
-        ring: 'ring-blue-100 dark:ring-blue-500/20',
+        bg: 'bg-status-info-bg dark:bg-status-info',
+        icon: 'text-status-info dark:text-status-info',
+        ring: 'ring-status-info dark:ring-status-info/20',
     },
     emerald: {
-        bg: 'bg-emerald-50 dark:bg-emerald-500/10',
-        icon: 'text-emerald-600 dark:text-emerald-400',
-        ring: 'ring-emerald-100 dark:ring-emerald-500/20',
+        bg: 'bg-status-success-bg dark:bg-status-success',
+        icon: 'text-status-success dark:text-status-success',
+        ring: 'ring-status-success dark:ring-status-success/20',
     },
     amber: {
-        bg: 'bg-amber-50 dark:bg-amber-500/10',
-        icon: 'text-amber-600 dark:text-amber-400',
-        ring: 'ring-amber-100 dark:ring-amber-500/20',
+        bg: 'bg-status-warning-bg dark:bg-status-warning',
+        icon: 'text-status-warning dark:text-status-warning',
+        ring: 'ring-status-warning dark:ring-status-warning/20',
     },
     red: {
-        bg: 'bg-red-50 dark:bg-red-500/10',
-        icon: 'text-red-600 dark:text-red-400',
-        ring: 'ring-red-100 dark:ring-red-500/20',
+        bg: 'bg-status-critical-bg dark:bg-status-critical',
+        icon: 'text-status-critical dark:text-status-critical',
+        ring: 'ring-status-critical dark:ring-status-critical/20',
     },
 };
 
@@ -330,7 +330,7 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
                                                             {i.status}
                                                         </Badge>
                                                         {i.is_notifiable && (
-                                                            <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 text-[10px]">WorkSafe</Badge>
+                                                            <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical text-[10px]">WorkSafe</Badge>
                                                         )}
                                                         {i.requires_followup && (
                                                             <Badge variant="outline" className="border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/10 dark:text-primary/70 text-[10px]">Follow-up</Badge>

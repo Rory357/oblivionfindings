@@ -153,7 +153,7 @@ export default function EvvIndex({ records = { data: [], links: [], current_page
                     {(records?.data ?? []).map((rec) => (
                         <Card key={rec.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
-                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${rec.has_issues ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}>
+                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${rec.has_issues ? 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}>
                                     {rec.has_issues ? <Flag className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
                                 </div>
                                 <div className="min-w-0 flex-1">
@@ -165,11 +165,11 @@ export default function EvvIndex({ records = { data: [], links: [], current_page
                                             {rec.status.replace('_', ' ')}
                                         </Badge>
                                         {rec.gps_verified ? (
-                                            <Badge variant="outline" className="h-4 px-1.5 text-[9px] text-emerald-700">
+                                            <Badge variant="outline" className="h-4 px-1.5 text-[9px] text-status-success">
                                                 <MapPin className="mr-0.5 h-2.5 w-2.5" /> GPS OK
                                             </Badge>
                                         ) : (
-                                            <Badge variant="outline" className="h-4 px-1.5 text-[9px] text-amber-700">
+                                            <Badge variant="outline" className="h-4 px-1.5 text-[9px] text-status-warning">
                                                 <AlertTriangle className="mr-0.5 h-2.5 w-2.5" /> No GPS
                                             </Badge>
                                         )}
@@ -184,7 +184,7 @@ export default function EvvIndex({ records = { data: [], links: [], current_page
                                         </span>
                                     </div>
                                     {rec.has_issues && rec.issue_description && (
-                                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{rec.issue_description}</p>
+                                        <p className="mt-1 text-xs text-status-critical dark:text-status-critical">{rec.issue_description}</p>
                                     )}
                                 </div>
                                 <div className="flex shrink-0 gap-1">

@@ -106,13 +106,13 @@ const fmtDateTime = (v: string | null) =>
 const sessionStatusColor = (status: string) => {
     switch (status) {
         case 'active':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'overdue':
-            return 'bg-red-100 text-red-800 animate-pulse';
+            return 'bg-status-critical-bg text-status-critical animate-pulse';
         case 'completed':
             return 'bg-muted text-foreground';
         case 'emergency':
-            return 'bg-red-600 text-white';
+            return 'bg-status-critical text-white';
         default:
             return 'bg-muted text-foreground';
     }
@@ -121,11 +121,11 @@ const sessionStatusColor = (status: string) => {
 const alertTypeColor = (type: string) => {
     switch (type) {
         case 'overdue_check_in':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'emergency':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         case 'no_response':
-            return 'bg-orange-100 text-orange-800';
+            return 'bg-status-warning-bg text-status-warning';
         default:
             return 'bg-muted text-foreground';
     }
@@ -134,11 +134,11 @@ const alertTypeColor = (type: string) => {
 const alertStatusColor = (status: string) => {
     switch (status) {
         case 'active':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         case 'acknowledged':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'resolved':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         default:
             return 'bg-muted text-foreground';
     }
@@ -399,7 +399,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                         <h2 className="text-base font-semibold">Recent Alerts</h2>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {alerts.map((alert) => (
-                                <Card key={alert.id} className={alert.type === 'emergency' ? 'border-red-300 bg-red-50/40' : ''}>
+                                <Card key={alert.id} className={alert.type === 'emergency' ? 'border-status-critical/30 bg-status-critical-bg' : ''}>
                                     <CardContent className="pt-5">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="space-y-1.5">
@@ -505,7 +505,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                 </SelectContent>
                             </Select>
                             {startForm.errors.user_id && (
-                                <p className="mt-1 text-xs text-red-600">{startForm.errors.user_id}</p>
+                                <p className="mt-1 text-xs text-status-critical">{startForm.errors.user_id}</p>
                             )}
                         </div>
 
@@ -559,7 +559,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
                                     onChange={(e) => startForm.setData('expected_end_at', e.target.value)}
                                 />
                                 {startForm.errors.expected_end_at && (
-                                    <p className="mt-1 text-xs text-red-600">{startForm.errors.expected_end_at}</p>
+                                    <p className="mt-1 text-xs text-status-critical">{startForm.errors.expected_end_at}</p>
                                 )}
                             </div>
                             <div>
@@ -676,7 +676,7 @@ export default function LoneWorkerIndex({ sessions, alerts, stats, staff, sites,
             <Dialog open={emergencyOpen} onOpenChange={setEmergencyOpen}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-red-700">
+                        <DialogTitle className="flex items-center gap-2 text-status-critical">
                             <Siren className="h-5 w-5" />
                             Trigger Emergency Alert
                         </DialogTitle>

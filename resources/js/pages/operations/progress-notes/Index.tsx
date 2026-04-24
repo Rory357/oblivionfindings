@@ -43,13 +43,13 @@ type Note = {
 };
 
 const EMOTIONS: Array<{ key: string; emoji: string; label: string; color: string }> = [
-    { key: 'happy', emoji: '😊', label: 'Happy', color: 'bg-emerald-100 text-emerald-700' },
-    { key: 'calm', emoji: '😌', label: 'Calm', color: 'bg-sky-100 text-sky-700' },
-    { key: 'excited', emoji: '🤩', label: 'Excited', color: 'bg-amber-100 text-amber-700' },
+    { key: 'happy', emoji: '😊', label: 'Happy', color: 'bg-status-success-bg text-status-success' },
+    { key: 'calm', emoji: '😌', label: 'Calm', color: 'bg-status-info-bg text-status-info' },
+    { key: 'excited', emoji: '🤩', label: 'Excited', color: 'bg-status-warning-bg text-status-warning' },
     { key: 'tired', emoji: '😴', label: 'Tired', color: 'bg-primary/10 text-primary' },
-    { key: 'anxious', emoji: '😰', label: 'Anxious', color: 'bg-orange-100 text-orange-700' },
-    { key: 'sad', emoji: '😢', label: 'Sad', color: 'bg-blue-100 text-blue-700' },
-    { key: 'frustrated', emoji: '😤', label: 'Frustrated', color: 'bg-red-100 text-red-700' },
+    { key: 'anxious', emoji: '😰', label: 'Anxious', color: 'bg-status-warning-bg text-status-warning' },
+    { key: 'sad', emoji: '😢', label: 'Sad', color: 'bg-status-info-bg text-status-info' },
+    { key: 'frustrated', emoji: '😤', label: 'Frustrated', color: 'bg-status-critical-bg text-status-critical' },
     { key: 'confused', emoji: '😕', label: 'Confused', color: 'bg-primary/10 text-primary' },
 ];
 const EMOTION_MAP = Object.fromEntries(EMOTIONS.map(e => [e.key, e]));
@@ -70,11 +70,11 @@ type Props = {
 const NOTE_TYPE_STYLES: Record<string, { border: string; bg: string; label: string; dot: string }> = {
     general: { border: 'border-l-violet-400', bg: 'bg-primary/10', label: 'General', dot: 'bg-primary' },
     goal_update: { border: 'border-l-indigo-400', bg: 'bg-primary/10', label: 'Goal Update', dot: 'bg-primary' },
-    observation: { border: 'border-l-blue-400', bg: 'bg-blue-50', label: 'Observation', dot: 'bg-blue-500' },
-    handover: { border: 'border-l-cyan-400', bg: 'bg-cyan-50', label: 'Handover', dot: 'bg-cyan-500' },
-    incident: { border: 'border-l-red-400', bg: 'bg-red-50', label: 'Incident', dot: 'bg-red-500' },
-    daily: { border: 'border-l-emerald-400', bg: 'bg-emerald-50', label: 'Daily', dot: 'bg-emerald-500' },
-    weekly: { border: 'border-l-amber-400', bg: 'bg-amber-50', label: 'Weekly', dot: 'bg-amber-500' },
+    observation: { border: 'border-l-blue-400', bg: 'bg-status-info-bg', label: 'Observation', dot: 'bg-status-info' },
+    handover: { border: 'border-l-cyan-400', bg: 'bg-status-info-bg', label: 'Handover', dot: 'bg-status-info' },
+    incident: { border: 'border-l-red-400', bg: 'bg-status-critical-bg', label: 'Incident', dot: 'bg-status-critical' },
+    daily: { border: 'border-l-emerald-400', bg: 'bg-status-success-bg', label: 'Daily', dot: 'bg-status-success' },
+    weekly: { border: 'border-l-amber-400', bg: 'bg-status-warning-bg', label: 'Weekly', dot: 'bg-status-warning' },
 };
 
 function formatRelativeTime(iso: string): string {
@@ -194,7 +194,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                 {/* Add Note Form */}
                 {showAddForm && (
                     <Card className="overflow-hidden border-primary">
-                        <div className="flex items-center justify-between bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
+                        <div className="flex items-center justify-between bg-primary px-4 py-2.5">
                             <h3 className="text-sm font-semibold text-white">New Progress Note</h3>
                             <DraftSavedIndicator savedAt={savedAt} className="text-white/90 [&_svg]:text-white" />
                         </div>
@@ -300,7 +300,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                             </SelectContent>
                         </Select>
                         <Button size="sm" variant={filters?.flagged === '1' ? 'default' : 'outline'}
-                            className={`h-9 gap-1 text-xs ${filters?.flagged !== '1' ? 'text-red-600 border-red-200 hover:bg-red-50' : ''}`}
+                            className={`h-9 gap-1 text-xs ${filters?.flagged !== '1' ? 'text-status-critical border-status-critical/30 hover:bg-status-critical-bg' : ''}`}
                             onClick={() => updateFilters('flagged', filters?.flagged === '1' ? null : '1')}>
                             <Flag className="h-3.5 w-3.5" /> Flagged
                         </Button>
@@ -333,7 +333,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                     {(notes?.data ?? []).map((note) => {
                         const style = NOTE_TYPE_STYLES[note.note_type] ?? NOTE_TYPE_STYLES.general;
                         return (
-                            <Card key={note.id} className={`overflow-hidden border-l-4 transition-all hover:shadow-sm ${note.is_flagged ? 'border-l-red-500 bg-red-50/30' : style.border}`}>
+                            <Card key={note.id} className={`overflow-hidden border-l-4 transition-all hover:shadow-sm ${note.is_flagged ? 'border-l-red-500 bg-status-critical-bg' : style.border}`}>
                                 <CardContent className="p-4">
                                     <div className="flex items-start gap-3">
                                         {/* Author avatar */}
@@ -349,8 +349,8 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                                                         {EMOTION_MAP[em]?.emoji ?? em} {EMOTION_MAP[em]?.label ?? em}
                                                     </span>
                                                 ))}
-                                                {note.is_flagged && <Badge className="border-0 bg-red-100 text-red-700 text-[9px]">Flagged</Badge>}
-                                                {note.visibility === 'include_family' && <Badge className="border-0 bg-blue-100 text-blue-700 text-[9px]">Family</Badge>}
+                                                {note.is_flagged && <Badge className="border-0 bg-status-critical-bg text-status-critical text-[9px]">Flagged</Badge>}
+                                                {note.visibility === 'include_family' && <Badge className="border-0 bg-status-info-bg text-status-info text-[9px]">Family</Badge>}
                                             </div>
                                             {/* Client + Goal + Shift */}
                                             <div className="mt-0.5 flex items-center gap-2 flex-wrap">
@@ -365,7 +365,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                                             {/* Content */}
                                             <p className="mt-1.5 text-sm leading-relaxed text-foreground">{note.content.length > 400 ? note.content.slice(0, 400) + '...' : note.content}</p>
                                             {note.flagged_reason && (
-                                                <div className="mt-1.5 rounded bg-red-50 px-2 py-1 text-xs text-red-600">
+                                                <div className="mt-1.5 rounded bg-status-critical-bg px-2 py-1 text-xs text-status-critical">
                                                     Flag reason: {note.flagged_reason}
                                                 </div>
                                             )}
@@ -373,7 +373,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                                         <div className="flex shrink-0 flex-col items-end gap-1">
                                             <span className="text-[10px] font-medium text-muted-foreground">{new Date(note.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                             <span className="text-[10px] text-muted-foreground">{new Date(note.created_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })} · {formatRelativeTime(note.created_at)}</span>
-                                            <Button variant="ghost" size="sm" className={`h-6 gap-1 px-1.5 text-[10px] ${note.is_flagged ? 'text-red-600' : 'text-muted-foreground hover:text-red-600'}`}
+                                            <Button variant="ghost" size="sm" className={`h-6 gap-1 px-1.5 text-[10px] ${note.is_flagged ? 'text-status-critical' : 'text-muted-foreground hover:text-status-critical'}`}
                                                 onClick={() => toggleFlag(note.id)} title={note.is_flagged ? 'Unflag' : 'Flag'}>
                                                 <Flag className="h-3 w-3" /> {note.is_flagged ? 'Unflag' : 'Flag'}
                                             </Button>

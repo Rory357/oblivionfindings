@@ -54,12 +54,12 @@ export function EventTimeline({ reportedAt, occurredAt, closedAt, investigations
 
     // Event occurred
     if (occurredAt) {
-        entries.push({ date: occurredAt, label: 'Event occurred', icon: AlertTriangle, color: 'bg-red-500' });
+        entries.push({ date: occurredAt, label: 'Event occurred', icon: AlertTriangle, color: 'bg-status-critical' });
     }
 
     // Event reported
     if (reportedAt) {
-        entries.push({ date: reportedAt, label: 'Event reported', icon: Shield, color: 'bg-blue-500' });
+        entries.push({ date: reportedAt, label: 'Event reported', icon: Shield, color: 'bg-status-info' });
     }
 
     // Investigation milestones
@@ -92,7 +92,7 @@ export function EventTimeline({ reportedAt, occurredAt, closedAt, investigations
                 label: 'Action completed',
                 detail: `${action.reference_number} — ${action.title}`,
                 icon: ClipboardList,
-                color: 'bg-amber-500',
+                color: 'bg-status-warning',
             });
         }
         if (action.verified_at) {
@@ -101,14 +101,14 @@ export function EventTimeline({ reportedAt, occurredAt, closedAt, investigations
                 label: 'Action verified',
                 detail: action.reference_number,
                 icon: CheckCircle2,
-                color: 'bg-green-500',
+                color: 'bg-status-success',
             });
         }
     }
 
     // Event closed
     if (closedAt) {
-        entries.push({ date: closedAt, label: 'Event closed', icon: CheckCircle2, color: 'bg-slate-500' });
+        entries.push({ date: closedAt, label: 'Event closed', icon: CheckCircle2, color: 'bg-muted-foreground/80' });
     }
 
     // Sort chronologically

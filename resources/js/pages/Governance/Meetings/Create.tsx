@@ -72,7 +72,7 @@ export default function MeetingCreate({ auth, boardMembers, committees }: Props)
                     </SelectContent>
                   </Select>
                   {errors.meeting_type && (
-                    <p className="text-sm text-red-600">{errors.meeting_type}</p>
+                    <p className="text-sm text-status-critical">{errors.meeting_type}</p>
                   )}
                 </div>
 
@@ -85,7 +85,7 @@ export default function MeetingCreate({ auth, boardMembers, committees }: Props)
                     onChange={(e) => setData('title', e.target.value)}
                     placeholder="e.g., Monthly Board Meeting - March 2026"
                   />
-                  {errors.title && <p className="text-sm text-red-600">{errors.title}</p>}
+                  {errors.title && <p className="text-sm text-status-critical">{errors.title}</p>}
                 </div>
 
                 {/* Date & Time */}
@@ -99,7 +99,7 @@ export default function MeetingCreate({ auth, boardMembers, committees }: Props)
                       onChange={(e) => setData('scheduled_at', e.target.value)}
                     />
                     {errors.scheduled_at && (
-                      <p className="text-sm text-red-600">{errors.scheduled_at}</p>
+                      <p className="text-sm text-status-critical">{errors.scheduled_at}</p>
                     )}
                   </div>
                   <div className="space-y-2">

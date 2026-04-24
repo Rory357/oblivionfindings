@@ -116,12 +116,12 @@ export default function DocumentsIndex({ auth, documents, categories }: Props) {
             <Card key={doc.id}>
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <FileIcon className="w-5 h-5 text-blue-500" />
+                  <FileIcon className="w-5 h-5 text-status-info" />
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{doc.title}</span>
                       <Badge variant="outline" className="text-xs">{getCategoryLabel(doc.category)}</Badge>
-                      {doc.is_confidential && <Badge className="bg-red-100 text-red-800 text-xs">Confidential</Badge>}
+                      {doc.is_confidential && <Badge className="bg-status-critical-bg text-status-critical text-xs">Confidential</Badge>}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {doc.file_name} &middot; {formatBytes(doc.file_size)} &middot; v{doc.version} &middot; {new Date(doc.updated_at).toLocaleDateString('en-NZ')}

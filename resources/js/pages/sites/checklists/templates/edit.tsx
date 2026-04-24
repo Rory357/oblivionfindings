@@ -360,7 +360,7 @@ export default function EditTemplate({ template }: Props) {
                                                                 </Badge>
                                                             )}
                                                             {item.failure_creates_hazard && (
-                                                                <Badge className="text-xs bg-red-500/20 text-red-300 border-red-500/30">
+                                                                <Badge className="text-xs bg-status-critical-bg text-status-critical border-status-critical/30">
                                                                     Hazard on Fail
                                                                 </Badge>
                                                             )}
@@ -382,7 +382,7 @@ export default function EditTemplate({ template }: Props) {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-red-400 hover:text-red-300"
+                                                    className="text-status-critical hover:text-status-critical"
                                                     onClick={() => {
                                                         if (confirm('Remove this item?')) {
                                                             itemForm.delete(`/sites/checklists/templates/items/${item.id}`);

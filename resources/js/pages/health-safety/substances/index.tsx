@@ -49,13 +49,13 @@ type Props = {
 const statusColor = (status: string) => {
     switch (status) {
         case 'active':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'inactive':
             return 'bg-muted text-foreground';
         case 'pending_review':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'restricted':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         default:
             return 'bg-muted text-foreground';
     }

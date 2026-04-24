@@ -130,7 +130,7 @@ export default function Holidays({ holidays, year, can }: Props) {
                                         required
                                     />
                                     {form.errors.name && (
-                                        <p className="mt-1 text-xs text-red-400">{form.errors.name}</p>
+                                        <p className="mt-1 text-xs text-status-critical">{form.errors.name}</p>
                                     )}
                                 </div>
                                 <div className="w-48">
@@ -143,7 +143,7 @@ export default function Holidays({ holidays, year, can }: Props) {
                                         required
                                     />
                                     {form.errors.date && (
-                                        <p className="mt-1 text-xs text-red-400">{form.errors.date}</p>
+                                        <p className="mt-1 text-xs text-status-critical">{form.errors.date}</p>
                                     )}
                                 </div>
                                 <div className="w-48">
@@ -225,7 +225,7 @@ export default function Holidays({ holidays, year, can }: Props) {
                                                 {holiday.is_national ? (
                                                     <Badge
                                                         variant="outline"
-                                                        className="border-blue-500/30 bg-blue-500/10 text-blue-400"
+                                                        className="border-status-info/30 bg-status-info-bg text-status-info"
                                                     >
                                                         <Globe className="mr-1 h-3 w-3" />
                                                         National
@@ -233,7 +233,7 @@ export default function Holidays({ holidays, year, can }: Props) {
                                                 ) : (
                                                     <Badge
                                                         variant="outline"
-                                                        className="border-amber-500/30 bg-amber-500/10 text-amber-400"
+                                                        className="border-status-warning/30 bg-status-warning-bg text-status-warning"
                                                     >
                                                         <MapPin className="mr-1 h-3 w-3" />
                                                         Regional
@@ -246,7 +246,7 @@ export default function Holidays({ holidays, year, can }: Props) {
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleDelete(holiday.id)}
-                                                        className="text-red-400 hover:text-red-300"
+                                                        className="text-status-critical hover:text-status-critical"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>

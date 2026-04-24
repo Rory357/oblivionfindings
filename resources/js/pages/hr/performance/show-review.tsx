@@ -71,9 +71,9 @@ export default function ShowReview({ review, can }: Props) {
         switch (status) {
             case 'completed':
             case 'signed_off':
-                return 'bg-green-100 text-green-800 border-green-200';
+                return 'bg-status-success-bg text-status-success border-status-success/30';
             case 'in_progress':
-                return 'bg-blue-100 text-blue-800 border-blue-200';
+                return 'bg-status-info-bg text-status-info border-status-info/30';
             case 'draft':
                 return 'bg-muted text-foreground border-border';
             default:
@@ -88,7 +88,7 @@ export default function ShowReview({ review, can }: Props) {
                 {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                         key={star}
-                        className={`h-5 w-5 ${star <= rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
+                        className={`h-5 w-5 ${star <= rating ? 'fill-amber-400 text-status-warning' : 'text-foreground'}`}
                     />
                 ))}
                 <span className="ml-2 text-sm text-muted-foreground">

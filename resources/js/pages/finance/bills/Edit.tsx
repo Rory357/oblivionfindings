@@ -223,7 +223,7 @@ export default function BillEdit({ auth, bill, vendors, accounts, costCentres, f
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.vendor_id && <p className="text-sm text-red-600 mt-1">{errors.vendor_id}</p>}
+                                    {errors.vendor_id && <p className="text-sm text-status-critical mt-1">{errors.vendor_id}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="vendor_reference">Vendor Reference</Label>
@@ -258,7 +258,7 @@ export default function BillEdit({ auth, bill, vendors, accounts, costCentres, f
                                         value={data.bill_date}
                                         onChange={(e) => setData('bill_date', e.target.value)}
                                     />
-                                    {errors.bill_date && <p className="text-sm text-red-600 mt-1">{errors.bill_date}</p>}
+                                    {errors.bill_date && <p className="text-sm text-status-critical mt-1">{errors.bill_date}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="due_date">Due Date *</Label>
@@ -268,7 +268,7 @@ export default function BillEdit({ auth, bill, vendors, accounts, costCentres, f
                                         value={data.due_date}
                                         onChange={(e) => setData('due_date', e.target.value)}
                                     />
-                                    {errors.due_date && <p className="text-sm text-red-600 mt-1">{errors.due_date}</p>}
+                                    {errors.due_date && <p className="text-sm text-status-critical mt-1">{errors.due_date}</p>}
                                 </div>
                             </div>
                             <div className="mt-4">
@@ -294,7 +294,7 @@ export default function BillEdit({ auth, bill, vendors, accounts, costCentres, f
                             </Button>
                         </CardHeader>
                         <CardContent>
-                            {errors.lines && <p className="text-sm text-red-600 mb-2">{errors.lines}</p>}
+                            {errors.lines && <p className="text-sm text-status-critical mb-2">{errors.lines}</p>}
                             <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
@@ -322,7 +322,7 @@ export default function BillEdit({ auth, bill, vendors, accounts, costCentres, f
                                                         className="min-w-[180px]"
                                                     />
                                                     {errors[`lines.${index}.description` as keyof typeof errors] && (
-                                                        <p className="text-xs text-red-600">{errors[`lines.${index}.description` as keyof typeof errors]}</p>
+                                                        <p className="text-xs text-status-critical">{errors[`lines.${index}.description` as keyof typeof errors]}</p>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
@@ -421,7 +421,7 @@ export default function BillEdit({ auth, bill, vendors, accounts, costCentres, f
                                                         onClick={() => removeLine(index)}
                                                         disabled={data.lines.length <= 1}
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                                        <Trash2 className="w-4 h-4 text-status-critical" />
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>

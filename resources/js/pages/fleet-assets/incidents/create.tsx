@@ -56,10 +56,10 @@ const INCIDENT_TYPES = [
 ];
 
 const SEVERITY_LEVELS = [
-    { value: 'minor', label: 'Minor', color: 'border-yellow-500 bg-yellow-50 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-600' },
-    { value: 'moderate', label: 'Moderate', color: 'border-orange-500 bg-orange-50 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-600' },
-    { value: 'major', label: 'Major', color: 'border-red-500 bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600' },
-    { value: 'critical', label: 'Critical', color: 'border-red-700 bg-red-100 text-red-900 dark:bg-red-950/50 dark:text-red-300 dark:border-red-700' },
+    { value: 'minor', label: 'Minor', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30' },
+    { value: 'moderate', label: 'Moderate', color: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30' },
+    { value: 'major', label: 'Major', color: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30' },
+    { value: 'critical', label: 'Critical', color: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30' },
 ];
 
 const DAMAGE_AREAS = [
@@ -374,7 +374,7 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
                                     <div className="font-medium">Police Notified</div>
                                     <div className="text-xs text-muted-foreground">Has the police been notified about this incident?</div>
                                 </Label>
-                                <button type="button" onClick={() => form.setData('police_notified', !form.data.police_notified)} className={cn("h-7 w-12 rounded-full transition-colors", form.data.police_notified ? "bg-primary" : "bg-slate-300")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data.police_notified ? "translate-x-6" : "translate-x-1")} /></button>
+                                <button type="button" onClick={() => form.setData('police_notified', !form.data.police_notified)} className={cn("h-7 w-12 rounded-full transition-colors", form.data.police_notified ? "bg-primary" : "bg-muted")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data.police_notified ? "translate-x-6" : "translate-x-1")} /></button>
                             </div>
                             {form.data.police_notified && (
                                 <div className="ml-4">
@@ -392,7 +392,7 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
                                     <div className="font-medium">Insurance Claim</div>
                                     <div className="text-xs text-muted-foreground">Has an insurance claim been lodged?</div>
                                 </Label>
-                                <button type="button" onClick={() => form.setData('insurance_claimed', !form.data.insurance_claimed)} className={cn("h-7 w-12 rounded-full transition-colors", form.data.insurance_claimed ? "bg-primary" : "bg-slate-300")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data.insurance_claimed ? "translate-x-6" : "translate-x-1")} /></button>
+                                <button type="button" onClick={() => form.setData('insurance_claimed', !form.data.insurance_claimed)} className={cn("h-7 w-12 rounded-full transition-colors", form.data.insurance_claimed ? "bg-primary" : "bg-muted")}><span className={cn("block h-5 w-5 rounded-full bg-white shadow transition-transform", form.data.insurance_claimed ? "translate-x-6" : "translate-x-1")} /></button>
                             </div>
                             {form.data.insurance_claimed && (
                                 <div className="ml-4">

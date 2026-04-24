@@ -44,21 +44,21 @@ interface Props extends PageProps {
 export default function ComplianceIndex({ auth, obligations, summary, frameworks }: Props) {
   const getStatusColor = (status: string) => {
     return {
-      complete: 'bg-green-100 text-green-800',
-      not_due: 'bg-blue-100 text-blue-800',
-      due_soon: 'bg-yellow-100 text-yellow-800',
-      overdue: 'bg-red-100 text-red-800',
+      complete: 'bg-status-success-bg text-status-success',
+      not_due: 'bg-status-info-bg text-status-info',
+      due_soon: 'bg-status-warning-bg text-status-warning',
+      overdue: 'bg-status-critical-bg text-status-critical',
     }[status] || 'bg-muted text-foreground';
   };
 
   const getFrameworkColor = (framework: string) => {
     const colors: Record<string, string> = {
-      charities: 'bg-blue-500',
-      nga_paerewa: 'bg-green-500',
+      charities: 'bg-status-info',
+      nga_paerewa: 'bg-status-success',
       privacy_act: 'bg-primary',
-      hswa: 'bg-orange-500',
+      hswa: 'bg-status-warning',
     };
-    return colors[framework] || 'bg-gray-500';
+    return colors[framework] || 'bg-muted-foreground/80';
   };
 
   const formatDate = (dateString: string) => {
@@ -107,9 +107,9 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Overdue</p>
-                    <p className="text-3xl font-bold text-red-600">{summary.total_overdue}</p>
+                    <p className="text-3xl font-bold text-status-critical">{summary.total_overdue}</p>
                   </div>
-                  <AlertTriangle className="w-8 h-8 text-red-500" />
+                  <AlertTriangle className="w-8 h-8 text-status-critical" />
                 </div>
               </CardContent>
             </Card>
@@ -118,9 +118,9 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Due Soon (30d)</p>
-                    <p className="text-3xl font-bold text-yellow-600">{summary.total_due_soon}</p>
+                    <p className="text-3xl font-bold text-status-warning">{summary.total_due_soon}</p>
                   </div>
-                  <Clock className="w-8 h-8 text-yellow-500" />
+                  <Clock className="w-8 h-8 text-status-warning" />
                 </div>
               </CardContent>
             </Card>
@@ -129,9 +129,9 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Next 30 Days</p>
-                    <p className="text-3xl font-bold text-blue-600">{summary.next_30_days.length}</p>
+                    <p className="text-3xl font-bold text-status-info">{summary.next_30_days.length}</p>
                   </div>
-                  <Calendar className="w-8 h-8 text-blue-500" />
+                  <Calendar className="w-8 h-8 text-status-info" />
                 </div>
               </CardContent>
             </Card>
@@ -140,7 +140,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Compliance Rate</p>
-                    <p className="text-3xl font-bold text-green-600">
+                    <p className="text-3xl font-bold text-status-success">
                       {(() => {
                         const total = Object.values(summary.by_framework).reduce((a, f) => a + f.total, 0);
                         const complete = Object.values(summary.by_framework).reduce((a, f) => a + f.complete, 0);
@@ -148,7 +148,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                       })()}%
                   </p>
                   </div>
-                  <FileCheck className="w-8 h-8 text-green-500" />
+                  <FileCheck className="w-8 h-8 text-status-success" />
                 </div>
               </CardContent>
             </Card>
@@ -176,7 +176,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                           <Badge variant="destructive">{data.overdue} overdue</Badge>
                         )}
                         {data.due_soon > 0 && (
-                          <Badge className="bg-yellow-100 text-yellow-800">{data.due_soon} due soon</Badge>
+                          <Badge className="bg-status-warning-bg text-status-warning">{data.due_soon} due soon</Badge>
                         )}
                       </div>
                     </div>
@@ -198,20 +198,20 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                     key={obligation.id}
                     className={cn(
                       "flex items-center justify-between p-4 rounded-lg border",
-                      obligation.status === 'overdue' && "bg-red-50 border-red-200",
-                      obligation.status === 'due_soon' && "bg-yellow-50 border-yellow-200"
+                      obligation.status === 'overdue' && "bg-status-critical-bg border-status-critical/30",
+                      obligation.status === 'due_soon' && "bg-status-warning-bg border-status-warning/30"
                     )}
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <Link
                           href={showCompliance.url({ obligation: obligation.id })}
-                          className="font-semibold text-foreground hover:text-blue-600"
+                          className="font-semibold text-foreground hover:text-status-info"
                         >
                           {obligation.obligation_title}
                         </Link>
                         {obligation.evidence_provided && (
-                          <Badge variant="outline" className="text-green-600">
+                          <Badge variant="outline" className="text-status-success">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             Evidence
                           </Badge>

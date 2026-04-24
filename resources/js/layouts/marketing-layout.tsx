@@ -33,7 +33,7 @@ const MarketingLayout: React.FC<MarketingLayoutProps> = ({
                 <div className="pointer-events-none fixed inset-0 -z-10">
                     <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background" />
                     <div className="absolute top-0 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/5" />
-                    <div className="absolute right-1/4 bottom-0 h-[400px] w-[400px] rounded-full bg-emerald-500/5 blur-3xl dark:bg-emerald-500/5" />
+                    <div className="absolute right-1/4 bottom-0 h-[400px] w-[400px] rounded-full bg-status-success blur-3xl dark:bg-status-success" />
                 </div>
 
                 {/* Page container */}

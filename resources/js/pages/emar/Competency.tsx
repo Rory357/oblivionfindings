@@ -25,11 +25,11 @@ type Props = {
 };
 
 const statusConfig: Record<string, { icon: any; color: string }> = {
-    passed: { icon: CheckCircle, color: 'text-green-600' },
-    failed: { icon: XCircle, color: 'text-red-600' },
-    pending: { icon: Clock, color: 'text-amber-600' },
-    in_progress: { icon: Clock, color: 'text-blue-600' },
-    expired: { icon: AlertTriangle, color: 'text-red-600' },
+    passed: { icon: CheckCircle, color: 'text-status-success' },
+    failed: { icon: XCircle, color: 'text-status-critical' },
+    pending: { icon: Clock, color: 'text-status-warning' },
+    in_progress: { icon: Clock, color: 'text-status-info' },
+    expired: { icon: AlertTriangle, color: 'text-status-critical' },
 };
 
 const competencyFields = [
@@ -124,7 +124,7 @@ function NewAssessmentDialog({ staff, staffWithoutAssessment }: { staff: Props['
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {form.errors.user_id && <p className="text-sm text-red-600">{form.errors.user_id}</p>}
+                            {form.errors.user_id && <p className="text-sm text-status-critical">{form.errors.user_id}</p>}
                         </div>
 
                         <div className="space-y-2">
@@ -138,19 +138,19 @@ function NewAssessmentDialog({ staff, staffWithoutAssessment }: { staff: Props['
                                     <SelectItem value="remedial">Remedial</SelectItem>
                                 </SelectContent>
                             </Select>
-                            {form.errors.assessment_type && <p className="text-sm text-red-600">{form.errors.assessment_type}</p>}
+                            {form.errors.assessment_type && <p className="text-sm text-status-critical">{form.errors.assessment_type}</p>}
                         </div>
 
                         <div className="space-y-2">
                             <Label>Assessment Date</Label>
                             <Input type="date" value={form.data.assessment_date} onChange={(e) => form.setData('assessment_date', e.target.value)} />
-                            {form.errors.assessment_date && <p className="text-sm text-red-600">{form.errors.assessment_date}</p>}
+                            {form.errors.assessment_date && <p className="text-sm text-status-critical">{form.errors.assessment_date}</p>}
                         </div>
 
                         <div className="space-y-2">
                             <Label>Expiry Date</Label>
                             <Input type="date" value={form.data.expiry_date} onChange={(e) => form.setData('expiry_date', e.target.value)} />
-                            {form.errors.expiry_date && <p className="text-sm text-red-600">{form.errors.expiry_date}</p>}
+                            {form.errors.expiry_date && <p className="text-sm text-status-critical">{form.errors.expiry_date}</p>}
                         </div>
                     </div>
 
@@ -281,7 +281,7 @@ function EditAssessmentDialog({ assessment, staff, staffWithoutAssessment, open,
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {form.errors.user_id && <p className="text-sm text-red-600">{form.errors.user_id}</p>}
+                            {form.errors.user_id && <p className="text-sm text-status-critical">{form.errors.user_id}</p>}
                         </div>
 
                         <div className="space-y-2">
@@ -295,19 +295,19 @@ function EditAssessmentDialog({ assessment, staff, staffWithoutAssessment, open,
                                     <SelectItem value="remedial">Remedial</SelectItem>
                                 </SelectContent>
                             </Select>
-                            {form.errors.assessment_type && <p className="text-sm text-red-600">{form.errors.assessment_type}</p>}
+                            {form.errors.assessment_type && <p className="text-sm text-status-critical">{form.errors.assessment_type}</p>}
                         </div>
 
                         <div className="space-y-2">
                             <Label>Assessment Date</Label>
                             <Input type="date" value={form.data.assessment_date} onChange={(e) => form.setData('assessment_date', e.target.value)} />
-                            {form.errors.assessment_date && <p className="text-sm text-red-600">{form.errors.assessment_date}</p>}
+                            {form.errors.assessment_date && <p className="text-sm text-status-critical">{form.errors.assessment_date}</p>}
                         </div>
 
                         <div className="space-y-2">
                             <Label>Expiry Date</Label>
                             <Input type="date" value={form.data.expiry_date} onChange={(e) => form.setData('expiry_date', e.target.value)} />
-                            {form.errors.expiry_date && <p className="text-sm text-red-600">{form.errors.expiry_date}</p>}
+                            {form.errors.expiry_date && <p className="text-sm text-status-critical">{form.errors.expiry_date}</p>}
                         </div>
                     </div>
 
@@ -398,13 +398,13 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-700 dark:bg-red-900/40"><XCircle className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical dark:bg-status-critical"><XCircle className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{expired.length}</p><p className="text-xs text-muted-foreground">Expired Assessments</p></div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40"><Clock className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning"><Clock className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{expiringSoon.length}</p><p className="text-xs text-muted-foreground">Expiring Within 30 Days</p></div>
                         </CardContent>
                     </Card>
@@ -474,8 +474,8 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                                                     <td className="p-3 text-xs">{a.assessor?.name ?? '—'}</td>
                                                     <td className="p-3">
                                                         <div className="flex gap-1">
-                                                            {a.can_administer_unsupervised && <Badge className="bg-green-100 text-green-700 text-[10px]">Unsupervised</Badge>}
-                                                            {a.can_witness_controlled && <Badge className="bg-blue-100 text-blue-700 text-[10px]">CD Witness</Badge>}
+                                                            {a.can_administer_unsupervised && <Badge className="bg-status-success-bg text-status-success text-[10px]">Unsupervised</Badge>}
+                                                            {a.can_witness_controlled && <Badge className="bg-status-info-bg text-status-info text-[10px]">CD Witness</Badge>}
                                                         </div>
                                                     </td>
                                                     {canManageCompetency && (
@@ -484,7 +484,7 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                                                                 <Button size="icon" variant="ghost" onClick={() => openEditAssessment(a)}>
                                                                     <Pencil className="h-3.5 w-3.5" />
                                                                 </Button>
-                                                                <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteAssessment(a.id)}>
+                                                                <Button size="icon" variant="ghost" className="text-status-critical hover:text-status-critical" onClick={() => deleteAssessment(a.id)}>
                                                                     <Trash2 className="h-3.5 w-3.5" />
                                                                 </Button>
                                                             </div>
@@ -509,10 +509,10 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                                             <span className="font-medium">{a.user?.name}</span>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm">
-                                                    Expires: <span className="font-medium text-amber-600">{a.expiry_date ? new Date(a.expiry_date).toLocaleDateString('en-NZ') : '—'}</span>
+                                                    Expires: <span className="font-medium text-status-warning">{a.expiry_date ? new Date(a.expiry_date).toLocaleDateString('en-NZ') : '—'}</span>
                                                 </span>
                                                 {canManageCompetency && (
-                                                    <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteAssessment(a.id)}>
+                                                    <Button size="sm" variant="ghost" className="text-status-critical hover:text-status-critical" onClick={() => deleteAssessment(a.id)}>
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 )}

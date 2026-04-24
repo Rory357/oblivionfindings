@@ -120,7 +120,7 @@ export default function CreateSite() {
                                 })}
                             </div>
                             <input type="hidden" name="type" value={data.type} />
-                            {errors.type && <div className="mt-2 text-sm text-red-400">{errors.type}</div>}
+                            {errors.type && <div className="mt-2 text-sm text-status-critical">{errors.type}</div>}
                         </CardContent>
                     </Card>
 
@@ -138,7 +138,7 @@ export default function CreateSite() {
                                     onChange={(e) => setData('name', e.target.value)}
                                     className="mt-1"
                                 />
-                                {errors.name && <div className="mt-1 text-sm text-red-400">{errors.name}</div>}
+                                {errors.name && <div className="mt-1 text-sm text-status-critical">{errors.name}</div>}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -342,7 +342,7 @@ export default function CreateSite() {
                     {/* Risk Flags */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-amber-400">
+                            <CardTitle className="flex items-center gap-2 text-status-warning">
                                 <AlertTriangle className="w-5 h-5" />
                                 Risk Assessment
                             </CardTitle>

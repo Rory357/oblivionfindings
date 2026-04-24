@@ -239,9 +239,9 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
                                                     <td className="px-4 py-3 text-center">
                                                         <Badge className={
                                                             entry.status === 'sent' || entry.status === 'delivered'
-                                                                ? 'bg-green-100 text-green-800'
+                                                                ? 'bg-status-success-bg text-status-success'
                                                                 : entry.status === 'failed'
-                                                                  ? 'bg-red-100 text-red-800'
+                                                                  ? 'bg-status-critical-bg text-status-critical'
                                                                   : 'bg-muted text-foreground'
                                                         }>
                                                             {entry.status ?? 'unknown'}

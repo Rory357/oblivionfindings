@@ -137,24 +137,24 @@ type Props = {
 const statusBadge = (status: string) => {
     switch (status) {
         case 'active':
-            return <Badge className="bg-green-100 text-green-800 border-green-200">{status}</Badge>;
+            return <Badge className="bg-status-success-bg text-status-success border-status-success/30">{status}</Badge>;
         case 'completed':
         case 'closed':
             return <Badge className="bg-muted text-foreground border-border">{status}</Badge>;
         case 'scheduled':
         case 'pending':
-            return <Badge className="bg-blue-100 text-blue-800 border-blue-200">{status}</Badge>;
+            return <Badge className="bg-status-info-bg text-status-info border-status-info/30">{status}</Badge>;
         case 'in_progress':
         case 'open':
-            return <Badge className="bg-amber-100 text-amber-800 border-amber-200">{status}</Badge>;
+            return <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">{status}</Badge>;
         case 'feedback_received':
             return <Badge className="bg-primary/10 text-primary border-primary">feedback received</Badge>;
         case 'actioned':
-            return <Badge className="bg-teal-100 text-teal-800 border-teal-200">actioned</Badge>;
+            return <Badge className="bg-status-info-bg text-status-info border-status-info/30">actioned</Badge>;
         case 'inactive':
         case 'expired':
         case 'cancelled':
-            return <Badge className="bg-red-100 text-red-800 border-red-200">{status}</Badge>;
+            return <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">{status}</Badge>;
         default:
             return <Badge className="bg-muted text-foreground border-border">{status}</Badge>;
     }
@@ -187,16 +187,16 @@ const consultationTypeLabel: Record<string, string> = {
 };
 
 const consultationTypeColor: Record<string, string> = {
-    hazard_identified: 'bg-red-100 text-red-800 border-red-200',
-    risk_assessment: 'bg-amber-100 text-amber-800 border-amber-200',
-    procedure_change: 'bg-blue-100 text-blue-800 border-blue-200',
+    hazard_identified: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    risk_assessment: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    procedure_change: 'bg-status-info-bg text-status-info border-status-info/30',
     policy_change: 'bg-primary/10 text-primary border-primary',
-    equipment_change: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    equipment_change: 'bg-status-info-bg text-status-info border-status-info/30',
     other: 'bg-muted text-foreground border-border',
     general: 'bg-muted text-foreground border-border',
     workplace_change: 'bg-primary/10 text-primary border-primary',
-    ppe: 'bg-orange-100 text-orange-800 border-orange-200',
-    training: 'bg-teal-100 text-teal-800 border-teal-200',
+    ppe: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    training: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
 const formatDate = (d: string) => {
@@ -250,9 +250,9 @@ function ConsultationProgressBar({ status }: { status: string }) {
                             <div
                                 className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors ${
                                     isCompleted
-                                        ? 'bg-green-500 text-white'
+                                        ? 'bg-status-success text-white'
                                         : isCurrent
-                                          ? 'bg-blue-500 text-white'
+                                          ? 'bg-status-info text-white'
                                           : 'bg-muted text-muted-foreground'
                                 }`}
                             >
@@ -264,7 +264,7 @@ function ConsultationProgressBar({ status }: { status: string }) {
                             </div>
                             <span
                                 className={`mt-1 text-[10px] leading-tight text-center ${
-                                    isCurrent ? 'font-semibold text-blue-700' : 'text-muted-foreground'
+                                    isCurrent ? 'font-semibold text-status-info' : 'text-muted-foreground'
                                 }`}
                             >
                                 {CONSULTATION_STEP_LABELS[step]}
@@ -273,7 +273,7 @@ function ConsultationProgressBar({ status }: { status: string }) {
                         {idx < CONSULTATION_STEPS.length - 1 && (
                             <div
                                 className={`h-0.5 flex-1 rounded-full mb-4 ${
-                                    isCompleted ? 'bg-green-400' : 'bg-muted'
+                                    isCompleted ? 'bg-status-success' : 'bg-muted'
                                 }`}
                             />
                         )}
@@ -289,11 +289,11 @@ function ConsultationProgressBar({ status }: { status: string }) {
 /* ------------------------------------------------------------------ */
 
 const consultationTypes = [
-    { value: 'hazard_identified', label: 'Hazard Identified', icon: AlertTriangle, color: 'text-red-600 bg-red-50 border-red-200' },
-    { value: 'risk_assessment', label: 'Risk Assessment', icon: ShieldCheck, color: 'text-amber-600 bg-amber-50 border-amber-200' },
-    { value: 'procedure_change', label: 'Procedure Change', icon: ClipboardList, color: 'text-blue-600 bg-blue-50 border-blue-200' },
+    { value: 'hazard_identified', label: 'Hazard Identified', icon: AlertTriangle, color: 'text-status-critical bg-status-critical-bg border-status-critical/30' },
+    { value: 'risk_assessment', label: 'Risk Assessment', icon: ShieldCheck, color: 'text-status-warning bg-status-warning-bg border-status-warning/30' },
+    { value: 'procedure_change', label: 'Procedure Change', icon: ClipboardList, color: 'text-status-info bg-status-info-bg border-status-info/30' },
     { value: 'policy_change', label: 'Policy Change', icon: FileText, color: 'text-primary bg-primary/10 border-primary' },
-    { value: 'equipment_change', label: 'Equipment Change', icon: Building2, color: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
+    { value: 'equipment_change', label: 'Equipment Change', icon: Building2, color: 'text-status-info bg-status-info-bg border-status-info/30' },
     { value: 'other', label: 'Other', icon: MessageSquare, color: 'text-muted-foreground bg-muted border-border' },
 ] as const;
 
@@ -717,27 +717,27 @@ export default function WorkerParticipationIndex({
             label: 'Active Representatives',
             value: stats.active_reps,
             icon: Users,
-            bg: 'bg-blue-50',
-            iconColor: 'text-blue-600',
-            borderColor: stats.active_reps > 0 ? 'border-blue-200' : 'border-border',
+            bg: 'bg-status-info-bg',
+            iconColor: 'text-status-info',
+            borderColor: stats.active_reps > 0 ? 'border-status-info/30' : 'border-border',
             tab: 'representatives',
         },
         {
             label: 'Active Committees',
             value: stats.active_committees,
             icon: Building2,
-            bg: 'bg-green-50',
-            iconColor: 'text-green-600',
-            borderColor: stats.active_committees > 0 ? 'border-green-200' : 'border-border',
+            bg: 'bg-status-success-bg',
+            iconColor: 'text-status-success',
+            borderColor: stats.active_committees > 0 ? 'border-status-success/30' : 'border-border',
             tab: 'meetings',
         },
         {
             label: 'Meetings This Month',
             value: stats.meetings_this_month,
             icon: CalendarDays,
-            bg: 'bg-amber-50',
-            iconColor: 'text-amber-600',
-            borderColor: stats.meetings_this_month > 0 ? 'border-amber-200' : 'border-border',
+            bg: 'bg-status-warning-bg',
+            iconColor: 'text-status-warning',
+            borderColor: stats.meetings_this_month > 0 ? 'border-status-warning/30' : 'border-border',
             tab: 'meetings',
         },
         {
@@ -822,7 +822,7 @@ export default function WorkerParticipationIndex({
                                 <CardHeader>
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2 text-base">
-                                            <ShieldCheck className="h-5 w-5 text-blue-600" />
+                                            <ShieldCheck className="h-5 w-5 text-status-info" />
                                             H&S Representatives
                                         </CardTitle>
                                         {can_manage && (
@@ -836,8 +836,8 @@ export default function WorkerParticipationIndex({
                                 <CardContent>
                                     {representatives.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-12 text-center">
-                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 mb-4">
-                                                <ShieldCheck className="h-7 w-7 text-blue-500" />
+                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-info-bg mb-4">
+                                                <ShieldCheck className="h-7 w-7 text-status-info" />
                                             </div>
                                             <h3 className="text-sm font-semibold text-foreground">
                                                 No H&S representatives yet
@@ -863,7 +863,7 @@ export default function WorkerParticipationIndex({
                                                         <CardContent className="pt-5 space-y-3">
                                                             <div className="flex items-start justify-between">
                                                                 <div className="flex items-center gap-3">
-                                                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                                                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-bg text-sm font-semibold text-status-info">
                                                                         {(rep.user?.name ?? 'U').charAt(0).toUpperCase()}
                                                                     </div>
                                                                     <div>
@@ -912,10 +912,10 @@ export default function WorkerParticipationIndex({
                                                                     <div
                                                                         className={`h-1.5 rounded-full transition-all ${
                                                                             pct >= 100
-                                                                                ? 'bg-green-500'
+                                                                                ? 'bg-status-success'
                                                                                 : pct >= 60
-                                                                                  ? 'bg-blue-500'
-                                                                                  : 'bg-amber-500'
+                                                                                  ? 'bg-status-info'
+                                                                                  : 'bg-status-warning'
                                                                         }`}
                                                                         style={{ width: `${pct}%` }}
                                                                     />
@@ -939,7 +939,7 @@ export default function WorkerParticipationIndex({
                                 <CardHeader>
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2 text-base">
-                                            <CalendarDays className="h-5 w-5 text-amber-600" />
+                                            <CalendarDays className="h-5 w-5 text-status-warning" />
                                             Committee Meetings
                                         </CardTitle>
                                         {can_manage && (
@@ -962,12 +962,12 @@ export default function WorkerParticipationIndex({
                                 <CardContent>
                                     {/* Success notification */}
                                     {meetingSuccessMessage && (
-                                        <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                                        <div className="mb-4 flex items-center gap-2 rounded-lg border border-status-success/30 bg-status-success-bg p-3 text-sm text-status-success">
                                             <CheckCircle2 className="h-4 w-4 shrink-0" />
                                             {meetingSuccessMessage}
                                             <button
                                                 type="button"
-                                                className="ml-auto text-green-600 hover:text-green-800"
+                                                className="ml-auto text-status-success hover:text-status-success"
                                                 onClick={() => setMeetingSuccessMessage(null)}
                                             >
                                                 <XCircle className="h-4 w-4" />
@@ -977,9 +977,9 @@ export default function WorkerParticipationIndex({
 
                                     {/* No committee warning */}
                                     {committees.length === 0 && (
-                                        <div className="mb-4 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-200 bg-amber-50 py-8 text-center">
-                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 mb-4">
-                                                <Building2 className="h-7 w-7 text-amber-600" />
+                                        <div className="mb-4 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-status-warning/30 bg-status-warning-bg py-8 text-center">
+                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg mb-4">
+                                                <Building2 className="h-7 w-7 text-status-warning" />
                                             </div>
                                             <h3 className="text-sm font-semibold text-foreground">
                                                 You need to create an H&S Committee before scheduling meetings
@@ -999,8 +999,8 @@ export default function WorkerParticipationIndex({
 
                                     {committees.length > 0 && meetings.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border py-12 text-center">
-                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 mb-4">
-                                                <CalendarDays className="h-7 w-7 text-amber-500" />
+                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg mb-4">
+                                                <CalendarDays className="h-7 w-7 text-status-warning" />
                                             </div>
                                             <h3 className="text-sm font-semibold text-foreground">
                                                 No meetings scheduled
@@ -1078,9 +1078,9 @@ export default function WorkerParticipationIndex({
                                                                             className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
                                                                         >
                                                                             {att.confirmed ? (
-                                                                                <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                                                                <CheckCircle2 className="h-3 w-3 text-status-success" />
                                                                             ) : (
-                                                                                <Clock className="h-3 w-3 text-amber-500" />
+                                                                                <Clock className="h-3 w-3 text-status-warning" />
                                                                             )}
                                                                             {att.name}
                                                                         </div>
@@ -1092,13 +1092,13 @@ export default function WorkerParticipationIndex({
                                                         {/* Minutes document */}
                                                         {meeting.minutes_document_name && (
                                                             <div className="flex items-center gap-2 rounded-lg border bg-muted p-2.5 text-xs">
-                                                                <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                                                                <FileText className="h-4 w-4 text-status-info shrink-0" />
                                                                 <span className="font-medium truncate flex-1">
                                                                     {meeting.minutes_document_name}
                                                                 </span>
                                                                 <a
                                                                     href={`/health-safety/worker-participation/meetings/${meeting.id}/minutes/download`}
-                                                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium shrink-0"
+                                                                    className="flex items-center gap-1 text-status-info hover:text-status-info font-medium shrink-0"
                                                                 >
                                                                     <Download className="h-3.5 w-3.5" />
                                                                     Download
@@ -1119,7 +1119,7 @@ export default function WorkerParticipationIndex({
                                                                             className="flex items-start gap-2 rounded-lg border bg-white p-2.5 text-xs"
                                                                         >
                                                                             <CheckCircle2 className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${
-                                                                                item.status === 'completed' ? 'text-green-500' : 'text-slate-300'
+                                                                                item.status === 'completed' ? 'text-status-success' : 'text-muted-foreground'
                                                                             }`} />
                                                                             <div className="flex-1 min-w-0">
                                                                                 <div className="font-medium">{item.description}</div>
@@ -1181,7 +1181,7 @@ export default function WorkerParticipationIndex({
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline"
-                                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                            className="text-status-critical hover:text-status-critical hover:bg-status-critical-bg"
                                                                             onClick={() => setCancelMeetingId(meeting.id)}
                                                                         >
                                                                             <XCircle className="mr-1.5 h-3.5 w-3.5" />
@@ -1335,17 +1335,17 @@ export default function WorkerParticipationIndex({
 
                                                         {/* Outcome */}
                                                         {c.outcome && (
-                                                            <div className="text-xs bg-teal-50 rounded-lg p-3">
-                                                                <span className="font-semibold text-teal-700">Outcome: </span>
-                                                                <span className="text-teal-900">{c.outcome}</span>
+                                                            <div className="text-xs bg-status-info-bg rounded-lg p-3">
+                                                                <span className="font-semibold text-status-info">Outcome: </span>
+                                                                <span className="text-status-info">{c.outcome}</span>
                                                             </div>
                                                         )}
 
                                                         {/* Changes made */}
                                                         {c.changes_made && (
-                                                            <div className="text-xs bg-green-50 rounded-lg p-3">
-                                                                <span className="font-semibold text-green-700">Changes Made: </span>
-                                                                <span className="text-green-900">{c.changes_made}</span>
+                                                            <div className="text-xs bg-status-success-bg rounded-lg p-3">
+                                                                <span className="font-semibold text-status-success">Changes Made: </span>
+                                                                <span className="text-status-success">{c.changes_made}</span>
                                                             </div>
                                                         )}
 
@@ -1363,8 +1363,8 @@ export default function WorkerParticipationIndex({
                                                                 <div className="space-y-2">
                                                                     {c.document_name && (
                                                                         <div className="flex items-center gap-3 rounded-lg border bg-muted p-3">
-                                                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 shrink-0">
-                                                                                <FileText className="h-4.5 w-4.5 text-blue-600" />
+                                                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info-bg shrink-0">
+                                                                                <FileText className="h-4.5 w-4.5 text-status-info" />
                                                                             </div>
                                                                             <div className="flex-1 min-w-0">
                                                                                 <div className="text-xs font-medium truncate">{c.document_name}</div>
@@ -1372,7 +1372,7 @@ export default function WorkerParticipationIndex({
                                                                             </div>
                                                                             <a
                                                                                 href={`/health-safety/worker-participation/consultations/${c.id}/documents/document`}
-                                                                                className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors shrink-0"
+                                                                                className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-status-info hover:text-status-info hover:bg-status-info-bg transition-colors shrink-0"
                                                                             >
                                                                                 <Download className="h-3.5 w-3.5" />
                                                                                 Download
@@ -1380,9 +1380,9 @@ export default function WorkerParticipationIndex({
                                                                         </div>
                                                                     )}
                                                                     {c.outcome_document_name && (
-                                                                        <div className="flex items-center gap-3 rounded-lg border bg-teal-50 p-3">
-                                                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 shrink-0">
-                                                                                <FileText className="h-4.5 w-4.5 text-teal-600" />
+                                                                        <div className="flex items-center gap-3 rounded-lg border bg-status-info-bg p-3">
+                                                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info-bg shrink-0">
+                                                                                <FileText className="h-4.5 w-4.5 text-status-info" />
                                                                             </div>
                                                                             <div className="flex-1 min-w-0">
                                                                                 <div className="text-xs font-medium truncate">{c.outcome_document_name}</div>
@@ -1390,7 +1390,7 @@ export default function WorkerParticipationIndex({
                                                                             </div>
                                                                             <a
                                                                                 href={`/health-safety/worker-participation/consultations/${c.id}/documents/outcome`}
-                                                                                className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-teal-600 hover:text-teal-800 hover:bg-teal-50 transition-colors shrink-0"
+                                                                                className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-status-info hover:text-status-info hover:bg-status-info-bg transition-colors shrink-0"
                                                                             >
                                                                                 <Download className="h-3.5 w-3.5" />
                                                                                 Download
@@ -1478,8 +1478,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-                                <UserPlus className="h-4 w-4 text-blue-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-info-bg">
+                                <UserPlus className="h-4 w-4 text-status-info" />
                             </div>
                             Add H&S Representative
                         </DialogTitle>
@@ -1493,7 +1493,7 @@ export default function WorkerParticipationIndex({
                             </h4>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="space-y-1.5">
-                                    <Label>Staff Member <span className="text-red-500">*</span></Label>
+                                    <Label>Staff Member <span className="text-status-critical">*</span></Label>
                                     <Select
                                         value={repForm.data.user_id || '__none__'}
                                         onValueChange={(v) =>
@@ -1513,11 +1513,11 @@ export default function WorkerParticipationIndex({
                                         </SelectContent>
                                     </Select>
                                     {repForm.errors.user_id && (
-                                        <p className="text-xs text-red-600">{repForm.errors.user_id}</p>
+                                        <p className="text-xs text-status-critical">{repForm.errors.user_id}</p>
                                     )}
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label>Site <span className="text-red-500">*</span></Label>
+                                    <Label>Site <span className="text-status-critical">*</span></Label>
                                     <Select
                                         value={repForm.data.site_id || '__none__'}
                                         onValueChange={(v) =>
@@ -1537,7 +1537,7 @@ export default function WorkerParticipationIndex({
                                         </SelectContent>
                                     </Select>
                                     {repForm.errors.site_id && (
-                                        <p className="text-xs text-red-600">{repForm.errors.site_id}</p>
+                                        <p className="text-xs text-status-critical">{repForm.errors.site_id}</p>
                                     )}
                                 </div>
                             </div>
@@ -1635,8 +1635,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
-                                <CalendarDays className="h-4 w-4 text-amber-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-warning-bg">
+                                <CalendarDays className="h-4 w-4 text-status-warning" />
                             </div>
                             Schedule Committee Meeting
                         </DialogTitle>
@@ -1644,9 +1644,9 @@ export default function WorkerParticipationIndex({
 
                     <div className="space-y-5">
                         {committees.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-200 bg-amber-50 py-8 text-center">
-                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 mb-4">
-                                    <Building2 className="h-7 w-7 text-amber-600" />
+                            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-status-warning/30 bg-status-warning-bg py-8 text-center">
+                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-warning-bg mb-4">
+                                    <Building2 className="h-7 w-7 text-status-warning" />
                                 </div>
                                 <h3 className="text-sm font-semibold text-foreground">
                                     Create a committee first before scheduling a meeting
@@ -1676,7 +1676,7 @@ export default function WorkerParticipationIndex({
 
                             {/* Committee select */}
                             <div className="space-y-1.5">
-                                <Label>Committee <span className="text-red-500">*</span></Label>
+                                <Label>Committee <span className="text-status-critical">*</span></Label>
                                 <Select
                                     value={meetingForm.data.committee_id || '__none__'}
                                     onValueChange={(v) =>
@@ -1696,26 +1696,26 @@ export default function WorkerParticipationIndex({
                                     </SelectContent>
                                 </Select>
                                 {meetingForm.errors.committee_id && (
-                                    <p className="text-xs text-red-600">{meetingForm.errors.committee_id}</p>
+                                    <p className="text-xs text-status-critical">{meetingForm.errors.committee_id}</p>
                                 )}
                             </div>
 
                             {/* Date/time */}
                             <div className="space-y-1.5">
-                                <Label>Date & Time <span className="text-red-500">*</span></Label>
+                                <Label>Date & Time <span className="text-status-critical">*</span></Label>
                                 <Input
                                     type="datetime-local"
                                     value={meetingForm.data.meeting_date}
                                     onChange={(e) => meetingForm.setData('meeting_date', e.target.value)}
                                 />
                                 {meetingForm.errors.meeting_date && (
-                                    <p className="text-xs text-red-600">{meetingForm.errors.meeting_date}</p>
+                                    <p className="text-xs text-status-critical">{meetingForm.errors.meeting_date}</p>
                                 )}
                             </div>
 
                             {/* Location */}
                             <div className="space-y-1.5">
-                                <Label>Location <span className="text-red-500">*</span></Label>
+                                <Label>Location <span className="text-status-critical">*</span></Label>
                                 <Select
                                     value={
                                         meetingLocationMode === 'custom'
@@ -1759,7 +1759,7 @@ export default function WorkerParticipationIndex({
                                 )}
 
                                 {meetingForm.errors.location && (
-                                    <p className="text-xs text-red-600">{meetingForm.errors.location}</p>
+                                    <p className="text-xs text-status-critical">{meetingForm.errors.location}</p>
                                 )}
                             </div>
                         </div>
@@ -1802,7 +1802,7 @@ export default function WorkerParticipationIndex({
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    className="h-7 w-7 p-0 text-status-critical hover:text-status-critical hover:bg-status-critical-bg"
                                                     onClick={() => removeAgendaItem(idx)}
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />
@@ -1907,20 +1907,20 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {/* Title */}
                         <div className="space-y-1.5">
-                            <Label>Title <span className="text-red-500">*</span></Label>
+                            <Label>Title <span className="text-status-critical">*</span></Label>
                             <Input
                                 placeholder="Brief description of the consultation topic"
                                 value={consultationForm.data.title}
                                 onChange={(e) => consultationForm.setData('title', e.target.value)}
                             />
                             {consultationForm.errors.title && (
-                                <p className="text-xs text-red-600">{consultationForm.errors.title}</p>
+                                <p className="text-xs text-status-critical">{consultationForm.errors.title}</p>
                             )}
                         </div>
 
                         {/* Type: card buttons */}
                         <div className="space-y-1.5">
-                            <Label>Type <span className="text-red-500">*</span></Label>
+                            <Label>Type <span className="text-status-critical">*</span></Label>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {consultationTypes.map((ct) => {
                                     const Icon = ct.icon;
@@ -1950,7 +1950,7 @@ export default function WorkerParticipationIndex({
                         {/* Date & Site */}
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-1.5">
-                                <Label>Date <span className="text-red-500">*</span></Label>
+                                <Label>Date <span className="text-status-critical">*</span></Label>
                                 <Input
                                     type="date"
                                     value={consultationForm.data.consultation_date}
@@ -1959,7 +1959,7 @@ export default function WorkerParticipationIndex({
                                     }
                                 />
                                 {consultationForm.errors.consultation_date && (
-                                    <p className="text-xs text-red-600">
+                                    <p className="text-xs text-status-critical">
                                         {consultationForm.errors.consultation_date}
                                     </p>
                                 )}
@@ -2029,7 +2029,7 @@ export default function WorkerParticipationIndex({
 
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <Label>Worker Feedback Summary <span className="text-red-500">*</span></Label>
+                            <Label>Worker Feedback Summary <span className="text-status-critical">*</span></Label>
                             <Textarea
                                 placeholder="Summarise the feedback received from workers..."
                                 rows={4}
@@ -2037,7 +2037,7 @@ export default function WorkerParticipationIndex({
                                 onChange={(e) => feedbackForm.setData('worker_feedback_summary', e.target.value)}
                             />
                             {feedbackForm.errors.worker_feedback_summary && (
-                                <p className="text-xs text-red-600">{feedbackForm.errors.worker_feedback_summary}</p>
+                                <p className="text-xs text-status-critical">{feedbackForm.errors.worker_feedback_summary}</p>
                             )}
                         </div>
 
@@ -2097,8 +2097,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100">
-                                <CheckCircle2 className="h-4 w-4 text-teal-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-info-bg">
+                                <CheckCircle2 className="h-4 w-4 text-status-info" />
                             </div>
                             Record Outcome
                         </DialogTitle>
@@ -2106,7 +2106,7 @@ export default function WorkerParticipationIndex({
 
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <Label>Outcome <span className="text-red-500">*</span></Label>
+                            <Label>Outcome <span className="text-status-critical">*</span></Label>
                             <Textarea
                                 placeholder="Describe the outcome of this consultation..."
                                 rows={4}
@@ -2114,7 +2114,7 @@ export default function WorkerParticipationIndex({
                                 onChange={(e) => outcomeForm.setData('outcome', e.target.value)}
                             />
                             {outcomeForm.errors.outcome && (
-                                <p className="text-xs text-red-600">{outcomeForm.errors.outcome}</p>
+                                <p className="text-xs text-status-critical">{outcomeForm.errors.outcome}</p>
                             )}
                         </div>
 
@@ -2193,8 +2193,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-                                <Upload className="h-4 w-4 text-blue-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-info-bg">
+                                <Upload className="h-4 w-4 text-status-info" />
                             </div>
                             Upload Document
                         </DialogTitle>
@@ -2221,7 +2221,7 @@ export default function WorkerParticipationIndex({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>File <span className="text-red-500">*</span></Label>
+                            <Label>File <span className="text-status-critical">*</span></Label>
                             <Input
                                 type="file"
                                 onChange={(e) => consultDocForm.setData('document', e.target.files?.[0] || null)}
@@ -2251,8 +2251,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-success-bg">
+                                <CheckCircle2 className="h-4 w-4 text-status-success" />
                             </div>
                             Complete Meeting
                         </DialogTitle>
@@ -2345,7 +2345,7 @@ export default function WorkerParticipationIndex({
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                className="h-7 w-7 p-0 text-status-critical hover:text-status-critical hover:bg-status-critical-bg"
                                                 onClick={() => removeCompleteMeetingActionItem(idx)}
                                             >
                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -2413,8 +2413,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-                                <XCircle className="h-4 w-4 text-red-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-critical-bg">
+                                <XCircle className="h-4 w-4 text-status-critical" />
                             </div>
                             Cancel Meeting
                         </DialogTitle>
@@ -2446,8 +2446,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-                                <Users className="h-4 w-4 text-blue-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-info-bg">
+                                <Users className="h-4 w-4 text-status-info" />
                             </div>
                             Manage Meeting Attendees
                         </DialogTitle>
@@ -2505,15 +2505,15 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
-                                <FileText className="h-4 w-4 text-amber-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-warning-bg">
+                                <FileText className="h-4 w-4 text-status-warning" />
                             </div>
                             Upload Meeting Minutes
                         </DialogTitle>
                     </DialogHeader>
 
                     <div className="space-y-1.5">
-                        <Label>Minutes Document <span className="text-red-500">*</span></Label>
+                        <Label>Minutes Document <span className="text-status-critical">*</span></Label>
                         <Input
                             type="file"
                             onChange={(e) => minutesForm.setData('document', e.target.files?.[0] || null)}
@@ -2545,8 +2545,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-                                <Building2 className="h-4 w-4 text-green-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-success-bg">
+                                <Building2 className="h-4 w-4 text-status-success" />
                             </div>
                             Create H&S Committee
                         </DialogTitle>
@@ -2554,14 +2554,14 @@ export default function WorkerParticipationIndex({
 
                     <div className="space-y-4">
                         <div className="space-y-1.5">
-                            <Label>Committee Name <span className="text-red-500">*</span></Label>
+                            <Label>Committee Name <span className="text-status-critical">*</span></Label>
                             <Input
                                 placeholder="e.g. Health & Safety Committee"
                                 value={committeeForm.data.name}
                                 onChange={(e) => committeeForm.setData('name', e.target.value)}
                             />
                             {committeeForm.errors.name && (
-                                <p className="text-xs text-red-600">{committeeForm.errors.name}</p>
+                                <p className="text-xs text-status-critical">{committeeForm.errors.name}</p>
                             )}
                         </div>
                         <div className="space-y-1.5">
@@ -2616,20 +2616,20 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {/* Title */}
                         <div className="space-y-1.5">
-                            <Label>Title <span className="text-red-500">*</span></Label>
+                            <Label>Title <span className="text-status-critical">*</span></Label>
                             <Input
                                 placeholder="Brief description of the consultation topic"
                                 value={editConsultationForm.data.title}
                                 onChange={(e) => editConsultationForm.setData('title', e.target.value)}
                             />
                             {editConsultationForm.errors.title && (
-                                <p className="text-xs text-red-600">{editConsultationForm.errors.title}</p>
+                                <p className="text-xs text-status-critical">{editConsultationForm.errors.title}</p>
                             )}
                         </div>
 
                         {/* Type */}
                         <div className="space-y-1.5">
-                            <Label>Consultation Type <span className="text-red-500">*</span></Label>
+                            <Label>Consultation Type <span className="text-status-critical">*</span></Label>
                             <Select
                                 value={editConsultationForm.data.consultation_type || '__none__'}
                                 onValueChange={(v) =>
@@ -2649,7 +2649,7 @@ export default function WorkerParticipationIndex({
                                 </SelectContent>
                             </Select>
                             {editConsultationForm.errors.consultation_type && (
-                                <p className="text-xs text-red-600">{editConsultationForm.errors.consultation_type}</p>
+                                <p className="text-xs text-status-critical">{editConsultationForm.errors.consultation_type}</p>
                             )}
                         </div>
 
@@ -2690,7 +2690,7 @@ export default function WorkerParticipationIndex({
                                 </Select>
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Consultation Date <span className="text-red-500">*</span></Label>
+                                <Label>Consultation Date <span className="text-status-critical">*</span></Label>
                                 <Input
                                     type="date"
                                     value={editConsultationForm.data.consultation_date}
@@ -2699,7 +2699,7 @@ export default function WorkerParticipationIndex({
                                     }
                                 />
                                 {editConsultationForm.errors.consultation_date && (
-                                    <p className="text-xs text-red-600">
+                                    <p className="text-xs text-status-critical">
                                         {editConsultationForm.errors.consultation_date}
                                     </p>
                                 )}
@@ -2737,8 +2737,8 @@ export default function WorkerParticipationIndex({
                 <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
-                                <Pencil className="h-4 w-4 text-amber-600" />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-status-warning-bg">
+                                <Pencil className="h-4 w-4 text-status-warning" />
                             </div>
                             Edit Meeting
                         </DialogTitle>
@@ -2747,20 +2747,20 @@ export default function WorkerParticipationIndex({
                     <div className="space-y-5">
                         {/* Date/Time */}
                         <div className="space-y-1.5">
-                            <Label>Date & Time <span className="text-red-500">*</span></Label>
+                            <Label>Date & Time <span className="text-status-critical">*</span></Label>
                             <Input
                                 type="datetime-local"
                                 value={editMeetingForm.data.meeting_date}
                                 onChange={(e) => editMeetingForm.setData('meeting_date', e.target.value)}
                             />
                             {editMeetingForm.errors.meeting_date && (
-                                <p className="text-xs text-red-600">{editMeetingForm.errors.meeting_date}</p>
+                                <p className="text-xs text-status-critical">{editMeetingForm.errors.meeting_date}</p>
                             )}
                         </div>
 
                         {/* Location */}
                         <div className="space-y-1.5">
-                            <Label>Location <span className="text-red-500">*</span></Label>
+                            <Label>Location <span className="text-status-critical">*</span></Label>
                             <Select
                                 value={
                                     editMeetingLocationMode === 'custom'
@@ -2804,7 +2804,7 @@ export default function WorkerParticipationIndex({
                             )}
 
                             {editMeetingForm.errors.location && (
-                                <p className="text-xs text-red-600">{editMeetingForm.errors.location}</p>
+                                <p className="text-xs text-status-critical">{editMeetingForm.errors.location}</p>
                             )}
                         </div>
 
@@ -2846,7 +2846,7 @@ export default function WorkerParticipationIndex({
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    className="h-7 w-7 p-0 text-status-critical hover:text-status-critical hover:bg-status-critical-bg"
                                                     onClick={() => removeEditAgendaItem(idx)}
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />

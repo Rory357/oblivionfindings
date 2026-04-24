@@ -129,7 +129,7 @@ export default function EditLegalHold({ hold }: Props) {
                                     onChange={(e) => setData('reason', e.target.value)}
                                     rows={4}
                                 />
-                                {errors.reason && <p className="text-xs text-red-500">{errors.reason}</p>}
+                                {errors.reason && <p className="text-xs text-status-critical">{errors.reason}</p>}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -139,7 +139,7 @@ export default function EditLegalHold({ hold }: Props) {
                                         value={data.legal_authority}
                                         onChange={(e) => setData('legal_authority', e.target.value)}
                                     />
-                                    {errors.legal_authority && <p className="text-xs text-red-500">{errors.legal_authority}</p>}
+                                    {errors.legal_authority && <p className="text-xs text-status-critical">{errors.legal_authority}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Review Date</Label>
@@ -148,7 +148,7 @@ export default function EditLegalHold({ hold }: Props) {
                                         value={data.review_date}
                                         onChange={(e) => setData('review_date', e.target.value)}
                                     />
-                                    {errors.review_date && <p className="text-xs text-red-500">{errors.review_date}</p>}
+                                    {errors.review_date && <p className="text-xs text-status-critical">{errors.review_date}</p>}
                                 </div>
                             </div>
 
@@ -160,7 +160,7 @@ export default function EditLegalHold({ hold }: Props) {
                                     rows={3}
                                     placeholder="Record IDs or references (comma or newline separated)"
                                 />
-                                {errors.related_records && <p className="text-xs text-red-500">{errors.related_records}</p>}
+                                {errors.related_records && <p className="text-xs text-status-critical">{errors.related_records}</p>}
                             </div>
 
                             <div className="flex justify-end gap-2">
@@ -180,7 +180,7 @@ export default function EditLegalHold({ hold }: Props) {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <LockOpen className="h-5 w-5 text-amber-500" />
+                                    <LockOpen className="h-5 w-5 text-status-warning" />
                                     Release Hold
                                 </CardTitle>
                             </CardHeader>
@@ -194,7 +194,7 @@ export default function EditLegalHold({ hold }: Props) {
                                         placeholder="Why is this hold being released?"
                                     />
                                     {releaseForm.errors.release_reason && (
-                                        <p className="text-xs text-red-500">{releaseForm.errors.release_reason}</p>
+                                        <p className="text-xs text-status-critical">{releaseForm.errors.release_reason}</p>
                                     )}
                                 </div>
                                 <div className="flex justify-end">

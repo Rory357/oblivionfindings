@@ -43,13 +43,13 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'under_investigation':
-                return 'bg-blue-100 text-blue-800 border-blue-200';
+                return 'bg-status-info-bg text-status-info border-status-info/30';
             case 'discovered':
-                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'contained':
-                return 'bg-orange-100 text-orange-800 border-orange-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'resolved':
-                return 'bg-green-100 text-green-800 border-green-200';
+                return 'bg-status-success-bg text-status-success border-status-success/30';
             case 'notified':
                 return 'bg-primary/10 text-primary border-primary';
             default:
@@ -158,7 +158,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 font-semibold">
                                                 {breach.requires_authority_notification && !breach.authority_notified_at && (
-                                                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                                                    <AlertTriangle className="h-4 w-4 text-status-critical" />
                                                 )}
                                                 {breach.breach_reference}
                                             </div>
@@ -167,13 +167,13 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                                     {statusLabels[breach.status] ?? breach.status}
                                                 </Badge>
                                                 {breach.requires_authority_notification && !breach.authority_notified_at && (
-                                                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
+                                                    <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                                         <Clock className="mr-1 h-3 w-3" />
                                                         ICO notification required
                                                     </Badge>
                                                 )}
                                                 {breach.authority_notified_at && (
-                                                    <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                                                    <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
                                                         ICO notified
                                                     </Badge>
                                                 )}

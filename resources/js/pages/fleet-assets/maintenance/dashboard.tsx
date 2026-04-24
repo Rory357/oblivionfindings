@@ -322,8 +322,8 @@ export default function MaintenanceDashboard({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-yellow-500/10 p-2.5">
-                                <Clock className="h-5 w-5 text-yellow-600" />
+                            <div className="rounded-lg bg-status-warning p-2.5">
+                                <Clock className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{stats.open_work_orders}</p>
@@ -344,8 +344,8 @@ export default function MaintenanceDashboard({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-blue-500/10 p-2.5">
-                                <DollarSign className="h-5 w-5 text-blue-600" />
+                            <div className="rounded-lg bg-status-info p-2.5">
+                                <DollarSign className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{formatCurrency(stats.avg_cost)}</p>
@@ -355,8 +355,8 @@ export default function MaintenanceDashboard({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 pt-6">
-                            <div className="rounded-lg bg-red-500/10 p-2.5">
-                                <AlertTriangle className="h-5 w-5 text-red-600" />
+                            <div className="rounded-lg bg-status-critical p-2.5">
+                                <AlertTriangle className="h-5 w-5 text-status-critical" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{stats.overdue_schedules}</p>
@@ -451,7 +451,7 @@ export default function MaintenanceDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <AlertTriangle className="h-4 w-4 text-red-500" />
+                                <AlertTriangle className="h-4 w-4 text-status-critical" />
                                 Overdue Services
                             </CardTitle>
                         </CardHeader>
@@ -461,7 +461,7 @@ export default function MaintenanceDashboard({
                                     {overdueServices.map((svc) => (
                                         <div
                                             key={svc.id}
-                                            className="flex items-center justify-between rounded-md border border-red-200 bg-red-50/50 px-3 py-2 dark:border-red-900/30 dark:bg-red-950/20"
+                                            className="flex items-center justify-between rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 dark:border-status-critical/30 dark:bg-status-critical"
                                         >
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-medium">{svc.name}</p>

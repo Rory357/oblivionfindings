@@ -152,8 +152,8 @@ export default function ControlRoomStats({
                         <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <span className="relative flex h-2 w-2">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
                                 </span>
                                 Auto-refreshing
                             </div>
@@ -176,8 +176,8 @@ export default function ControlRoomStats({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                <div className="rounded-lg bg-status-info-bg p-2 dark:bg-status-info">
+                                    <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
                                 </div>
                                 <div>
                                     <p className="text-xs font-medium text-muted-foreground">Avg Acknowledge</p>
@@ -202,8 +202,8 @@ export default function ControlRoomStats({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-                                    <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                <div className="rounded-lg bg-status-success-bg p-2 dark:bg-status-success">
+                                    <ShieldCheck className="h-5 w-5 text-status-success dark:text-status-success" />
                                 </div>
                                 <div>
                                     <p className="text-xs font-medium text-muted-foreground">SLA Compliance</p>
@@ -215,8 +215,8 @@ export default function ControlRoomStats({
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
-                                    <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                                    <AlertTriangle className="h-5 w-5 text-status-warning dark:text-status-warning" />
                                 </div>
                                 <div>
                                     <p className="text-xs font-medium text-muted-foreground">Open Alerts</p>
@@ -491,12 +491,12 @@ export default function ControlRoomStats({
                                                     <td className="py-3 pr-4 font-medium">{s.name}</td>
                                                     <td className="py-3 pr-4 text-right">{s.duration_hours}h</td>
                                                     <td className="py-3 pr-4 text-right">{s.alerts_created}</td>
-                                                    <td className="py-3 pr-4 text-right text-green-600 dark:text-green-400">
+                                                    <td className="py-3 pr-4 text-right text-status-success dark:text-status-success">
                                                         {s.alerts_resolved}
                                                     </td>
                                                     <td className="py-3 text-right">
                                                         {s.alerts_escalated > 0 ? (
-                                                            <span className="text-orange-600 dark:text-orange-400">
+                                                            <span className="text-status-warning dark:text-status-warning">
                                                                 {s.alerts_escalated}
                                                             </span>
                                                         ) : (
@@ -532,7 +532,7 @@ export default function ControlRoomStats({
                                             key={i}
                                             className={`rounded-lg border p-4 ${
                                                 !ss.is_healthy
-                                                    ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                                    ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
                                                     : 'border-border'
                                             }`}
                                         >
@@ -540,7 +540,7 @@ export default function ControlRoomStats({
                                                 <div className="flex items-center gap-2">
                                                     <span
                                                         className={`inline-block h-2.5 w-2.5 rounded-full ${
-                                                            ss.is_healthy ? 'bg-green-500' : 'bg-red-500'
+                                                            ss.is_healthy ? 'bg-status-success' : 'bg-status-critical'
                                                         }`}
                                                     />
                                                     <span className="text-sm font-medium">{ss.name}</span>
@@ -553,7 +553,7 @@ export default function ControlRoomStats({
                                                 {ss.is_healthy ? (
                                                     <Wifi className="h-3 w-3" />
                                                 ) : (
-                                                    <WifiOff className="h-3 w-3 text-red-500" />
+                                                    <WifiOff className="h-3 w-3 text-status-critical" />
                                                 )}
                                                 <span>
                                                     {ss.last_heartbeat_at

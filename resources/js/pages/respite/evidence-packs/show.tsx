@@ -150,7 +150,7 @@ export default function EvidencePackShow({ pack }: Props) {
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {addItemForm.errors.type && <div className="mt-1 text-xs text-red-500">{addItemForm.errors.type}</div>}
+                                        {addItemForm.errors.type && <div className="mt-1 text-xs text-status-critical">{addItemForm.errors.type}</div>}
                                     </div>
                                     <div>
                                         <Label>Title</Label>
@@ -159,7 +159,7 @@ export default function EvidencePackShow({ pack }: Props) {
                                             onChange={(e) => addItemForm.setData('title', e.target.value)}
                                             placeholder="Item title"
                                         />
-                                        {addItemForm.errors.title && <div className="mt-1 text-xs text-red-500">{addItemForm.errors.title}</div>}
+                                        {addItemForm.errors.title && <div className="mt-1 text-xs text-status-critical">{addItemForm.errors.title}</div>}
                                     </div>
                                 </div>
                                 <div>
@@ -169,7 +169,7 @@ export default function EvidencePackShow({ pack }: Props) {
                                         onChange={(e) => addItemForm.setData('description', e.target.value)}
                                         rows={2}
                                     />
-                                    {addItemForm.errors.description && <div className="mt-1 text-xs text-red-500">{addItemForm.errors.description}</div>}
+                                    {addItemForm.errors.description && <div className="mt-1 text-xs text-status-critical">{addItemForm.errors.description}</div>}
                                 </div>
                                 <div className="flex justify-end">
                                     <Button type="submit" size="sm" disabled={addItemForm.processing}>

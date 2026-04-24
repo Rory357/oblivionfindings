@@ -156,17 +156,17 @@ interface Props {
 }
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-black',
-    low: 'bg-blue-500 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-black',
+    low: 'bg-status-info text-white',
 };
 
 const statusColors: Record<string, string> = {
-    open: 'bg-red-100 text-red-800 border-red-200',
-    ack: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    triaging: 'bg-blue-100 text-blue-800 border-blue-200',
-    resolved: 'bg-green-100 text-green-800 border-green-200',
+    open: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    ack: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    triaging: 'bg-status-info-bg text-status-info border-status-info/30',
+    resolved: 'bg-status-success-bg text-status-success border-status-success/30',
     closed: 'bg-muted text-foreground border-border',
 };
 
@@ -352,8 +352,8 @@ export default function ControlRoomIndex({
                         <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <span className="relative flex h-2 w-2">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
                                 </span>
                                 Live
                             </div>
@@ -389,7 +389,7 @@ export default function ControlRoomIndex({
                         value={stats.critical}
                         icon={AlertTriangle}
                         href="/control-room?severity=critical"
-                        className={stats.critical > 0 ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' : undefined}
+                        className={stats.critical > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:bg-status-critical' : undefined}
                     />
                     <KpiCard
                         label="Avg Response"
@@ -402,7 +402,7 @@ export default function ControlRoomIndex({
                         value={`${sla_compliance_pct}%`}
                         icon={ShieldCheck}
                         href="/control-room/sla"
-                        className={sla_compliance_pct < 90 ? 'border-yellow-300 bg-yellow-50/50 dark:bg-yellow-950/20' : undefined}
+                        className={sla_compliance_pct < 90 ? 'border-status-warning/30 bg-status-warning-bg dark:bg-status-warning' : undefined}
                     />
                 </div>
 
@@ -410,12 +410,12 @@ export default function ControlRoomIndex({
                 {(stats.critical > 0 || active_shift) && (
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                         {stats.critical > 0 && (
-                            <div className="flex flex-1 items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 dark:border-red-800 dark:bg-red-950/30">
+                            <div className="flex flex-1 items-center gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg px-4 py-2.5 dark:border-status-critical/30 dark:bg-status-critical">
                                 <div className="relative flex h-3 w-3">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-critical opacity-75" />
+                                    <span className="relative inline-flex h-3 w-3 rounded-full bg-status-critical" />
                                 </div>
-                                <span className="text-sm font-semibold text-red-800 dark:text-red-200">
+                                <span className="text-sm font-semibold text-status-critical dark:text-status-critical">
                                     {stats.critical} CRITICAL ALERT{stats.critical !== 1 ? 'S' : ''} REQUIRE ATTENTION
                                 </span>
                                 <Button variant="destructive" size="sm" className="ml-auto" asChild>
@@ -426,8 +426,8 @@ export default function ControlRoomIndex({
                         {active_shift && (
                             <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
                                 <span className="relative flex h-2.5 w-2.5">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-success" />
                                 </span>
                                 <span className="text-sm">
                                     <span className="font-medium">{active_shift.name}</span>
@@ -451,8 +451,8 @@ export default function ControlRoomIndex({
                                 key={i}
                                 className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 text-sm ${
                                     flag.level === 'critical'
-                                        ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200'
-                                        : 'border-yellow-300 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200'
+                                        ? 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical'
+                                        : 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning'
                                 }`}
                             >
                                 {flag.level === 'critical' ? (
@@ -696,7 +696,7 @@ export default function ControlRoomIndex({
                                                 <div className="mb-1.5 flex items-center justify-between">
                                                     <span className="text-sm font-medium">{q.name}</span>
                                                     <span className={`text-lg font-bold ${
-                                                        isHot ? 'text-red-600' : isWarm ? 'text-orange-500' : 'text-green-600'
+                                                        isHot ? 'text-status-critical' : isWarm ? 'text-status-warning' : 'text-status-success'
                                                     }`}>
                                                         {q.active_alerts}
                                                     </span>
@@ -704,7 +704,7 @@ export default function ControlRoomIndex({
                                                 <div className="h-2 rounded-full bg-muted">
                                                     <div
                                                         className={`h-full rounded-full transition-all ${
-                                                            isHot ? 'bg-red-500' : isWarm ? 'bg-orange-400' : 'bg-green-500'
+                                                            isHot ? 'bg-status-critical' : isWarm ? 'bg-status-warning' : 'bg-status-success'
                                                         }`}
                                                         style={{ width: `${Math.min((q.active_alerts / 10) * 100, 100)}%` }}
                                                     />
@@ -717,7 +717,7 @@ export default function ControlRoomIndex({
                                         <div className="border-t pt-3">
                                             <div className="flex items-center justify-between text-sm">
                                                 <span className="text-muted-foreground">Unassigned</span>
-                                                <span className={`font-bold ${workload.unassigned >= 5 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                                <span className={`font-bold ${workload.unassigned >= 5 ? 'text-status-critical' : 'text-muted-foreground'}`}>
                                                     {workload.unassigned}
                                                 </span>
                                             </div>
@@ -794,10 +794,10 @@ export default function ControlRoomIndex({
                 {/* Row 5: Quick Stats Bar */}
                 <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6">
                     {[
-                        { label: 'Open', value: stats.open, color: 'text-red-500', filter: () => applyFilter('status', 'open') },
-                        { label: 'Acknowledged', value: stats.acknowledged, color: 'text-yellow-500', filter: () => applyFilter('status', 'ack') },
-                        { label: 'Triaging', value: stats.triaging, color: 'text-blue-500', filter: () => applyFilter('status', 'triaging') },
-                        { label: escalation_rate ? `Escalated (${escalation_rate}%)` : 'Escalated', value: stats.escalated, color: 'text-orange-500', filter: () => applyFilter('escalation_level', '1') },
+                        { label: 'Open', value: stats.open, color: 'text-status-critical', filter: () => applyFilter('status', 'open') },
+                        { label: 'Acknowledged', value: stats.acknowledged, color: 'text-status-warning', filter: () => applyFilter('status', 'ack') },
+                        { label: 'Triaging', value: stats.triaging, color: 'text-status-info', filter: () => applyFilter('status', 'triaging') },
+                        { label: escalation_rate ? `Escalated (${escalation_rate}%)` : 'Escalated', value: stats.escalated, color: 'text-status-warning', filter: () => applyFilter('escalation_level', '1') },
                         { label: 'Unassigned', value: stats.unassigned, color: 'text-primary', filter: () => applyFilter('assigned_to', 'unassigned') },
                         { label: 'My Alerts', value: stats.my_alerts, color: 'text-primary', filter: () => applyFilter('assigned_to', 'me') },
                     ].map((s) => (
@@ -927,7 +927,7 @@ export default function ControlRoomIndex({
                                         <div className="flex items-center gap-2">
                                             <span className="font-medium">{alert.alert_type}</span>
                                             {alert.escalation_level > 0 && (
-                                                <Badge variant="outline" className="border-orange-300 text-orange-600">
+                                                <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                                     L{alert.escalation_level}
                                                 </Badge>
                                             )}
@@ -963,8 +963,8 @@ export default function ControlRoomIndex({
                                         )}
                                         {alert.sla_status && (
                                             <span className={`inline-block h-2.5 w-2.5 rounded-full ${
-                                                alert.sla_status === 'on_track' ? 'bg-green-500' :
-                                                alert.sla_status === 'at_risk' ? 'bg-yellow-500' : 'bg-red-500'
+                                                alert.sla_status === 'on_track' ? 'bg-status-success' :
+                                                alert.sla_status === 'at_risk' ? 'bg-status-warning' : 'bg-status-critical'
                                             }`} title={`SLA: ${alert.sla_status.replace('_', ' ')}`} />
                                         )}
                                         <Badge className={severityColors[alert.severity] || ''}>

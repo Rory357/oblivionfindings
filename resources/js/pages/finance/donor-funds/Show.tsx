@@ -98,18 +98,18 @@ const fundTypeLabels: Record<string, string> = {
 };
 
 const txnTypeConfig: Record<string, { label: string; className: string; isInflow: boolean }> = {
-    receipt: { label: 'Receipt', className: 'bg-green-100 text-green-800', isInflow: true },
-    expenditure: { label: 'Expenditure', className: 'bg-red-100 text-red-800', isInflow: false },
-    commitment: { label: 'Commitment', className: 'bg-amber-100 text-amber-800', isInflow: false },
-    release: { label: 'Release', className: 'bg-blue-100 text-blue-800', isInflow: true },
+    receipt: { label: 'Receipt', className: 'bg-status-success-bg text-status-success', isInflow: true },
+    expenditure: { label: 'Expenditure', className: 'bg-status-critical-bg text-status-critical', isInflow: false },
+    commitment: { label: 'Commitment', className: 'bg-status-warning-bg text-status-warning', isInflow: false },
+    release: { label: 'Release', className: 'bg-status-info-bg text-status-info', isInflow: true },
     transfer: { label: 'Transfer', className: 'bg-primary/10 text-primary', isInflow: false },
     adjustment: { label: 'Adjustment', className: 'bg-muted text-foreground', isInflow: false },
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    active: { label: 'Active', className: 'border-green-300 text-green-600' },
-    fully_spent: { label: 'Fully Spent', className: 'border-amber-300 text-amber-600' },
-    expired: { label: 'Expired', className: 'border-red-300 text-red-600' },
+    active: { label: 'Active', className: 'border-status-success/30 text-status-success' },
+    fully_spent: { label: 'Fully Spent', className: 'border-status-warning/30 text-status-warning' },
+    expired: { label: 'Expired', className: 'border-status-critical/30 text-status-critical' },
     returned: { label: 'Returned', className: 'border-border text-muted-foreground' },
 };
 
@@ -194,7 +194,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         {config.label}
                     </Badge>
                     {fund.is_restricted && (
-                        <Badge variant="outline" className="border-amber-300 text-amber-600">
+                        <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                             Restricted
                         </Badge>
                     )}
@@ -224,7 +224,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         <Card>
                             <CardContent className="p-4">
                                 <p className="text-sm text-muted-foreground">Available Balance</p>
-                                <p className="text-xl font-bold text-emerald-600">{formatCurrency(fund.available_balance)}</p>
+                                <p className="text-xl font-bold text-status-success">{formatCurrency(fund.available_balance)}</p>
                             </CardContent>
                         </Card>
                         {fund.budget_amount && (
@@ -373,7 +373,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                         <TableCell className="max-w-[250px] truncate">{txn.description}</TableCell>
                                                         <TableCell className="text-sm">{txn.reference ?? '-'}</TableCell>
                                                         <TableCell className="text-right">
-                                                            <span className={`font-medium ${typeConf.isInflow ? 'text-emerald-600' : 'text-destructive'}`}>
+                                                            <span className={`font-medium ${typeConf.isInflow ? 'text-status-success' : 'text-destructive'}`}>
                                                                 {typeConf.isInflow ? '+' : '-'}
                                                                 {formatCurrency(txn.amount)}
                                                             </span>
@@ -395,7 +395,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                                    <TrendingUp className="h-5 w-5 text-status-success" />
                                     Record Receipt
                                 </CardTitle>
                             </CardHeader>
@@ -619,7 +619,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                             {formatDate(report.period_from)} - {formatDate(report.period_to)}
                                                         </TableCell>
                                                         <TableCell className="text-right">{formatCurrency(report.opening_balance)}</TableCell>
-                                                        <TableCell className="text-right text-emerald-600">
+                                                        <TableCell className="text-right text-status-success">
                                                             {formatCurrency(report.total_receipts)}
                                                         </TableCell>
                                                         <TableCell className="text-right text-destructive">

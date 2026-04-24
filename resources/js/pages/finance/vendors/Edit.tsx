@@ -168,16 +168,16 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label htmlFor="name">
-                                        Name <span className="text-red-500">*</span>
+                                        Name <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="name"
                                         value={data.name}
                                         onChange={(e) => setData('name', e.target.value)}
-                                        className={errors.name ? 'border-red-500' : ''}
+                                        className={errors.name ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.name && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.name}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.name}</p>
                                     )}
                                 </div>
                                 <div>
@@ -188,20 +188,20 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         onChange={(e) => setData('trading_name', e.target.value)}
                                     />
                                     {errors.trading_name && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.trading_name}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.trading_name}</p>
                                     )}
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label htmlFor="vendor_type">
-                                        Type <span className="text-red-500">*</span>
+                                        Type <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.vendor_type}
                                         onValueChange={(value) => setData('vendor_type', value)}
                                     >
-                                        <SelectTrigger className={errors.vendor_type ? 'border-red-500' : ''}>
+                                        <SelectTrigger className={errors.vendor_type ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select type" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -213,7 +213,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.vendor_type && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.vendor_type}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.vendor_type}</p>
                                     )}
                                 </div>
                                 <div>
@@ -224,7 +224,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         onChange={(e) => setData('gst_number', e.target.value)}
                                     />
                                     {errors.gst_number && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.gst_number}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.gst_number}</p>
                                     )}
                                 </div>
                             </div>
@@ -238,7 +238,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         onChange={(e) => setData('email', e.target.value)}
                                     />
                                     {errors.email && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.email}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.email}</p>
                                     )}
                                 </div>
                                 <div>
@@ -249,7 +249,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         onChange={(e) => setData('phone', e.target.value)}
                                     />
                                     {errors.phone && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.phone}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.phone}</p>
                                     )}
                                 </div>
                             </div>
@@ -335,7 +335,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         onChange={(e) => setData('payment_terms_days', e.target.value)}
                                     />
                                     {errors.payment_terms_days && (
-                                        <p className="text-sm text-red-500 mt-1">{errors.payment_terms_days}</p>
+                                        <p className="text-sm text-status-critical mt-1">{errors.payment_terms_days}</p>
                                     )}
                                 </div>
                                 <div>
@@ -346,7 +346,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         onChange={(e) => setData('bank_account_number', e.target.value)}
                                     />
                                     {errors.bank_account_number && (
-                                        <p className="text-sm text-red-500 mt-1">
+                                        <p className="text-sm text-status-critical mt-1">
                                             {errors.bank_account_number}
                                         </p>
                                     )}
@@ -372,7 +372,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.default_expense_account_id && (
-                                        <p className="text-sm text-red-500 mt-1">
+                                        <p className="text-sm text-status-critical mt-1">
                                             {errors.default_expense_account_id}
                                         </p>
                                     )}
@@ -395,7 +395,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                 placeholder="Internal notes about this vendor..."
                             />
                             {errors.notes && (
-                                <p className="text-sm text-red-500 mt-1">{errors.notes}</p>
+                                <p className="text-sm text-status-critical mt-1">{errors.notes}</p>
                             )}
                         </CardContent>
                     </Card>
@@ -445,7 +445,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => removeContact(index)}
-                                                    className="text-red-500 hover:text-red-700"
+                                                    className="text-status-critical hover:text-status-critical"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
@@ -453,7 +453,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
                                                     <Label>
-                                                        Name <span className="text-red-500">*</span>
+                                                        Name <span className="text-status-critical">*</span>
                                                     </Label>
                                                     <Input
                                                         value={contact.name}
@@ -462,12 +462,12 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                                         }
                                                         className={
                                                             errors[`contacts.${index}.name` as keyof typeof errors]
-                                                                ? 'border-red-500'
+                                                                ? 'border-status-critical/30'
                                                                 : ''
                                                         }
                                                     />
                                                     {errors[`contacts.${index}.name` as keyof typeof errors] && (
-                                                        <p className="text-sm text-red-500 mt-1">
+                                                        <p className="text-sm text-status-critical mt-1">
                                                             {errors[`contacts.${index}.name` as keyof typeof errors]}
                                                         </p>
                                                     )}
@@ -491,7 +491,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                                                         }
                                                     />
                                                     {errors[`contacts.${index}.email` as keyof typeof errors] && (
-                                                        <p className="text-sm text-red-500 mt-1">
+                                                        <p className="text-sm text-status-critical mt-1">
                                                             {errors[`contacts.${index}.email` as keyof typeof errors]}
                                                         </p>
                                                     )}

@@ -40,10 +40,10 @@ interface Props {
 }
 
 const priorityConfig: Record<string, { className: string; label: string }> = {
-    low: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Low' },
-    normal: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Normal' },
-    high: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'High' },
-    urgent: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Urgent' },
+    low: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Low' },
+    normal: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Normal' },
+    high: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'High' },
+    urgent: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Urgent' },
 };
 
 const formatDate = (value?: string | null) => {
@@ -85,7 +85,7 @@ export default function AnnouncementShow({ announcement, userAcknowledged, can }
                     <Card>
                         <CardContent className="p-5">
                             <div className="mb-4 flex flex-wrap items-center gap-2">
-                                {announcement.is_pinned && <Pin className="h-4 w-4 text-yellow-500" />}
+                                {announcement.is_pinned && <Pin className="h-4 w-4 text-status-warning" />}
                                 <Badge className={config.className}>{config.label} Priority</Badge>
                                 <Badge variant="outline" className="capitalize">{announcement.target_audience}</Badge>
                                 {announcement.requires_acknowledgement && (
@@ -116,7 +116,7 @@ export default function AnnouncementShow({ announcement, userAcknowledged, can }
                                     </p>
                                 </div>
                                 {userAcknowledged ? (
-                                    <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                                    <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
                                         <CheckCircle className="mr-1 h-3 w-3" />
                                         Acknowledged
                                     </Badge>

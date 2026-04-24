@@ -93,12 +93,12 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-blue-500/10 p-2">
-                                            <DollarSign className="h-5 w-5 text-blue-600" />
+                                        <div className="rounded-lg bg-status-info p-2">
+                                            <DollarSign className="h-5 w-5 text-status-info" />
                                         </div>
                                         <div>
                                             <p className="text-sm text-muted-foreground">Total Cash</p>
-                                            <p className={`text-2xl font-semibold font-mono tabular-nums ${totalCash >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            <p className={`text-2xl font-semibold font-mono tabular-nums ${totalCash >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                 {formatCurrency(totalCash)}
                                             </p>
                                         </div>
@@ -123,12 +123,12 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-amber-500/10 p-2">
-                                            <Star className="h-5 w-5 text-amber-600" />
+                                        <div className="rounded-lg bg-status-warning p-2">
+                                            <Star className="h-5 w-5 text-status-warning" />
                                         </div>
                                         <div>
                                             <p className="text-sm text-muted-foreground">Primary Account</p>
-                                            <p className={`text-2xl font-semibold font-mono tabular-nums ${(primaryAccount?.current_balance ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            <p className={`text-2xl font-semibold font-mono tabular-nums ${(primaryAccount?.current_balance ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                 {primaryAccount ? formatCurrency(primaryAccount.current_balance) : 'N/A'}
                                             </p>
                                         </div>
@@ -187,7 +187,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                                 </div>
                                                 <div className="flex gap-1">
                                                     {account.is_primary && (
-                                                        <Badge variant="default" className="bg-blue-500/10 text-blue-700 border-blue-500/30">Primary</Badge>
+                                                        <Badge variant="default" className="bg-status-info-bg text-status-info border-status-info/30">Primary</Badge>
                                                     )}
                                                     {!account.is_active && (
                                                         <Badge variant="secondary">Inactive</Badge>
@@ -206,7 +206,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
 
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-sm text-muted-foreground">Current Balance</span>
-                                                    <span className={`text-lg font-semibold font-mono tabular-nums ${account.current_balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    <span className={`text-lg font-semibold font-mono tabular-nums ${account.current_balance >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                         {formatCurrency(account.current_balance)}
                                                     </span>
                                                 </div>
@@ -219,7 +219,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                                 )}
 
                                                 {account.unreconciled_count > 0 && (
-                                                    <div className="flex items-center gap-2 text-amber-700 bg-amber-500/10 rounded-md px-3 py-2">
+                                                    <div className="flex items-center gap-2 text-status-warning bg-status-warning rounded-md px-3 py-2">
                                                         <AlertCircle className="h-4 w-4 shrink-0" />
                                                         <span className="text-sm font-medium">
                                                             {account.unreconciled_count} unreconciled transaction{account.unreconciled_count !== 1 ? 's' : ''}

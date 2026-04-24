@@ -82,29 +82,29 @@ export default function CreateTemplate() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="name">
-                                        Template Name <span className="text-red-500">*</span>
+                                        Template Name <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="name"
                                         value={data.name}
                                         onChange={(e) => setData('name', e.target.value)}
                                         placeholder="e.g., Employment Contract"
-                                        className={errors.name ? 'border-red-500' : ''}
+                                        className={errors.name ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.name && (
-                                        <p className="text-sm text-red-500">{errors.name}</p>
+                                        <p className="text-sm text-status-critical">{errors.name}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="category">
-                                        Category <span className="text-red-500">*</span>
+                                        Category <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.category}
                                         onValueChange={(value) => setData('category', value)}
                                     >
-                                        <SelectTrigger id="category" className={errors.category ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="category" className={errors.category ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select category" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -116,14 +116,14 @@ export default function CreateTemplate() {
                                         </SelectContent>
                                     </Select>
                                     {errors.category && (
-                                        <p className="text-sm text-red-500">{errors.category}</p>
+                                        <p className="text-sm text-status-critical">{errors.category}</p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="content">
-                                    Template Content <span className="text-red-500">*</span>
+                                    Template Content <span className="text-status-critical">*</span>
                                 </Label>
                                 <Textarea
                                     id="content"
@@ -131,10 +131,10 @@ export default function CreateTemplate() {
                                     onChange={(e) => setData('content', e.target.value)}
                                     placeholder="Enter the template content. Use {{field_name}} for merge fields..."
                                     rows={15}
-                                    className={errors.content ? 'border-red-500' : ''}
+                                    className={errors.content ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.content && (
-                                    <p className="text-sm text-red-500">{errors.content}</p>
+                                    <p className="text-sm text-status-critical">{errors.content}</p>
                                 )}
                                 <p className="text-xs text-muted-foreground">
                                     Use {'{{employee_name}}'}, {'{{date}}'}, {'{{position_title}}'} etc. as placeholders for dynamic content.
@@ -165,7 +165,7 @@ export default function CreateTemplate() {
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => removeMergeField(index)}
-                                            className="text-red-500 hover:text-red-600"
+                                            className="text-status-critical hover:text-status-critical"
                                         >
                                             <X className="h-4 w-4" />
                                         </Button>

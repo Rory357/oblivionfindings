@@ -148,7 +148,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                                         {charge.client && (
                                             <span>{charge.client.first_name} {charge.client.last_name}</span>
                                         )}
-                                        <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                                        <span className="font-semibold tabular-nums text-status-success dark:text-status-success">
                                             {nzd.format(charge.amount)}
                                         </span>
                                         {charge.next_charge_date && (

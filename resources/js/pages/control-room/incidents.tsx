@@ -77,31 +77,31 @@ interface Props {
 }
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    major: 'bg-orange-500 text-white',
-    high: 'bg-orange-500 text-white',
-    moderate: 'bg-yellow-500 text-black',
-    medium: 'bg-yellow-500 text-black',
-    minor: 'bg-blue-500 text-white',
-    low: 'bg-blue-500 text-white',
-    near_miss: 'bg-gray-500 text-white',
+    critical: 'bg-status-critical text-white',
+    major: 'bg-status-warning text-white',
+    high: 'bg-status-warning text-white',
+    moderate: 'bg-status-warning text-black',
+    medium: 'bg-status-warning text-black',
+    minor: 'bg-status-info text-white',
+    low: 'bg-status-info text-white',
+    near_miss: 'bg-muted-foreground/80 text-white',
 };
 
 const statusColors: Record<string, string> = {
-    submitted: 'bg-blue-100 text-blue-800',
-    reported: 'bg-blue-100 text-blue-800',
+    submitted: 'bg-status-info-bg text-status-info',
+    reported: 'bg-status-info-bg text-status-info',
     reviewed: 'bg-primary/10 text-primary',
-    investigating: 'bg-yellow-100 text-yellow-800',
-    triaged: 'bg-yellow-100 text-yellow-800',
+    investigating: 'bg-status-warning-bg text-status-warning',
+    triaged: 'bg-status-warning-bg text-status-warning',
     action_plan: 'bg-primary/10 text-primary',
-    monitoring: 'bg-teal-100 text-teal-800',
-    resolved: 'bg-green-100 text-green-800',
+    monitoring: 'bg-status-info-bg text-status-info',
+    resolved: 'bg-status-success-bg text-status-success',
     closed: 'bg-muted text-foreground',
 };
 
 const sourceTypeConfig: Record<string, { label: string; color: string; icon: typeof AlertTriangle }> = {
-    client_incident: { label: 'Client Incident', color: 'bg-blue-100 text-blue-800', icon: FileWarning },
-    medication_error: { label: 'Medication Error', color: 'bg-red-100 text-red-800', icon: Pill },
+    client_incident: { label: 'Client Incident', color: 'bg-status-info-bg text-status-info', icon: FileWarning },
+    medication_error: { label: 'Medication Error', color: 'bg-status-critical-bg text-status-critical', icon: Pill },
     safeguarding: { label: 'Safeguarding', color: 'bg-primary/10 text-primary', icon: Shield },
 };
 
@@ -231,19 +231,19 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">Critical</CardTitle>
-                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                            <AlertTriangle className="h-4 w-4 text-status-critical" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-red-600">{stats.critical}</div>
+                            <div className="text-2xl font-bold text-status-critical">{stats.critical}</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">High</CardTitle>
-                            <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            <AlertTriangle className="h-4 w-4 text-status-warning" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-orange-500">{stats.high}</div>
+                            <div className="text-2xl font-bold text-status-warning">{stats.high}</div>
                         </CardContent>
                     </Card>
                     <Card>
@@ -398,7 +398,7 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                                                 >
                                                     {config?.label ?? incident.source_type}
                                                 </Badge>
-                                                <Badge className={severityColors[incident.severity] ?? 'bg-gray-500 text-white'}>
+                                                <Badge className={severityColors[incident.severity] ?? 'bg-muted-foreground/80 text-white'}>
                                                     {incident.severity}
                                                 </Badge>
                                                 <Badge
@@ -408,7 +408,7 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                                                     {incident.status.replace(/_/g, ' ')}
                                                 </Badge>
                                                 {incident.requires_followup && (
-                                                    <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
+                                                    <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                                         Follow-up Required
                                                     </Badge>
                                                 )}
@@ -502,7 +502,7 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                                     >
                                         {sourceTypeConfig[selectedIncident.source_type]?.label ?? selectedIncident.source_type}
                                     </Badge>
-                                    <Badge className={severityColors[selectedIncident.severity] ?? 'bg-gray-500 text-white'}>
+                                    <Badge className={severityColors[selectedIncident.severity] ?? 'bg-muted-foreground/80 text-white'}>
                                         {selectedIncident.severity}
                                     </Badge>
                                     <Badge
@@ -569,8 +569,8 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                                     )}
 
                                     {selectedIncident.requires_followup && (
-                                        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-                                            <p className="text-sm font-medium text-amber-800">
+                                        <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3">
+                                            <p className="text-sm font-medium text-status-warning">
                                                 Follow-up is required for this incident.
                                             </p>
                                         </div>
@@ -583,7 +583,7 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                                     <div className="mt-2 space-y-3">
                                         <div className="flex gap-3">
                                             <div className="flex flex-col items-center">
-                                                <div className="h-2 w-2 rounded-full bg-blue-500" />
+                                                <div className="h-2 w-2 rounded-full bg-status-info" />
                                                 <div className="w-px flex-1 bg-border" />
                                             </div>
                                             <div className="pb-3">
@@ -597,7 +597,7 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                                         </div>
                                         <div className="flex gap-3">
                                             <div className="flex flex-col items-center">
-                                                <div className="h-2 w-2 rounded-full bg-green-500" />
+                                                <div className="h-2 w-2 rounded-full bg-status-success" />
                                                 <div className="w-px flex-1 bg-border" />
                                             </div>
                                             <div className="pb-3">
@@ -609,7 +609,7 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                                         </div>
                                         <div className="flex gap-3">
                                             <div className="flex flex-col items-center">
-                                                <div className={`h-2 w-2 rounded-full ${selectedIncident.status === 'closed' || selectedIncident.status === 'resolved' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                                                <div className={`h-2 w-2 rounded-full ${selectedIncident.status === 'closed' || selectedIncident.status === 'resolved' ? 'bg-status-success' : 'bg-status-warning'}`} />
                                             </div>
                                             <div>
                                                 <p className="text-sm font-medium">

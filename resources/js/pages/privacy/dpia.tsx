@@ -48,13 +48,13 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
     const getOutcomeColor = (outcome: string | null) => {
         switch (outcome) {
             case 'approved':
-                return 'bg-green-100 text-green-800 border-green-200';
+                return 'bg-status-success-bg text-status-success border-status-success/30';
             case 'approved_with_conditions':
-                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'requires_dpo_review':
-                return 'bg-orange-100 text-orange-800 border-orange-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'rejected':
-                return 'bg-red-100 text-red-800 border-red-200';
+                return 'bg-status-critical-bg text-status-critical border-status-critical/30';
             default:
                 return 'bg-muted text-foreground border-border';
         }
@@ -63,13 +63,13 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
     const getRiskColor = (risk: string) => {
         switch (risk) {
             case 'low':
-                return 'bg-green-100 text-green-800 border-green-200';
+                return 'bg-status-success-bg text-status-success border-status-success/30';
             case 'medium':
-                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'high':
-                return 'bg-orange-100 text-orange-800 border-orange-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'very_high':
-                return 'bg-red-100 text-red-800 border-red-200';
+                return 'bg-status-critical-bg text-status-critical border-status-critical/30';
             default:
                 return 'bg-muted text-foreground border-border';
         }
@@ -177,7 +177,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 font-semibold">
-                                                <Activity className="h-4 w-4 text-green-500" />
+                                                <Activity className="h-4 w-4 text-status-success" />
                                                 {dpia.assessment_name}
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">

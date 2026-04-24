@@ -197,7 +197,7 @@ export default function ClientMedical({
                 </div>
 
                 {has_open_controlled_discrepancy && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
                         There is an open controlled-drug discrepancy for this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. Review and resolve before further controlled stock edits (unless override is granted).
                     </div>
                 )}
@@ -1063,7 +1063,7 @@ export default function ClientMedical({
                                                 }
                                             />
                                             {administrationForm.errors.reason && (
-                                                <div className="mt-1 text-xs text-red-600">
+                                                <div className="mt-1 text-xs text-status-critical">
                                                     {administrationForm.errors.reason}
                                                 </div>
                                             )}
@@ -1098,7 +1098,7 @@ export default function ClientMedical({
                                                     </SelectContent>
                                                 </Select>
                                                 {administrationForm.errors.witnessed_by && (
-                                                    <div className="mt-1 text-xs text-red-600">
+                                                    <div className="mt-1 text-xs text-status-critical">
                                                         {administrationForm.errors.witnessed_by}
                                                     </div>
                                                 )}
@@ -1363,7 +1363,7 @@ export default function ClientMedical({
                                                     placeholder="e.g. stock count, discrepancy investigation"
                                                 />
                                                 {stockForm.errors.reason && (
-                                                    <div className="mt-1 text-xs text-red-600">
+                                                    <div className="mt-1 text-xs text-status-critical">
                                                         {stockForm.errors.reason}
                                                     </div>
                                                 )}
@@ -1394,7 +1394,7 @@ export default function ClientMedical({
                                                     </SelectContent>
                                                 </Select>
                                                 {stockForm.errors.witnessed_by && (
-                                                    <div className="mt-1 text-xs text-red-600">
+                                                    <div className="mt-1 text-xs text-status-critical">
                                                         {stockForm.errors.witnessed_by}
                                                     </div>
                                                 )}
@@ -1604,7 +1604,7 @@ export default function ClientMedical({
                                         <div className="text-sm font-medium">
                                             {d.medication?.name || 'Medication'}
                                         </div>
-                                        <div className={`text-xs ${d.status === 'open' ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                        <div className={`text-xs ${d.status === 'open' ? 'text-status-warning' : 'text-muted-foreground'}`}>
                                             {d.status}
                                             {d.reported_at
                                                 ? ` • ${new Date(d.reported_at).toLocaleString()}`

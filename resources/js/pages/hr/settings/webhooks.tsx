@@ -144,7 +144,7 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                                         placeholder="https://example.com/webhook"
                                         required
                                     />
-                                    {form.errors.url && <p className="text-sm text-red-500 mt-1">{form.errors.url}</p>}
+                                    {form.errors.url && <p className="text-sm text-status-critical mt-1">{form.errors.url}</p>}
                                 </div>
 
                                 <div>
@@ -160,7 +160,7 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                                             </label>
                                         ))}
                                     </div>
-                                    {form.errors.events && <p className="text-sm text-red-500 mt-1">{form.errors.events}</p>}
+                                    {form.errors.events && <p className="text-sm text-status-critical mt-1">{form.errors.events}</p>}
                                 </div>
 
                                 {editingId && (
@@ -251,7 +251,7 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
                                                     <Button variant="ghost" size="sm" onClick={() => deleteWebhook(webhook.id)} title="Delete">
-                                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                                        <Trash2 className="h-4 w-4 text-status-critical" />
                                                     </Button>
                                                 </div>
                                             </TableCell>

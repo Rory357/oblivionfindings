@@ -44,7 +44,7 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
             <Head title={`Edit: ${budget.title}`} />
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-3 mb-6">
-                    <DollarSign className="w-8 h-8 text-emerald-600" />
+                    <DollarSign className="w-8 h-8 text-status-success" />
                     <h1 className="text-3xl font-bold text-foreground">Edit Budget</h1>
                 </div>
                 <Card>
@@ -55,18 +55,18 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
                                 <div>
                                     <Label>Title</Label>
                                     <Input value={data.title} onChange={(e) => setData('title', e.target.value)} />
-                                    {errors.title && <p className="text-sm text-red-600 mt-1">{errors.title}</p>}
+                                    {errors.title && <p className="text-sm text-status-critical mt-1">{errors.title}</p>}
                                 </div>
                                 <div>
                                     <Label>Fiscal Year</Label>
                                     <Input value={data.fiscal_year} onChange={(e) => setData('fiscal_year', e.target.value)} placeholder="2025-2026" />
-                                    {errors.fiscal_year && <p className="text-sm text-red-600 mt-1">{errors.fiscal_year}</p>}
+                                    {errors.fiscal_year && <p className="text-sm text-status-critical mt-1">{errors.fiscal_year}</p>}
                                 </div>
                             </div>
                             <div>
                                 <Label>Total Budget ($)</Label>
                                 <Input type="number" step="0.01" value={data.total_budget} onChange={(e) => setData('total_budget', parseFloat(e.target.value))} />
-                                {errors.total_budget && <p className="text-sm text-red-600 mt-1">{errors.total_budget}</p>}
+                                {errors.total_budget && <p className="text-sm text-status-critical mt-1">{errors.total_budget}</p>}
                                 <p className="text-xs text-muted-foreground mt-1">This is automatically recalculated when line items are added or removed.</p>
                             </div>
                             <div>

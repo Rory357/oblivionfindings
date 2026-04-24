@@ -50,15 +50,15 @@ type Props = {
 };
 
 const severityColor: Record<string, string> = {
-    critical: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800 dark:text-red-300',
-    warning: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300',
-    info: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-300',
+    critical: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
+    warning: 'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
+    info: 'bg-status-info-bg border-status-info/30 text-status-info dark:bg-status-info-bg dark:border-status-info/30 dark:text-status-info',
 };
 
 const varianceBadge = (status: string) => {
     switch (status) {
         case 'over_budget': return <Badge variant="destructive">Over Budget</Badge>;
-        case 'approaching': return <Badge className="bg-amber-500 text-white border-0">Approaching</Badge>;
+        case 'approaching': return <Badge className="bg-status-warning text-white border-0">Approaching</Badge>;
         case 'under_budget': return <Badge variant="secondary">Under Budget</Badge>;
         default: return <Badge variant="outline">{status}</Badge>;
     }
@@ -234,14 +234,14 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Wages</p>
                                 <p className="mt-1 text-xl font-bold text-primary dark:text-primary/70">{$(dashboard.staffing.wages)}</p>
                             </div>
-                            <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950/30">
+                            <div className="rounded-lg bg-status-info-bg p-4 dark:bg-status-info">
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Employer On-Costs</p>
-                                <p className="mt-1 text-xl font-bold text-blue-700 dark:text-blue-300">{$(dashboard.staffing.employer_oncost)}</p>
+                                <p className="mt-1 text-xl font-bold text-status-info dark:text-status-info">{$(dashboard.staffing.employer_oncost)}</p>
                                 <p className="mt-0.5 text-[10px] text-muted-foreground">{pct(dashboard.staffing.oncost_pct_of_wages)} of wages</p>
                             </div>
-                            <div className="rounded-lg bg-cyan-50 p-4 dark:bg-cyan-950/30">
+                            <div className="rounded-lg bg-status-info-bg p-4 dark:bg-status-info">
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Total Staffing</p>
-                                <p className="mt-1 text-xl font-bold text-cyan-700 dark:text-cyan-300">{$(dashboard.staffing.total_staffing_cost)}</p>
+                                <p className="mt-1 text-xl font-bold text-status-info dark:text-status-info">{$(dashboard.staffing.total_staffing_cost)}</p>
                             </div>
                             <div className="rounded-lg bg-muted p-4 dark:bg-muted/30">
                                 <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">% of Total Cost</p>
@@ -275,7 +275,7 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                             <TableCell className="font-medium">{line.label}</TableCell>
                                             <TableCell className="text-right tabular-nums">{$(line.planned)}</TableCell>
                                             <TableCell className="text-right tabular-nums">{$(line.actual)}</TableCell>
-                                            <TableCell className={`text-right tabular-nums ${Number(line.variance) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            <TableCell className={`text-right tabular-nums ${Number(line.variance) > 0 ? 'text-status-critical' : 'text-status-success'}`}>
                                                 {$(line.variance)}
                                             </TableCell>
                                             <TableCell className="text-right tabular-nums">{pct(line.variance_pct)}</TableCell>
@@ -287,7 +287,7 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
                                         <TableCell>Total</TableCell>
                                         <TableCell className="text-right tabular-nums">{$(variance.totals.planned)}</TableCell>
                                         <TableCell className="text-right tabular-nums">{$(variance.totals.actual)}</TableCell>
-                                        <TableCell className={`text-right tabular-nums ${Number(variance.totals.variance) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        <TableCell className={`text-right tabular-nums ${Number(variance.totals.variance) > 0 ? 'text-status-critical' : 'text-status-success'}`}>
                                             {$(variance.totals.variance)}
                                         </TableCell>
                                         <TableCell className="text-right tabular-nums">{pct(variance.totals.variance_pct)}</TableCell>

@@ -17,9 +17,9 @@ type Props = {
 };
 
 const typeColors = {
-    head_office: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    house: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    facility: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    head_office: 'bg-status-info-bg text-status-info border-status-info/30',
+    house: 'bg-status-success-bg text-status-success border-status-success/30',
+    facility: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 export default function SiteReportsIndex({ sites }: Props) {
@@ -52,7 +52,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Home className="w-5 h-5 text-emerald-400" />
+                                    <Home className="w-5 h-5 text-status-success" />
                                     <CardTitle className="text-base">Houses</CardTitle>
                                 </div>
                                 <Badge variant="outline" className={typeColors.house}>
@@ -64,7 +64,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                             <p className="text-sm text-muted-foreground">
                                 Quality home checks, bedroom occupancy, hazard trends, and maintenance reports.
                             </p>
-                            <ul className="text-sm space-y-1 text-slate-300">
+                            <ul className="text-sm space-y-1 text-muted-foreground">
                                 <li>- Hazards by severity & time-to-close</li>
                                 <li>- Checklist compliance rates</li>
                                 <li>- Bedroom occupancy reports</li>
@@ -83,7 +83,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Warehouse className="w-5 h-5 text-amber-400" />
+                                    <Warehouse className="w-5 h-5 text-status-warning" />
                                     <CardTitle className="text-base">Facilities</CardTitle>
                                 </div>
                                 <Badge variant="outline" className={typeColors.facility}>
@@ -95,7 +95,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                             <p className="text-sm text-muted-foreground">
                                 Equipment-focused safety reports, zone utilization, and facility compliance.
                             </p>
-                            <ul className="text-sm space-y-1 text-slate-300">
+                            <ul className="text-sm space-y-1 text-muted-foreground">
                                 <li>- Equipment hazard register</li>
                                 <li>- Safety walkthrough compliance</li>
                                 <li>- Equipment condition summary</li>
@@ -114,7 +114,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Building2 className="w-5 h-5 text-blue-400" />
+                                    <Building2 className="w-5 h-5 text-status-info" />
                                     <CardTitle className="text-base">Head Office</CardTitle>
                                 </div>
                                 <Badge variant="outline" className={typeColors.head_office}>
@@ -126,7 +126,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                             <p className="text-sm text-muted-foreground">
                                 Room booking utilization, safety compliance, and IT asset reports.
                             </p>
-                            <ul className="text-sm space-y-1 text-slate-300">
+                            <ul className="text-sm space-y-1 text-muted-foreground">
                                 <li>- Room booking utilization</li>
                                 <li>- Safety & facilities compliance</li>
                                 <li>- IT/Network asset summary</li>
@@ -153,15 +153,15 @@ export default function SiteReportsIndex({ sites }: Props) {
                                 <div className="text-sm text-muted-foreground">Total Sites</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-emerald-400">{houseCount}</div>
+                                <div className="text-2xl font-bold text-status-success">{houseCount}</div>
                                 <div className="text-sm text-muted-foreground">Houses</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-amber-400">{facilityCount}</div>
+                                <div className="text-2xl font-bold text-status-warning">{facilityCount}</div>
                                 <div className="text-sm text-muted-foreground">Facilities</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-blue-400">{officeCount}</div>
+                                <div className="text-2xl font-bold text-status-info">{officeCount}</div>
                                 <div className="text-sm text-muted-foreground">Head Offices</div>
                             </div>
                         </div>

@@ -63,19 +63,19 @@ type Props = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-    accepted: 'text-green-600',
-    disputed: 'text-red-600',
-    pending_acceptance: 'text-yellow-600',
+    accepted: 'text-status-success',
+    disputed: 'text-status-critical',
+    pending_acceptance: 'text-status-warning',
 };
 
 function conditionBadge(condition: string) {
     switch (condition) {
         case 'good':
         case 'clean':
-            return <Badge variant="default" className="bg-green-600">{condition.replace(/_/g, ' ')}</Badge>;
+            return <Badge variant="default" className="bg-status-success">{condition.replace(/_/g, ' ')}</Badge>;
         case 'minor_damage':
         case 'acceptable':
-            return <Badge variant="default" className="bg-amber-500">{condition.replace(/_/g, ' ')}</Badge>;
+            return <Badge variant="default" className="bg-status-warning">{condition.replace(/_/g, ' ')}</Badge>;
         case 'significant_damage':
         case 'needs_cleaning':
             return <Badge variant="destructive">{condition.replace(/_/g, ' ')}</Badge>;
@@ -87,7 +87,7 @@ function conditionBadge(condition: string) {
 function statusBadge(status: string) {
     switch (status) {
         case 'accepted':
-            return <Badge variant="default" className="bg-green-600"><Check className="mr-1 h-3 w-3" />Accepted</Badge>;
+            return <Badge variant="default" className="bg-status-success"><Check className="mr-1 h-3 w-3" />Accepted</Badge>;
         case 'disputed':
             return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" />Disputed</Badge>;
         case 'pending_acceptance':
@@ -143,9 +143,9 @@ export default function HandoverIndex({ handovers: rawHandovers, vehicles, filte
                 {/* Dark KPI Cards */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     <FleetStatCard label="TOTAL HANDOVERS" value={totalCount} icon={ArrowLeftRight} subtitle="All records" />
-                    <FleetStatCard label="PENDING" value={pendingCount} icon={Clock} color="amber" valueClassName="text-yellow-400" subtitle="Awaiting acceptance" />
-                    <FleetStatCard label="ACCEPTED" value={acceptedCount} icon={Check} color="amber" valueClassName="text-green-400" subtitle="Completed handovers" />
-                    <FleetStatCard label="DISPUTED" value={disputedCount} icon={XCircle} color="red" valueClassName="text-red-400" subtitle="Requires review" />
+                    <FleetStatCard label="PENDING" value={pendingCount} icon={Clock} color="amber" valueClassName="text-status-warning" subtitle="Awaiting acceptance" />
+                    <FleetStatCard label="ACCEPTED" value={acceptedCount} icon={Check} color="amber" valueClassName="text-status-success" subtitle="Completed handovers" />
+                    <FleetStatCard label="DISPUTED" value={disputedCount} icon={XCircle} color="red" valueClassName="text-status-critical" subtitle="Requires review" />
                     <Card className="border bg-primary/10 dark:bg-primary/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
                         <CardContent className="flex items-center gap-6 p-4">
                             <ProgressRing value={acceptanceRate} size={80} color={FLEET_COLORS.success} label="Acceptance Rate" />

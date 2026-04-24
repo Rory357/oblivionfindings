@@ -167,10 +167,10 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
                       <div key={level} className="flex items-center justify-between">
                         <span className="text-sm">{level}</span>
                         <Badge className={cn(
-                          level === 'Critical' && 'bg-red-100 text-red-800',
-                          level === 'High' && 'bg-orange-100 text-orange-800',
-                          level === 'Medium' && 'bg-yellow-100 text-yellow-800',
-                          level === 'Low' && 'bg-green-100 text-green-800',
+                          level === 'Critical' && 'bg-status-critical-bg text-status-critical',
+                          level === 'High' && 'bg-status-warning-bg text-status-warning',
+                          level === 'Medium' && 'bg-status-warning-bg text-status-warning',
+                          level === 'Low' && 'bg-status-success-bg text-status-success',
                         )}>
                           {count}
                         </Badge>
@@ -192,7 +192,7 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
                         <span className="text-xs text-muted-foreground w-16">{point.month}</span>
                         <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
                           <div 
-                            className="h-full bg-blue-500 rounded-full"
+                            className="h-full bg-status-info rounded-full"
                             style={{ width: `${Math.min(100, point.new_risks * 10)}%` }}
                           />
                         </div>

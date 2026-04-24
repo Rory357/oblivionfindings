@@ -92,11 +92,11 @@ export default function ComplianceShow({ auth, obligation }: Props) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'complete':
-        return 'bg-green-100 text-green-800';
+        return 'bg-status-success-bg text-status-success';
       case 'overdue':
-        return 'bg-red-100 text-red-800';
+        return 'bg-status-critical-bg text-status-critical';
       case 'due_soon':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning-bg text-status-warning';
       default:
         return 'bg-muted text-foreground';
     }
@@ -159,7 +159,7 @@ export default function ComplianceShow({ auth, obligation }: Props) {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back Link */}
           <div className="mb-4">
-            <Link href={complianceIndex.url()} className="text-sm text-blue-600 hover:underline">
+            <Link href={complianceIndex.url()} className="text-sm text-status-info hover:underline">
               ← Back to Compliance
             </Link>
           </div>
@@ -283,7 +283,7 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                       {evidenceItems.map((ev) => (
                         <div key={ev.id} className="flex items-center justify-between p-4 border rounded-lg">
                           <div className="flex items-center gap-3">
-                            <FileCheck className="w-6 h-6 text-green-500" />
+                            <FileCheck className="w-6 h-6 text-status-success" />
                             <div>
                               <p className="font-medium">{ev.title}</p>
                               <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -323,7 +323,7 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                             <span className="text-sm">{reminder.days_before_due} days before due</span>
                           </div>
                           <Badge className={cn(
-                            reminder.status === 'sent' && 'bg-green-100 text-green-800',
+                            reminder.status === 'sent' && 'bg-status-success-bg text-status-success',
                             reminder.status === 'pending' && 'bg-muted text-foreground',
                           )}>
                             {reminder.status}
@@ -340,18 +340,18 @@ export default function ComplianceShow({ auth, obligation }: Props) {
             <div className="space-y-6">
               {/* Status Card */}
               <Card className={cn(
-                obligation.status === 'overdue' && 'border-red-200 bg-red-50',
-                obligation.status === 'due_soon' && 'border-yellow-200 bg-yellow-50',
-                obligation.status === 'complete' && 'border-green-200 bg-green-50',
+                obligation.status === 'overdue' && 'border-status-critical/30 bg-status-critical-bg',
+                obligation.status === 'due_soon' && 'border-status-warning/30 bg-status-warning-bg',
+                obligation.status === 'complete' && 'border-status-success/30 bg-status-success-bg',
               )}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     {obligation.status === 'complete' ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <CheckCircle className="w-5 h-5 text-status-success" />
                     ) : obligation.status === 'overdue' ? (
-                      <AlertTriangle className="w-5 h-5 text-red-500" />
+                      <AlertTriangle className="w-5 h-5 text-status-critical" />
                     ) : (
-                      <Clock className="w-5 h-5 text-yellow-500" />
+                      <Clock className="w-5 h-5 text-status-warning" />
                     )}
                     Status
                   </CardTitle>
@@ -359,8 +359,8 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                 <CardContent>
                   {obligation.status === 'complete' ? (
                     <div>
-                      <p className="text-green-800 font-medium">Completed</p>
-                      <p className="text-sm text-green-600">
+                      <p className="text-status-success font-medium">Completed</p>
+                      <p className="text-sm text-status-success">
                         {obligation.completed_at} by {obligation.completed_by?.name}
                       </p>
                     </div>
@@ -368,9 +368,9 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                     <div>
                       <p className="text-2xl font-bold">
                         {daysRemaining() < 0 ? (
-                          <span className="text-red-600">{Math.abs(daysRemaining())} days overdue</span>
+                          <span className="text-status-critical">{Math.abs(daysRemaining())} days overdue</span>
                         ) : (
-                          <span className={daysRemaining() <= 7 ? 'text-yellow-600' : 'text-foreground'}>
+                          <span className={daysRemaining() <= 7 ? 'text-status-warning' : 'text-foreground'}>
                             {daysRemaining()} days remaining
                           </span>
                         )}
@@ -408,12 +408,12 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                     <p className="text-sm text-muted-foreground">Evidence</p>
                     <p className="font-medium">
                       {obligation.evidence_provided ? (
-                        <span className="text-green-600 flex items-center gap-1">
+                        <span className="text-status-success flex items-center gap-1">
                           <CheckCircle className="w-4 h-4" />
                           Provided
                         </span>
                       ) : obligation.evidence_required ? (
-                        <span className="text-red-600">Required - Not provided</span>
+                        <span className="text-status-critical">Required - Not provided</span>
                       ) : (
                         <span className="text-muted-foreground">Not required</span>
                       )}
@@ -423,11 +423,11 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                     <div>
                       <p className="text-sm text-muted-foreground">Sign-off</p>
                       {obligation.signed_off_at ? (
-                        <p className="text-green-600 text-sm">
+                        <p className="text-status-success text-sm">
                           Signed by {obligation.signed_off_by?.name} on {obligation.signed_off_at}
                         </p>
                       ) : (
-                        <p className="text-yellow-600 text-sm">Pending sign-off</p>
+                        <p className="text-status-warning text-sm">Pending sign-off</p>
                       )}
                     </div>
                   )}

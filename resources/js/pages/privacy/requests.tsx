@@ -46,17 +46,17 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'completed':
-                return 'bg-green-100 text-green-800 border-green-200';
+                return 'bg-status-success-bg text-status-success border-status-success/30';
             case 'in_progress':
-                return 'bg-blue-100 text-blue-800 border-blue-200';
+                return 'bg-status-info-bg text-status-info border-status-info/30';
             case 'received':
             case 'under_review':
             case 'identity_verification':
-                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'rejected':
-                return 'bg-red-100 text-red-800 border-red-200';
+                return 'bg-status-critical-bg text-status-critical border-status-critical/30';
             case 'overdue':
-                return 'bg-orange-100 text-orange-800 border-orange-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             default:
                 return 'bg-muted text-foreground border-border';
         }
@@ -190,30 +190,30 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 font-semibold">
-                                                    {isOverdue && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                                                    {isOverdue && <AlertTriangle className="h-4 w-4 text-status-critical" />}
                                                     {request.reference_number}
                                                 </div>
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     <Badge className={getStatusColor(request.status)}>
                                                         {STATUS_LABELS[request.status] ?? request.status.replace(/_/g, ' ')}
                                                     </Badge>
-                                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                                                    <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info">
                                                         {getRequestTypeLabel(request.request_type)}
                                                     </Badge>
                                                     {isOverdue && (
-                                                        <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
+                                                        <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                                             <AlertTriangle className="mr-1 h-3 w-3" />
                                                             {Math.abs(daysRemaining)} days overdue
                                                         </Badge>
                                                     )}
                                                     {!isOverdue && isDueSoon && (
-                                                        <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
+                                                        <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                                             <Clock className="mr-1 h-3 w-3" />
                                                             {daysRemaining} days remaining
                                                         </Badge>
                                                     )}
                                                     {isIdentityVerified && (
-                                                        <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                                                        <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
                                                             Identity Verified
                                                         </Badge>
                                                     )}

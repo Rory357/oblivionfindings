@@ -31,32 +31,32 @@ const PRIORITY_BORDER: Record<string, string> = {
 };
 
 const PRIORITY_TEXT: Record<string, string> = {
-    critical: 'text-red-600 dark:text-red-400',
-    high: 'text-amber-600 dark:text-amber-400',
-    medium: 'text-blue-600 dark:text-blue-400',
+    critical: 'text-status-critical dark:text-status-critical',
+    high: 'text-status-warning dark:text-status-warning',
+    medium: 'text-status-info dark:text-status-info',
     low: 'text-muted-foreground dark:text-muted-foreground',
 };
 
 const CATEGORY_BADGE: Record<string, string> = {
-    health: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-    social: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    independence: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    health: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    social: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    independence: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     skills: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
-    wellbeing: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    wellbeing: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
 };
 
 const STATUS_ICON: Record<string, { icon: typeof CheckCircle2; className: string }> = {
-    completed: { icon: CheckCircle2, className: 'text-emerald-500' },
-    in_progress: { icon: Clock, className: 'text-blue-500' },
+    completed: { icon: CheckCircle2, className: 'text-status-success' },
+    in_progress: { icon: Clock, className: 'text-status-info' },
     not_started: { icon: Circle, className: 'text-muted-foreground' },
-    on_hold: { icon: Pause, className: 'text-amber-500' },
+    on_hold: { icon: Pause, className: 'text-status-warning' },
 };
 
 const PROGRESS_COLOR: Record<string, string> = {
-    completed: 'bg-emerald-500',
-    in_progress: 'bg-blue-500',
-    not_started: 'bg-slate-400',
-    on_hold: 'bg-amber-500',
+    completed: 'bg-status-success',
+    in_progress: 'bg-status-info',
+    not_started: 'bg-muted',
+    on_hold: 'bg-status-warning',
 };
 
 function formatDate(date: string | null | undefined): string {
@@ -133,12 +133,12 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                                 value={goal.progress_percentage}
                                 className={`h-1.5 flex-1 ${
                                     goal.status === 'completed'
-                                        ? '[&>div]:bg-emerald-500'
+                                        ? '[&>div]:bg-status-success'
                                         : goal.status === 'in_progress'
-                                          ? '[&>div]:bg-blue-500'
+                                          ? '[&>div]:bg-status-info'
                                           : goal.status === 'on_hold'
-                                            ? '[&>div]:bg-amber-500'
-                                            : '[&>div]:bg-slate-400'
+                                            ? '[&>div]:bg-status-warning'
+                                            : '[&>div]:bg-muted'
                                 }`}
                             />
                             <span className="text-xs tabular-nums text-muted-foreground shrink-0">
@@ -149,8 +149,8 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                         {/* Target date */}
                         {goal.target_date && (
                             <div className="mt-1.5 flex items-center gap-1">
-                                <Calendar className={`h-3 w-3 ${overdue ? 'text-red-500' : 'text-muted-foreground'}`} />
-                                <span className={`text-[11px] ${overdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+                                <Calendar className={`h-3 w-3 ${overdue ? 'text-status-critical' : 'text-muted-foreground'}`} />
+                                <span className={`text-[11px] ${overdue ? 'text-status-critical dark:text-status-critical font-medium' : 'text-muted-foreground'}`}>
                                     {overdue ? 'Overdue: ' : 'Target: '}
                                     {formatDate(goal.target_date)}
                                 </span>
@@ -191,7 +191,7 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        className="h-6 text-[11px] px-2 text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-950/30"
+                                        className="h-6 text-[11px] px-2 text-status-info border-status-info/30 hover:bg-status-info-bg dark:text-status-info dark:border-status-info/30 dark:hover:bg-status-info"
                                         onClick={handleStart}
                                     >
                                         Start
@@ -201,7 +201,7 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        className="h-6 text-[11px] px-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-950/30"
+                                        className="h-6 text-[11px] px-2 text-status-success border-status-success/30 hover:bg-status-success-bg dark:text-status-success dark:border-status-success/30 dark:hover:bg-status-success"
                                         onClick={handleMarkAchieved}
                                     >
                                         <CheckCircle2 className="h-3 w-3 mr-0.5" />

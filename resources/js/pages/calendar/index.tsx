@@ -123,12 +123,12 @@ function eventTone(
     if (status === 'cancelled')
         return 'border-border bg-muted text-foreground';
     if (status === 'completed')
-        return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+        return 'border-status-success/30 bg-status-success-bg text-status-success';
     if (hasActiveReplacement)
-        return 'border-amber-200 bg-amber-50 text-amber-900';
-    if (isOpenShift) return 'border-red-200 bg-red-50 text-red-800';
+        return 'border-status-warning/30 bg-status-warning-bg text-status-warning';
+    if (isOpenShift) return 'border-status-critical/30 bg-status-critical-bg text-status-critical';
     if (status === 'in_progress')
-        return 'border-blue-200 bg-blue-50 text-blue-800';
+        return 'border-status-info/30 bg-status-info-bg text-status-info';
     return 'border-border bg-background text-foreground';
 }
 
@@ -785,7 +785,7 @@ export default function CalendarIndex(props: Props) {
                                 <div className="text-muted-foreground">
                                     Coverage gaps
                                 </div>
-                                <div className="mt-1 text-sm font-semibold text-red-500">
+                                <div className="mt-1 text-sm font-semibold text-status-critical">
                                     {rangeSummary.coverageGaps}
                                 </div>
                             </div>
@@ -793,23 +793,23 @@ export default function CalendarIndex(props: Props) {
 
                         <div className="mb-4 grid gap-2 rounded-lg border p-3 text-xs text-muted-foreground sm:grid-cols-4">
                             <div className="flex items-center gap-2">
-                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-400" />
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-status-critical" />
                                 Open or unassigned shift
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-status-warning" />
                                 Replacement in progress
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" />
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-status-info" />
                                 In progress
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-status-success" />
                                 Completed
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-300" />
+                                <span className="inline-block h-2.5 w-2.5 rounded-full bg-status-critical" />
                                 Background coverage gap
                             </div>
                         </div>
@@ -1051,18 +1051,18 @@ export default function CalendarIndex(props: Props) {
                         )}
 
                         {viewInfo?.eventType === 'coverage_gap' && (
-                            <div className="grid gap-2 rounded-md border border-red-200 bg-red-50/60 p-3 text-sm">
-                                <div className="font-medium text-red-700">
+                            <div className="grid gap-2 rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm">
+                                <div className="font-medium text-status-critical">
                                     {gapKindLabel(viewInfo.coverageGapKind)}
                                 </div>
-                                <div className="text-red-700/90">
+                                <div className="text-status-critical">
                                     {viewInfo.siteName ?? 'Site'} needs{' '}
                                     {viewInfo.coverageRequiredStaff ?? 0} staff
                                     in this window and only has{' '}
                                     {viewInfo.coverageAssignedStaff ?? 0}{' '}
                                     assigned.
                                 </div>
-                                <div className="text-red-700/90">
+                                <div className="text-status-critical">
                                     Missing {viewInfo.coverageMissingStaff ?? 0}{' '}
                                     staff
                                     {viewInfo.coverageWindowLabel
@@ -1076,7 +1076,7 @@ export default function CalendarIndex(props: Props) {
                                             (role) => (
                                                 <span
                                                     key={`coverage-role-${role.key}`}
-                                                    className="rounded-full border border-red-200 bg-white/70 px-2 py-1 text-[11px] font-medium"
+                                                    className="rounded-full border border-status-critical/30 bg-white/70 px-2 py-1 text-[11px] font-medium"
                                                 >
                                                     {role.label ?? role.key}{' '}
                                                     still needed x
@@ -1093,7 +1093,7 @@ export default function CalendarIndex(props: Props) {
                                             (issue) => (
                                                 <span
                                                     key={`coverage-issue-${issue}`}
-                                                    className="rounded-full border border-red-200 bg-white/70 px-2 py-1 text-[11px] font-medium"
+                                                    className="rounded-full border border-status-critical/30 bg-white/70 px-2 py-1 text-[11px] font-medium"
                                                 >
                                                     {issue ===
                                                     'headcount_exact_but_role_gap'
@@ -1189,7 +1189,7 @@ export default function CalendarIndex(props: Props) {
                                 <div className="grid gap-3 rounded-md border p-3 text-sm">
                                     <div className="flex flex-wrap gap-2">
                                         {viewInfo.isOpenShift ? (
-                                            <span className="rounded-full border px-2 py-1 text-[11px] font-medium tracking-wide text-red-700 uppercase">
+                                            <span className="rounded-full border px-2 py-1 text-[11px] font-medium tracking-wide text-status-critical uppercase">
                                                 Open shift
                                             </span>
                                         ) : null}
@@ -1199,7 +1199,7 @@ export default function CalendarIndex(props: Props) {
                                             </span>
                                         ) : null}
                                         {viewInfo.hasActiveReplacement ? (
-                                            <span className="rounded-full border px-2 py-1 text-[11px] font-medium tracking-wide text-amber-700 uppercase">
+                                            <span className="rounded-full border px-2 py-1 text-[11px] font-medium tracking-wide text-status-warning uppercase">
                                                 Replacement{' '}
                                                 {viewInfo.replacementStatus ??
                                                     'active'}

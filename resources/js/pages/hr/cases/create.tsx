@@ -59,11 +59,11 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
     const getSeverityColor = (severity: string) => {
         switch (severity) {
             case 'critical':
-                return 'text-red-600 bg-red-50';
+                return 'text-status-critical bg-status-critical-bg';
             case 'high':
-                return 'text-orange-600 bg-orange-50';
+                return 'text-status-warning bg-status-warning-bg';
             case 'medium':
-                return 'text-yellow-600 bg-yellow-50';
+                return 'text-status-warning bg-status-warning-bg';
             case 'low':
                 return 'text-muted-foreground bg-muted';
             default:
@@ -84,7 +84,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                         </Button>
                     </Link>
                     <div className="flex items-center gap-3">
-                        <Briefcase className="h-6 w-6 text-blue-500" />
+                        <Briefcase className="h-6 w-6 text-status-info" />
                         <div>
                             <h1 className="text-2xl font-bold">New HR Case</h1>
                             <p className="text-muted-foreground">
@@ -104,7 +104,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                 <div className="space-y-2">
                                     <Label htmlFor="user_id">
                                         Subject (Staff Member){' '}
-                                        <span className="text-red-500">*</span>
+                                        <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.user_id}
@@ -116,7 +116,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                             id="user_id"
                                             className={
                                                 errors.user_id
-                                                    ? 'border-red-500'
+                                                    ? 'border-status-critical/30'
                                                     : ''
                                             }
                                         >
@@ -134,7 +134,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.user_id && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-status-critical">
                                             {errors.user_id}
                                         </p>
                                     )}
@@ -177,7 +177,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                 <div className="space-y-2">
                                     <Label htmlFor="case_type">
                                         Case Type{' '}
-                                        <span className="text-red-500">*</span>
+                                        <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.case_type}
@@ -189,7 +189,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                             id="case_type"
                                             className={
                                                 errors.case_type
-                                                    ? 'border-red-500'
+                                                    ? 'border-status-critical/30'
                                                     : ''
                                             }
                                         >
@@ -207,7 +207,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.case_type && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-status-critical">
                                             {errors.case_type}
                                         </p>
                                     )}
@@ -216,7 +216,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                 <div className="space-y-2">
                                     <Label htmlFor="severity">
                                         Severity{' '}
-                                        <span className="text-red-500">*</span>
+                                        <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.severity}
@@ -228,7 +228,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                             id="severity"
                                             className={
                                                 errors.severity
-                                                    ? 'border-red-500'
+                                                    ? 'border-status-critical/30'
                                                     : ''
                                             }
                                         >
@@ -249,7 +249,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.severity && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-status-critical">
                                             {errors.severity}
                                         </p>
                                     )}
@@ -259,7 +259,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                             <div className="space-y-2">
                                 <Label htmlFor="title">
                                     Case Title{' '}
-                                    <span className="text-red-500">*</span>
+                                    <span className="text-status-critical">*</span>
                                 </Label>
                                 <Input
                                     id="title"
@@ -269,11 +269,11 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                         setData('title', e.target.value)
                                     }
                                     className={
-                                        errors.title ? 'border-red-500' : ''
+                                        errors.title ? 'border-status-critical/30' : ''
                                     }
                                 />
                                 {errors.title && (
-                                    <p className="text-sm text-red-500">
+                                    <p className="text-sm text-status-critical">
                                         {errors.title}
                                     </p>
                                 )}
@@ -291,12 +291,12 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                     }
                                     className={
                                         errors.description
-                                            ? 'border-red-500'
+                                            ? 'border-status-critical/30'
                                             : ''
                                     }
                                 />
                                 {errors.description && (
-                                    <p className="text-sm text-red-500">
+                                    <p className="text-sm text-status-critical">
                                         {errors.description}
                                     </p>
                                 )}

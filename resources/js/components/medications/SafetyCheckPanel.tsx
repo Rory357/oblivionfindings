@@ -33,18 +33,18 @@ interface Props {
 }
 
 const severityConfig = {
-  info: { icon: Info, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
-  caution: { icon: AlertCircle, color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' },
-  warning: { icon: AlertTriangle, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
-  danger: { icon: ShieldAlert, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
+  info: { icon: Info, color: 'text-status-info', bgColor: 'bg-status-info-bg', borderColor: 'border-status-info/30' },
+  caution: { icon: AlertCircle, color: 'text-status-warning', bgColor: 'bg-status-warning-bg', borderColor: 'border-status-warning/30' },
+  warning: { icon: AlertTriangle, color: 'text-status-warning', bgColor: 'bg-status-warning-bg', borderColor: 'border-status-warning/30' },
+  danger: { icon: ShieldAlert, color: 'text-status-critical', bgColor: 'bg-status-critical-bg', borderColor: 'border-status-critical/30' },
 };
 
 const levelConfig = {
-  safe: { icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
-  caution: { icon: AlertCircle, color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' },
-  warning: { icon: AlertTriangle, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
-  danger: { icon: ShieldAlert, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
-  blocked: { icon: Ban, color: 'text-red-700', bgColor: 'bg-red-100', borderColor: 'border-red-300' },
+  safe: { icon: CheckCircle, color: 'text-status-success', bgColor: 'bg-status-success-bg', borderColor: 'border-status-success/30' },
+  caution: { icon: AlertCircle, color: 'text-status-warning', bgColor: 'bg-status-warning-bg', borderColor: 'border-status-warning/30' },
+  warning: { icon: AlertTriangle, color: 'text-status-warning', bgColor: 'bg-status-warning-bg', borderColor: 'border-status-warning/30' },
+  danger: { icon: ShieldAlert, color: 'text-status-critical', bgColor: 'bg-status-critical-bg', borderColor: 'border-status-critical/30' },
+  blocked: { icon: Ban, color: 'text-status-critical', bgColor: 'bg-status-critical-bg', borderColor: 'border-status-critical/30' },
 };
 
 export default function SafetyCheckPanel({ safetyCheck, onOverride, showDetails = true }: Props) {
@@ -83,7 +83,7 @@ export default function SafetyCheckPanel({ safetyCheck, onOverride, showDetails 
       </CardHeader>
       <CardContent className="space-y-3">
         {safetyCheck.blocked && (
-          <div className="rounded-md border border-red-200 bg-red-100 p-3 text-red-800">
+          <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-status-critical">
             <div className="flex items-start gap-2">
               <Ban className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
@@ -131,7 +131,7 @@ export default function SafetyCheckPanel({ safetyCheck, onOverride, showDetails 
               type="button"
               variant="outline"
               onClick={onOverride}
-              className="border-red-300 text-red-700 hover:bg-red-50"
+              className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
             >
               Override (Manager Required)
             </Button>
@@ -139,7 +139,7 @@ export default function SafetyCheckPanel({ safetyCheck, onOverride, showDetails 
         )}
 
         {safetyCheck.can_proceed && safetyCheck.warnings.length === 0 && (
-          <div className="flex items-center gap-2 text-sm text-green-700">
+          <div className="flex items-center gap-2 text-sm text-status-success">
             <CheckCircle className="h-4 w-4" />
             <span>All safety checks passed. Safe to administer.</span>
           </div>

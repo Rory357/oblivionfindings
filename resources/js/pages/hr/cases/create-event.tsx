@@ -63,7 +63,7 @@ export default function CreateEvent({ hrCase, eventTypes }: Props) {
                         </Button>
                     </Link>
                     <div className="flex items-center gap-3">
-                        <Clock className="h-6 w-6 text-blue-500" />
+                        <Clock className="h-6 w-6 text-status-info" />
                         <div>
                             <h1 className="text-2xl font-bold">Add Timeline Event</h1>
                             <p className="text-muted-foreground">
@@ -82,13 +82,13 @@ export default function CreateEvent({ hrCase, eventTypes }: Props) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="event_type">
-                                        Event Type <span className="text-red-500">*</span>
+                                        Event Type <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.event_type}
                                         onValueChange={(value) => setData('event_type', value)}
                                     >
-                                        <SelectTrigger id="event_type" className={errors.event_type ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="event_type" className={errors.event_type ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select event type" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -100,40 +100,40 @@ export default function CreateEvent({ hrCase, eventTypes }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.event_type && (
-                                        <p className="text-sm text-red-500">{errors.event_type}</p>
+                                        <p className="text-sm text-status-critical">{errors.event_type}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="occurred_at">
-                                        Date & Time <span className="text-red-500">*</span>
+                                        Date & Time <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="occurred_at"
                                         type="datetime-local"
                                         value={data.occurred_at}
                                         onChange={(e) => setData('occurred_at', e.target.value)}
-                                        className={errors.occurred_at ? 'border-red-500' : ''}
+                                        className={errors.occurred_at ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.occurred_at && (
-                                        <p className="text-sm text-red-500">{errors.occurred_at}</p>
+                                        <p className="text-sm text-status-critical">{errors.occurred_at}</p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="title">
-                                    Title <span className="text-red-500">*</span>
+                                    Title <span className="text-status-critical">*</span>
                                 </Label>
                                 <Input
                                     id="title"
                                     placeholder="Brief title for this event"
                                     value={data.title}
                                     onChange={(e) => setData('title', e.target.value)}
-                                    className={errors.title ? 'border-red-500' : ''}
+                                    className={errors.title ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.title && (
-                                    <p className="text-sm text-red-500">{errors.title}</p>
+                                    <p className="text-sm text-status-critical">{errors.title}</p>
                                 )}
                             </div>
 
@@ -145,10 +145,10 @@ export default function CreateEvent({ hrCase, eventTypes }: Props) {
                                     rows={5}
                                     value={data.description}
                                     onChange={(e) => setData('description', e.target.value)}
-                                    className={errors.description ? 'border-red-500' : ''}
+                                    className={errors.description ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.description && (
-                                    <p className="text-sm text-red-500">{errors.description}</p>
+                                    <p className="text-sm text-status-critical">{errors.description}</p>
                                 )}
                             </div>
 

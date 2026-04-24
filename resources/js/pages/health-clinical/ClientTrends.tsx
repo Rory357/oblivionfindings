@@ -333,7 +333,7 @@ export default function ClientTrends({
                                 { dataKey: 'weight_kg', name: 'Weight (kg)', color: '#059669' },
                             ]}
                             tooltipFormatter={(value) => [`${Number(value).toFixed(1)} kg`, 'Weight']}
-                            icon={<Scale className="h-4 w-4 text-emerald-600" />}
+                            icon={<Scale className="h-4 w-4 text-status-success" />}
                         />
 
                         <TrendChartCard
@@ -349,7 +349,7 @@ export default function ClientTrends({
                                 `${Number(value).toFixed(0)}/10${payload.location ? ` · ${payload.location}` : ''}`,
                                 'Pain Score',
                             ]}
-                            icon={<Activity className="h-4 w-4 text-rose-600" />}
+                            icon={<Activity className="h-4 w-4 text-status-critical" />}
                         />
 
                         <TrendChartCard
@@ -366,7 +366,7 @@ export default function ClientTrends({
                                 { dataKey: 'pulse', name: 'Pulse', color: '#f59e0b' },
                             ]}
                             tooltipFormatter={(value, name) => [String(value), name]}
-                            icon={<HeartPulse className="h-4 w-4 text-blue-600" />}
+                            icon={<HeartPulse className="h-4 w-4 text-status-info" />}
                         />
 
                         <TrendChartCard
@@ -384,7 +384,7 @@ export default function ClientTrends({
                                 `${Number(value).toFixed(0)} ml${payload.fluid_type ? ` · ${payload.fluid_type}` : ''}`,
                                 'Fluid Intake',
                             ]}
-                            icon={<Droplets className="h-4 w-4 text-cyan-600" />}
+                            icon={<Droplets className="h-4 w-4 text-status-info" />}
                         />
                     </div>
                 )}

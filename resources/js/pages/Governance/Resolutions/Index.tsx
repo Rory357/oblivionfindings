@@ -33,23 +33,23 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
   const getStatusColor = (status: string) => {
     return {
       draft: 'bg-muted text-foreground',
-      proposed: 'bg-blue-100 text-blue-800',
-      open: 'bg-green-100 text-green-800',
+      proposed: 'bg-status-info-bg text-status-info',
+      open: 'bg-status-success-bg text-status-success',
       closed: 'bg-primary/10 text-primary',
-      implemented: 'bg-green-100 text-green-800',
+      implemented: 'bg-status-success-bg text-status-success',
       archived: 'bg-muted text-foreground',
-      cancelled: 'bg-red-100 text-red-800',
+      cancelled: 'bg-status-critical-bg text-status-critical',
     }[status] || 'bg-muted text-foreground';
   };
 
   const getOutcomeBadge = (outcome: string | null) => {
     if (!outcome) return null;
     return outcome === 'carried' ? (
-      <Badge className="bg-green-100 text-green-800">
+      <Badge className="bg-status-success-bg text-status-success">
         <CheckCircle className="w-3 h-3 mr-1" /> Carried
       </Badge>
     ) : (
-      <Badge className="bg-red-100 text-red-800">
+      <Badge className="bg-status-critical-bg text-status-critical">
         <AlertCircle className="w-3 h-3 mr-1" /> Defeated
       </Badge>
     );
@@ -79,9 +79,9 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
 
           {/* Pending Votes Alert */}
           {my_pending_votes.length > 0 && (
-            <Card className="mb-6 border-orange-200 bg-orange-50">
+            <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-800">
+                <CardTitle className="flex items-center gap-2 text-status-warning">
                   <Vote className="w-5 h-5" />
                   Your Vote Required ({my_pending_votes.length})
                 </CardTitle>
@@ -91,7 +91,7 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
                   {my_pending_votes.map((vote) => (
                     <div
                       key={vote.id}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-100"
+                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-status-warning/30"
                     >
                       <div>
                         <p className="font-medium text-foreground">{vote.title}</p>
@@ -126,7 +126,7 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
                         <h3 className="font-semibold text-foreground">
                           <Link
                             href={showResolution.url({ resolution: resolution.id })}
-                            className="hover:text-blue-600"
+                            className="hover:text-status-info"
                           >
                             {resolution.title}
                           </Link>

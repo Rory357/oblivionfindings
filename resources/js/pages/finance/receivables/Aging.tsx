@@ -43,19 +43,19 @@ const formatNZD = (amount: number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const bucketColors: Record<string, string> = {
-    current: 'text-emerald-700 dark:text-emerald-400',
-    '1_30': 'text-yellow-700 dark:text-yellow-400',
-    '31_60': 'text-orange-700 dark:text-orange-400',
-    '61_90': 'text-red-600 dark:text-red-400',
-    '90_plus': 'text-red-800 dark:text-red-300 font-semibold',
+    current: 'text-status-success dark:text-status-success',
+    '1_30': 'text-status-warning dark:text-status-warning',
+    '31_60': 'text-status-warning dark:text-status-warning',
+    '61_90': 'text-status-critical dark:text-status-critical',
+    '90_plus': 'text-status-critical dark:text-status-critical font-semibold',
 };
 
 const bucketBgColors: Record<string, string> = {
-    current: 'bg-emerald-50 dark:bg-emerald-950/30',
-    '1_30': 'bg-yellow-50 dark:bg-yellow-950/30',
-    '31_60': 'bg-orange-50 dark:bg-orange-950/30',
-    '61_90': 'bg-red-50 dark:bg-red-950/20',
-    '90_plus': 'bg-red-100 dark:bg-red-950/40',
+    current: 'bg-status-success-bg dark:bg-status-success',
+    '1_30': 'bg-status-warning-bg dark:bg-status-warning',
+    '31_60': 'bg-status-warning-bg dark:bg-status-warning',
+    '61_90': 'bg-status-critical-bg dark:bg-status-critical',
+    '90_plus': 'bg-status-critical-bg dark:bg-status-critical',
 };
 
 const breadcrumbs: BreadcrumbItem[] = [

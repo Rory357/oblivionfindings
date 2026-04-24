@@ -1153,21 +1153,21 @@ export default function RoadmapDashboard({
                 </div>
 
                 {summary.status === 'unavailable' && (
-                    <Card className="border-amber-300 bg-amber-50">
+                    <Card className="border-status-warning/30 bg-status-warning-bg">
                         <CardContent className="space-y-2 py-4 text-sm">
-                            <div className="font-medium text-amber-900">
+                            <div className="font-medium text-status-warning">
                                 Roadmap module is not ready in this environment.
                             </div>
-                            <div className="text-amber-900">
+                            <div className="text-status-warning">
                                 Reason: {summary.reason ?? 'Missing roadmap tables or seed data.'}
                             </div>
-                            <div className="font-mono text-xs text-amber-900">
+                            <div className="font-mono text-xs text-status-warning">
                                 php artisan migrate
                             </div>
-                            <div className="font-mono text-xs text-amber-900">
+                            <div className="font-mono text-xs text-status-warning">
                                 php artisan db:seed --class=Database\\Seeders\\RoadmapPermissionsSeeder
                             </div>
-                            <div className="font-mono text-xs text-amber-900">
+                            <div className="font-mono text-xs text-status-warning">
                                 php artisan db:seed --class=Database\\Seeders\\RoadmapSeeder
                             </div>
                         </CardContent>
@@ -1442,7 +1442,7 @@ export default function RoadmapDashboard({
                         {can.manageRoadmap && (
                             <>
                                 {managers.length === 0 && (
-                                    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
                                         No manager users are available to assign as initiative owners.
                                         Add manager roles in Access Control first.
                                     </div>
@@ -1685,9 +1685,9 @@ export default function RoadmapDashboard({
                 </Card>
 
                 {triage.overload && (
-                    <Card className="border-amber-300 bg-amber-50">
+                    <Card className="border-status-warning/30 bg-status-warning-bg">
                         <CardContent className="flex items-center gap-3 py-4">
-                            <AlertTriangle className="h-5 w-5 text-amber-600" />
+                            <AlertTriangle className="h-5 w-5 text-status-warning" />
                             <div className="text-sm">
                                 Triage inbox is overloaded with {triage.pending}{' '}
                                 pending suggestions. Review and convert or

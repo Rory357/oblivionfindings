@@ -140,7 +140,7 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-red-400 hover:text-red-300"
+                                                className="text-status-critical hover:text-status-critical"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </Button>
@@ -155,7 +155,7 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                 <AlertDialogAction
-                                                    className="bg-red-600 hover:bg-red-700"
+                                                    className="bg-status-critical hover:bg-status-critical"
                                                     onClick={() => router.delete(`/sites/checklists/templates/${template.id}`)}
                                                 >
                                                     Delete

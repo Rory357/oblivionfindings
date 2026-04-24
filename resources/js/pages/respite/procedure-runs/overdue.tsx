@@ -18,27 +18,27 @@ export default function OverdueProcedureRuns({ runs }: Props) {
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
                     <h1 className="text-lg font-semibold">Overdue Procedure Runs</h1>
-                    <Badge className="bg-red-100 text-red-800">{runs.data.length}</Badge>
+                    <Badge className="bg-status-critical-bg text-status-critical">{runs.data.length}</Badge>
                 </div>
                 <div className="text-sm text-muted-foreground">Procedure runs that have breached their SLA deadline.</div>
                 <RespiteSubnav />
 
                 <div className="space-y-2">
                     {runs.data.map((r: any) => (
-                        <Card key={r.id} className="border-red-200">
+                        <Card key={r.id} className="border-status-critical/30">
                             <CardHeader>
                                 <CardTitle className="text-base">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
                                             <div className="font-semibold">{r.template?.name || 'Unknown Template'}</div>
                                             <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge className="bg-red-100 text-red-800">{r.status?.replace(/_/g, ' ')}</Badge>
-                                                <Badge className="bg-red-100 text-red-800">SLA Breached</Badge>
+                                                <Badge className="bg-status-critical-bg text-status-critical">{r.status?.replace(/_/g, ' ')}</Badge>
+                                                <Badge className="bg-status-critical-bg text-status-critical">SLA Breached</Badge>
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
                                                 Progress: {r.current_step || 0}/{r.total_steps || 0} steps
                                             </div>
-                                            <div className="mt-1 text-xs text-red-600 font-medium">
+                                            <div className="mt-1 text-xs text-status-critical font-medium">
                                                 SLA Deadline: {formatDateTime(r.sla_deadline)}
                                             </div>
                                             <div className="mt-1 text-xs text-muted-foreground">

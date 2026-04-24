@@ -82,11 +82,11 @@ const filingTypeLabels: Record<string, string> = {
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    validated: { label: 'Validated', className: 'bg-blue-500/10 text-blue-600 border-blue-500/30' },
-    submitted: { label: 'Submitted', className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' },
-    accepted: { label: 'Accepted', className: 'bg-green-500/10 text-green-600 border-green-500/30' },
-    rejected: { label: 'Rejected', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
-    error: { label: 'Error', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
+    validated: { label: 'Validated', className: 'bg-status-info-bg text-status-info border-status-info/30' },
+    submitted: { label: 'Submitted', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
+    accepted: { label: 'Accepted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
+    rejected: { label: 'Rejected', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
+    error: { label: 'Error', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
 export default function IrdFilingsIndex({ filings, availableGstReturns, filters }: PageProps) {
@@ -143,8 +143,8 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500/10">
-                                <CheckCircle className="h-5 w-5 text-green-600" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-success">
+                                <CheckCircle className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Filed</p>
@@ -154,8 +154,8 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-yellow-500/10">
-                                <Clock className="h-5 w-5 text-yellow-600" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-warning">
+                                <Clock className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Pending</p>
@@ -325,7 +325,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
                                                         {formatDate(filing.period_from)} &ndash;{' '}
                                                         {formatDate(filing.period_to)}
                                                     </td>
-                                                    <td className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${amount >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                    <td className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${amount >= 0 ? 'text-status-critical' : 'text-status-success'}`}>
                                                         {formatCurrency(Math.abs(amount))}
                                                         {amount < 0 ? ' (Refund)' : ''}
                                                     </td>

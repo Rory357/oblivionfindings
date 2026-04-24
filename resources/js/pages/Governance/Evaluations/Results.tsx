@@ -12,9 +12,9 @@ interface Props extends PageProps {
 
 const statusColors: Record<string, string> = {
     draft: 'bg-muted text-foreground',
-    open: 'bg-blue-100 text-blue-800',
-    closed: 'bg-green-100 text-green-800',
-    completed: 'bg-green-100 text-green-800',
+    open: 'bg-status-info-bg text-status-info',
+    closed: 'bg-status-success-bg text-status-success',
+    completed: 'bg-status-success-bg text-status-success',
 };
 
 const typeLabels: Record<string, string> = {
@@ -131,7 +131,7 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                                                             {agg.average_score !== undefined && agg.average_score !== null && (
                                                                 <div className="flex items-center gap-3">
                                                                     <span className="text-sm text-muted-foreground">Average Score:</span>
-                                                                    <Badge className="bg-blue-100 text-blue-800 text-lg px-3">
+                                                                    <Badge className="bg-status-info-bg text-status-info text-lg px-3">
                                                                         {typeof agg.average_score === 'number'
                                                                             ? agg.average_score.toFixed(1)
                                                                             : agg.average_score}

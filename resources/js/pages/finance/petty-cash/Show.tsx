@@ -56,9 +56,9 @@ const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const typeConfig: Record<string, { label: string; className: string }> = {
-    top_up: { label: 'Top Up', className: 'bg-green-100 text-green-800' },
-    expense: { label: 'Expense', className: 'bg-red-100 text-red-800' },
-    adjustment: { label: 'Adjustment', className: 'bg-blue-100 text-blue-800' },
+    top_up: { label: 'Top Up', className: 'bg-status-success-bg text-status-success' },
+    expense: { label: 'Expense', className: 'bg-status-critical-bg text-status-critical' },
+    adjustment: { label: 'Adjustment', className: 'bg-status-info-bg text-status-info' },
 };
 
 export default function PettyCashShow({ summary, expenseAccounts }: Props) {
@@ -100,7 +100,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                     </Button>
                     <h1 className="text-2xl font-bold tracking-tight">{fund.name}</h1>
                     {fund.is_active ? (
-                        <Badge variant="outline" className="border-green-300 text-green-600">
+                        <Badge variant="outline" className="border-status-success/30 text-status-success">
                             Active
                         </Badge>
                     ) : (
@@ -126,7 +126,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Variance</p>
                             <p
-                                className={`text-xl font-bold ${fund.variance < 0 ? 'text-destructive' : fund.variance > 0 ? 'text-emerald-600' : ''}`}
+                                className={`text-xl font-bold ${fund.variance < 0 ? 'text-destructive' : fund.variance > 0 ? 'text-status-success' : ''}`}
                             >
                                 {formatCurrency(fund.variance)}
                             </p>
@@ -273,7 +273,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                                                     {txn.account_name ?? '-'}
                                                 </TableCell>
                                                 <TableCell
-                                                    className={`text-right font-medium ${txn.type === 'expense' ? 'text-destructive' : 'text-emerald-600'}`}
+                                                    className={`text-right font-medium ${txn.type === 'expense' ? 'text-destructive' : 'text-status-success'}`}
                                                 >
                                                     {txn.type === 'expense' ? '-' : '+'}
                                                     {formatCurrency(txn.amount)}
@@ -285,7 +285,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     {txn.receipt_path ? (
-                                                        <Receipt className="h-4 w-4 text-emerald-600" />
+                                                        <Receipt className="h-4 w-4 text-status-success" />
                                                     ) : (
                                                         <span className="text-muted-foreground">-</span>
                                                     )}

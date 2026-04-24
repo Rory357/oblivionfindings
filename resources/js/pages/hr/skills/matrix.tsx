@@ -38,10 +38,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const proficiencyColors: Record<string, string> = {
-    beginner: 'bg-red-500/20 text-red-400 border-red-500/30',
-    intermediate: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    advanced: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    expert: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    beginner: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    intermediate: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    advanced: 'bg-status-info-bg text-status-info border-status-info/30',
+    expert: 'bg-status-success-bg text-status-success border-status-success/30',
 };
 
 const proficiencyShort: Record<string, string> = {

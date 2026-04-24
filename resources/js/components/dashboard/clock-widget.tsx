@@ -84,10 +84,10 @@ export function ClockWidget({ activeClock, todayTotal }: ClockWidgetProps) {
                 {isClockedIn ? (
                     <>
                         <span className="relative flex h-2.5 w-2.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
+                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-status-success" />
                         </span>
-                        <span className="text-sm font-medium text-emerald-300">Clocked In</span>
+                        <span className="text-sm font-medium text-status-success">Clocked In</span>
                     </>
                 ) : (
                     <>
@@ -120,7 +120,7 @@ export function ClockWidget({ activeClock, todayTotal }: ClockWidgetProps) {
                     disabled={processing}
                     variant="destructive"
                     size="lg"
-                    className="gap-2 rounded-full px-8 bg-red-500 hover:bg-red-600 shadow-md"
+                    className="gap-2 rounded-full px-8 bg-status-critical hover:bg-status-critical shadow-md"
                 >
                     {processing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

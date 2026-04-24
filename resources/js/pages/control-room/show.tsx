@@ -199,17 +199,17 @@ const SEVERITY_BORDER: Record<string, string> = {
 };
 
 const SEVERITY_BADGE: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-black',
-    low: 'bg-blue-500 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-black',
+    low: 'bg-status-info text-white',
 };
 
 const STATUS_BADGE: Record<string, string> = {
-    open: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-    acknowledged: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-    triaging: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-    resolved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    open: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    acknowledged: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    triaging: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    resolved: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     closed: 'bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground',
 };
 
@@ -322,7 +322,7 @@ function StatusStepper({ alert }: { alert: Alert }) {
                             <div
                                 className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors ${
                                     completed
-                                        ? 'border-green-500 bg-green-500 text-white'
+                                        ? 'border-status-success/30 bg-status-success text-white'
                                         : current
                                           ? 'border-primary bg-primary text-primary-foreground'
                                           : 'border-muted-foreground/30 bg-muted text-muted-foreground'
@@ -333,7 +333,7 @@ function StatusStepper({ alert }: { alert: Alert }) {
                             <span
                                 className={`mt-1.5 text-xs font-medium capitalize ${
                                     completed
-                                        ? 'text-green-600 dark:text-green-400'
+                                        ? 'text-status-success dark:text-status-success'
                                         : current
                                           ? 'text-foreground'
                                           : 'text-muted-foreground'
@@ -352,7 +352,7 @@ function StatusStepper({ alert }: { alert: Alert }) {
                                 <div
                                     className={`h-0.5 w-full rounded ${
                                         i < currentIdx
-                                            ? 'bg-green-500'
+                                            ? 'bg-status-success'
                                             : 'bg-muted-foreground/20'
                                     }`}
                                 />
@@ -380,19 +380,19 @@ function SlaGauge({
 
     const now = Date.now();
     let pct = 100;
-    let colorCls = 'bg-green-500';
-    let textCls = 'text-green-600 dark:text-green-400';
+    let colorCls = 'bg-status-success';
+    let textCls = 'text-status-success dark:text-status-success';
     let statusLabel = 'On Track';
 
     if (breached || (deadline && new Date(deadline).getTime() <= now)) {
         pct = 100;
-        colorCls = 'bg-red-500';
-        textCls = 'text-red-600 dark:text-red-400';
+        colorCls = 'bg-status-critical';
+        textCls = 'text-status-critical dark:text-status-critical';
         statusLabel = 'Breached';
     } else if (met) {
         pct = 100;
-        colorCls = 'bg-green-500';
-        textCls = 'text-green-600 dark:text-green-400';
+        colorCls = 'bg-status-success';
+        textCls = 'text-status-success dark:text-status-success';
         statusLabel = 'Met';
     } else if (deadline) {
         const deadlineMs = new Date(deadline).getTime();
@@ -401,13 +401,13 @@ function SlaGauge({
         pct = Math.min(100, Math.max(5, 100 - (remaining / (remaining + 3600000)) * 100));
         if (remaining < 900000) {
             // < 15 min
-            colorCls = 'bg-red-500';
-            textCls = 'text-red-600 dark:text-red-400';
+            colorCls = 'bg-status-critical';
+            textCls = 'text-status-critical dark:text-status-critical';
             statusLabel = 'At Risk';
         } else if (remaining < 3600000) {
             // < 1hr
-            colorCls = 'bg-yellow-500';
-            textCls = 'text-yellow-600 dark:text-yellow-400';
+            colorCls = 'bg-status-warning';
+            textCls = 'text-status-warning dark:text-status-warning';
             statusLabel = 'At Risk';
         }
     }
@@ -566,7 +566,7 @@ export default function ControlRoomAlertShow({
                             </Badge>
                             <Badge
                                 className={`px-3 py-1 text-sm font-semibold capitalize ${
-                                    SEVERITY_BADGE[alert.severity] ?? 'bg-gray-500 text-white'
+                                    SEVERITY_BADGE[alert.severity] ?? 'bg-muted-foreground/80 text-white'
                                 }`}
                             >
                                 {alert.severity}
@@ -815,8 +815,8 @@ export default function ControlRoomAlertShow({
 
                                                 {/* Affected Residents */}
                                                 {fc?.affected_resident_count != null && fc.affected_resident_count > 0 && (
-                                                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 p-3">
-                                                        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400"><Users className="h-3 w-3" /> Affected Residents ({fc.affected_resident_count})</div>
+                                                    <div className="rounded-md bg-status-warning-bg dark:bg-status-warning p-3">
+                                                        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-status-warning dark:text-status-warning"><Users className="h-3 w-3" /> Affected Residents ({fc.affected_resident_count})</div>
                                                     </div>
                                                 )}
 
@@ -1007,15 +1007,15 @@ export default function ControlRoomAlertShow({
                                                     >
                                                         <div className="flex-shrink-0">
                                                             {step.status === 'completed' ? (
-                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-500 text-white">
+                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-status-success text-white">
                                                                     <Check className="h-4 w-4" />
                                                                 </div>
                                                             ) : step.status === 'skipped' ? (
-                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-400 text-white">
+                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-white">
                                                                     <SkipForward className="h-4 w-4" />
                                                                 </div>
                                                             ) : step.status === 'failed' ? (
-                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white">
+                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-status-critical text-white">
                                                                     <XCircle className="h-4 w-4" />
                                                                 </div>
                                                             ) : step.status === 'in_progress' ? (
@@ -1043,9 +1043,9 @@ export default function ControlRoomAlertShow({
                                                                 variant="outline"
                                                                 className={`text-[10px] capitalize ${
                                                                     step.status === 'completed'
-                                                                        ? 'border-green-500 text-green-600'
+                                                                        ? 'border-status-success/30 text-status-success'
                                                                         : step.status === 'failed'
-                                                                          ? 'border-red-500 text-red-600'
+                                                                          ? 'border-status-critical/30 text-status-critical'
                                                                           : step.status ===
                                                                               'in_progress'
                                                                             ? 'border-primary text-primary'
@@ -1076,7 +1076,7 @@ export default function ControlRoomAlertShow({
                                                                                 )
                                                                             }
                                                                         >
-                                                                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                                            <CheckCircle2 className="h-4 w-4 text-status-success" />
                                                                         </Button>
                                                                         <Button
                                                                             variant="ghost"
@@ -1392,7 +1392,7 @@ export default function ControlRoomAlertShow({
                             <CardContent className="space-y-2">
                                 {/* Acknowledge */}
                                 <Button
-                                    className="w-full justify-start gap-3 h-auto py-3 bg-yellow-500/10 text-yellow-700 border border-yellow-500/30 hover:bg-yellow-500/20 dark:text-yellow-400"
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-status-warning-bg text-status-warning border border-status-warning/30 hover:bg-status-warning dark:text-status-warning"
                                     variant="outline"
                                     disabled={
                                         alert.status !== 'open' || !can.manage || processing
@@ -1410,7 +1410,7 @@ export default function ControlRoomAlertShow({
 
                                 {/* Start Triage */}
                                 <Button
-                                    className="w-full justify-start gap-3 h-auto py-3 bg-blue-500/10 text-blue-700 border border-blue-500/30 hover:bg-blue-500/20 dark:text-blue-400"
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-status-info-bg text-status-info border border-status-info/30 hover:bg-status-info dark:text-status-info"
                                     variant="outline"
                                     disabled={
                                         !['open', 'acknowledged'].includes(alert.status) ||
@@ -1430,7 +1430,7 @@ export default function ControlRoomAlertShow({
 
                                 {/* Resolve */}
                                 <Button
-                                    className="w-full justify-start gap-3 h-auto py-3 bg-green-500/10 text-green-700 border border-green-500/30 hover:bg-green-500/20 dark:text-green-400"
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-status-success-bg text-status-success border border-status-success/30 hover:bg-status-success dark:text-status-success"
                                     variant="outline"
                                     disabled={
                                         alert.status === 'resolved' ||
@@ -1451,7 +1451,7 @@ export default function ControlRoomAlertShow({
 
                                 {/* Close */}
                                 <Button
-                                    className="w-full justify-start gap-3 h-auto py-3 bg-gray-500/10 text-foreground border border-gray-500/30 hover:bg-gray-500/20 dark:text-muted-foreground"
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-muted-foreground/80/10 text-foreground border border-border/30 hover:bg-muted-foreground/80/20 dark:text-muted-foreground"
                                     variant="outline"
                                     disabled={
                                         alert.status !== 'resolved' || !can.manage || processing
@@ -1469,7 +1469,7 @@ export default function ControlRoomAlertShow({
 
                                 {/* Escalate */}
                                 <Button
-                                    className="w-full justify-start gap-3 h-auto py-3 bg-red-500/10 text-red-700 border border-red-500/30 hover:bg-red-500/20 dark:text-red-400"
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-status-critical-bg text-status-critical border border-status-critical/30 hover:bg-status-critical dark:text-status-critical"
                                     variant="outline"
                                     disabled={
                                         alert.status === 'closed' ||
@@ -1659,7 +1659,7 @@ export default function ControlRoomAlertShow({
                             <Button
                                 onClick={handleResolve}
                                 disabled={!resolveNotes.trim() || processing}
-                                className="bg-green-600 hover:bg-green-700 text-white"
+                                className="bg-status-success hover:bg-status-success text-white"
                             >
                                 <CheckCircle2 className="mr-1.5 h-4 w-4" />
                                 Resolve

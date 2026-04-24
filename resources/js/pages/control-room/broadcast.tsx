@@ -148,7 +148,7 @@ function statusBadge(total: number, delivered: number, failed: number) {
         return <Badge variant="destructive">Partial Failure</Badge>;
     }
     if (delivered === total) {
-        return <Badge className="bg-status-success text-status-success-foreground hover:bg-status-success/90">Delivered</Badge>;
+        return <Badge className="bg-status-success-bg text-status-success-foreground hover:bg-status-success/90">Delivered</Badge>;
     }
     return <Badge variant="secondary">Sending</Badge>;
 }

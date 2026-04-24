@@ -471,7 +471,7 @@ function TripRow({
                 <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1.5">
                         {trip.is_personal && (
-                            <Badge className="bg-orange-500 text-white text-[10px]">Personal</Badge>
+                            <Badge className="bg-status-warning text-white text-[10px]">Personal</Badge>
                         )}
                         <Button
                             variant="ghost"
@@ -484,7 +484,7 @@ function TripRow({
                             }}
                         >
                             {trip.is_personal ? (
-                                <UserX className="h-4 w-4 text-orange-500" />
+                                <UserX className="h-4 w-4 text-status-warning" />
                             ) : (
                                 <User className="h-4 w-4 text-muted-foreground" />
                             )}
@@ -540,14 +540,14 @@ function TripRow({
                                     <div className="rounded-md border p-3">
                                         <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Start Address</p>
                                         <p className="mt-1 text-sm flex items-center gap-1">
-                                            <MapPin className="h-3 w-3 shrink-0 text-green-500" />
+                                            <MapPin className="h-3 w-3 shrink-0 text-status-success" />
                                             {trip.start_address ?? '---'}
                                         </p>
                                     </div>
                                     <div className="rounded-md border p-3">
                                         <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">End Address</p>
                                         <p className="mt-1 text-sm flex items-center gap-1">
-                                            <MapPin className="h-3 w-3 shrink-0 text-red-500" />
+                                            <MapPin className="h-3 w-3 shrink-0 text-status-critical" />
                                             {trip.end_address ?? '---'}
                                         </p>
                                     </div>

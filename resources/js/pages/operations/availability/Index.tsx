@@ -81,7 +81,7 @@ export default function AvailabilityIndex({ staff, upcomingLeave }: Props) {
                 <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-3 pt-5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info">
                                 <User className="h-5 w-5" />
                             </div>
                             <div>
@@ -92,7 +92,7 @@ export default function AvailabilityIndex({ staff, upcomingLeave }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 pt-5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success">
                                 <CheckCircle className="h-5 w-5" />
                             </div>
                             <div>
@@ -103,7 +103,7 @@ export default function AvailabilityIndex({ staff, upcomingLeave }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 pt-5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                                 <Calendar className="h-5 w-5" />
                             </div>
                             <div>
@@ -169,7 +169,7 @@ export default function AvailabilityIndex({ staff, upcomingLeave }: Props) {
                                                                 key={day}
                                                                 className={`flex h-8 w-10 flex-col items-center justify-center rounded text-xs ${
                                                                     isAvailable
-                                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                        ? 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success'
                                                                         : 'bg-muted text-muted-foreground'
                                                                 }`}
                                                             >
@@ -193,7 +193,7 @@ export default function AvailabilityIndex({ staff, upcomingLeave }: Props) {
                                                 <div className="space-y-1">
                                                     {timeOff.map((off) => (
                                                         <div key={off.id} className="flex items-center gap-2 text-xs">
-                                                            <Clock className="h-3 w-3 text-amber-500" />
+                                                            <Clock className="h-3 w-3 text-status-warning" />
                                                             <span>
                                                                 {new Date(off.starts_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
                                                                 {' — '}
@@ -215,7 +215,7 @@ export default function AvailabilityIndex({ staff, upcomingLeave }: Props) {
                                                 <div className="space-y-1">
                                                     {memberLeave.map((leave) => (
                                                         <div key={leave.id} className="flex items-center gap-2 text-xs">
-                                                            <Calendar className="h-3 w-3 text-blue-500" />
+                                                            <Calendar className="h-3 w-3 text-status-info" />
                                                             <Badge variant="secondary" className="text-[10px]">
                                                                 {leave.leave_type?.replace(/_/g, ' ') ?? 'Leave'}
                                                             </Badge>

@@ -64,7 +64,7 @@ function actionBadge(action: string) {
         case 'returned':
             return <Badge variant="secondary">Returned</Badge>;
         case 'transferred':
-            return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">Transferred</Badge>;
+            return <Badge className="bg-status-warning-bg text-status-warning hover:bg-status-warning-bg">Transferred</Badge>;
         default:
             return <Badge variant="outline">{action}</Badge>;
     }
@@ -154,8 +154,8 @@ export default function KeyManagement({
                 {/* Dark KPI Cards */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     <FleetStatCard label="TOTAL VEHICLES" value={totalVehicles} icon={Car} subtitle="Tracked vehicles" />
-                    <FleetStatCard label="KEYS OUT" value={keysOut} icon={Unlock} color="amber" valueClassName="text-amber-400" subtitle="Currently checked out" />
-                    <FleetStatCard label="KEYS IN SAFE" value={keysInSafe} icon={Lock} color="amber" valueClassName="text-green-400" subtitle="Returned to safe" />
+                    <FleetStatCard label="KEYS OUT" value={keysOut} icon={Unlock} color="amber" valueClassName="text-status-warning" subtitle="Currently checked out" />
+                    <FleetStatCard label="KEYS IN SAFE" value={keysInSafe} icon={Lock} color="amber" valueClassName="text-status-success" subtitle="Returned to safe" />
                     <FleetStatCard label="TRANSFERS TODAY" value={transfersToday} icon={ArrowLeftRight} subtitle="Activity today" />
                 </div>
 
@@ -295,7 +295,7 @@ export default function KeyManagement({
                                                 </td>
                                                 <td className="py-3 pr-4">
                                                     <div className="flex items-center gap-2">
-                                                        <span className={`h-2 w-2 rounded-full ${h.status === 'checked_out' ? 'bg-amber-500' : 'bg-green-500'}`} />
+                                                        <span className={`h-2 w-2 rounded-full ${h.status === 'checked_out' ? 'bg-status-warning' : 'bg-status-success'}`} />
                                                         {h.holder_name ?? '-'}
                                                     </div>
                                                 </td>

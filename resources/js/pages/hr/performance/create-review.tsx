@@ -109,13 +109,13 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="employee_user_id">
-                                        Staff Member <span className="text-red-500">*</span>
+                                        Staff Member <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.employee_user_id}
                                         onValueChange={(value) => setData('employee_user_id', value)}
                                     >
-                                        <SelectTrigger id="employee_user_id" className={errors.employee_user_id ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="employee_user_id" className={errors.employee_user_id ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select staff member" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -127,19 +127,19 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.employee_user_id && (
-                                        <p className="text-sm text-red-500">{errors.employee_user_id}</p>
+                                        <p className="text-sm text-status-critical">{errors.employee_user_id}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="review_type">
-                                        Review Type <span className="text-red-500">*</span>
+                                        Review Type <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.review_type}
                                         onValueChange={(value) => setData('review_type', value)}
                                     >
-                                        <SelectTrigger id="review_type" className={errors.review_type ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="review_type" className={errors.review_type ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select review type" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -151,39 +151,39 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.review_type && (
-                                        <p className="text-sm text-red-500">{errors.review_type}</p>
+                                        <p className="text-sm text-status-critical">{errors.review_type}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="review_period_start">
-                                        Period Start <span className="text-red-500">*</span>
+                                        Period Start <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="review_period_start"
                                         type="date"
                                         value={data.review_period_start}
                                         onChange={(e) => setData('review_period_start', e.target.value)}
-                                        className={errors.review_period_start ? 'border-red-500' : ''}
+                                        className={errors.review_period_start ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.review_period_start && (
-                                        <p className="text-sm text-red-500">{errors.review_period_start}</p>
+                                        <p className="text-sm text-status-critical">{errors.review_period_start}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="review_period_end">
-                                        Period End <span className="text-red-500">*</span>
+                                        Period End <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="review_period_end"
                                         type="date"
                                         value={data.review_period_end}
                                         onChange={(e) => setData('review_period_end', e.target.value)}
-                                        className={errors.review_period_end ? 'border-red-500' : ''}
+                                        className={errors.review_period_end ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.review_period_end && (
-                                        <p className="text-sm text-red-500">{errors.review_period_end}</p>
+                                        <p className="text-sm text-status-critical">{errors.review_period_end}</p>
                                     )}
                                 </div>
 
@@ -194,10 +194,10 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                         type="date"
                                         value={data.next_review_date}
                                         onChange={(e) => setData('next_review_date', e.target.value)}
-                                        className={errors.next_review_date ? 'border-red-500' : ''}
+                                        className={errors.next_review_date ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.next_review_date && (
-                                        <p className="text-sm text-red-500">{errors.next_review_date}</p>
+                                        <p className="text-sm text-status-critical">{errors.next_review_date}</p>
                                     )}
                                 </div>
 
@@ -236,9 +236,9 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                     rows={4}
                                     value={data.strengths}
                                     onChange={(e) => setData('strengths', e.target.value)}
-                                    className={errors.strengths ? 'border-red-500' : ''}
+                                    className={errors.strengths ? 'border-status-critical/30' : ''}
                                 />
-                                {errors.strengths && <p className="text-sm text-red-500">{errors.strengths}</p>}
+                                {errors.strengths && <p className="text-sm text-status-critical">{errors.strengths}</p>}
                             </div>
 
                             <div className="space-y-2">
@@ -249,10 +249,10 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                     rows={4}
                                     value={data.development_areas}
                                     onChange={(e) => setData('development_areas', e.target.value)}
-                                    className={errors.development_areas ? 'border-red-500' : ''}
+                                    className={errors.development_areas ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.development_areas && (
-                                    <p className="text-sm text-red-500">{errors.development_areas}</p>
+                                    <p className="text-sm text-status-critical">{errors.development_areas}</p>
                                 )}
                             </div>
                         </CardContent>
@@ -280,7 +280,7 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => removeGoal(index)}
-                                            className="text-red-500 hover:text-red-600"
+                                            className="text-status-critical hover:text-status-critical"
                                         >
                                             Remove
                                         </Button>
@@ -312,7 +312,7 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => removeTraining(index)}
-                                            className="text-red-500 hover:text-red-600"
+                                            className="text-status-critical hover:text-status-critical"
                                         >
                                             Remove
                                         </Button>

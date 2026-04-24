@@ -26,13 +26,13 @@ export default function OfflineStatusBanner() {
     const offline = !online;
 
     let tone =
-        'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100';
+        'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/60 dark:bg-status-warning-bg dark:text-status-warning';
     if (!offline && syncing) {
         tone =
-            'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-100';
+            'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/60 dark:bg-status-info-bg dark:text-status-info';
     } else if (!offline && pendingCount > 0) {
         tone =
-            'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-100';
+            'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/60 dark:bg-status-info-bg dark:text-status-info';
     }
 
     const Icon = offline ? CloudOff : RefreshCw;

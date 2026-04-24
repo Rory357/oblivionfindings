@@ -61,17 +61,17 @@ function ActionBadge({ action }: { action: string }) {
     const a = action?.toLowerCase?.() ?? '';
     const config: Record<string, { class: string; icon: React.ReactNode; label: string }> = {
         created: {
-            class: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+            class: 'bg-status-success-bg text-status-success border-status-success/30',
             icon: <Plus className="h-3 w-3 mr-1" />,
             label: 'Created',
         },
         updated: {
-            class: 'bg-amber-100 text-amber-800 border-amber-200',
+            class: 'bg-status-warning-bg text-status-warning border-status-warning/30',
             icon: <Pencil className="h-3 w-3 mr-1" />,
             label: 'Updated',
         },
         deleted: {
-            class: 'bg-rose-100 text-rose-800 border-rose-200',
+            class: 'bg-status-critical-bg text-status-critical border-status-critical/30',
             icon: <Trash2 className="h-3 w-3 mr-1" />,
             label: 'Deleted',
         },

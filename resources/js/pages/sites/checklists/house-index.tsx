@@ -124,9 +124,9 @@ const frequencyLabels: Record<string, string> = {
 };
 
 const runStatusColors: Record<string, string> = {
-    in_progress: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    completed: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    overdue: 'bg-red-500/20 text-red-300 border-red-500/30',
+    in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
+    completed: 'bg-status-success-bg text-status-success border-status-success/30',
+    overdue: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 const runStatusLabels: Record<string, string> = {
@@ -343,7 +343,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                     Site-specific
                                                 </Badge>
                                             ) : (
-                                                <Badge className="bg-slate-500/20 text-slate-300 border-slate-500/30">
+                                                <Badge className="bg-muted-foreground/80/20 text-muted-foreground border-border/30">
                                                     Global
                                                 </Badge>
                                             )}
@@ -417,10 +417,10 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                             <div
                                                                 className={`h-full rounded-full ${
                                                                     run.completion_percentage === 100
-                                                                        ? 'bg-emerald-500'
+                                                                        ? 'bg-status-success'
                                                                         : run.completion_percentage > 50
-                                                                            ? 'bg-blue-500'
-                                                                            : 'bg-amber-500'
+                                                                            ? 'bg-status-info'
+                                                                            : 'bg-status-warning'
                                                                 }`}
                                                                 style={{ width: `${run.completion_percentage}%` }}
                                                             />
@@ -432,7 +432,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                 </TableCell>
                                                 <TableCell>
                                                     {(run.damages_count ?? 0) > 0 ? (
-                                                        <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">
+                                                        <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">
                                                             <AlertTriangle className="w-3 h-3 mr-1" />
                                                             {run.damages_count}
                                                         </Badge>
@@ -498,7 +498,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                         required
                                     />
                                     {templateForm.errors.name && (
-                                        <p className="text-sm text-red-400 mt-1">{templateForm.errors.name}</p>
+                                        <p className="text-sm text-status-critical mt-1">{templateForm.errors.name}</p>
                                     )}
                                 </div>
                                 <div>
@@ -589,7 +589,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-red-400 hover:text-red-300"
+                                                    className="text-status-critical hover:text-status-critical"
                                                     onClick={() => removeItem(index)}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -649,7 +649,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                     <Label className="font-medium">
                                                         {item.question}
                                                         {item.is_required && (
-                                                            <span className="text-red-400 ml-1">*</span>
+                                                            <span className="text-status-critical ml-1">*</span>
                                                         )}
                                                     </Label>
                                                 </div>
@@ -751,16 +751,16 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                             type="button"
                                                             variant="outline"
                                                             size="sm"
-                                                            className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+                                                            className="text-status-warning border-status-warning/30 hover:bg-status-warning"
                                                             onClick={() => toggleDamageForItem(item.id, item.question)}
                                                         >
                                                             <AlertTriangle className="w-3.5 h-3.5 mr-1" />
                                                             Report Damage
                                                         </Button>
                                                     ) : (
-                                                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                                                        <div className="rounded-lg border border-status-warning/30 bg-status-warning p-3 space-y-2">
                                                             <div className="flex items-center justify-between">
-                                                                <span className="text-sm font-medium text-amber-400 flex items-center gap-1">
+                                                                <span className="text-sm font-medium text-status-warning flex items-center gap-1">
                                                                     <AlertTriangle className="w-3.5 h-3.5" />
                                                                     Damage Report
                                                                 </span>
@@ -768,7 +768,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                                     type="button"
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    className="text-red-400 hover:text-red-300 h-6 px-2"
+                                                                    className="text-status-critical hover:text-status-critical h-6 px-2"
                                                                     onClick={() => removeDamageForItem(item.id)}
                                                                 >
                                                                     <Trash2 className="w-3.5 h-3.5" />
@@ -839,7 +839,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                         </div>
                         <DialogFooter className="flex-col sm:flex-row gap-2">
                             {Object.keys(itemDamages).length > 0 && (
-                                <div className="flex items-center gap-1 text-sm text-amber-400 mr-auto">
+                                <div className="flex items-center gap-1 text-sm text-status-warning mr-auto">
                                     <AlertTriangle className="w-4 h-4" />
                                     {Object.keys(itemDamages).length} damage{' '}
                                     {Object.keys(itemDamages).length === 1 ? 'report' : 'reports'} will be created
@@ -893,12 +893,12 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                                                 {resp.response_value ? (
                                                     <Badge className={
                                                         resp.response_value === 'yes' || resp.response_value === 'pass'
-                                                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
                                                             : resp.response_value === 'no' || resp.response_value === 'fail'
-                                                                ? 'bg-red-500/20 text-red-300 border-red-500/30'
+                                                                ? 'bg-status-critical-bg text-status-critical border-status-critical/30'
                                                                 : resp.response_value === 'na'
-                                                                    ? 'bg-slate-500/20 text-slate-300 border-slate-500/30'
-                                                                    : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                                                                    ? 'bg-muted-foreground/80/20 text-muted-foreground border-border/30'
+                                                                    : 'bg-status-info-bg text-status-info border-status-info/30'
                                                     }>
                                                         {resp.response_value === 'yes' ? 'Yes'
                                                             : resp.response_value === 'no' ? 'No'

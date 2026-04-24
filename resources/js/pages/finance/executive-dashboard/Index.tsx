@@ -61,9 +61,9 @@ const $ = (v: string | number) => formatCurrency(Number(v));
 const pct = (v: string | number) => `${Number(v).toFixed(1)}%`;
 
 const severityColor: Record<string, string> = {
-    critical: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800 dark:text-red-300',
-    warning: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300',
-    info: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-300',
+    critical: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
+    warning: 'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
+    info: 'bg-status-info-bg border-status-info/30 text-status-info dark:bg-status-info-bg dark:border-status-info/30 dark:text-status-info',
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -208,7 +208,7 @@ export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummar
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums">{$(c.total_cost)}</TableCell>
-                                                <TableCell className={`text-right tabular-nums ${Number(c.weekly_gap) > 0 ? 'text-red-600' : ''}`}>
+                                                <TableCell className={`text-right tabular-nums ${Number(c.weekly_gap) > 0 ? 'text-status-critical' : ''}`}>
                                                     {$(c.weekly_gap)}
                                                 </TableCell>
                                             </TableRow>

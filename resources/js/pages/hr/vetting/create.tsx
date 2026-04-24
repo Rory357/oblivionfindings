@@ -67,13 +67,13 @@ export default function CreateVetting({ staff, checkTypes }: Props) {
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="space-y-2">
                                 <Label htmlFor="user_id">
-                                    Staff Member <span className="text-red-500">*</span>
+                                    Staff Member <span className="text-status-critical">*</span>
                                 </Label>
                                 <Select
                                     value={data.user_id}
                                     onValueChange={(value) => setData('user_id', value)}
                                 >
-                                    <SelectTrigger id="user_id" className={errors.user_id ? 'border-red-500' : ''}>
+                                    <SelectTrigger id="user_id" className={errors.user_id ? 'border-status-critical/30' : ''}>
                                         <SelectValue placeholder="Select staff member" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -85,19 +85,19 @@ export default function CreateVetting({ staff, checkTypes }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {errors.user_id && (
-                                    <p className="text-sm text-red-500">{errors.user_id}</p>
+                                    <p className="text-sm text-status-critical">{errors.user_id}</p>
                                 )}
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="check_type">
-                                    Check Type <span className="text-red-500">*</span>
+                                    Check Type <span className="text-status-critical">*</span>
                                 </Label>
                                 <Select
                                     value={data.check_type}
                                     onValueChange={(value) => setData('check_type', value)}
                                 >
-                                    <SelectTrigger id="check_type" className={errors.check_type ? 'border-red-500' : ''}>
+                                    <SelectTrigger id="check_type" className={errors.check_type ? 'border-status-critical/30' : ''}>
                                         <SelectValue placeholder="Select check type" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -109,7 +109,7 @@ export default function CreateVetting({ staff, checkTypes }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {errors.check_type && (
-                                    <p className="text-sm text-red-500">{errors.check_type}</p>
+                                    <p className="text-sm text-status-critical">{errors.check_type}</p>
                                 )}
                             </div>
 
@@ -120,10 +120,10 @@ export default function CreateVetting({ staff, checkTypes }: Props) {
                                     value={data.provider}
                                     onChange={(e) => setData('provider', e.target.value)}
                                     placeholder="e.g., NZ Police Vetting Service"
-                                    className={errors.provider ? 'border-red-500' : ''}
+                                    className={errors.provider ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.provider && (
-                                    <p className="text-sm text-red-500">{errors.provider}</p>
+                                    <p className="text-sm text-status-critical">{errors.provider}</p>
                                 )}
                             </div>
 
@@ -134,10 +134,10 @@ export default function CreateVetting({ staff, checkTypes }: Props) {
                                     value={data.reference_number}
                                     onChange={(e) => setData('reference_number', e.target.value)}
                                     placeholder="e.g., VET-12345"
-                                    className={errors.reference_number ? 'border-red-500' : ''}
+                                    className={errors.reference_number ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.reference_number && (
-                                    <p className="text-sm text-red-500">{errors.reference_number}</p>
+                                    <p className="text-sm text-status-critical">{errors.reference_number}</p>
                                 )}
                             </div>
 
@@ -148,10 +148,10 @@ export default function CreateVetting({ staff, checkTypes }: Props) {
                                     type="date"
                                     value={data.check_date}
                                     onChange={(e) => setData('check_date', e.target.value)}
-                                    className={errors.check_date ? 'border-red-500' : ''}
+                                    className={errors.check_date ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.check_date && (
-                                    <p className="text-sm text-red-500">{errors.check_date}</p>
+                                    <p className="text-sm text-status-critical">{errors.check_date}</p>
                                 )}
                             </div>
 
@@ -163,10 +163,10 @@ export default function CreateVetting({ staff, checkTypes }: Props) {
                                     onChange={(e) => setData('notes', e.target.value)}
                                     placeholder="Any additional notes about this check..."
                                     rows={3}
-                                    className={errors.notes ? 'border-red-500' : ''}
+                                    className={errors.notes ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.notes && (
-                                    <p className="text-sm text-red-500">{errors.notes}</p>
+                                    <p className="text-sm text-status-critical">{errors.notes}</p>
                                 )}
                             </div>
 

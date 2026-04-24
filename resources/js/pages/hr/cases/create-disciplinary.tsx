@@ -88,7 +88,7 @@ export default function CreateDisciplinary({
                         </Button>
                     </Link>
                     <div className="flex items-center gap-3">
-                        <AlertTriangle className="h-6 w-6 text-red-500" />
+                        <AlertTriangle className="h-6 w-6 text-status-critical" />
                         <div>
                             <h1 className="text-2xl font-bold">
                                 Add Disciplinary Action
@@ -111,7 +111,7 @@ export default function CreateDisciplinary({
                                 <div className="space-y-2">
                                     <Label htmlFor="employee_user_id">
                                         Employee{' '}
-                                        <span className="text-red-500">*</span>
+                                        <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.employee_user_id}
@@ -123,7 +123,7 @@ export default function CreateDisciplinary({
                                             id="employee_user_id"
                                             className={
                                                 errors.employee_user_id
-                                                    ? 'border-red-500'
+                                                    ? 'border-status-critical/30'
                                                     : ''
                                             }
                                         >
@@ -141,7 +141,7 @@ export default function CreateDisciplinary({
                                         </SelectContent>
                                     </Select>
                                     {errors.employee_user_id && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-status-critical">
                                             {errors.employee_user_id}
                                         </p>
                                     )}
@@ -150,7 +150,7 @@ export default function CreateDisciplinary({
                                 <div className="space-y-2">
                                     <Label htmlFor="action_type">
                                         Action Type{' '}
-                                        <span className="text-red-500">*</span>
+                                        <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.action_type}
@@ -162,7 +162,7 @@ export default function CreateDisciplinary({
                                             id="action_type"
                                             className={
                                                 errors.action_type
-                                                    ? 'border-red-500'
+                                                    ? 'border-status-critical/30'
                                                     : ''
                                             }
                                         >
@@ -180,7 +180,7 @@ export default function CreateDisciplinary({
                                         </SelectContent>
                                     </Select>
                                     {errors.action_type && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-status-critical">
                                             {errors.action_type}
                                         </p>
                                     )}
@@ -239,12 +239,12 @@ export default function CreateDisciplinary({
                                         }
                                         className={
                                             errors.response_deadline
-                                                ? 'border-red-500'
+                                                ? 'border-status-critical/30'
                                                 : ''
                                         }
                                     />
                                     {errors.response_deadline && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-status-critical">
                                             {errors.response_deadline}
                                         </p>
                                     )}
@@ -254,7 +254,7 @@ export default function CreateDisciplinary({
                             <div className="space-y-2">
                                 <Label htmlFor="allegation_summary">
                                     Allegation Summary{' '}
-                                    <span className="text-red-500">*</span>
+                                    <span className="text-status-critical">*</span>
                                 </Label>
                                 <Textarea
                                     id="allegation_summary"
@@ -269,12 +269,12 @@ export default function CreateDisciplinary({
                                     }
                                     className={
                                         errors.allegation_summary
-                                            ? 'border-red-500'
+                                            ? 'border-status-critical/30'
                                             : ''
                                     }
                                 />
                                 {errors.allegation_summary && (
-                                    <p className="text-sm text-red-500">
+                                    <p className="text-sm text-status-critical">
                                         {errors.allegation_summary}
                                     </p>
                                 )}
@@ -297,12 +297,12 @@ export default function CreateDisciplinary({
                                     }
                                     className={
                                         errors.investigation_notes
-                                            ? 'border-red-500'
+                                            ? 'border-status-critical/30'
                                             : ''
                                     }
                                 />
                                 {errors.investigation_notes && (
-                                    <p className="text-sm text-red-500">
+                                    <p className="text-sm text-status-critical">
                                         {errors.investigation_notes}
                                     </p>
                                 )}
@@ -332,12 +332,12 @@ export default function CreateDisciplinary({
                                         }
                                         className={
                                             errors.meeting_scheduled_at
-                                                ? 'border-red-500'
+                                                ? 'border-status-critical/30'
                                                 : ''
                                         }
                                     />
                                     {errors.meeting_scheduled_at && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-status-critical">
                                             {errors.meeting_scheduled_at}
                                         </p>
                                     )}
@@ -359,12 +359,12 @@ export default function CreateDisciplinary({
                                         }
                                         className={
                                             errors.meeting_location
-                                                ? 'border-red-500'
+                                                ? 'border-status-critical/30'
                                                 : ''
                                         }
                                     />
                                     {errors.meeting_location && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-status-critical">
                                             {errors.meeting_location}
                                         </p>
                                     )}
@@ -398,21 +398,21 @@ export default function CreateDisciplinary({
                         </CardContent>
                     </Card>
 
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4">
                         <div className="flex items-start gap-3">
-                            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
+                            <AlertTriangle className="mt-0.5 h-5 w-5 text-status-warning" />
                             <div>
-                                <h4 className="font-medium text-amber-900">
+                                <h4 className="font-medium text-status-warning">
                                     Important Notice
                                 </h4>
-                                <p className="mt-1 text-sm text-amber-800">
+                                <p className="mt-1 text-sm text-status-warning">
                                     Before proceeding with any disciplinary
                                     action, ensure you have followed your
                                     organization's disciplinary procedure and
                                     the principles of natural justice. The
                                     employee must be given:
                                 </p>
-                                <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-800">
+                                <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-status-warning">
                                     <li>
                                         Clear communication of the allegations
                                     </li>

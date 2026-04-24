@@ -113,12 +113,12 @@ export default function BalanceSheet({ report, filters }: Props) {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900/30">
-                                <Landmark className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            <div className="rounded-full bg-status-info-bg p-3 dark:bg-status-info">
+                                <Landmark className="h-5 w-5 text-status-info dark:text-status-info" />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Assets</p>
-                                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                <p className="text-2xl font-bold text-status-info dark:text-status-info">
                                     {formatCurrency(report.total_assets)}
                                 </p>
                             </div>
@@ -126,12 +126,12 @@ export default function BalanceSheet({ report, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
-                                <HandCoins className="h-5 w-5 text-red-600 dark:text-red-400" />
+                            <div className="rounded-full bg-status-critical-bg p-3 dark:bg-status-critical">
+                                <HandCoins className="h-5 w-5 text-status-critical dark:text-status-critical" />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Liabilities</p>
-                                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                <p className="text-2xl font-bold text-status-critical dark:text-status-critical">
                                     {formatCurrency(report.total_liabilities)}
                                 </p>
                             </div>
@@ -139,12 +139,12 @@ export default function BalanceSheet({ report, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="rounded-full bg-amber-100 p-3 dark:bg-amber-900/30">
-                                <Scale className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            <div className="rounded-full bg-status-warning-bg p-3 dark:bg-status-warning">
+                                <Scale className="h-5 w-5 text-status-warning dark:text-status-warning" />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Equity</p>
-                                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                                <p className="text-2xl font-bold text-status-warning dark:text-status-warning">
                                     {formatCurrency(report.total_equity)}
                                 </p>
                             </div>
@@ -200,13 +200,13 @@ export default function BalanceSheet({ report, filters }: Props) {
                             </div>
                             <div className="mt-3 flex items-center justify-center gap-6 text-sm text-muted-foreground">
                                 <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-blue-500" /> Assets
+                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-info" /> Assets
                                 </span>
                                 <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-red-500" /> Liabilities
+                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-critical" /> Liabilities
                                 </span>
                                 <span className="flex items-center gap-1.5">
-                                    <span className="inline-block h-3 w-3 rounded-sm bg-amber-500" /> Equity
+                                    <span className="inline-block h-3 w-3 rounded-sm bg-status-warning" /> Equity
                                 </span>
                             </div>
                         </CardContent>
@@ -225,7 +225,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                             })}
                         </CardTitle>
                         {report.balanced ? (
-                            <Badge variant="outline" className="border-emerald-300 text-emerald-600 dark:text-emerald-400">
+                            <Badge variant="outline" className="border-status-success/30 text-status-success dark:text-status-success">
                                 <CheckCircle className="mr-1 h-3 w-3" />
                                 Balanced
                             </Badge>

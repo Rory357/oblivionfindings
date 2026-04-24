@@ -79,7 +79,7 @@ export default function InjuryCreate({ staff, sites }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {form.errors.user_id && <p className="text-xs text-red-600">{form.errors.user_id}</p>}
+                                {form.errors.user_id && <p className="text-xs text-status-critical">{form.errors.user_id}</p>}
                             </div>
                             <div className="space-y-1">
                                 <Label>Site</Label>
@@ -95,7 +95,7 @@ export default function InjuryCreate({ staff, sites }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {form.errors.site_id && <p className="text-xs text-red-600">{form.errors.site_id}</p>}
+                                {form.errors.site_id && <p className="text-xs text-status-critical">{form.errors.site_id}</p>}
                             </div>
                             <div className="space-y-1">
                                 <Label>Injury Date</Label>
@@ -104,7 +104,7 @@ export default function InjuryCreate({ staff, sites }: Props) {
                                     value={form.data.injury_date}
                                     onChange={(e) => form.setData('injury_date', e.target.value)}
                                 />
-                                {form.errors.injury_date && <p className="text-xs text-red-600">{form.errors.injury_date}</p>}
+                                {form.errors.injury_date && <p className="text-xs text-status-critical">{form.errors.injury_date}</p>}
                             </div>
                         </div>
                     </CardContent>
@@ -173,7 +173,7 @@ export default function InjuryCreate({ staff, sites }: Props) {
                                 placeholder="Describe how the injury occurred"
                                 rows={3}
                             />
-                            {form.errors.description && <p className="text-xs text-red-600">{form.errors.description}</p>}
+                            {form.errors.description && <p className="text-xs text-status-critical">{form.errors.description}</p>}
                         </div>
 
                         <div className="space-y-1">
@@ -240,7 +240,7 @@ export default function InjuryCreate({ staff, sites }: Props) {
 
                 {/* Errors */}
                 {Object.keys(form.errors).length > 0 && (
-                    <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                    <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                         <p className="font-medium">Please fix the following errors:</p>
                         <ul className="mt-1 list-disc pl-5">
                             {Object.entries(form.errors).map(([field, message]) => (

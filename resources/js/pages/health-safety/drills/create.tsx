@@ -69,7 +69,7 @@ export default function DrillCreate({ sites }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {form.errors.site_id && <p className="text-xs text-red-600">{form.errors.site_id}</p>}
+                                {form.errors.site_id && <p className="text-xs text-status-critical">{form.errors.site_id}</p>}
                             </div>
                             <div className="space-y-1">
                                 <Label>Drill Type</Label>
@@ -98,7 +98,7 @@ export default function DrillCreate({ sites }: Props) {
                                 onChange={(e) => form.setData('title', e.target.value)}
                                 placeholder="e.g. Q1 Fire Evacuation Drill"
                             />
-                            {form.errors.title && <p className="text-xs text-red-600">{form.errors.title}</p>}
+                            {form.errors.title && <p className="text-xs text-status-critical">{form.errors.title}</p>}
                         </div>
 
                         <div className="space-y-1">
@@ -108,7 +108,7 @@ export default function DrillCreate({ sites }: Props) {
                                 value={form.data.scheduled_at}
                                 onChange={(e) => form.setData('scheduled_at', e.target.value)}
                             />
-                            {form.errors.scheduled_at && <p className="text-xs text-red-600">{form.errors.scheduled_at}</p>}
+                            {form.errors.scheduled_at && <p className="text-xs text-status-critical">{form.errors.scheduled_at}</p>}
                         </div>
 
                         <div className="space-y-1">
@@ -122,7 +122,7 @@ export default function DrillCreate({ sites }: Props) {
                         </div>
 
                         {Object.keys(form.errors).length > 0 && (
-                            <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                            <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                                 <p className="font-medium">Please fix the following errors:</p>
                                 <ul className="mt-1 list-disc pl-5">
                                     {Object.entries(form.errors).map(([field, message]) => (

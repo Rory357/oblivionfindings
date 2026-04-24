@@ -40,35 +40,35 @@ export default function MobileDashboard({
             label: 'Daily Vehicle Check',
             href: '/fleet-assets/daily-check',
             icon: CheckCircle2,
-            color: 'bg-green-500',
+            color: 'bg-status-success',
             show: true,
         },
         {
             label: 'Start Inspection',
             href: '/fleet-assets/inspections/create',
             icon: ClipboardList,
-            color: 'bg-blue-500',
+            color: 'bg-status-info',
             show: can.start_inspection,
         },
         {
             label: 'Log Transport',
             href: '/fleet-assets/transports/create',
             icon: Truck,
-            color: 'bg-orange-500',
+            color: 'bg-status-warning',
             show: true,
         },
         {
             label: 'Live Map',
             href: '/fleet-assets/map',
             icon: Map,
-            color: 'bg-cyan-500',
+            color: 'bg-status-info',
             show: true,
         },
         {
             label: 'Report Incident',
             href: '/fleet-assets/incidents/create',
             icon: AlertTriangle,
-            color: 'bg-red-500',
+            color: 'bg-status-critical',
             show: true,
         },
         {
@@ -85,7 +85,7 @@ export default function MobileDashboard({
             <Head title="Mobile Dashboard" />
             <div className="min-h-screen bg-background">
                 {/* Purple gradient header */}
-                <div className="bg-gradient-to-br from-purple-600 to-purple-800 px-4 pb-6 pt-8 text-white">
+                <div className="bg-gradient-to-br from-primary to-primary px-4 pb-6 pt-8 text-white">
                     <p
                         className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/70"
                         dusk="fleet-mobile-dashboard-heading"

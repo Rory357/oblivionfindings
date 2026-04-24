@@ -50,13 +50,13 @@ function actionColor(action: string): string {
         case 'completed':
         case 'approved':
         case 'created':
-            return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
+            return 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success';
         case 'started':
         case 'submitted':
-            return 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
+            return 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info';
         case 'cancelled':
         case 'rejected':
-            return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
+            return 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical';
         default:
             return 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground';
     }

@@ -63,9 +63,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Draft' },
-    active: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Active' },
-    closed: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Closed' },
+    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
+    active: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Active' },
+    closed: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Closed' },
 };
 
 export default function SurveyResults({ survey, results, enps, can }: Props) {
@@ -95,22 +95,22 @@ export default function SurveyResults({ survey, results, enps, can }: Props) {
                         <CardContent>
                             <div className="flex items-center gap-8">
                                 <div className="text-center">
-                                    <p className={`text-4xl font-bold ${enps.score >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                    <p className={`text-4xl font-bold ${enps.score >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                         {enps.score}
                                     </p>
                                     <p className="text-xs text-muted-foreground">eNPS Score</p>
                                 </div>
                                 <div className="flex gap-6 text-sm">
                                     <div className="text-center">
-                                        <p className="text-lg font-semibold text-emerald-500">{enps.promoters}</p>
+                                        <p className="text-lg font-semibold text-status-success">{enps.promoters}</p>
                                         <p className="text-xs text-muted-foreground">Promoters (9-10)</p>
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-lg font-semibold text-yellow-500">{enps.passives}</p>
+                                        <p className="text-lg font-semibold text-status-warning">{enps.passives}</p>
                                         <p className="text-xs text-muted-foreground">Passives (7-8)</p>
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-lg font-semibold text-red-500">{enps.detractors}</p>
+                                        <p className="text-lg font-semibold text-status-critical">{enps.detractors}</p>
                                         <p className="text-xs text-muted-foreground">Detractors (0-6)</p>
                                     </div>
                                 </div>

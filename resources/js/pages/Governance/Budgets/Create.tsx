@@ -50,7 +50,7 @@ export default function BudgetsCreate({ auth }: PageProps) {
                   onChange={(e) => setData('fiscal_year', parseInt(e.target.value, 10))}
                 />
                 {errors.fiscal_year && (
-                  <p className="text-sm text-red-600 mt-1">{errors.fiscal_year}</p>
+                  <p className="text-sm text-status-critical mt-1">{errors.fiscal_year}</p>
                 )}
               </div>
 
@@ -63,7 +63,7 @@ export default function BudgetsCreate({ auth }: PageProps) {
                   placeholder="e.g., FY2026 Operating Budget"
                 />
                 {errors.title && (
-                  <p className="text-sm text-red-600 mt-1">{errors.title}</p>
+                  <p className="text-sm text-status-critical mt-1">{errors.title}</p>
                 )}
               </div>
 
@@ -78,7 +78,7 @@ export default function BudgetsCreate({ auth }: PageProps) {
                   onChange={(e) => setData('total_budget', e.target.value)}
                 />
                 {errors.total_budget && (
-                  <p className="text-sm text-red-600 mt-1">{errors.total_budget}</p>
+                  <p className="text-sm text-status-critical mt-1">{errors.total_budget}</p>
                 )}
               </div>
 

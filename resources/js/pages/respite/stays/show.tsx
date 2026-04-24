@@ -16,9 +16,9 @@ type Props = {
 };
 
 const statusColor: Record<string, string> = {
-    admitted: 'bg-blue-100 text-blue-800',
-    active: 'bg-green-100 text-green-800',
-    extended: 'bg-amber-100 text-amber-800',
+    admitted: 'bg-status-info-bg text-status-info',
+    active: 'bg-status-success-bg text-status-success',
+    extended: 'bg-status-warning-bg text-status-warning',
     discharged: 'bg-muted text-muted-foreground',
 };
 
@@ -31,11 +31,11 @@ const moodLabels: Record<string, string> = {
 };
 
 const riskStatusColor: Record<string, string> = {
-    pending_review: 'bg-yellow-100 text-yellow-800',
-    active: 'bg-red-100 text-red-800',
-    modified: 'bg-orange-100 text-orange-800',
+    pending_review: 'bg-status-warning-bg text-status-warning',
+    active: 'bg-status-critical-bg text-status-critical',
+    modified: 'bg-status-warning-bg text-status-warning',
     suspended: 'bg-muted text-muted-foreground',
-    completed: 'bg-green-100 text-green-800',
+    completed: 'bg-status-success-bg text-status-success',
 };
 
 export default function RespiteStayShow({ stay }: Props) {
@@ -198,14 +198,14 @@ export default function RespiteStayShow({ stay }: Props) {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-base">Arrival Checklist</CardTitle>
-                                {stay.arrival_checklist_complete && <Badge className="bg-green-100 text-green-800">Complete</Badge>}
+                                {stay.arrival_checklist_complete && <Badge className="bg-status-success-bg text-status-success">Complete</Badge>}
                             </div>
                         </CardHeader>
                         <CardContent>
                             <ul className="space-y-1 text-sm">
                                 {arrivalChecklist.map((item: any, i: number) => (
                                     <li key={i} className="flex items-center gap-2">
-                                        <span className={item.done ? 'text-green-600' : 'text-muted-foreground'}>{item.done ? '\u2713' : '\u25CB'}</span>
+                                        <span className={item.done ? 'text-status-success' : 'text-muted-foreground'}>{item.done ? '\u2713' : '\u25CB'}</span>
                                         <span>{item.label || item}</span>
                                     </li>
                                 ))}
@@ -220,14 +220,14 @@ export default function RespiteStayShow({ stay }: Props) {
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-base">Discharge Checklist</CardTitle>
-                                {stay.discharge_checklist_complete && <Badge className="bg-green-100 text-green-800">Complete</Badge>}
+                                {stay.discharge_checklist_complete && <Badge className="bg-status-success-bg text-status-success">Complete</Badge>}
                             </div>
                         </CardHeader>
                         <CardContent>
                             <ul className="space-y-1 text-sm">
                                 {dischargeChecklist.map((item: any, i: number) => (
                                     <li key={i} className="flex items-center gap-2">
-                                        <span className={item.done ? 'text-green-600' : 'text-muted-foreground'}>{item.done ? '\u2713' : '\u25CB'}</span>
+                                        <span className={item.done ? 'text-status-success' : 'text-muted-foreground'}>{item.done ? '\u2713' : '\u25CB'}</span>
                                         <span>{item.label || item}</span>
                                     </li>
                                 ))}
@@ -278,7 +278,7 @@ export default function RespiteStayShow({ stay }: Props) {
                                                 <span className="font-medium">{note.note_date}</span>
                                                 <Badge variant="outline" className="text-xs capitalize">{note.shift_period?.replace('_', ' ')}</Badge>
                                             </div>
-                                            {note.incident_occurred && <Badge className="bg-red-100 text-red-800">Incident</Badge>}
+                                            {note.incident_occurred && <Badge className="bg-status-critical-bg text-status-critical">Incident</Badge>}
                                         </div>
                                         <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                                             {note.mood && <span>Mood: {moodLabels[note.mood] || note.mood}</span>}
@@ -289,7 +289,7 @@ export default function RespiteStayShow({ stay }: Props) {
                                         </div>
                                         {note.observations && <p className="mt-2 text-muted-foreground">{note.observations}</p>}
                                         {note.activities && <p className="mt-1"><span className="font-medium">Activities:</span> {note.activities}</p>}
-                                        {note.concerns && <p className="mt-1 text-amber-700"><span className="font-medium">Concerns:</span> {note.concerns}</p>}
+                                        {note.concerns && <p className="mt-1 text-status-warning"><span className="font-medium">Concerns:</span> {note.concerns}</p>}
                                     </div>
                                 ))}
                                 {stay.daily_notes.length > 5 && (
@@ -320,13 +320,13 @@ export default function RespiteStayShow({ stay }: Props) {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="outline" className="text-xs capitalize">{h.handover_type?.replace('_', ' ')}</Badge>
-                                                {h.sensitive_flag && <Badge className="bg-red-100 text-red-800">Sensitive</Badge>}
+                                                {h.sensitive_flag && <Badge className="bg-status-critical-bg text-status-critical">Sensitive</Badge>}
                                             </div>
                                             <span className="text-xs text-muted-foreground">{formatDateTime(h.created_at)}</span>
                                         </div>
                                         <p className="mt-2">{h.notes}</p>
                                         {h.acknowledged_at && (
-                                            <p className="mt-1 text-xs text-green-600">Acknowledged {formatDateTime(h.acknowledged_at)}</p>
+                                            <p className="mt-1 text-xs text-status-success">Acknowledged {formatDateTime(h.acknowledged_at)}</p>
                                         )}
                                     </div>
                                 ))}
