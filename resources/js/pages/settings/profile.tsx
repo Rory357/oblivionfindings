@@ -57,13 +57,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useRef } from 'react';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: edit().url,
-    },
-];
-
 const NZ_AU_TIMEZONES = [
     { value: 'Pacific/Auckland', label: 'Auckland (NZST/NZDT)' },
     { value: 'Pacific/Chatham', label: 'Chatham Islands' },
@@ -192,6 +185,13 @@ export default function Profile({
         ? daysSince(profileData.passwordChangedAt)
         : null;
     const roles = profileData.roles;
+    const title = t('app.profile.title', 'Profile settings');
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title,
+            href: edit().url,
+        },
+    ];
 
     const handleFileSelect = useCallback(
         (file: File | null) => {
@@ -234,7 +234,7 @@ export default function Profile({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Profile settings" />
+            <Head title={title} />
 
             <SettingsLayout>
                 {/* ── Modern Profile Header ── */}
@@ -369,10 +369,16 @@ export default function Profile({
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <User className="h-4.5 w-4.5 text-primary" />
-                                    Personal Information
+                                    {t(
+                                        'app.profile.personal.title',
+                                        'Personal information',
+                                    )}
                                 </CardTitle>
                                 <CardDescription>
-                                    Update your personal details
+                                    {t(
+                                        'app.profile.personal.description',
+                                        'Update your personal details',
+                                    )}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -390,7 +396,10 @@ export default function Profile({
                                             <div className="grid gap-4 sm:grid-cols-2">
                                                 <div className="grid gap-2">
                                                     <Label htmlFor="name">
-                                                        Full name{' '}
+                                                        {t(
+                                                            'app.auth.full_name',
+                                                            'Full name',
+                                                        )}{' '}
                                                         <span className="text-status-critical">
                                                             *
                                                         </span>
@@ -412,7 +421,10 @@ export default function Profile({
 
                                                 <div className="grid gap-2">
                                                     <Label htmlFor="email">
-                                                        Email address{' '}
+                                                        {t(
+                                                            'app.auth.email_address',
+                                                            'Email address',
+                                                        )}{' '}
                                                         <span className="text-status-critical">
                                                             *
                                                         </span>
@@ -522,7 +534,10 @@ export default function Profile({
                                                     className="bg-primary hover:bg-primary"
                                                     data-test="update-profile-button"
                                                 >
-                                                    Save changes
+                                                    {t(
+                                                        'app.actions.save_changes',
+                                                        'Save changes',
+                                                    )}
                                                 </Button>
                                                 <Transition
                                                     show={recentlySuccessful}
@@ -532,7 +547,10 @@ export default function Profile({
                                                     leaveTo="opacity-0"
                                                 >
                                                     <p className="text-sm font-medium text-status-success">
-                                                        Profile saved
+                                                        {t(
+                                                            'app.profile.personal.saved',
+                                                            'Profile saved',
+                                                        )}
                                                     </p>
                                                 </Transition>
                                             </div>
@@ -547,10 +565,16 @@ export default function Profile({
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Globe className="h-4.5 w-4.5 text-primary" />
-                                    Preferences
+                                    {t(
+                                        'app.profile.preferences.title',
+                                        'Preferences',
+                                    )}
                                 </CardTitle>
                                 <CardDescription>
-                                    Customise your experience
+                                    {t(
+                                        'app.profile.preferences.description',
+                                        'Customise your experience',
+                                    )}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -561,7 +585,10 @@ export default function Profile({
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <div className="grid gap-2">
                                             <Label htmlFor="timezone">
-                                                Timezone
+                                                {t(
+                                                    'app.profile.preferences.timezone',
+                                                    'Timezone',
+                                                )}
                                             </Label>
                                             <Select
                                                 value={
@@ -576,7 +603,12 @@ export default function Profile({
                                                 }
                                             >
                                                 <SelectTrigger id="timezone">
-                                                    <SelectValue placeholder="Select timezone" />
+                                                    <SelectValue
+                                                        placeholder={t(
+                                                            'app.profile.preferences.select_timezone',
+                                                            'Select timezone',
+                                                        )}
+                                                    />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {NZ_AU_TIMEZONES.map(
@@ -601,7 +633,10 @@ export default function Profile({
 
                                         <div className="grid gap-2">
                                             <Label htmlFor="date_format">
-                                                Date format
+                                                {t(
+                                                    'app.appearance.regional.date_format',
+                                                    'Date format',
+                                                )}
                                             </Label>
                                             <Select
                                                 value={
@@ -616,7 +651,12 @@ export default function Profile({
                                                 }
                                             >
                                                 <SelectTrigger id="date_format">
-                                                    <SelectValue placeholder="Select format" />
+                                                    <SelectValue
+                                                        placeholder={t(
+                                                            'app.profile.preferences.select_format',
+                                                            'Select format',
+                                                        )}
+                                                    />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {DATE_FORMATS.map((df) => (
@@ -639,7 +679,12 @@ export default function Profile({
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label>Time format</Label>
+                                        <Label>
+                                            {t(
+                                                'app.appearance.regional.time_format',
+                                                'Time format',
+                                            )}
+                                        </Label>
                                         <RadioGroup
                                             value={
                                                 preferencesForm.data.time_format
@@ -661,7 +706,10 @@ export default function Profile({
                                                     htmlFor="time-12"
                                                     className="cursor-pointer font-normal"
                                                 >
-                                                    12-hour
+                                                    {t(
+                                                        'app.appearance.regional.time_format_12',
+                                                        '12-hour',
+                                                    )}
                                                 </Label>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -673,7 +721,10 @@ export default function Profile({
                                                     htmlFor="time-24"
                                                     className="cursor-pointer font-normal"
                                                 >
-                                                    24-hour
+                                                    {t(
+                                                        'app.appearance.regional.time_format_24',
+                                                        '24-hour',
+                                                    )}
                                                 </Label>
                                             </div>
                                         </RadioGroup>
@@ -729,7 +780,10 @@ export default function Profile({
 
                                     <div className="grid gap-2">
                                         <Label htmlFor="landing_route_preference">
-                                            Default landing page
+                                            {t(
+                                                'app.profile.preferences.default_landing_page',
+                                                'Default landing page',
+                                            )}
                                         </Label>
                                         <Select
                                             value={
@@ -743,11 +797,19 @@ export default function Profile({
                                                 id="landing_route_preference"
                                                 className="max-w-sm"
                                             >
-                                                <SelectValue placeholder="System default" />
+                                                <SelectValue
+                                                    placeholder={t(
+                                                        'app.profile.preferences.system_default',
+                                                        'System default',
+                                                    )}
+                                                />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="__system__">
-                                                    System default
+                                                    {t(
+                                                        'app.profile.preferences.system_default',
+                                                        'System default',
+                                                    )}
                                                 </SelectItem>
                                                 {profileData.landingOptions.map(
                                                     (opt) => (
@@ -757,7 +819,11 @@ export default function Profile({
                                                         >
                                                             {opt.label}
                                                             <span className="ml-2 text-xs text-muted-foreground">
-                                                                (via{' '}
+                                                                (
+                                                                {t(
+                                                                    'app.profile.preferences.via',
+                                                                    'via',
+                                                                )}{' '}
                                                                 {opt.role_label}
                                                                 )
                                                             </span>
@@ -769,8 +835,14 @@ export default function Profile({
                                         <p className="text-xs text-muted-foreground">
                                             {profileData.landingOptions
                                                 .length === 0
-                                                ? "None of your roles have a landing page configured. You'll be sent to the dashboard after login."
-                                                : 'Pick which of your roles decides where you land after login.'}
+                                                ? t(
+                                                      'app.profile.preferences.no_landing_options',
+                                                      "None of your roles have a landing page configured. You'll be sent to the dashboard after login.",
+                                                  )
+                                                : t(
+                                                      'app.profile.preferences.landing_help',
+                                                      'Pick which of your roles decides where you land after login.',
+                                                  )}
                                         </p>
                                     </div>
 
@@ -798,7 +870,10 @@ export default function Profile({
                                             leaveTo="opacity-0"
                                         >
                                             <p className="mt-3 text-sm font-medium text-status-success">
-                                                Preferences saved
+                                                {t(
+                                                    'app.settings.preferences_saved',
+                                                    'Preferences saved',
+                                                )}
                                             </p>
                                         </Transition>
                                     </div>
@@ -814,10 +889,16 @@ export default function Profile({
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Shield className="h-4.5 w-4.5 text-primary" />
-                                    Account Security
+                                    {t(
+                                        'app.profile.security.title',
+                                        'Account security',
+                                    )}
                                 </CardTitle>
                                 <CardDescription>
-                                    Manage your account security
+                                    {t(
+                                        'app.profile.security.description',
+                                        'Manage your account security',
+                                    )}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -829,12 +910,18 @@ export default function Profile({
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium">
-                                                Password
+                                                {t(
+                                                    'app.auth.password',
+                                                    'Password',
+                                                )}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
                                                 {passwordChangedDaysAgo !== null
                                                     ? `Last changed ${passwordChangedDaysAgo} day${passwordChangedDaysAgo !== 1 ? 's' : ''} ago`
-                                                    : 'Set a strong password'}
+                                                    : t(
+                                                          'app.profile.security.set_strong_password',
+                                                          'Set a strong password',
+                                                      )}
                                             </p>
                                         </div>
                                     </div>
@@ -845,7 +932,10 @@ export default function Profile({
                                         asChild
                                     >
                                         <Link href="/settings/password">
-                                            Change
+                                            {t(
+                                                'app.actions.change',
+                                                'Change',
+                                            )}
                                         </Link>
                                     </Button>
                                 </div>
@@ -860,15 +950,24 @@ export default function Profile({
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium">
-                                                Two-factor authentication
+                                                {t(
+                                                    'app.profile.security.two_factor',
+                                                    'Two-factor authentication',
+                                                )}
                                             </p>
                                             {twoFactorEnabled ? (
                                                 <Badge className="mt-1 bg-status-success-bg text-status-success hover:bg-status-success-bg dark:bg-status-success-bg dark:text-status-success">
-                                                    Enabled
+                                                    {t(
+                                                        'app.profile.security.enabled',
+                                                        'Enabled',
+                                                    )}
                                                 </Badge>
                                             ) : (
                                                 <Badge className="mt-1 bg-status-warning-bg text-status-warning hover:bg-status-warning-bg dark:bg-status-warning-bg dark:text-status-warning">
-                                                    Not enabled
+                                                    {t(
+                                                        'app.profile.security.not_enabled',
+                                                        'Not enabled',
+                                                    )}
                                                 </Badge>
                                             )}
                                         </div>
@@ -880,7 +979,10 @@ export default function Profile({
                                         asChild
                                     >
                                         <Link href="/settings/two-factor">
-                                            Manage
+                                            {t(
+                                                'app.actions.manage',
+                                                'Manage',
+                                            )}
                                         </Link>
                                     </Button>
                                 </div>
@@ -895,10 +997,16 @@ export default function Profile({
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium">
-                                                Active sessions
+                                                {t(
+                                                    'app.profile.security.active_sessions',
+                                                    'Active sessions',
+                                                )}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                1 active session
+                                                {t(
+                                                    'app.profile.security.one_active_session',
+                                                    '1 active session',
+                                                )}
                                             </p>
                                         </div>
                                     </div>
@@ -908,7 +1016,7 @@ export default function Profile({
                                         className="text-primary hover:text-primary"
                                         disabled
                                     >
-                                        View
+                                        {t('app.actions.view', 'View')}
                                     </Button>
                                 </div>
                             </CardContent>
