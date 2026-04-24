@@ -71,19 +71,19 @@ const formatCurrency = (amount: number | undefined | null) => {
 };
 
 const severityColors: Record<string, string> = {
-    minor: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-    moderate: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    major: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    critical: 'bg-red-500/20 text-red-300 border-red-500/30',
+    minor: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
+    moderate: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    major: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 const statusColors: Record<string, string> = {
-    reported: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    assessed: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+    reported: 'bg-status-info-bg text-status-info border-status-info/30',
+    assessed: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     repair_scheduled: 'bg-primary/20 text-primary/70 border-primary/30',
-    repair_in_progress: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    repaired: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    closed: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+    repair_in_progress: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    repaired: 'bg-status-success-bg text-status-success border-status-success/30',
+    closed: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
 };
 
 const statusLabels: Record<string, string> = {
@@ -241,9 +241,9 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                             <div className="text-sm text-muted-foreground mt-2">By Severity</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-amber-500/5 border-amber-500/20">
+                    <Card className="bg-status-warning border-status-warning/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-amber-400 flex items-center gap-1">
+                            <div className="text-2xl font-bold text-status-warning flex items-center gap-1">
                                 <DollarSign className="w-5 h-5" />
                                 {formatCurrency(totalEstimatedCost)}
                             </div>
@@ -388,7 +388,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                         required
                                     />
                                     {createForm.errors.title && (
-                                        <p className="text-sm text-red-400 mt-1">{createForm.errors.title}</p>
+                                        <p className="text-sm text-status-critical mt-1">{createForm.errors.title}</p>
                                     )}
                                 </div>
                                 <div>
@@ -419,7 +419,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                     required
                                 />
                                 {createForm.errors.description && (
-                                    <p className="text-sm text-red-400 mt-1">{createForm.errors.description}</p>
+                                    <p className="text-sm text-status-critical mt-1">{createForm.errors.description}</p>
                                 )}
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -453,7 +453,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                         required
                                     />
                                     {createForm.errors.damage_date && (
-                                        <p className="text-sm text-red-400 mt-1">{createForm.errors.damage_date}</p>
+                                        <p className="text-sm text-status-critical mt-1">{createForm.errors.damage_date}</p>
                                     )}
                                 </div>
                                 <div>
@@ -465,7 +465,7 @@ export default function SiteDamages({ site, damages, canCreate, canManage }: Pro
                                         required
                                     />
                                     {createForm.errors.discovered_date && (
-                                        <p className="text-sm text-red-400 mt-1">{createForm.errors.discovered_date}</p>
+                                        <p className="text-sm text-status-critical mt-1">{createForm.errors.discovered_date}</p>
                                     )}
                                 </div>
                             </div>

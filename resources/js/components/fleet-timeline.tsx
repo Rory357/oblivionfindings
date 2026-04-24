@@ -91,17 +91,17 @@ const TYPE_ICONS: Record<string, typeof Truck> = {
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
-    critical: 'text-red-600 dark:text-red-400',
-    high: 'text-orange-500 dark:text-orange-400',
-    medium: 'text-amber-500 dark:text-amber-400',
+    critical: 'text-status-critical dark:text-status-critical',
+    high: 'text-status-warning dark:text-status-warning',
+    medium: 'text-status-warning dark:text-status-warning',
     low: 'text-muted-foreground',
 };
 
 const SEVERITY_DOT: Record<string, string> = {
-    critical: 'bg-red-500',
-    high: 'bg-orange-500',
-    medium: 'bg-amber-500',
-    low: 'bg-slate-300 dark:bg-slate-600',
+    critical: 'bg-status-critical',
+    high: 'bg-status-warning',
+    medium: 'bg-status-warning',
+    low: 'bg-muted dark:bg-muted-foreground/80',
 };
 
 const CATEGORY_LABEL: Record<string, string> = {

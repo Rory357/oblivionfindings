@@ -133,7 +133,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                     ))}
                 </SelectContent>
             </Select>
-            {errors[field] && <div className="mt-1 text-xs text-red-500">{errors[field]}</div>}
+            {errors[field] && <div className="mt-1 text-xs text-status-critical">{errors[field]}</div>}
         </div>
     );
 
@@ -198,7 +198,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.stay_id && <div className="mt-1 text-xs text-red-500">{errors.stay_id}</div>}
+                                    {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
                                 </div>
                                 <div>
                                     <Label>Note Date</Label>
@@ -207,7 +207,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                         value={data.note_date}
                                         onChange={(e) => setData('note_date', e.target.value)}
                                     />
-                                    {errors.note_date && <div className="mt-1 text-xs text-red-500">{errors.note_date}</div>}
+                                    {errors.note_date && <div className="mt-1 text-xs text-status-critical">{errors.note_date}</div>}
                                 </div>
                                 <div>
                                     <Label>Shift Period</Label>
@@ -219,7 +219,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.shift_period && <div className="mt-1 text-xs text-red-500">{errors.shift_period}</div>}
+                                    {errors.shift_period && <div className="mt-1 text-xs text-status-critical">{errors.shift_period}</div>}
                                 </div>
                             </div>
                         </CardContent>
@@ -244,7 +244,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.mobility && <div className="mt-1 text-xs text-red-500">{errors.mobility}</div>}
+                                {errors.mobility && <div className="mt-1 text-xs text-status-critical">{errors.mobility}</div>}
                             </div>
                         </CardContent>
                     </Card>
@@ -268,7 +268,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                     onChange={(e) => setData('activities', e.target.value)}
                                     rows={3}
                                 />
-                                {errors.activities && <div className="mt-1 text-xs text-red-500">{errors.activities}</div>}
+                                {errors.activities && <div className="mt-1 text-xs text-status-critical">{errors.activities}</div>}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between">
@@ -284,7 +284,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                     onChange={(e) => setData('observations', e.target.value)}
                                     rows={3}
                                 />
-                                {errors.observations && <div className="mt-1 text-xs text-red-500">{errors.observations}</div>}
+                                {errors.observations && <div className="mt-1 text-xs text-status-critical">{errors.observations}</div>}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between">
@@ -300,7 +300,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                     onChange={(e) => setData('concerns', e.target.value)}
                                     rows={3}
                                 />
-                                {errors.concerns && <div className="mt-1 text-xs text-red-500">{errors.concerns}</div>}
+                                {errors.concerns && <div className="mt-1 text-xs text-status-critical">{errors.concerns}</div>}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between">
@@ -316,7 +316,7 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                     onChange={(e) => setData('goals_progress', e.target.value)}
                                     rows={3}
                                 />
-                                {errors.goals_progress && <div className="mt-1 text-xs text-red-500">{errors.goals_progress}</div>}
+                                {errors.goals_progress && <div className="mt-1 text-xs text-status-critical">{errors.goals_progress}</div>}
                             </div>
                         </CardContent>
                     </Card>

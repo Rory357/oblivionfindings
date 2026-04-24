@@ -74,7 +74,7 @@ export default function OnboardingShow({ workflow }: Props) {
                             <CardContent className="flex items-start gap-3 p-4">
                                 <div className="mt-0.5">
                                     {step.status === 'completed' ? (
-                                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                        <CheckCircle2 className="h-5 w-5 text-status-success" />
                                     ) : (
                                         <Circle className="h-5 w-5 text-muted-foreground" />
                                     )}

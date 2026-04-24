@@ -67,13 +67,13 @@ export default function CreateLeave({ staff, leaveTypes }: Props) {
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="space-y-2">
                                 <Label htmlFor="user_id">
-                                    Staff Member <span className="text-red-500">*</span>
+                                    Staff Member <span className="text-status-critical">*</span>
                                 </Label>
                                 <Select
                                     value={data.user_id}
                                     onValueChange={(value) => setData('user_id', value)}
                                 >
-                                    <SelectTrigger id="user_id" className={errors.user_id ? 'border-red-500' : ''}>
+                                    <SelectTrigger id="user_id" className={errors.user_id ? 'border-status-critical/30' : ''}>
                                         <SelectValue placeholder="Select staff member" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -85,19 +85,19 @@ export default function CreateLeave({ staff, leaveTypes }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {errors.user_id && (
-                                    <p className="text-sm text-red-500">{errors.user_id}</p>
+                                    <p className="text-sm text-status-critical">{errors.user_id}</p>
                                 )}
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="leave_type">
-                                    Leave Type <span className="text-red-500">*</span>
+                                    Leave Type <span className="text-status-critical">*</span>
                                 </Label>
                                 <Select
                                     value={data.leave_type}
                                     onValueChange={(value) => setData('leave_type', value)}
                                 >
-                                    <SelectTrigger id="leave_type" className={errors.leave_type ? 'border-red-500' : ''}>
+                                    <SelectTrigger id="leave_type" className={errors.leave_type ? 'border-status-critical/30' : ''}>
                                         <SelectValue placeholder="Select leave type" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -109,47 +109,47 @@ export default function CreateLeave({ staff, leaveTypes }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {errors.leave_type && (
-                                    <p className="text-sm text-red-500">{errors.leave_type}</p>
+                                    <p className="text-sm text-status-critical">{errors.leave_type}</p>
                                 )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="starts_at">
-                                        Start Date <span className="text-red-500">*</span>
+                                        Start Date <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="starts_at"
                                         type="date"
                                         value={data.starts_at}
                                         onChange={(e) => setData('starts_at', e.target.value)}
-                                        className={errors.starts_at ? 'border-red-500' : ''}
+                                        className={errors.starts_at ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.starts_at && (
-                                        <p className="text-sm text-red-500">{errors.starts_at}</p>
+                                        <p className="text-sm text-status-critical">{errors.starts_at}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="ends_at">
-                                        End Date <span className="text-red-500">*</span>
+                                        End Date <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="ends_at"
                                         type="date"
                                         value={data.ends_at}
                                         onChange={(e) => setData('ends_at', e.target.value)}
-                                        className={errors.ends_at ? 'border-red-500' : ''}
+                                        className={errors.ends_at ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.ends_at && (
-                                        <p className="text-sm text-red-500">{errors.ends_at}</p>
+                                        <p className="text-sm text-status-critical">{errors.ends_at}</p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="hours_requested">
-                                    Hours Requested <span className="text-red-500">*</span>
+                                    Hours Requested <span className="text-status-critical">*</span>
                                 </Label>
                                 <Input
                                     id="hours_requested"
@@ -160,10 +160,10 @@ export default function CreateLeave({ staff, leaveTypes }: Props) {
                                     value={data.hours_requested}
                                     onChange={(e) => setData('hours_requested', e.target.value)}
                                     placeholder="e.g., 8"
-                                    className={errors.hours_requested ? 'border-red-500' : ''}
+                                    className={errors.hours_requested ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.hours_requested && (
-                                    <p className="text-sm text-red-500">{errors.hours_requested}</p>
+                                    <p className="text-sm text-status-critical">{errors.hours_requested}</p>
                                 )}
                             </div>
 

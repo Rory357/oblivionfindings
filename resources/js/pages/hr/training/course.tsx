@@ -22,18 +22,18 @@ interface UserItem { id: number; name: string }
 interface Props { course: Course; users: UserItem[]; can: { manage: boolean; enroll: boolean } }
 
 const DELIVERY_LABELS: Record<string, string> = { online: 'Online', in_person: 'In Person', blended: 'Blended', self_paced: 'Self-Paced' };
-const DELIVERY_COLORS: Record<string, string> = { online: 'bg-blue-100 text-blue-700', in_person: 'bg-emerald-100 text-emerald-700', blended: 'bg-primary/10 text-primary', self_paced: 'bg-amber-100 text-amber-700' };
+const DELIVERY_COLORS: Record<string, string> = { online: 'bg-status-info-bg text-status-info', in_person: 'bg-status-success-bg text-status-success', blended: 'bg-primary/10 text-primary', self_paced: 'bg-status-warning-bg text-status-warning' };
 const DELIVERY_ICONS: Record<string, typeof Monitor> = { online: Monitor, in_person: MapPin, blended: Layers, self_paced: Zap };
 
 const STATUS_COLORS: Record<string, string> = {
-    enrolled: 'bg-blue-100 text-blue-700', in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700',
-    withdrawn: 'bg-muted text-muted-foreground', failed: 'bg-red-100 text-red-700', scheduled: 'bg-blue-100 text-blue-700', cancelled: 'bg-red-100 text-red-700',
+    enrolled: 'bg-status-info-bg text-status-info', in_progress: 'bg-status-warning-bg text-status-warning', completed: 'bg-status-success-bg text-status-success',
+    withdrawn: 'bg-muted text-muted-foreground', failed: 'bg-status-critical-bg text-status-critical', scheduled: 'bg-status-info-bg text-status-info', cancelled: 'bg-status-critical-bg text-status-critical',
 };
 
 function formatDate(v?: string | null) { if (!v) return '\u2014'; const d = new Date(v); return isNaN(d.getTime()) ? v : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function formatCurrency(v: string | null) { if (!v) return '\u2014'; const n = parseFloat(v); return isNaN(n) ? v : new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(n); }
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-rose-500', 'bg-primary'];
+const AVATAR_COLORS = ['bg-status-info', 'bg-primary', 'bg-status-success', 'bg-status-warning', 'bg-status-critical', 'bg-status-info', 'bg-status-critical', 'bg-primary'];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 
@@ -72,7 +72,7 @@ export default function CourseDetail({ course, users, can }: Props) {
             <div className="space-y-6 p-4 lg:p-6">
 
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-white shadow-lg">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
                     <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -82,7 +82,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <h1 className="text-2xl font-bold">{course.title}</h1>
                                     <Badge className="border-0 bg-white/20 text-white text-[10px] font-mono">{course.code}</Badge>
-                                    {course.is_mandatory && <Badge className="border-0 bg-red-500/80 text-white text-[10px]">Mandatory</Badge>}
+                                    {course.is_mandatory && <Badge className="border-0 bg-status-critical text-white text-[10px]">Mandatory</Badge>}
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/70">
                                     <span className="flex items-center gap-1"><DmIcon className="h-3.5 w-3.5" />{DELIVERY_LABELS[course.delivery_method]}</span>
@@ -116,7 +116,7 @@ export default function CourseDetail({ course, users, can }: Props) {
 
                 {/* Course Info Cards */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
                         <div className="text-lg font-bold text-primary">{course.category || '\u2014'}</div>
                         <div className="text-[10px] uppercase tracking-wider text-primary">Category</div>
                     </div>
@@ -129,7 +129,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Sessions</div>
                     </div>
                     <div className="rounded-xl border p-3 text-center">
-                        <Badge variant={course.is_active ? 'default' : 'secondary'} className={course.is_active ? 'bg-emerald-100 text-emerald-700 border-0' : ''}>
+                        <Badge variant={course.is_active ? 'default' : 'secondary'} className={course.is_active ? 'bg-status-success-bg text-status-success border-0' : ''}>
                             {course.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                         <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">Status</div>
@@ -139,9 +139,9 @@ export default function CourseDetail({ course, users, can }: Props) {
                 {/* Sessions */}
                 {course.sessions?.length > 0 && (
                     <Card className="overflow-hidden">
-                        <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-transparent pb-3">
+                        <CardHeader className="border-b bg-gradient-to-r from-status-info-bg to-transparent pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100"><Calendar className="h-4 w-4 text-blue-600" /></div>
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-info-bg"><Calendar className="h-4 w-4 text-status-info" /></div>
                                 Sessions
                                 <Badge variant="secondary" className="text-[10px]">{course.sessions.length}</Badge>
                             </CardTitle>
@@ -149,9 +149,9 @@ export default function CourseDetail({ course, users, can }: Props) {
                         <CardContent className="p-0">
                             <div className="divide-y">
                                 {course.sessions.map(s => (
-                                    <div key={s.id} className="flex items-center justify-between px-4 py-3 hover:bg-blue-50/30 transition-colors">
+                                    <div key={s.id} className="flex items-center justify-between px-4 py-3 hover:bg-status-info-bg transition-colors">
                                         <div className="flex items-center gap-3">
-                                            <div className="flex h-10 w-10 flex-col items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                                            <div className="flex h-10 w-10 flex-col items-center justify-center rounded-lg bg-status-info-bg text-status-info">
                                                 <span className="text-[10px] font-medium leading-none">{new Date(s.session_date).toLocaleDateString('en-NZ', { month: 'short' })}</span>
                                                 <span className="text-sm font-bold leading-none">{new Date(s.session_date).getDate()}</span>
                                             </div>
@@ -170,7 +170,7 @@ export default function CourseDetail({ course, users, can }: Props) {
 
                 {/* Enrollments */}
                 <Card className="overflow-hidden">
-                    <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
+                    <CardHeader className="border-b bg-gradient-to-r from-primary/10 to-transparent pb-3">
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"><Users className="h-4 w-4 text-primary" /></div>
@@ -187,7 +187,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                     <CardContent className="p-0">
                         {!course.enrollments?.length ? (
                             <div className="flex flex-col items-center gap-2 py-12">
-                                <Users className="h-8 w-8 text-slate-200" />
+                                <Users className="h-8 w-8 text-foreground" />
                                 <p className="text-sm text-muted-foreground">No enrolments yet</p>
                             </div>
                         ) : (
@@ -272,7 +272,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                         <div className="space-y-1.5"><Label>Notes</Label><Textarea value={completeForm.notes} onChange={e => setCompleteForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" /></div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setCompleteOpen(false)}>Cancel</Button>
-                            <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">Mark Completed</Button>
+                            <Button type="submit" className="bg-status-success hover:bg-status-success">Mark Completed</Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

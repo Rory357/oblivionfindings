@@ -105,7 +105,7 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {form.errors.client_id && <p className="mt-1 text-xs text-red-500">{form.errors.client_id}</p>}
+                                    {form.errors.client_id && <p className="mt-1 text-xs text-status-critical">{form.errors.client_id}</p>}
                                 </div>
 
                                 {/* Medication Details */}
@@ -113,12 +113,12 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                     <div>
                                         <Label htmlFor="dest-med">Medication Name</Label>
                                         <Input id="dest-med" value={form.data.medication_name} onChange={(e) => form.setData('medication_name', e.target.value)} />
-                                        {form.errors.medication_name && <p className="mt-1 text-xs text-red-500">{form.errors.medication_name}</p>}
+                                        {form.errors.medication_name && <p className="mt-1 text-xs text-status-critical">{form.errors.medication_name}</p>}
                                     </div>
                                     <div>
                                         <Label htmlFor="dest-form">Form</Label>
                                         <Input id="dest-form" value={form.data.form} onChange={(e) => form.setData('form', e.target.value)} placeholder="tablet, liquid, patch..." />
-                                        {form.errors.form && <p className="mt-1 text-xs text-red-500">{form.errors.form}</p>}
+                                        {form.errors.form && <p className="mt-1 text-xs text-status-critical">{form.errors.form}</p>}
                                     </div>
                                     <div>
                                         <Label htmlFor="dest-strength">Strength</Label>
@@ -128,7 +128,7 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                         <div>
                                             <Label htmlFor="dest-qty">Quantity</Label>
                                             <Input id="dest-qty" type="number" min={1} value={form.data.quantity} onChange={(e) => form.setData('quantity', parseInt(e.target.value) || 1)} />
-                                            {form.errors.quantity && <p className="mt-1 text-xs text-red-500">{form.errors.quantity}</p>}
+                                            {form.errors.quantity && <p className="mt-1 text-xs text-status-critical">{form.errors.quantity}</p>}
                                         </div>
                                         <div>
                                             <Label htmlFor="dest-unit">Unit</Label>
@@ -157,7 +157,7 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.reason && <p className="mt-1 text-xs text-red-500">{form.errors.reason}</p>}
+                                        {form.errors.reason && <p className="mt-1 text-xs text-status-critical">{form.errors.reason}</p>}
                                     </div>
                                     <div>
                                         <Label>Disposal Method</Label>
@@ -169,7 +169,7 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.disposal_method && <p className="mt-1 text-xs text-red-500">{form.errors.disposal_method}</p>}
+                                        {form.errors.disposal_method && <p className="mt-1 text-xs text-status-critical">{form.errors.disposal_method}</p>}
                                     </div>
                                 </div>
 
@@ -193,12 +193,12 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                                         <SelectItem value="C">Class C</SelectItem>
                                                     </SelectContent>
                                                 </Select>
-                                                {form.errors.controlled_drug_class && <p className="mt-1 text-xs text-red-500">{form.errors.controlled_drug_class}</p>}
+                                                {form.errors.controlled_drug_class && <p className="mt-1 text-xs text-status-critical">{form.errors.controlled_drug_class}</p>}
                                             </div>
                                             <div>
                                                 <Label htmlFor="dest-auth-name">Authorised By (Name)</Label>
                                                 <Input id="dest-auth-name" value={form.data.authorised_by_name} onChange={(e) => form.setData('authorised_by_name', e.target.value)} />
-                                                {form.errors.authorised_by_name && <p className="mt-1 text-xs text-red-500">{form.errors.authorised_by_name}</p>}
+                                                {form.errors.authorised_by_name && <p className="mt-1 text-xs text-status-critical">{form.errors.authorised_by_name}</p>}
                                             </div>
                                             <div>
                                                 <Label htmlFor="dest-auth-reg">Registration No.</Label>
@@ -220,7 +220,7 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.witness_1_id && <p className="mt-1 text-xs text-red-500">{form.errors.witness_1_id}</p>}
+                                        {form.errors.witness_1_id && <p className="mt-1 text-xs text-status-critical">{form.errors.witness_1_id}</p>}
                                     </div>
                                     <div>
                                         <Label>Witness 2 {form.data.is_controlled_drug ? '(required for CD)' : '(optional)'}</Label>
@@ -232,7 +232,7 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.witness_2_id && <p className="mt-1 text-xs text-red-500">{form.errors.witness_2_id}</p>}
+                                        {form.errors.witness_2_id && <p className="mt-1 text-xs text-status-critical">{form.errors.witness_2_id}</p>}
                                     </div>
                                 </div>
 
@@ -295,7 +295,7 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                                     }
                                                 }}
                                             >
-                                                <Trash2 className="h-4 w-4 text-red-500" />
+                                                <Trash2 className="h-4 w-4 text-status-critical" />
                                             </Button>
                                         </td>
                                     </tr>

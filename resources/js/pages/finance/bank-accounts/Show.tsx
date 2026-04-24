@@ -61,20 +61,20 @@ interface Props {
 const statusBadge = (status: string) => {
     switch (status) {
         case 'reconciled':
-            return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30"><CheckCircle className="h-3 w-3 mr-1" />Reconciled</Badge>;
+            return <Badge className="bg-status-success-bg text-status-success border-status-success/30"><CheckCircle className="h-3 w-3 mr-1" />Reconciled</Badge>;
         case 'matched':
-            return <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30"><Clock className="h-3 w-3 mr-1" />Matched</Badge>;
+            return <Badge className="bg-status-info-bg text-status-info border-status-info/30"><Clock className="h-3 w-3 mr-1" />Matched</Badge>;
         default:
-            return <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30"><AlertCircle className="h-3 w-3 mr-1" />Unreconciled</Badge>;
+            return <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30"><AlertCircle className="h-3 w-3 mr-1" />Unreconciled</Badge>;
     }
 };
 
 const reconStatusBadge = (status: string) => {
     switch (status) {
         case 'completed':
-            return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">Completed</Badge>;
+            return <Badge className="bg-status-success-bg text-status-success border-status-success/30">Completed</Badge>;
         default:
-            return <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30">In Progress</Badge>;
+            return <Badge className="bg-status-info-bg text-status-info border-status-info/30">In Progress</Badge>;
     }
 };
 
@@ -141,7 +141,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                     <Card>
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Current Balance</p>
-                            <p className={`text-2xl font-semibold font-mono tabular-nums mt-1 ${bankAccount.current_balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            <p className={`text-2xl font-semibold font-mono tabular-nums mt-1 ${bankAccount.current_balance >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                 {formatCurrency(bankAccount.current_balance)}
                             </p>
                         </CardContent>
@@ -265,7 +265,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                             <TableCell>
                                                 <Badge variant="outline" className="capitalize">{txn.source}</Badge>
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${txn.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            <TableCell className={`text-right font-mono tabular-nums ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                 {formatCurrency(txn.amount)}
                                             </TableCell>
                                             <TableCell>{statusBadge(txn.status)}</TableCell>

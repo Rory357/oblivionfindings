@@ -38,13 +38,13 @@ function fromLocalDateTimeInput(v: string) {
 function pillForScheduleState(state: string) {
   switch (state) {
     case 'due':
-      return { label: 'Due', className: 'bg-amber-100 text-amber-800 border-amber-200' };
+      return { label: 'Due', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' };
     case 'due_soon':
-      return { label: 'Due soon', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
+      return { label: 'Due soon', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' };
     case 'late':
-      return { label: 'Late', className: 'bg-red-100 text-red-800 border-red-200' };
+      return { label: 'Late', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' };
     case 'missed_auto':
-      return { label: 'Overdue', className: 'bg-rose-100 text-rose-800 border-rose-200' };
+      return { label: 'Overdue', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' };
     case 'upcoming':
       return { label: 'Upcoming', className: 'bg-muted text-foreground border-border' };
     case 'historical':
@@ -59,13 +59,13 @@ function pillForScheduleState(state: string) {
 function pillForStatus(status?: string | null) {
   switch (status) {
     case 'given':
-      return { label: 'Given', className: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+      return { label: 'Given', className: 'bg-status-success-bg text-status-success border-status-success/30' };
     case 'refused':
-      return { label: 'Refused', className: 'bg-orange-100 text-orange-800 border-orange-200' };
+      return { label: 'Refused', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' };
     case 'withheld':
-      return { label: 'Withheld', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
+      return { label: 'Withheld', className: 'bg-status-warning-bg text-status-warning border-status-warning/30' };
     case 'missed':
-      return { label: 'Missed', className: 'bg-rose-100 text-rose-800 border-rose-200' };
+      return { label: 'Missed', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' };
     default:
       return { label: 'Not recorded', className: 'bg-muted text-foreground border-border' };
   }
@@ -252,12 +252,12 @@ export default function ClientMar() {
         </div>
 
         {has_open_controlled_discrepancy && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4" />
               <div>
                 <div className="font-medium">Open controlled-drug discrepancy</div>
-                <div className="text-xs text-amber-800">Review and resolve before further controlled stock edits (unless override is granted).</div>
+                <div className="text-xs text-status-warning">Review and resolve before further controlled stock edits (unless override is granted).</div>
               </div>
             </div>
           </div>

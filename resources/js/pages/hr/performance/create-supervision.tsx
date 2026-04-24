@@ -101,13 +101,13 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="employee_user_id">
-                                        Staff Member <span className="text-red-500">*</span>
+                                        Staff Member <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.employee_user_id}
                                         onValueChange={(value) => setData('employee_user_id', value)}
                                     >
-                                        <SelectTrigger id="employee_user_id" className={errors.employee_user_id ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="employee_user_id" className={errors.employee_user_id ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select staff member" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -119,19 +119,19 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.employee_user_id && (
-                                        <p className="text-sm text-red-500">{errors.employee_user_id}</p>
+                                        <p className="text-sm text-status-critical">{errors.employee_user_id}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="session_type">
-                                        Session Type <span className="text-red-500">*</span>
+                                        Session Type <span className="text-status-critical">*</span>
                                     </Label>
                                     <Select
                                         value={data.session_type}
                                         onValueChange={(value) => setData('session_type', value)}
                                     >
-                                        <SelectTrigger id="session_type" className={errors.session_type ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="session_type" className={errors.session_type ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select session type" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -143,23 +143,23 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.session_type && (
-                                        <p className="text-sm text-red-500">{errors.session_type}</p>
+                                        <p className="text-sm text-status-critical">{errors.session_type}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="session_date">
-                                        Session Date <span className="text-red-500">*</span>
+                                        Session Date <span className="text-status-critical">*</span>
                                     </Label>
                                     <Input
                                         id="session_date"
                                         type="date"
                                         value={data.session_date}
                                         onChange={(e) => setData('session_date', e.target.value)}
-                                        className={errors.session_date ? 'border-red-500' : ''}
+                                        className={errors.session_date ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.session_date && (
-                                        <p className="text-sm text-red-500">{errors.session_date}</p>
+                                        <p className="text-sm text-status-critical">{errors.session_date}</p>
                                     )}
                                 </div>
 
@@ -172,10 +172,10 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
                                         placeholder="e.g., 30"
                                         value={data.duration_minutes}
                                         onChange={(e) => setData('duration_minutes', e.target.value)}
-                                        className={errors.duration_minutes ? 'border-red-500' : ''}
+                                        className={errors.duration_minutes ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.duration_minutes && (
-                                        <p className="text-sm text-red-500">{errors.duration_minutes}</p>
+                                        <p className="text-sm text-status-critical">{errors.duration_minutes}</p>
                                     )}
                                 </div>
                             </div>
@@ -188,10 +188,10 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
                                     rows={5}
                                     value={data.topics_discussed}
                                     onChange={(e) => setData('topics_discussed', e.target.value)}
-                                    className={errors.topics_discussed ? 'border-red-500' : ''}
+                                    className={errors.topics_discussed ? 'border-status-critical/30' : ''}
                                 />
                                 {errors.topics_discussed && (
-                                    <p className="text-sm text-red-500">{errors.topics_discussed}</p>
+                                    <p className="text-sm text-status-critical">{errors.topics_discussed}</p>
                                 )}
                             </div>
                         </CardContent>
@@ -219,7 +219,7 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => removeAction(index)}
-                                            className="text-red-500 hover:text-red-600"
+                                            className="text-status-critical hover:text-status-critical"
                                         >
                                             Remove
                                         </Button>
@@ -242,10 +242,10 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
                                         type="date"
                                         value={data.next_session_date}
                                         onChange={(e) => setData('next_session_date', e.target.value)}
-                                        className={errors.next_session_date ? 'border-red-500' : ''}
+                                        className={errors.next_session_date ? 'border-status-critical/30' : ''}
                                     />
                                     {errors.next_session_date && (
-                                        <p className="text-sm text-red-500">{errors.next_session_date}</p>
+                                        <p className="text-sm text-status-critical">{errors.next_session_date}</p>
                                     )}
                                 </div>
                             </div>

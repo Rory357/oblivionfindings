@@ -497,7 +497,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             setNestedData('next_of_kin.client_id', value)
                                         }
                                     >
-                                        <SelectTrigger id="nok_client" className={form.errors['next_of_kin.client_id'] ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="nok_client" className={form.errors['next_of_kin.client_id'] ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select a client..." />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -519,7 +519,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             setNestedData('next_of_kin.relationship', value)
                                         }
                                     >
-                                        <SelectTrigger id="nok_relationship" className={form.errors['next_of_kin.relationship'] ? 'border-red-500' : ''}>
+                                        <SelectTrigger id="nok_relationship" className={form.errors['next_of_kin.relationship'] ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select relationship..." />
                                         </SelectTrigger>
                                         <SelectContent>

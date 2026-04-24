@@ -78,7 +78,7 @@ export default function CreateClient({
                             ))}
                         </select>
                         {errors.site_id && (
-                            <div className="mt-1 text-xs text-red-400">
+                            <div className="mt-1 text-xs text-status-critical">
                                 {errors.site_id}
                             </div>
                         )}
@@ -106,7 +106,7 @@ export default function CreateClient({
                             ))}
                         </select>
                         {errors.service_context_id && (
-                            <div className="mt-1 text-xs text-red-400">
+                            <div className="mt-1 text-xs text-status-critical">
                                 {errors.service_context_id}
                             </div>
                         )}
@@ -124,7 +124,7 @@ export default function CreateClient({
                             onChange={(e) => setData('nhi_number', e.target.value.toUpperCase())}
                         />
                         {errors.nhi_number && (
-                            <div className="mt-1 text-xs text-red-400">{errors.nhi_number}</div>
+                            <div className="mt-1 text-xs text-status-critical">{errors.nhi_number}</div>
                         )}
                         <div className="mt-1 text-xs text-muted-foreground">
                             3 letters followed by 4 digits (e.g., ZAC5961)
@@ -143,7 +143,7 @@ export default function CreateClient({
                             }
                         />
                         {errors.first_name && (
-                            <div className="mt-1 text-xs text-red-400">
+                            <div className="mt-1 text-xs text-status-critical">
                                 {errors.first_name}
                             </div>
                         )}
@@ -159,7 +159,7 @@ export default function CreateClient({
                             }
                         />
                         {errors.last_name && (
-                            <div className="mt-1 text-xs text-red-400">
+                            <div className="mt-1 text-xs text-status-critical">
                                 {errors.last_name}
                             </div>
                         )}
@@ -173,7 +173,7 @@ export default function CreateClient({
                             onChange={(e) => setData('preferred_name', e.target.value)}
                         />
                         {errors.preferred_name && (
-                            <div className="mt-1 text-xs text-red-400">{errors.preferred_name}</div>
+                            <div className="mt-1 text-xs text-status-critical">{errors.preferred_name}</div>
                         )}
                     </div>
 
@@ -187,7 +187,7 @@ export default function CreateClient({
                                 onChange={(e) => setData('date_of_birth', e.target.value)}
                             />
                             {errors.date_of_birth && (
-                                <div className="mt-1 text-xs text-red-400">{errors.date_of_birth}</div>
+                                <div className="mt-1 text-xs text-status-critical">{errors.date_of_birth}</div>
                             )}
                         </div>
 
@@ -199,7 +199,7 @@ export default function CreateClient({
                                 onChange={(e) => setData('gender', e.target.value)}
                             />
                             {errors.gender && (
-                                <div className="mt-1 text-xs text-red-400">{errors.gender}</div>
+                                <div className="mt-1 text-xs text-status-critical">{errors.gender}</div>
                             )}
                         </div>
                     </div>
@@ -215,7 +215,7 @@ export default function CreateClient({
                             <option value="inactive">inactive</option>
                         </select>
                         {errors.status && (
-                            <div className="mt-1 text-xs text-red-400">
+                            <div className="mt-1 text-xs text-status-critical">
                                 {errors.status}
                             </div>
                         )}
@@ -232,7 +232,7 @@ export default function CreateClient({
                                     onChange={(e) => setData('phone', e.target.value)}
                                 />
                                 {errors.phone && (
-                                    <div className="mt-1 text-xs text-red-400">{errors.phone}</div>
+                                    <div className="mt-1 text-xs text-status-critical">{errors.phone}</div>
                                 )}
                             </div>
                             <div>
@@ -243,7 +243,7 @@ export default function CreateClient({
                                     onChange={(e) => setData('email', e.target.value)}
                                 />
                                 {errors.email && (
-                                    <div className="mt-1 text-xs text-red-400">{errors.email}</div>
+                                    <div className="mt-1 text-xs text-status-critical">{errors.email}</div>
                                 )}
                             </div>
                         </div>
@@ -275,7 +275,7 @@ export default function CreateClient({
                                     onChange={(e) => setData('address_line_1', e.target.value)}
                                 />
                                 {errors.address_line_1 && (
-                                    <div className="mt-1 text-xs text-red-400">{errors.address_line_1}</div>
+                                    <div className="mt-1 text-xs text-status-critical">{errors.address_line_1}</div>
                                 )}
                             </div>
                             <div>
@@ -286,7 +286,7 @@ export default function CreateClient({
                                     onChange={(e) => setData('address_line_2', e.target.value)}
                                 />
                                 {errors.address_line_2 && (
-                                    <div className="mt-1 text-xs text-red-400">{errors.address_line_2}</div>
+                                    <div className="mt-1 text-xs text-status-critical">{errors.address_line_2}</div>
                                 )}
                             </div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -298,7 +298,7 @@ export default function CreateClient({
                                         onChange={(e) => setData('suburb', e.target.value)}
                                     />
                                     {errors.suburb && (
-                                        <div className="mt-1 text-xs text-red-400">{errors.suburb}</div>
+                                        <div className="mt-1 text-xs text-status-critical">{errors.suburb}</div>
                                     )}
                                 </div>
                                 <div>
@@ -309,7 +309,7 @@ export default function CreateClient({
                                         onChange={(e) => setData('city', e.target.value)}
                                     />
                                     {errors.city && (
-                                        <div className="mt-1 text-xs text-red-400">{errors.city}</div>
+                                        <div className="mt-1 text-xs text-status-critical">{errors.city}</div>
                                     )}
                                 </div>
                                 <div>
@@ -320,7 +320,7 @@ export default function CreateClient({
                                         onChange={(e) => setData('postcode', e.target.value)}
                                     />
                                     {errors.postcode && (
-                                        <div className="mt-1 text-xs text-red-400">{errors.postcode}</div>
+                                        <div className="mt-1 text-xs text-status-critical">{errors.postcode}</div>
                                     )}
                                 </div>
                             </div>
@@ -338,7 +338,7 @@ export default function CreateClient({
                                     onChange={(e) => setData('funding_type', e.target.value)}
                                 />
                                 {errors.funding_type && (
-                                    <div className="mt-1 text-xs text-red-400">{errors.funding_type}</div>
+                                    <div className="mt-1 text-xs text-status-critical">{errors.funding_type}</div>
                                 )}
                             </div>
                             <div>
@@ -350,7 +350,7 @@ export default function CreateClient({
                                     onChange={(e) => setData('funding_notes', e.target.value)}
                                 />
                                 {errors.funding_notes && (
-                                    <div className="mt-1 text-xs text-red-400">{errors.funding_notes}</div>
+                                    <div className="mt-1 text-xs text-status-critical">{errors.funding_notes}</div>
                                 )}
                             </div>
                         </div>

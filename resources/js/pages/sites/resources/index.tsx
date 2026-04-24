@@ -46,9 +46,9 @@ const typeLabels: Record<string, string> = {
 
 const typeColors: Record<string, string> = {
     boardroom: 'bg-primary/20 text-primary/70 border-primary/30',
-    training_room: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    meeting_room: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    other: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+    training_room: 'bg-status-info-bg text-status-info border-status-info/30',
+    meeting_room: 'bg-status-success-bg text-status-success border-status-success/30',
+    other: 'bg-muted-foreground/80/20 text-muted-foreground border-border/30',
 };
 
 export default function SiteResources({ site, resources }: Props) {
@@ -142,15 +142,15 @@ export default function SiteResources({ site, resources }: Props) {
                             <div className="text-sm text-muted-foreground">Total Resources</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-emerald-400">{activeResources.length}</div>
+                            <div className="text-2xl font-bold text-status-success">{activeResources.length}</div>
                             <div className="text-sm text-muted-foreground">Active</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-blue-500/5 border-blue-500/20">
+                    <Card className="bg-status-info border-status-info/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-blue-400">
+                            <div className="text-2xl font-bold text-status-info">
                                 {activeResources.filter(r => r.is_bookable).length}
                             </div>
                             <div className="text-sm text-muted-foreground">Bookable</div>
@@ -281,7 +281,7 @@ export default function SiteResources({ site, resources }: Props) {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                        className="text-status-critical hover:text-status-critical hover:bg-status-critical"
                                                         onClick={() => handleDeactivate(resource)}
                                                         disabled={deleteForm.processing}
                                                     >

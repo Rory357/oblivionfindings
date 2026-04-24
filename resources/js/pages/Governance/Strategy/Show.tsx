@@ -66,12 +66,12 @@ export default function StrategyShow({ auth, plan }: Props) {
 
   const getPillarColor = (pillar: string) => {
     const colors: Record<string, string> = {
-      safety: 'bg-red-100 text-red-800 border-red-200',
-      quality: 'bg-blue-100 text-blue-800 border-blue-200',
-      people: 'bg-green-100 text-green-800 border-green-200',
-      finance: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      safety: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+      quality: 'bg-status-info-bg text-status-info border-status-info/30',
+      people: 'bg-status-success-bg text-status-success border-status-success/30',
+      finance: 'bg-status-warning-bg text-status-warning border-status-warning/30',
       compliance: 'bg-primary/10 text-primary border-primary',
-      it_resilience: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+      it_resilience: 'bg-status-info-bg text-status-info border-status-info/30',
     };
     return colors[pillar] || 'bg-muted text-foreground border-border';
   };
@@ -81,15 +81,15 @@ export default function StrategyShow({ auth, plan }: Props) {
       case 'achieved':
       case 'complete':
       case 'approved':
-        return 'bg-green-100 text-green-800';
+        return 'bg-status-success-bg text-status-success';
       case 'in_progress':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info-bg text-status-info';
       case 'at_risk':
       case 'on_hold':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning-bg text-status-warning';
       case 'blocked':
       case 'cancelled':
-        return 'bg-red-100 text-red-800';
+        return 'bg-status-critical-bg text-status-critical';
       default:
         return 'bg-muted text-foreground';
     }
@@ -125,7 +125,7 @@ export default function StrategyShow({ auth, plan }: Props) {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back Link */}
           <div className="mb-4">
-            <Link href={strategyIndex.url()} className="text-sm text-blue-600 hover:underline">
+            <Link href={strategyIndex.url()} className="text-sm text-status-info hover:underline">
               ← Back to Strategic Plans
             </Link>
           </div>
@@ -194,13 +194,13 @@ export default function StrategyShow({ auth, plan }: Props) {
 
           {/* Approval Status */}
           {plan.approval_resolution && (
-            <Card className="mb-6 border-green-200 bg-green-50">
+            <Card className="mb-6 border-status-success/30 bg-status-success-bg">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
+                  <CheckCircle className="w-6 h-6 text-status-success" />
                   <div>
-                    <p className="font-medium text-green-800">Board Approved</p>
-                    <p className="text-sm text-green-600">
+                    <p className="font-medium text-status-success">Board Approved</p>
+                    <p className="text-sm text-status-success">
                       Resolution {plan.approval_resolution.resolution_reference} - {plan.approval_resolution.outcome}
                     </p>
                   </div>
@@ -244,11 +244,11 @@ export default function StrategyShow({ auth, plan }: Props) {
                             {goal.key_results.map((kr, index) => (
                               <div key={index} className="flex items-center gap-2 text-sm">
                                 {kr.status === 'achieved' ? (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
+                                  <CheckCircle className="w-4 h-4 text-status-success" />
                                 ) : kr.status === 'in_progress' ? (
-                                  <Clock className="w-4 h-4 text-blue-500" />
+                                  <Clock className="w-4 h-4 text-status-info" />
                                 ) : (
-                                  <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                                  <AlertTriangle className="w-4 h-4 text-status-warning" />
                                 )}
                                 <span className={cn(
                                   kr.status === 'achieved' && 'line-through text-muted-foreground'

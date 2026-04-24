@@ -90,14 +90,14 @@ const statusColor = (status: string) => {
     switch (status) {
         case 'active':
         case 'current':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'inactive':
         case 'superseded':
             return 'bg-muted text-foreground';
         case 'pending_review':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'expired':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         default:
             return 'bg-muted text-foreground';
     }
@@ -271,7 +271,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                                 {sds.file_name ? (
                                                     <Link
                                                         href={`/health-safety/substances/${substance.id}/sds/${sds.id}/download`}
-                                                        className="text-xs text-blue-600 underline"
+                                                        className="text-xs text-status-info underline"
                                                     >
                                                         {sds.file_name}
                                                     </Link>
@@ -328,12 +328,12 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                             <td className="py-2 pr-4">{loc.current_quantity ?? '-'}</td>
                                             <td className="py-2 pr-4">{loc.max_quantity ?? '-'}</td>
                                             <td className="py-2 pr-4">
-                                                <Badge className={loc.is_labelled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                                <Badge className={loc.is_labelled ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'}>
                                                     {loc.is_labelled ? 'Yes' : 'No'}
                                                 </Badge>
                                             </td>
                                             <td className="py-2">
-                                                <Badge className={loc.segregation_compliant ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                                <Badge className={loc.segregation_compliant ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'}>
                                                     {loc.segregation_compliant ? 'Yes' : 'No'}
                                                 </Badge>
                                             </td>
@@ -387,7 +387,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                                             <td className="py-2 pr-4 capitalize">{exp.exposure_type}</td>
                                             <td className="py-2 pr-4">{exp.symptoms ?? '-'}</td>
                                             <td className="py-2">
-                                                <Badge className={exp.medical_attention ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}>
+                                                <Badge className={exp.medical_attention ? 'bg-status-critical-bg text-status-critical' : 'bg-status-success-bg text-status-success'}>
                                                     {exp.medical_attention ? 'Yes' : 'No'}
                                                 </Badge>
                                             </td>

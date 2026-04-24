@@ -110,7 +110,7 @@ export default function InterestsIndex({ auth, interestsByMember, boardMembers }
                 <div>
                   <Label>Nature of Interest</Label>
                   <Input value={data.nature_of_interest} onChange={e => setData('nature_of_interest', e.target.value)} />
-                  {errors.nature_of_interest && <p className="text-red-500 text-sm mt-1">{errors.nature_of_interest}</p>}
+                  {errors.nature_of_interest && <p className="text-status-critical text-sm mt-1">{errors.nature_of_interest}</p>}
                 </div>
                 <div>
                   <Label>Description</Label>
@@ -157,7 +157,7 @@ export default function InterestsIndex({ auth, interestsByMember, boardMembers }
                           <span className="font-medium">{interest.nature_of_interest}</span>
                           {interest.organization_name && <span className="text-muted-foreground">({interest.organization_name})</span>}
                         </div>
-                        <Badge className={interest.is_active ? 'bg-green-100 text-green-800' : 'bg-muted text-foreground'}>
+                        <Badge className={interest.is_active ? 'bg-status-success-bg text-status-success' : 'bg-muted text-foreground'}>
                           {interest.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </div>

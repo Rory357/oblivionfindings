@@ -66,7 +66,7 @@ export default function PettyCashIndex({ funds }: Props) {
                                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                                             <CardTitle className="text-lg">{fund.name}</CardTitle>
                                             {fund.is_active ? (
-                                                <Badge variant="outline" className="border-green-300 text-green-600">
+                                                <Badge variant="outline" className="border-status-success/30 text-status-success">
                                                     Active
                                                 </Badge>
                                             ) : (
@@ -93,7 +93,7 @@ export default function PettyCashIndex({ funds }: Props) {
                                                     <span className="text-muted-foreground">Variance: </span>
                                                     <span
                                                         className={
-                                                            variance < 0 ? 'font-medium text-destructive' : 'text-emerald-600'
+                                                            variance < 0 ? 'font-medium text-destructive' : 'text-status-success'
                                                         }
                                                     >
                                                         {formatCurrency(variance)}

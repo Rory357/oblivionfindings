@@ -160,8 +160,8 @@ const interviewStatusVariants: Record<string, 'default' | 'secondary' | 'destruc
 };
 
 const recColors: Record<string, string> = {
-    strong_yes: 'text-green-500', yes: 'text-emerald-500', maybe: 'text-amber-500',
-    neutral: 'text-amber-500', no: 'text-orange-500', strong_no: 'text-red-500',
+    strong_yes: 'text-status-success', yes: 'text-status-success', maybe: 'text-status-warning',
+    neutral: 'text-status-warning', no: 'text-status-warning', strong_no: 'text-status-critical',
 };
 
 function formatNZDate(dateStr: string): string {
@@ -412,7 +412,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                         {interviewForm.processing ? 'Scheduling...' : 'Schedule Interview'}
                                     </Button>
                                     {interviewForm.errors.scheduled_at && (
-                                        <p className="text-xs text-red-500">{interviewForm.errors.scheduled_at}</p>
+                                        <p className="text-xs text-status-critical">{interviewForm.errors.scheduled_at}</p>
                                     )}
                                 </div>
                             </div>
@@ -513,10 +513,10 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                         {referenceForm.processing ? 'Adding...' : 'Add Reference'}
                                     </Button>
                                     {referenceForm.errors.referee_name && (
-                                        <p className="text-xs text-red-500">{referenceForm.errors.referee_name}</p>
+                                        <p className="text-xs text-status-critical">{referenceForm.errors.referee_name}</p>
                                     )}
                                     {referenceForm.errors.referee_email && (
-                                        <p className="text-xs text-red-500">{referenceForm.errors.referee_email}</p>
+                                        <p className="text-xs text-status-critical">{referenceForm.errors.referee_email}</p>
                                     )}
                                 </div>
                             </div>
@@ -534,7 +534,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                     {app.reference_checks.map((ref) => (
                                         <div key={ref.id} className="flex items-center gap-2 text-xs">
                                             {ref.status === 'completed' ? (
-                                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                                <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
                                             ) : (
                                                 <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                             )}
@@ -558,7 +558,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                 </Button>
                             )}
                             {!allReferencesComplete && app.reference_checks.length > 0 && (
-                                <p className="text-xs text-amber-500">Complete all references to prepare an offer.</p>
+                                <p className="text-xs text-status-warning">Complete all references to prepare an offer.</p>
                             )}
                         </div>
                     )}
@@ -629,12 +629,12 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
             <Head title={fullName} />
             <div className="flex flex-col gap-6 p-6">
                 {flash?.success && (
-                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-400">
+                    <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-3 text-sm text-status-success">
                         {flash.success}
                     </div>
                 )}
                 {flash?.error && (
-                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                         {flash.error}
                     </div>
                 )}
@@ -920,7 +920,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                                                         <div className="mt-2 flex flex-wrap gap-2">
                                                                             {interview.scores.map((score) => (
                                                                                 <div key={score.id} className="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs">
-                                                                                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                                                                    <Star className="h-3 w-3 fill-amber-400 text-status-warning" />
                                                                                     <span>{score.overall_score ?? '-'}</span>
                                                                                     {score.recommendation && (
                                                                                         <span className={recColors[score.recommendation] ?? 'text-muted-foreground'}>
@@ -989,9 +989,9 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
 
                                         {/* Offer */}
                                         {app.offer && (
-                                            <div className="rounded-xl border-2 border-emerald-500/20 bg-emerald-500/5 p-4">
+                                            <div className="rounded-xl border-2 border-status-success/20 bg-status-success p-4">
                                                 <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                                    <Gift className="h-4 w-4 text-emerald-500" />
+                                                    <Gift className="h-4 w-4 text-status-success" />
                                                     Employment Offer
                                                 </h4>
                                                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
@@ -1072,8 +1072,8 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                         {documents.length > 0 && (
                             <div className="grid grid-cols-3 gap-3">
                                 <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-primary">{documents.length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Total</p></CardContent></Card>
-                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-amber-600">{documents.filter(d => d.expires_at && !isExpired(d.expires_at) && new Date(d.expires_at) <= new Date(Date.now() + 30 * 86400000)).length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Expiring</p></CardContent></Card>
-                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-red-600">{documents.filter(d => d.is_expired).length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Expired</p></CardContent></Card>
+                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-status-warning">{documents.filter(d => d.expires_at && !isExpired(d.expires_at) && new Date(d.expires_at) <= new Date(Date.now() + 30 * 86400000)).length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Expiring</p></CardContent></Card>
+                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-status-critical">{documents.filter(d => d.is_expired).length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Expired</p></CardContent></Card>
                             </div>
                         )}
 
@@ -1095,7 +1095,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                 {documents.map((doc) => {
                                     const docExpired = isExpired(doc.expires_at);
-                                    const iconClass = doc.mime_type?.includes('pdf') ? 'text-red-500' : doc.mime_type?.includes('image') ? 'text-blue-500' : 'text-muted-foreground';
+                                    const iconClass = doc.mime_type?.includes('pdf') ? 'text-status-critical' : doc.mime_type?.includes('image') ? 'text-status-info' : 'text-muted-foreground';
                                     const IconComp = doc.mime_type?.includes('pdf') ? FileText : doc.mime_type?.includes('image') ? FileImage : File;
                                     return (
                                         <div key={doc.id} className="group relative flex flex-col items-center gap-2 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/50">
@@ -1103,7 +1103,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                             <p className="text-xs font-medium text-center truncate w-full">{doc.original_name}</p>
                                             <div className="flex flex-wrap justify-center gap-1">
                                                 <Badge variant="outline" className="text-[10px]">{doc.category_label}</Badge>
-                                                {docExpired && <Badge variant="outline" className="text-[10px] border-red-200 bg-red-50 text-red-600">Expired</Badge>}
+                                                {docExpired && <Badge variant="outline" className="text-[10px] border-status-critical/30 bg-status-critical-bg text-status-critical">Expired</Badge>}
                                             </div>
                                             <p className="text-[10px] text-muted-foreground">{doc.formatted_size}</p>
                                             {doc.notes && <p className="text-[10px] text-muted-foreground italic text-center truncate w-full">{doc.notes}</p>}
@@ -1113,7 +1113,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3 w-3" /></Button>
                                                 </a>
                                                 {can.manage && (
-                                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600" onClick={() => deleteDocument(doc.id)}>
+                                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-status-critical" onClick={() => deleteDocument(doc.id)}>
                                                         <Trash2 className="h-3 w-3" />
                                                     </Button>
                                                 )}
@@ -1138,7 +1138,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                             <Upload className="mx-auto h-8 w-8 text-muted-foreground/50 mb-2" />
                                             <Input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="mx-auto max-w-xs" onChange={(e) => documentForm.setData('file', e.target.files?.[0] ?? null)} />
                                         </div>
-                                        {documentForm.errors.file && <p className="text-xs text-red-600">{documentForm.errors.file}</p>}
+                                        {documentForm.errors.file && <p className="text-xs text-status-critical">{documentForm.errors.file}</p>}
                                     </div>
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <div className="space-y-2">
@@ -1151,7 +1151,7 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {documentForm.errors.category && <p className="text-xs text-red-600">{documentForm.errors.category}</p>}
+                                            {documentForm.errors.category && <p className="text-xs text-status-critical">{documentForm.errors.category}</p>}
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Expiry Date</Label>

@@ -106,12 +106,12 @@ type Props = {
 /* ------------------------------------------------------------------ */
 
 function getStatusDotColor(resident: Resident): string {
-    if (resident.on_outing) return 'bg-blue-500';
-    if (resident.geofence_status === 'outside_zone') return 'bg-red-500';
-    if ((resident.battery ?? 100) < 20) return 'bg-amber-500';
-    if (resident.status === 'online') return 'bg-green-500';
-    if (resident.status === 'offline') return 'bg-red-400';
-    return 'bg-slate-400';
+    if (resident.on_outing) return 'bg-status-info';
+    if (resident.geofence_status === 'outside_zone') return 'bg-status-critical';
+    if ((resident.battery ?? 100) < 20) return 'bg-status-warning';
+    if (resident.status === 'online') return 'bg-status-success';
+    if (resident.status === 'offline') return 'bg-status-critical';
+    return 'bg-muted';
 }
 
 function getMarkerStatus(resident: Resident): string {
@@ -123,22 +123,22 @@ function getMarkerStatus(resident: Resident): string {
 
 function getZoneBadge(resident: Resident): { text: string; className: string } {
     if (resident.on_outing) {
-        return { text: 'On Outing', className: 'bg-blue-100 text-blue-700 border-blue-200' };
+        return { text: 'On Outing', className: 'bg-status-info-bg text-status-info border-status-info/30' };
     }
     switch (resident.geofence_status) {
         case 'in_zone':
             return { text: 'In Zone', className: 'bg-primary/10 text-primary border-primary' };
         case 'outside_zone':
-            return { text: 'Outside', className: 'bg-red-100 text-red-700 border-red-200' };
+            return { text: 'Outside', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' };
         default:
             return { text: 'Unknown', className: 'bg-muted text-muted-foreground' };
     }
 }
 
 function getBatteryBarColor(battery: number | null): string {
-    if (battery == null) return 'bg-slate-300';
-    if (battery < 20) return 'bg-red-500 animate-pulse';
-    if (battery <= 40) return 'bg-amber-500';
+    if (battery == null) return 'bg-muted';
+    if (battery < 20) return 'bg-status-critical animate-pulse';
+    if (battery <= 40) return 'bg-status-warning';
     return 'bg-primary';
 }
 
@@ -331,7 +331,7 @@ export default function ResidentTrackingIndex({
                                     onClick={() => setActiveTab('outside')}
                                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                                         activeTab === 'outside'
-                                            ? 'bg-red-100 text-red-700'
+                                            ? 'bg-status-critical-bg text-status-critical'
                                             : 'text-muted-foreground hover:bg-muted'
                                     }`}
                                 >
@@ -341,7 +341,7 @@ export default function ResidentTrackingIndex({
                                     onClick={() => setActiveTab('alerts')}
                                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                                         activeTab === 'alerts'
-                                            ? 'bg-amber-100 text-amber-700'
+                                            ? 'bg-status-warning-bg text-status-warning'
                                             : 'text-muted-foreground hover:bg-muted'
                                     }`}
                                 >
@@ -377,7 +377,7 @@ export default function ResidentTrackingIndex({
                                                 key={alert.id}
                                                 className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50"
                                             >
-                                                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                                                <AlertTriangle className="h-4 w-4 shrink-0 text-status-warning" />
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
                                                         <span className="truncate text-sm font-medium">
@@ -468,7 +468,7 @@ export default function ResidentTrackingIndex({
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                <AlertTriangle className="h-4 w-4 text-status-warning" />
                                 Recent Alerts
                             </CardTitle>
                         </CardHeader>
@@ -483,7 +483,7 @@ export default function ResidentTrackingIndex({
                                 <div className="space-y-3">
                                     {safeAlerts.map((alert) => (
                                         <div key={alert.id} className="flex items-start gap-2">
-                                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="truncate text-sm">
@@ -515,7 +515,7 @@ export default function ResidentTrackingIndex({
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Bus className="h-4 w-4 text-blue-500" />
+                                <Bus className="h-4 w-4 text-status-info" />
                                 Active Outings
                             </CardTitle>
                         </CardHeader>
@@ -531,7 +531,7 @@ export default function ResidentTrackingIndex({
                                 <div className="space-y-3">
                                     {safeOutings.map((outing) => (
                                         <div key={outing.id} className="flex items-start gap-2">
-                                            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+                                            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-info" />
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-medium">{outing.destination}</p>
                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">

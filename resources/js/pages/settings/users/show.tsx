@@ -138,13 +138,13 @@ function parseBrowser(ua?: string | null): { browser: string; os: string } {
 }
 
 const eventConfig: Record<string, { label: string; color: string; icon: typeof LogIn }> = {
-    login: { label: 'Signed in', color: 'bg-emerald-500', icon: LogIn },
-    logout: { label: 'Signed out', color: 'bg-blue-500', icon: LogOut },
-    failed_login: { label: 'Failed login attempt', color: 'bg-red-500', icon: XCircle },
-    password_changed: { label: 'Password changed', color: 'bg-amber-500', icon: KeyRound },
-    role_changed: { label: 'Role changed', color: 'bg-amber-500', icon: Shield },
-    '2fa_enabled': { label: '2FA enabled', color: 'bg-amber-500', icon: ShieldCheck },
-    '2fa_disabled': { label: '2FA disabled', color: 'bg-amber-500', icon: ShieldAlert },
+    login: { label: 'Signed in', color: 'bg-status-success', icon: LogIn },
+    logout: { label: 'Signed out', color: 'bg-status-info', icon: LogOut },
+    failed_login: { label: 'Failed login attempt', color: 'bg-status-critical', icon: XCircle },
+    password_changed: { label: 'Password changed', color: 'bg-status-warning', icon: KeyRound },
+    role_changed: { label: 'Role changed', color: 'bg-status-warning', icon: Shield },
+    '2fa_enabled': { label: '2FA enabled', color: 'bg-status-warning', icon: ShieldCheck },
+    '2fa_disabled': { label: '2FA disabled', color: 'bg-status-warning', icon: ShieldAlert },
     approved: { label: 'Account approved', color: 'bg-primary', icon: CheckCircle2 },
     suspended: { label: 'Account suspended', color: 'bg-primary', icon: ShieldAlert },
 };
@@ -197,7 +197,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
 
                     {/* Profile Header */}
                     <div className="relative overflow-hidden rounded-xl border bg-white dark:bg-muted">
-                        <div className="h-1.5 w-full bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-600" />
+                        <div className="h-1.5 w-full bg-primary" />
                         <div className="px-6 py-6">
                             <div className="flex items-center gap-5">
                                 <Avatar className="h-16 w-16 border-2 border-primary/30 shadow-md">
@@ -208,7 +208,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                     <div className="flex items-center gap-3">
                                         <h1 className="text-xl font-semibold tracking-tight truncate">{u.name}</h1>
                                         {u.is_active ? (
-                                            <Badge className="bg-emerald-100 text-emerald-700 text-xs">Active</Badge>
+                                            <Badge className="bg-status-success-bg text-status-success text-xs">Active</Badge>
                                         ) : (
                                             <Badge variant="destructive" className="text-xs">Inactive</Badge>
                                         )}
@@ -235,7 +235,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                             size="sm"
                                             variant="outline"
                                             dusk="user-suspend-action"
-                                            className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                                            className="text-status-warning border-status-warning/30 hover:bg-status-warning-bg"
                                             onClick={() => router.post(`${usersBasePath}/${u.id}/suspend`, {}, { preserveScroll: true })}>
                                             <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> Suspend
                                         </Button>
@@ -283,9 +283,9 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                             <span className="text-muted-foreground">Status</span>
                                             <span className="col-span-2">
                                                 {u.is_active ? (
-                                                    <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Active</span>
+                                                    <span className="flex items-center gap-1 text-status-success"><CheckCircle2 className="h-3.5 w-3.5" /> Active</span>
                                                 ) : (
-                                                    <span className="flex items-center gap-1 text-red-600"><XCircle className="h-3.5 w-3.5" /> Inactive</span>
+                                                    <span className="flex items-center gap-1 text-status-critical"><XCircle className="h-3.5 w-3.5" /> Inactive</span>
                                                 )}
                                             </span>
                                         </div>
@@ -320,11 +320,11 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                             <span className="text-muted-foreground">2FA Status</span>
                                             <span className="col-span-2">
                                                 {u.two_factor_confirmed_at ? (
-                                                    <Badge className="bg-emerald-100 text-emerald-700 text-xs gap-1">
+                                                    <Badge className="bg-status-success-bg text-status-success text-xs gap-1">
                                                         <ShieldCheck className="h-3 w-3" /> Enabled
                                                     </Badge>
                                                 ) : (
-                                                    <Badge className="bg-amber-100 text-amber-700 text-xs gap-1">
+                                                    <Badge className="bg-status-warning-bg text-status-warning text-xs gap-1">
                                                         <ShieldAlert className="h-3 w-3" /> Not Enabled
                                                     </Badge>
                                                 )}
@@ -394,7 +394,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                                 const newIds = Array.from(assignedIds).filter(id => id !== role.id);
                                                                 router.put(`${usersBasePath}/${u.id}`, { role_ids: newIds }, { preserveScroll: true });
                                                             }}
-                                                                className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"
+                                                                className="rounded p-1 text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical transition-colors"
                                                                 title="Remove role"
                                                             >
                                                                 <X className="h-3.5 w-3.5" />
@@ -467,7 +467,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                     {filteredLogs.map((log) => {
                                         const config = eventConfig[log.event_type] ?? {
                                             label: log.event_type.replace(/_/g, ' '),
-                                            color: 'bg-gray-400',
+                                            color: 'bg-muted',
                                             icon: Clock,
                                         };
                                         const Icon = config.icon;
@@ -566,7 +566,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                     <div className="flex items-center gap-2">
                                                         <p className="text-sm font-medium">{browser} on {os}</p>
                                                         {session.is_current && (
-                                                            <Badge className="bg-emerald-100 text-emerald-700 text-xs">Current Session</Badge>
+                                                            <Badge className="bg-status-success-bg text-status-success text-xs">Current Session</Badge>
                                                         )}
                                                     </div>
                                                     <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
@@ -582,7 +582,7 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="text-red-600 border-red-300 hover:bg-red-50"
+                                                        className="text-status-critical border-status-critical/30 hover:bg-status-critical-bg"
                                                         onClick={() => router.delete(`${usersBasePath}/${u.id}/sessions/${session.id}`, { preserveScroll: true })}
                                                     >
                                                         Terminate
@@ -629,10 +629,10 @@ export default function UserShow({ user, allRoles = [], login_logs = [], active_
                                             <span className="text-muted-foreground">Status</span>
                                             <span className="col-span-2">
                                                 {u.staff_profile.status === 'active' && (
-                                                    <Badge className="bg-emerald-100 text-emerald-700 text-xs">Active</Badge>
+                                                    <Badge className="bg-status-success-bg text-status-success text-xs">Active</Badge>
                                                 )}
                                                 {u.staff_profile.status === 'on_leave' && (
-                                                    <Badge className="bg-amber-100 text-amber-700 text-xs">On Leave</Badge>
+                                                    <Badge className="bg-status-warning-bg text-status-warning text-xs">On Leave</Badge>
                                                 )}
                                                 {u.staff_profile.status === 'terminated' && (
                                                     <Badge variant="destructive" className="text-xs">Terminated</Badge>

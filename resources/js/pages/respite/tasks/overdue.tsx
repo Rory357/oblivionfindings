@@ -12,9 +12,9 @@ type Props = {
 
 const priorityColors: Record<string, string> = {
     low: 'bg-muted text-foreground',
-    medium: 'bg-blue-100 text-blue-800',
-    high: 'bg-orange-100 text-orange-800',
-    urgent: 'bg-red-100 text-red-800',
+    medium: 'bg-status-info-bg text-status-info',
+    high: 'bg-status-warning-bg text-status-warning',
+    urgent: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function OverdueTasks({ tasks }: Props) {
@@ -31,7 +31,7 @@ export default function OverdueTasks({ tasks }: Props) {
 
                 <div className="space-y-2">
                     {tasks.data.map((t: any) => (
-                        <Card key={t.id} className="border-red-200">
+                        <Card key={t.id} className="border-status-critical/30">
                             <CardHeader>
                                 <CardTitle className="text-base">
                                     <div className="flex items-start justify-between gap-3">
@@ -39,14 +39,14 @@ export default function OverdueTasks({ tasks }: Props) {
                                             <div className="font-semibold">{t.title}</div>
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <Badge className={priorityColors[t.priority] || ''}>{t.priority}</Badge>
-                                                <Badge className="bg-red-100 text-red-800">Overdue</Badge>
+                                                <Badge className="bg-status-critical-bg text-status-critical">Overdue</Badge>
                                                 <Badge variant="outline">{t.status?.replace(/_/g, ' ')}</Badge>
                                             </div>
                                             {t.assigned_to && (
                                                 <div className="mt-2 text-xs text-muted-foreground">Assigned to: {t.assigned_to?.name}</div>
                                             )}
                                             {t.due_at && (
-                                                <div className="mt-1 text-xs text-red-600 font-medium">Due: {formatDateTime(t.due_at)}</div>
+                                                <div className="mt-1 text-xs text-status-critical font-medium">Due: {formatDateTime(t.due_at)}</div>
                                             )}
                                         </div>
                                         <Link href={`/respite/tasks/${t.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

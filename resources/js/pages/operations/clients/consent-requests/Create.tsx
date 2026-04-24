@@ -66,9 +66,9 @@ export default function ConsentRequestsCreate({ client, consent_types, portal_us
                 />
 
                 {noPortalUsers && (
-                    <Card className="border-amber-300 bg-amber-50">
+                    <Card className="border-status-warning/30 bg-status-warning-bg">
                         <CardContent className="flex items-start gap-3 p-4">
-                            <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-600" />
+                            <ShieldAlert className="mt-0.5 h-5 w-5 text-status-warning" />
                             <div>
                                 <div className="font-medium">No family-portal contacts linked.</div>
                                 <p className="text-sm text-muted-foreground">
@@ -276,5 +276,5 @@ export default function ConsentRequestsCreate({ client, consent_types, portal_us
 }
 
 function Err({ msg }: { msg: string }) {
-    return <p className="mt-1 text-xs text-red-600">{msg}</p>;
+    return <p className="mt-1 text-xs text-status-critical">{msg}</p>;
 }

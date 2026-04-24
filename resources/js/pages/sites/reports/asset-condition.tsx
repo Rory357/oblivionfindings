@@ -40,11 +40,11 @@ type Props = {
 };
 
 const statusColors: Record<string, string> = {
-    active: 'bg-emerald-500/20 text-emerald-400',
-    inactive: 'bg-slate-500/20 text-muted-foreground',
-    maintenance: 'bg-yellow-500/20 text-yellow-400',
-    retired: 'bg-red-500/20 text-red-400',
-    disposed: 'bg-red-500/20 text-red-400',
+    active: 'bg-status-success-bg text-status-success',
+    inactive: 'bg-muted-foreground/80/20 text-muted-foreground',
+    maintenance: 'bg-status-warning-bg text-status-warning',
+    retired: 'bg-status-critical-bg text-status-critical',
+    disposed: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function AssetConditionReport({ conditionGroups, sites, filters, summary }: Props) {
@@ -73,7 +73,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                         </Link>
                     </Button>
                     <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <Package className="w-5 h-5 text-blue-400" />
+                        <Package className="w-5 h-5 text-status-info" />
                         Asset Condition Report
                     </h1>
                     <p className="text-sm text-muted-foreground">
@@ -89,18 +89,18 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                             <div className="text-sm text-muted-foreground">Total Assets</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-red-500/5 border-red-500/20">
+                    <Card className="bg-status-critical border-status-critical/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-red-400 flex items-center gap-1">
+                            <div className="text-2xl font-bold text-status-critical flex items-center gap-1">
                                 <ShieldAlert className="w-5 h-5" />
                                 {summary.warranty_expired}
                             </div>
                             <div className="text-sm text-muted-foreground">Warranty Expired</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-orange-500/5 border-orange-500/20">
+                    <Card className="bg-status-warning border-status-warning/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-orange-400 flex items-center gap-1">
+                            <div className="text-2xl font-bold text-status-warning flex items-center gap-1">
                                 <Clock className="w-5 h-5" />
                                 {summary.warranty_expiring_soon}
                             </div>
@@ -157,7 +157,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="text-base flex items-center gap-2">
-                                        <Badge className={statusColors[group.status] || 'bg-slate-500/20 text-muted-foreground'}>
+                                        <Badge className={statusColors[group.status] || 'bg-muted-foreground/80/20 text-muted-foreground'}>
                                             {group.status}
                                         </Badge>
                                         <span className="text-muted-foreground font-normal">
@@ -166,12 +166,12 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                                     </CardTitle>
                                     <div className="flex gap-2">
                                         {group.warranty_expired > 0 && (
-                                            <Badge variant="outline" className="text-red-400">
+                                            <Badge variant="outline" className="text-status-critical">
                                                 {group.warranty_expired} expired warranty
                                             </Badge>
                                         )}
                                         {group.warranty_expiring_soon > 0 && (
-                                            <Badge variant="outline" className="text-orange-400">
+                                            <Badge variant="outline" className="text-status-warning">
                                                 {group.warranty_expiring_soon} expiring soon
                                             </Badge>
                                         )}
@@ -212,10 +212,10 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                                                                 variant="outline"
                                                                 className={
                                                                     isExpired
-                                                                        ? 'text-red-400'
+                                                                        ? 'text-status-critical'
                                                                         : isExpiringSoon
-                                                                        ? 'text-orange-400'
-                                                                        : 'text-emerald-400'
+                                                                        ? 'text-status-warning'
+                                                                        : 'text-status-success'
                                                                 }
                                                             >
                                                                 {new Date(asset.warranty_expires_at).toLocaleDateString()}

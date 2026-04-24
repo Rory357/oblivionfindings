@@ -125,11 +125,11 @@ function formatRelativeTime(isoString: string | null): string {
 function severityBadgeClass(severity: string): string {
     switch (severity) {
         case 'critical':
-            return 'bg-red-100 text-red-800 border-red-200';
+            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         case 'high':
-            return 'bg-orange-100 text-orange-800 border-orange-200';
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         case 'medium':
-            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         default:
             return 'bg-muted text-foreground border-border';
     }
@@ -326,8 +326,8 @@ export default function ShiftHandover({
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
-                                            <TrendingUp className="h-5 w-5 text-blue-600" />
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-info-bg">
+                                            <TrendingUp className="h-5 w-5 text-status-info" />
                                         </div>
                                         <div>
                                             <p className="text-sm text-muted-foreground">Alerts Created</p>
@@ -339,8 +339,8 @@ export default function ShiftHandover({
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-                                            <CheckCircle className="h-5 w-5 text-green-600" />
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-success-bg">
+                                            <CheckCircle className="h-5 w-5 text-status-success" />
                                         </div>
                                         <div>
                                             <p className="text-sm text-muted-foreground">Alerts Resolved</p>
@@ -352,8 +352,8 @@ export default function ShiftHandover({
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
-                                            <AlertTriangle className="h-5 w-5 text-orange-600" />
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning-bg">
+                                            <AlertTriangle className="h-5 w-5 text-status-warning" />
                                         </div>
                                         <div>
                                             <p className="text-sm text-muted-foreground">Alerts Escalated</p>
@@ -365,8 +365,8 @@ export default function ShiftHandover({
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
-                                            <ShieldAlert className="h-5 w-5 text-red-600" />
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-critical-bg">
+                                            <ShieldAlert className="h-5 w-5 text-status-critical" />
                                         </div>
                                         <div>
                                             <p className="text-sm text-muted-foreground">Open Now</p>
@@ -382,7 +382,7 @@ export default function ShiftHandover({
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                                        <AlertTriangle className="h-4 w-4 text-status-critical" />
                                         Critical &amp; High Severity Alerts ({criticalAlertsCount + highAlertsCount})
                                     </CardTitle>
                                 </CardHeader>
@@ -515,7 +515,7 @@ export default function ShiftHandover({
                                         {pinnedNotes.map((note) => (
                                             <div
                                                 key={note.id}
-                                                className="rounded-lg border bg-amber-50/50 p-3"
+                                                className="rounded-lg border bg-status-warning-bg p-3"
                                             >
                                                 <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
                                                     <span className="font-medium">
@@ -546,7 +546,7 @@ export default function ShiftHandover({
                                         {followupNotes.map((note) => (
                                             <div
                                                 key={note.id}
-                                                className="rounded-lg border bg-blue-50/50 p-3"
+                                                className="rounded-lg border bg-status-info-bg p-3"
                                             >
                                                 <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
                                                     <span className="font-medium">
@@ -559,7 +559,7 @@ export default function ShiftHandover({
                                                             <span>&middot;</span>
                                                             <Badge
                                                                 variant="outline"
-                                                                className="bg-blue-100 text-blue-700 border-blue-200 text-xs"
+                                                                className="bg-status-info-bg text-status-info border-status-info/30 text-xs"
                                                             >
                                                                 Follow-up: {formatDateTime(note.followup_at)}
                                                             </Badge>

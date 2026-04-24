@@ -222,8 +222,8 @@ function DoseTimesPreview({ frequency }: { frequency: string }) {
     if (!frequency) return null;
 
     return (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
-            <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+        <div className="rounded-md border border-status-success/30 bg-status-success-bg p-3 dark:border-status-success/30 dark:bg-status-success">
+            <div className="flex items-center gap-2 text-sm font-medium text-status-success dark:text-status-success">
                 <Clock className="h-4 w-4" />
                 Scheduled Dose Times
             </div>
@@ -232,14 +232,14 @@ function DoseTimesPreview({ frequency }: { frequency: string }) {
                     {times.map((t) => (
                         <span
                             key={t}
-                            className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                            className="inline-flex items-center rounded-full bg-status-success-bg px-2.5 py-0.5 text-xs font-medium text-status-success dark:bg-status-success-bg dark:text-status-success"
                         >
                             {t}
                         </span>
                     ))}
                 </div>
             ) : (
-                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                <p className="mt-1 text-xs text-status-success dark:text-status-success">
                     No fixed schedule — administered as needed or one-off.
                 </p>
             )}
@@ -319,7 +319,7 @@ function MedicationFormFields({
                         </SelectContent>
                     </Select>
                     {form.errors.client_id && (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-status-critical">
                             {form.errors.client_id}
                         </p>
                     )}
@@ -336,7 +336,7 @@ function MedicationFormFields({
                         }
                     />
                     {form.errors.medication_name && (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-status-critical">
                             {form.errors.medication_name}
                         </p>
                     )}
@@ -362,7 +362,7 @@ function MedicationFormFields({
                         onChange={(e) => form.setData('dose', e.target.value)}
                     />
                     {form.errors.dose && (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-status-critical">
                             {form.errors.dose}
                         </p>
                     )}
@@ -388,7 +388,7 @@ function MedicationFormFields({
                         </SelectContent>
                     </Select>
                     {form.errors.dose_unit && (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-status-critical">
                             {form.errors.dose_unit}
                         </p>
                     )}
@@ -411,7 +411,7 @@ function MedicationFormFields({
                         </SelectContent>
                     </Select>
                     {form.errors.frequency && (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-status-critical">
                             {form.errors.frequency}
                         </p>
                     )}
@@ -439,7 +439,7 @@ function MedicationFormFields({
                         </SelectContent>
                     </Select>
                     {form.errors.route && (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-status-critical">
                             {form.errors.route}
                         </p>
                     )}
@@ -462,7 +462,7 @@ function MedicationFormFields({
                         </SelectContent>
                     </Select>
                     {form.errors.form && (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-status-critical">
                             {form.errors.form}
                         </p>
                     )}
@@ -516,7 +516,7 @@ function MedicationFormFields({
                         }
                     />
                     {form.errors.start_date && (
-                        <p className="text-xs text-red-600">
+                        <p className="text-xs text-status-critical">
                             {form.errors.start_date}
                         </p>
                     )}
@@ -575,8 +575,8 @@ function MedicationFormFields({
 
             {/* PRN fields - shown when is_prn is checked */}
             {form.data.is_prn && (
-                <div className="rounded-md border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/30">
-                    <p className="mb-3 text-sm font-medium text-blue-700 dark:text-blue-400">
+                <div className="rounded-md border border-status-info/30 bg-status-info-bg p-4 dark:border-status-info/30 dark:bg-status-info">
+                    <p className="mb-3 text-sm font-medium text-status-info dark:text-status-info">
                         PRN Details
                     </p>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -605,7 +605,7 @@ function MedicationFormFields({
                                 }
                             />
                             {form.errors.max_per_day && (
-                                <p className="text-xs text-red-600">
+                                <p className="text-xs text-status-critical">
                                     {form.errors.max_per_day}
                                 </p>
                             )}
@@ -626,7 +626,7 @@ function MedicationFormFields({
                                 }
                             />
                             {form.errors.min_hours_between_doses && (
-                                <p className="text-xs text-red-600">
+                                <p className="text-xs text-status-critical">
                                     {form.errors.min_hours_between_doses}
                                 </p>
                             )}
@@ -812,11 +812,11 @@ function ImportCsvDialog() {
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="rounded-md border border-blue-200 bg-blue-50/50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30">
-                        <p className="font-medium text-blue-700 dark:text-blue-400">
+                    <div className="rounded-md border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30 dark:bg-status-info">
+                        <p className="font-medium text-status-info dark:text-status-info">
                             CSV Format
                         </p>
-                        <p className="mt-1 text-xs text-blue-600 dark:text-blue-300">
+                        <p className="mt-1 text-xs text-status-info dark:text-status-info">
                             client_name, medication_name, dose, frequency, route
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -1480,7 +1480,7 @@ export default function Medications({
                                                     </Badge>
                                                 )}
                                                 {m.high_risk && (
-                                                    <Badge className="bg-amber-100 text-[10px] text-amber-700">
+                                                    <Badge className="bg-status-warning-bg text-[10px] text-status-warning">
                                                         HR
                                                     </Badge>
                                                 )}
@@ -1502,14 +1502,14 @@ export default function Medications({
                                                                             m.id
                                                                         ] ===
                                                                         'contraindicated'
-                                                                            ? 'text-red-600'
+                                                                            ? 'text-status-critical'
                                                                             : interactionMap[
                                                                                     m
                                                                                         .id
                                                                                 ] ===
                                                                                 'major'
-                                                                              ? 'text-orange-600'
-                                                                              : 'text-yellow-600'
+                                                                              ? 'text-status-warning'
+                                                                              : 'text-status-warning'
                                                                     }`}
                                                                 />
                                                             </TooltipTrigger>
@@ -1562,7 +1562,7 @@ export default function Medications({
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        className="h-7 px-2 text-xs text-red-600 hover:text-red-700"
+                                                        className="h-7 px-2 text-xs text-status-critical hover:text-status-critical"
                                                         onClick={() =>
                                                             handleDiscontinue(m)
                                                         }

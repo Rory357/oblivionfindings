@@ -40,8 +40,8 @@ interface Props {
 }
 
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle2; color: string }> = {
-    compliant: { label: 'Compliant', variant: 'default', icon: CheckCircle2, color: 'text-green-500' },
-    expiring_soon: { label: 'Expiring Soon', variant: 'outline', icon: Clock, color: 'text-yellow-500' },
+    compliant: { label: 'Compliant', variant: 'default', icon: CheckCircle2, color: 'text-status-success' },
+    expiring_soon: { label: 'Expiring Soon', variant: 'outline', icon: Clock, color: 'text-status-warning' },
     expired: { label: 'Expired', variant: 'destructive', icon: AlertTriangle, color: 'text-destructive' },
     not_started: { label: 'Not Started', variant: 'secondary', icon: XCircle, color: 'text-muted-foreground' },
 };
@@ -95,14 +95,14 @@ export default function StaffComplianceDetail({ staff, complianceStatuses, summa
                     </Card>
                     <Card>
                         <CardContent className="pt-6 text-center">
-                            <CheckCircle2 className="mx-auto h-6 w-6 text-green-500" />
+                            <CheckCircle2 className="mx-auto h-6 w-6 text-status-success" />
                             <p className="mt-2 text-2xl font-bold">{summary.compliant}</p>
                             <p className="text-sm text-muted-foreground">Compliant</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6 text-center">
-                            <Clock className="mx-auto h-6 w-6 text-yellow-500" />
+                            <Clock className="mx-auto h-6 w-6 text-status-warning" />
                             <p className="mt-2 text-2xl font-bold">{summary.expiring_soon}</p>
                             <p className="text-sm text-muted-foreground">Expiring Soon</p>
                         </CardContent>
@@ -174,7 +174,7 @@ export default function StaffComplianceDetail({ staff, complianceStatuses, summa
                                                     {item.expiry_date ? (
                                                         <span className={
                                                             item.status === 'expired' ? 'text-destructive font-medium' :
-                                                            item.status === 'expiring_soon' ? 'text-yellow-600 font-medium' :
+                                                            item.status === 'expiring_soon' ? 'text-status-warning font-medium' :
                                                             'text-muted-foreground'
                                                         }>
                                                             {item.expiry_date}

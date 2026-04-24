@@ -85,10 +85,10 @@ type PageProps = {
 };
 
 const statusColors: Record<string, string> = {
-    draft: 'bg-gray-500/10 text-muted-foreground border-gray-500/30',
-    processing: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-    completed: 'bg-green-500/10 text-green-600 border-green-500/30',
-    failed: 'bg-red-500/10 text-red-600 border-red-500/30',
+    draft: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
+    processing: 'bg-status-info-bg text-status-info border-status-info/30',
+    completed: 'bg-status-success-bg text-status-success border-status-success/30',
+    failed: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 const methodLabels: Record<string, string> = {
@@ -402,8 +402,8 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                                                     variant="outline"
                                                     className={
                                                         entity.is_active
-                                                            ? 'bg-green-500/10 text-green-600 border-green-500/30'
-                                                            : 'bg-gray-500/10 text-muted-foreground border-gray-500/30'
+                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
+                                                            : 'bg-muted-foreground/80/10 text-muted-foreground border-border/30'
                                                     }
                                                 >
                                                     {entity.is_active ? 'Active' : 'Inactive'}

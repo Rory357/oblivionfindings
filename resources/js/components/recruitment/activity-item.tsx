@@ -8,9 +8,9 @@ interface ActivityItemProps {
 }
 
 const typeConfig: Record<string, { icon: React.ElementType; dotColor: string }> = {
-    status_change: { icon: ArrowRight, dotColor: 'bg-blue-500' },
-    interview: { icon: Calendar, dotColor: 'bg-amber-500' },
-    offer: { icon: Gift, dotColor: 'bg-emerald-500' },
+    status_change: { icon: ArrowRight, dotColor: 'bg-status-info' },
+    interview: { icon: Calendar, dotColor: 'bg-status-warning' },
+    offer: { icon: Gift, dotColor: 'bg-status-success' },
     note: { icon: MessageSquare, dotColor: 'bg-slate-500' },
     application: { icon: FileText, dotColor: 'bg-primary' },
 };

@@ -59,10 +59,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusClass: Record<string, string> = {
-    pending: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
-    retrying: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
-    success: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-    failed: 'border-red-500/30 text-red-400 bg-red-500/10',
+    pending: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+    retrying: 'border-status-warning/30 text-status-warning bg-status-warning',
+    success: 'border-status-success/30 text-status-success bg-status-success',
+    failed: 'border-status-critical/30 text-status-critical bg-status-critical',
 };
 
 export default function HrWebhookIndex({ endpoints, deliveries, eventOptions, can }: Props) {
@@ -181,13 +181,13 @@ export default function HrWebhookIndex({ endpoints, deliveries, eventOptions, ca
                                 <div className="space-y-2">
                                     <Label>Name</Label>
                                     <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Operations Alerts" />
-                                    {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+                                    {errors.name && <p className="text-xs text-status-critical">{errors.name}</p>}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label>Target URL</Label>
                                     <Input value={data.target_url} onChange={(e) => setData('target_url', e.target.value)} placeholder="https://hooks.example.test/hr" />
-                                    {errors.target_url && <p className="text-xs text-red-500">{errors.target_url}</p>}
+                                    {errors.target_url && <p className="text-xs text-status-critical">{errors.target_url}</p>}
                                 </div>
 
                                 <div className="space-y-2">
@@ -219,7 +219,7 @@ export default function HrWebhookIndex({ endpoints, deliveries, eventOptions, ca
                                             </label>
                                         ))}
                                     </div>
-                                    {errors.event_types && <p className="text-xs text-red-500">{errors.event_types}</p>}
+                                    {errors.event_types && <p className="text-xs text-status-critical">{errors.event_types}</p>}
                                 </div>
 
                                 <div className="md:col-span-2">
@@ -285,7 +285,7 @@ export default function HrWebhookIndex({ endpoints, deliveries, eventOptions, ca
                                                 {endpoint.deliveries_count} deliveries, {endpoint.failed_deliveries_count} failed
                                             </div>
                                             {endpoint.last_error && (
-                                                <div className="mt-1 max-w-md text-xs text-red-500">{endpoint.last_error}</div>
+                                                <div className="mt-1 max-w-md text-xs text-status-critical">{endpoint.last_error}</div>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-right">

@@ -22,10 +22,10 @@ export default function PrnHistoryPanel({ history, count24h, maxPerDay, remainin
   const percentage = maxCount ? (count24h / maxCount) * 100 : 0;
   
   const getBarColor = () => {
-    if (percentage >= 100) return 'bg-red-500';
-    if (percentage >= 75) return 'bg-orange-500';
-    if (percentage >= 50) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (percentage >= 100) return 'bg-status-critical';
+    if (percentage >= 75) return 'bg-status-warning';
+    if (percentage >= 50) return 'bg-status-warning';
+    return 'bg-status-success';
   };
 
   return (
@@ -104,12 +104,12 @@ export default function PrnHistoryPanel({ history, count24h, maxPerDay, remainin
 
         {/* Limit Warning */}
         {maxCount && count24h >= maxCount && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-2 text-center text-xs text-red-700">
+          <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-2 text-center text-xs text-status-critical">
             ⚠️ PRN limit reached - cannot administer
           </div>
         )}
         {maxCount && count24h >= maxCount * 0.75 && count24h < maxCount && (
-          <div className="rounded-md border border-orange-200 bg-orange-50 p-2 text-center text-xs text-orange-700">
+          <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-center text-xs text-status-warning">
             ⚠️ Approaching PRN limit
           </div>
         )}

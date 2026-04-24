@@ -102,9 +102,9 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
           </div>
         </div>
 
-        <Card className={cn(is_distributed ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50')}>
+        <Card className={cn(is_distributed ? 'border-status-success/30 bg-status-success-bg' : 'border-status-warning/30 bg-status-warning-bg')}>
           <CardContent className="flex items-start gap-3 pt-6">
-            {is_distributed ? <CheckCircle className="mt-0.5 h-6 w-6 text-green-600" /> : <Clock className="mt-0.5 h-6 w-6 text-amber-600" />}
+            {is_distributed ? <CheckCircle className="mt-0.5 h-6 w-6 text-status-success" /> : <Clock className="mt-0.5 h-6 w-6 text-status-warning" />}
             <div className="space-y-1">
               <p className="font-medium text-foreground">{is_distributed ? 'Pack distributed' : 'Pack ready for distribution'}</p>
               <p className="text-sm text-foreground">
@@ -177,7 +177,7 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
                       <p className="text-xs text-muted-foreground">{section.type}</p>
                     </div>
                   </div>
-                  {section.included && <CheckCircle className="h-5 w-5 text-green-600" />}
+                  {section.included && <CheckCircle className="h-5 w-5 text-status-success" />}
                 </div>
               ))}
             </CardContent>
@@ -204,12 +204,12 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
           </CardContent>
         </Card>
 
-        <Card className="mt-6 border-red-200">
+        <Card className="mt-6 border-status-critical/30">
           <CardContent className="flex items-start gap-3 pt-6">
-            <ShieldAlert className="mt-0.5 h-5 w-5 text-red-500" />
+            <ShieldAlert className="mt-0.5 h-5 w-5 text-status-critical" />
             <div className="space-y-1">
-              <p className="font-medium text-red-900">Confidential — Board only</p>
-              <p className="text-sm text-red-700">This pack is confidential governance material. Watermark: {pack.watermark_text}</p>
+              <p className="font-medium text-status-critical">Confidential — Board only</p>
+              <p className="text-sm text-status-critical">This pack is confidential governance material. Watermark: {pack.watermark_text}</p>
             </div>
           </CardContent>
         </Card>

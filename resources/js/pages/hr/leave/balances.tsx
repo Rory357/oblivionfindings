@@ -52,9 +52,9 @@ const formatHours = (hours: number) => {
 const getUsageColor = (remaining: number, entitlement: number) => {
     if (entitlement === 0) return 'text-muted-foreground';
     const pct = (remaining / entitlement) * 100;
-    if (pct <= 10) return 'text-red-600 font-semibold';
-    if (pct <= 25) return 'text-orange-600';
-    return 'text-green-600';
+    if (pct <= 10) return 'text-status-critical font-semibold';
+    if (pct <= 25) return 'text-status-warning';
+    return 'text-status-success';
 };
 
 export default function LeaveBalances({ balances, year, leaveTypes, filters, can }: Props) {
@@ -148,7 +148,7 @@ export default function LeaveBalances({ balances, year, leaveTypes, filters, can
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {balance.pending_hours > 0 ? (
-                                                <span className="text-amber-600">
+                                                <span className="text-status-warning">
                                                     {formatHours(balance.pending_hours)}
                                                 </span>
                                             ) : (

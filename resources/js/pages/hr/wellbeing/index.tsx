@@ -344,7 +344,7 @@ export default function WellbeingIndex({
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-medium text-muted-foreground">Amber Flags</CardTitle>
                         </CardHeader>
-                        <CardContent className="text-2xl font-semibold text-amber-600">{wellbeingSummary.flagged_amber}</CardContent>
+                        <CardContent className="text-2xl font-semibold text-status-warning">{wellbeingSummary.flagged_amber}</CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">

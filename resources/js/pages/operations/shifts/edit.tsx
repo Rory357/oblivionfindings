@@ -510,7 +510,7 @@ export default function ShiftEdit({
                                     </div>
                                 ) : null}
                                 {form.errors.series_scope ? (
-                                    <div className="text-xs text-red-500">
+                                    <div className="text-xs text-status-critical">
                                         {form.errors.series_scope}
                                     </div>
                                 ) : null}
@@ -586,7 +586,7 @@ export default function ShiftEdit({
                         <div className="space-y-2">
                             <Label>Shift tasks (checklist)</Label>
                             {taskError && (
-                                <div className="text-sm text-red-500">
+                                <div className="text-sm text-status-critical">
                                     {taskError}
                                 </div>
                             )}

@@ -203,7 +203,7 @@ export default function Modules({
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <p className="text-sm font-medium">{feature.name}</p>
-                                                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-700">
+                                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning">
                                                     Beta
                                                 </Badge>
                                             </div>

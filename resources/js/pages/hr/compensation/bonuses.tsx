@@ -15,10 +15,10 @@ type Props = {
 
 const breadcrumbs = [{ title: 'HR', href: '/hr' }, { title: 'Compensation', href: '/hr/compensation/bands' }, { title: 'Bonuses', href: '/hr/compensation/bonuses' }];
 const statusConfig: Record<string, { className: string; label: string }> = {
-    pending: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Pending' },
-    approved: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Approved' },
-    paid: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Paid' },
-    cancelled: { className: 'border-slate-500/30 text-muted-foreground', label: 'Cancelled' },
+    pending: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Pending' },
+    approved: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Approved' },
+    paid: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Paid' },
+    cancelled: { className: 'border-border/30 text-muted-foreground', label: 'Cancelled' },
 };
 
 export default function BonusIndex({ bonuses, can }: Props) {

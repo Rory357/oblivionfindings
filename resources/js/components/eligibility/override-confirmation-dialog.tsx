@@ -59,7 +59,7 @@ export function OverrideConfirmationDialog({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <ShieldCheck className="size-5 text-yellow-600" />
+                        <ShieldCheck className="size-5 text-status-warning" />
                         Override Eligibility Warnings
                     </DialogTitle>
                     <DialogDescription>
@@ -71,11 +71,11 @@ export function OverrideConfirmationDialog({
 
                 <div className="space-y-3">
                     {/* Warning list */}
-                    <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-950/50">
+                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30 dark:bg-status-warning">
                         <ul className="space-y-1.5">
                             {warnings.map((w, i) => (
-                                <li key={i} className="flex items-start gap-2 text-sm text-yellow-800 dark:text-yellow-300">
-                                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-yellow-600 dark:text-yellow-400" />
+                                <li key={i} className="flex items-start gap-2 text-sm text-status-warning dark:text-status-warning">
+                                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-status-warning dark:text-status-warning" />
                                     <span>{w.message}</span>
                                 </li>
                             ))}
@@ -113,7 +113,7 @@ export function OverrideConfirmationDialog({
                     <Button
                         onClick={handleConfirm}
                         disabled={!canSubmit}
-                        className="bg-yellow-600 text-white hover:bg-yellow-700 dark:bg-yellow-700 dark:hover:bg-yellow-600"
+                        className="bg-status-warning text-white hover:bg-status-warning dark:bg-status-warning dark:hover:bg-status-warning"
                     >
                         {processing ? 'Assigning...' : 'Override & Assign'}
                     </Button>

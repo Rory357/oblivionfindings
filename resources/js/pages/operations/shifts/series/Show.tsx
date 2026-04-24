@@ -672,11 +672,11 @@ export default function ShiftSeriesShow({
                                 </div>
                                 {coverageAlignment.linked_rule_issues.length >
                                 0 ? (
-                                    <div className="rounded-xl border border-red-200 bg-red-50/60 p-3">
-                                        <div className="text-xs font-semibold tracking-wide text-red-700 uppercase">
+                                    <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-3">
+                                        <div className="text-xs font-semibold tracking-wide text-status-critical uppercase">
                                             Coverage drift
                                         </div>
-                                        <div className="mt-1 text-sm text-red-700">
+                                        <div className="mt-1 text-sm text-status-critical">
                                             This recurring series is linked to
                                             demand windows that are still short.
                                         </div>
@@ -686,7 +686,7 @@ export default function ShiftSeriesShow({
                                                 .map((issue, index) => (
                                                     <div
                                                         key={`${issue.rule_name}-${index}`}
-                                                        className="rounded-lg border border-red-200 bg-white/80 p-3"
+                                                        className="rounded-lg border border-status-critical/30 bg-white/80 p-3"
                                                     >
                                                         <div className="text-sm font-medium text-foreground">
                                                             {issue.rule_name}
@@ -694,7 +694,7 @@ export default function ShiftSeriesShow({
                                                         <div className="mt-1 text-xs text-muted-foreground">
                                                             {issue.window_label}
                                                         </div>
-                                                        <div className="mt-1 text-xs text-red-700">
+                                                        <div className="mt-1 text-xs text-status-critical">
                                                             Missing{' '}
                                                             {
                                                                 issue.missing_staff
@@ -712,11 +712,11 @@ export default function ShiftSeriesShow({
                                     </div>
                                 ) : null}
                                 {coverageAlignment.orphan_series ? (
-                                    <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
-                                        <div className="text-xs font-semibold tracking-wide text-amber-700 uppercase">
+                                    <div className="rounded-xl border border-status-warning/30 bg-status-warning-bg p-3">
+                                        <div className="text-xs font-semibold tracking-wide text-status-warning uppercase">
                                             Demand mismatch
                                         </div>
-                                        <div className="mt-1 text-sm text-amber-700">
+                                        <div className="mt-1 text-sm text-status-warning">
                                             This recurring series no longer has
                                             a matching active coverage rule for{' '}
                                             {

@@ -58,7 +58,7 @@ type InboxPayload = {
 function UnreadBadge({ count }: { count: number }) {
     if (!count) return null;
     return (
-        <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm">
+        <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm">
             {count > 99 ? '99+' : count}
         </span>
     );
@@ -85,13 +85,13 @@ function notificationContext(n: { data: any }): Array<{ label: string; value: st
 }
 
 const MODULE_DOT_COLOURS: Record<string, string> = {
-    operations: 'bg-primary',
-    hr: 'bg-blue-500',
-    governance: 'bg-emerald-500',
-    sites: 'bg-amber-500',
-    incidents: 'bg-red-500',
-    fleet: 'bg-primary',
-    system: 'bg-slate-500',
+    operations: 'bg-category-ops',
+    hr: 'bg-category-hr',
+    governance: 'bg-category-governance',
+    sites: 'bg-category-sites',
+    incidents: 'bg-category-incidents',
+    fleet: 'bg-category-fleet',
+    system: 'bg-muted-foreground',
 };
 
 function getModuleDotClass(module?: string): string {
@@ -338,7 +338,7 @@ export default function InboxMenus() {
                                                     {a.title}
                                                 </span>
                                                 {isUnread && (
-                                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-info" />
                                                 )}
                                             </div>
                                             {a.body && (

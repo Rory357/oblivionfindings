@@ -51,10 +51,10 @@ const vendorTypeLabels: Record<string, string> = {
 };
 
 const vendorTypeColors: Record<string, string> = {
-    supplier: 'bg-blue-100 text-blue-800',
+    supplier: 'bg-status-info-bg text-status-info',
     contractor: 'bg-primary/10 text-primary',
-    utility: 'bg-amber-100 text-amber-800',
-    government: 'bg-teal-100 text-teal-800',
+    utility: 'bg-status-warning-bg text-status-warning',
+    government: 'bg-status-info-bg text-status-info',
     other: 'bg-muted text-foreground',
 };
 
@@ -233,7 +233,7 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                                                     variant={vendor.is_active ? 'default' : 'secondary'}
                                                     className={
                                                         vendor.is_active
-                                                            ? 'bg-green-100 text-green-800'
+                                                            ? 'bg-status-success-bg text-status-success'
                                                             : 'bg-muted text-muted-foreground'
                                                     }
                                                 >

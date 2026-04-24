@@ -111,7 +111,7 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
             icon: Clock,
             label: `Wait ${rule.remind_after_minutes}m`,
             sublabel: 'Before first reminder',
-            colour: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+            colour: 'text-status-info bg-status-info-bg dark:bg-status-info-bg dark:text-status-info border-status-info/30 dark:border-status-info/30',
         });
 
         if (rule.repeat_every_minutes > 0) {
@@ -120,7 +120,7 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
                 icon: Mail,
                 label: `Every ${rule.repeat_every_minutes}m`,
                 sublabel: `Reminders (${maxLabel})`,
-                colour: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+                colour: 'text-status-warning bg-status-warning-bg dark:bg-status-warning-bg dark:text-status-warning border-status-warning/30 dark:border-status-warning/30',
             });
         }
     }
@@ -135,8 +135,8 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
                 label: `Tier ${idx + 1}`,
                 sublabel: `After reminder #${tier.from_reminder}: ${tierGroups.join(', ') || 'No groups'}`,
                 colour: idx === tiers.length - 1
-                    ? 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800'
-                    : 'text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+                    ? 'text-status-critical bg-status-critical-bg dark:bg-status-critical-bg dark:text-status-critical border-status-critical/30 dark:border-status-critical/30'
+                    : 'text-status-warning bg-status-warning-bg dark:bg-status-warning-bg dark:text-status-warning border-status-warning/30 dark:border-status-warning/30',
             });
         });
     } else {
@@ -146,7 +146,7 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
                 icon: TrendingUp,
                 label: 'Escalate',
                 sublabel: groups.join(', '),
-                colour: 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+                colour: 'text-status-critical bg-status-critical-bg dark:bg-status-critical-bg dark:text-status-critical border-status-critical/30 dark:border-status-critical/30',
             });
         }
     }
@@ -190,9 +190,9 @@ function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availab
                             <div key={i} className="flex items-center gap-1">
                                 {i > 0 && (
                                     <div className="flex items-center px-0.5">
-                                        <div className="h-px w-3 bg-gradient-to-r from-violet-300 to-violet-500 dark:from-violet-700 dark:to-violet-500 sm:w-6" />
+                                        <div className="h-px w-3 bg-primary dark:from-primary dark:to-primary sm:w-6" />
                                         <ArrowRight className="h-3 w-3 text-primary" />
-                                        <div className="h-px w-3 bg-gradient-to-r from-violet-500 to-violet-300 dark:from-violet-500 dark:to-violet-700 sm:w-6" />
+                                        <div className="h-px w-3 bg-primary dark:from-primary dark:to-primary sm:w-6" />
                                     </div>
                                 )}
                                 <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 shadow-sm ${step.colour}`}>
@@ -477,35 +477,35 @@ export default function NotificationEscalations({
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-emerald-200 dark:border-emerald-800">
+                        <Card className="border-status-success/30 dark:border-status-success/30">
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                                    <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-success-bg dark:bg-status-success">
+                                    <Zap className="h-4 w-4 text-status-success dark:text-status-success" />
                                 </div>
                                 <div>
-                                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{stats.active}</p>
+                                    <p className="text-xl font-bold text-status-success dark:text-status-success">{stats.active}</p>
                                     <p className="text-xs text-muted-foreground">Active Rules</p>
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-amber-200 dark:border-amber-800">
+                        <Card className="border-status-warning/30 dark:border-status-warning/30">
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                                    <Bell className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg dark:bg-status-warning">
+                                    <Bell className="h-4 w-4 text-status-warning dark:text-status-warning" />
                                 </div>
                                 <div>
-                                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.ack}</p>
+                                    <p className="text-xl font-bold text-status-warning dark:text-status-warning">{stats.ack}</p>
                                     <p className="text-xs text-muted-foreground">Require Acknowledgement</p>
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card className="border-red-200 dark:border-red-800">
+                        <Card className="border-status-critical/30 dark:border-status-critical/30">
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30">
-                                    <Megaphone className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg dark:bg-status-critical">
+                                    <Megaphone className="h-4 w-4 text-status-critical dark:text-status-critical" />
                                 </div>
                                 <div>
-                                    <p className="text-xl font-bold text-red-600 dark:text-red-400">{stats.force}</p>
+                                    <p className="text-xl font-bold text-status-critical dark:text-status-critical">{stats.force}</p>
                                     <p className="text-xs text-muted-foreground">Force Delivery</p>
                                 </div>
                             </CardContent>
@@ -513,14 +513,14 @@ export default function NotificationEscalations({
                     </div>
 
                     {/* ── Info Banner ── */}
-                    <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30">
+                    <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30 dark:bg-status-info">
                         <CardContent className="flex gap-3 p-4">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-status-info-bg dark:bg-status-info">
+                                <Info className="h-4 w-4 text-status-info dark:text-status-info" />
                             </div>
-                            <div className="space-y-2 text-sm text-blue-900 dark:text-blue-200">
+                            <div className="space-y-2 text-sm text-status-info dark:text-status-info">
                                 <p className="font-semibold">How escalation works</p>
-                                <p className="text-xs leading-relaxed text-blue-800 dark:text-blue-300">
+                                <p className="text-xs leading-relaxed text-status-info dark:text-status-info">
                                     When a notification is sent and requires acknowledgement, the system will:
                                     <span className="font-semibold"> (1)</span> Wait for the configured time before sending the first reminder,
                                     <span className="font-semibold"> (2)</span> Send reminders at the configured interval,
@@ -640,7 +640,7 @@ export default function NotificationEscalations({
                                         </div>
                                         <div className="flex items-center gap-3">
                                             {isEnabled ? (
-                                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                <Badge className="bg-status-success-bg text-status-success hover:bg-status-success-bg dark:bg-status-success-bg dark:text-status-success">
                                                     Active
                                                 </Badge>
                                             ) : (
@@ -783,7 +783,7 @@ export default function NotificationEscalations({
 
                                                         <div className={`flex items-center justify-between gap-4 rounded-lg border px-4 py-3 ${
                                                             r.force_delivery
-                                                                ? 'border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20'
+                                                                ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
                                                                 : 'bg-background'
                                                         }`}>
                                                             <div>
@@ -794,7 +794,7 @@ export default function NotificationEscalations({
                                                                     Bypass user notification preferences &mdash; always deliver
                                                                 </p>
                                                                 {r.force_delivery && (
-                                                                    <div className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                                                    <div className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-status-critical dark:text-status-critical">
                                                                         <AlertTriangle className="h-3.5 w-3.5" />
                                                                         This will override individual user preferences
                                                                     </div>
@@ -804,7 +804,7 @@ export default function NotificationEscalations({
                                                                 id={`${k}-force`}
                                                                 checked={!!r.force_delivery}
                                                                 onCheckedChange={(v) => setRule(k, { force_delivery: !!v })}
-                                                                className={r.force_delivery ? 'data-[state=checked]:bg-red-600' : ''}
+                                                                className={r.force_delivery ? 'data-[state=checked]:bg-status-critical' : ''}
                                                             />
                                                         </div>
                                                     </div>
@@ -886,7 +886,7 @@ export default function NotificationEscalations({
                                                         {tiers.length > 0 ? (
                                                             <div className="relative space-y-3 pl-4">
                                                                 {/* Connecting line */}
-                                                                <div className="absolute bottom-4 left-[1.1rem] top-4 w-0.5 bg-gradient-to-b from-violet-300 via-violet-400 to-violet-600 dark:from-violet-700 dark:via-violet-600 dark:to-violet-400" />
+                                                                <div className="absolute bottom-4 left-[1.1rem] top-4 w-0.5 bg-primary dark:from-primary dark:via-primary dark:to-primary" />
                                                                 {tiers.map((tier, idx) => (
                                                                     <TierEditor
                                                                         key={idx}
@@ -937,13 +937,13 @@ export default function NotificationEscalations({
                         <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
                                 {isDirty && (
-                                    <div className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                        <div className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+                                    <div className="flex items-center gap-1.5 text-xs font-medium text-status-warning dark:text-status-warning">
+                                        <div className="h-2 w-2 animate-pulse rounded-full bg-status-warning" />
                                         Unsaved changes
                                     </div>
                                 )}
                                 {saveSuccess && (
-                                    <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                    <div className="flex items-center gap-1.5 text-sm font-medium text-status-success dark:text-status-success">
                                         <CheckCircle2 className="h-4 w-4" />
                                         Escalation rules saved successfully
                                     </div>

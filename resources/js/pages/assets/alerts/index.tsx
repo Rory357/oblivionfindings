@@ -26,7 +26,7 @@ export default function AssetAlertsIndex() {
                     <CardContent className="space-y-2">
                         <div className="rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">
                             These records are retained as legacy asset alert history only. Active operational alerts now live in{' '}
-                            <Link href={archive?.replacement_url ?? '/fleet-assets/alerts'} className="font-medium text-blue-600 hover:underline">
+                            <Link href={archive?.replacement_url ?? '/fleet-assets/alerts'} className="font-medium text-status-info hover:underline">
                                 Fleet Alerts
                             </Link>
                             {' '}and Control Room.

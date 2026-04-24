@@ -89,12 +89,12 @@ const categoryLabels: Record<string, string> = {
 };
 
 const categoryColors: Record<string, string> = {
-    vehicle: 'bg-blue-100 text-blue-800',
+    vehicle: 'bg-status-info-bg text-status-info',
     equipment: 'bg-primary/10 text-primary',
-    building: 'bg-amber-100 text-amber-800',
-    furniture: 'bg-teal-100 text-teal-800',
+    building: 'bg-status-warning-bg text-status-warning',
+    furniture: 'bg-status-info-bg text-status-info',
     it_equipment: 'bg-primary/10 text-primary',
-    land: 'bg-green-100 text-green-800',
+    land: 'bg-status-success-bg text-status-success',
 };
 
 const statusLabels: Record<string, string> = {
@@ -104,8 +104,8 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-    active: 'bg-green-100 text-green-800',
-    fully_depreciated: 'bg-amber-100 text-amber-800',
+    active: 'bg-status-success-bg text-status-success',
+    fully_depreciated: 'bg-status-warning-bg text-status-warning',
     disposed: 'bg-muted text-muted-foreground',
 };
 
@@ -233,8 +233,8 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-500/10 p-2">
-                                    <DollarSign className="h-5 w-5 text-blue-600" />
+                                <div className="rounded-lg bg-status-info p-2">
+                                    <DollarSign className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Cost</p>
@@ -248,8 +248,8 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-amber-500/10 p-2">
-                                    <TrendingDown className="h-5 w-5 text-amber-600" />
+                                <div className="rounded-lg bg-status-warning p-2">
+                                    <TrendingDown className="h-5 w-5 text-status-warning" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Depreciation</p>
@@ -263,8 +263,8 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-500/10 p-2">
-                                    <Package className="h-5 w-5 text-emerald-600" />
+                                <div className="rounded-lg bg-status-success p-2">
+                                    <Package className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Net Book Value</p>

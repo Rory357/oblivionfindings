@@ -82,6 +82,27 @@ oklch hue rotations, so charts retint automatically.
 Only use raw hex in charts as a last resort. If you need a 6th+ colour,
 extend `derivePalette.ts` rather than inlining hex.
 
+## Components
+
+Prefer the shadcn primitives over raw HTML + classNames wherever you
+can. They ship with consistent focus rings, disabled states, and
+`asChild` support.
+
+| Don't | Do |
+|---|---|
+| `<button className="rounded-md bg-primary …">` | `<Button>` |
+| `<button className="border rounded-md …">` | `<Button variant="outline">` |
+| `<button className="hover:bg-accent …">` | `<Button variant="ghost">` |
+| `<button className="text-primary underline">` | `<Button variant="link">` |
+| Icon-only trash/close/menu buttons | `<Button variant="ghost" size="icon">` |
+| `<div className="rounded-lg border bg-card …">` | `<Card>` |
+
+**Raw `<button>` is acceptable** when the element is a custom-layout
+selector (theme picker, colour swatch, option card with preview
+artwork inside) where `<Button>`'s default padding/height/gap would
+break the design. In that case, still use semantic tokens (primary,
+accent, muted-foreground) for the styling.
+
 ## Rules of thumb
 
 1. **No raw Tailwind colour classes in components.** `bg-violet-600`,

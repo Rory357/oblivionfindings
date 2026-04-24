@@ -244,7 +244,7 @@ export default function EftposTerminals({ terminals, bankAccounts, glAccounts }:
                                             <TableCell>{terminal.batch_count}</TableCell>
                                             <TableCell>
                                                 {terminal.is_active ? (
-                                                    <Badge variant="outline" className="border-green-300 text-green-600">
+                                                    <Badge variant="outline" className="border-status-success/30 text-status-success">
                                                         Active
                                                     </Badge>
                                                 ) : (

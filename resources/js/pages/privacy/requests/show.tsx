@@ -29,15 +29,15 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'completed':
-                return 'bg-green-100 text-green-800';
+                return 'bg-status-success-bg text-status-success';
             case 'in_progress':
-                return 'bg-blue-100 text-blue-800';
+                return 'bg-status-info-bg text-status-info';
             case 'received':
             case 'under_review':
             case 'identity_verification':
-                return 'bg-yellow-100 text-yellow-800';
+                return 'bg-status-warning-bg text-status-warning';
             case 'rejected':
-                return 'bg-red-100 text-red-800';
+                return 'bg-status-critical-bg text-status-critical';
             default:
                 return 'bg-muted text-foreground';
         }
@@ -86,30 +86,30 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            {isOverdue && <AlertTriangle className="h-5 w-5 text-red-500" />}
+                            {isOverdue && <AlertTriangle className="h-5 w-5 text-status-critical" />}
                             {dsr.reference_number}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
                             <Badge className={getStatusColor(dsr.status)}>
                                 {statusLabels[dsr.status] ?? dsr.status?.replace(/_/g, ' ')}
                             </Badge>
-                            <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                            <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info">
                                 {getRequestTypeLabel(dsr.request_type)}
                             </Badge>
                             {isOverdue && (
-                                <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
+                                <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                     <AlertTriangle className="mr-1 h-3 w-3" />
                                     {Math.abs(daysRemaining)} days overdue
                                 </Badge>
                             )}
                             {!isOverdue && daysRemaining <= 7 && (
-                                <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
+                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                     <Clock className="mr-1 h-3 w-3" />
                                     {daysRemaining} days remaining
                                 </Badge>
                             )}
                             {isIdentityVerified && (
-                                <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                                <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Identity Verified
                                 </Badge>
@@ -125,7 +125,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <User className="h-5 w-5 text-blue-500" />
+                                <User className="h-5 w-5 text-status-info" />
                                 Requester Information
                             </CardTitle>
                         </CardHeader>
@@ -164,7 +164,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                             </div>
                             <div>
                                 <span className="text-xs text-muted-foreground">Due Date</span>
-                                <p className={`font-medium ${isOverdue ? 'text-red-600' : ''}`}>
+                                <p className={`font-medium ${isOverdue ? 'text-status-critical' : ''}`}>
                                     {formatDate(dsr.extended_due_date || dsr.due_date)}
                                     {dsr.extension_requested && ' (Extended)'}
                                 </p>
@@ -188,7 +188,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <FileText className="h-5 w-5 text-green-500" />
+                            <FileText className="h-5 w-5 text-status-success" />
                             Request Details
                         </CardTitle>
                     </CardHeader>
@@ -206,7 +206,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                         )}
                         {dsr.rejection_reason && (
                             <div className="mt-4 pt-4 border-t">
-                                <span className="text-xs text-red-500">Rejection Reason</span>
+                                <span className="text-xs text-status-critical">Rejection Reason</span>
                                 <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
                                     {dsr.rejection_reason}
                                 </p>

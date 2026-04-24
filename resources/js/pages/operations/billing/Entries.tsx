@@ -187,7 +187,7 @@ export default function BillingEntriesPage({
                                     <UserRound className="h-3.5 w-3.5" />
                                     {entry.staff?.name ?? '-'}
                                 </p>
-                                <p className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                                <p className="inline-flex items-center gap-1 text-sm font-semibold text-status-success dark:text-status-success">
                                     <DollarSign className="h-3.5 w-3.5" />
                                     {nzd.format(entry.amount ?? 0)}
                                 </p>

@@ -114,10 +114,10 @@ const formatDate = (value?: string | null) => {
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-        case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
-        case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        case 'completed': return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'scheduled': return 'bg-status-info-bg text-status-info border-status-info/30';
+        case 'overdue': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
+        case 'in_progress': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         default: return 'bg-muted text-foreground border-border';
     }
 };
@@ -242,18 +242,18 @@ export default function PerformanceIndex({
 
                 {/* KPI Cards */}
                 <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-                    <Card className="border-l-4 border-l-blue-500 bg-blue-50/40">
+                    <Card className="border-l-4 border-l-blue-500 bg-status-info-bg">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className="text-xs font-medium text-blue-700">Notes This Month</p>
-                                <div className="rounded-full bg-blue-100 p-1.5">
-                                    <ClipboardList className="h-4 w-4 text-blue-600" />
+                                <p className="text-xs font-medium text-status-info">Notes This Month</p>
+                                <div className="rounded-full bg-status-info-bg p-1.5">
+                                    <ClipboardList className="h-4 w-4 text-status-info" />
                                 </div>
                             </div>
                             <div className="mt-1.5 flex items-baseline gap-2">
-                                <span className="text-2xl font-bold text-blue-900">{notesThisMonth}</span>
+                                <span className="text-2xl font-bold text-status-info">{notesThisMonth}</span>
                                 {notesTrend !== null && notesTrend !== 0 && (
-                                    <span className={`flex items-center text-xs ${notesTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                    <span className={`flex items-center text-xs ${notesTrend > 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                         {notesTrend > 0 ? <TrendingUp className="mr-0.5 h-3 w-3" /> : <TrendingDown className="mr-0.5 h-3 w-3" />}
                                         {Math.abs(notesTrend)}%
                                     </span>
@@ -262,41 +262,41 @@ export default function PerformanceIndex({
                         </CardContent>
                     </Card>
                     <Link href="/hr/performance/reviews">
-                        <Card className={`h-full border-l-4 cursor-pointer transition-colors hover:opacity-80 ${overdueReviews > 0 ? 'border-l-red-500 bg-red-50/50' : 'border-l-emerald-500 bg-emerald-50/40'}`}>
+                        <Card className={`h-full border-l-4 cursor-pointer transition-colors hover:opacity-80 ${overdueReviews > 0 ? 'border-l-red-500 bg-status-critical-bg' : 'border-l-emerald-500 bg-status-success-bg'}`}>
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                    <p className={`text-xs font-medium ${overdueReviews > 0 ? 'text-red-700' : 'text-emerald-700'}`}>Overdue Reviews</p>
-                                    <div className={`rounded-full p-1.5 ${overdueReviews > 0 ? 'bg-red-100' : 'bg-emerald-100'}`}>
-                                        <AlertTriangle className={`h-4 w-4 ${overdueReviews > 0 ? 'text-red-600' : 'text-emerald-600'}`} />
+                                    <p className={`text-xs font-medium ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`}>Overdue Reviews</p>
+                                    <div className={`rounded-full p-1.5 ${overdueReviews > 0 ? 'bg-status-critical-bg' : 'bg-status-success-bg'}`}>
+                                        <AlertTriangle className={`h-4 w-4 ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`} />
                                     </div>
                                 </div>
-                                <span className={`mt-1.5 block text-2xl font-bold ${overdueReviews > 0 ? 'text-red-700' : 'text-emerald-900'}`}>{overdueReviews}</span>
+                                <span className={`mt-1.5 block text-2xl font-bold ${overdueReviews > 0 ? 'text-status-critical' : 'text-status-success'}`}>{overdueReviews}</span>
                             </CardContent>
                         </Card>
                     </Link>
-                    <Card className={`border-l-4 ${oneToOneSla.overdue_count > 0 ? 'border-l-amber-500 bg-amber-50/50' : 'border-l-purple-500 bg-primary/10/40'}`}>
+                    <Card className={`border-l-4 ${oneToOneSla.overdue_count > 0 ? 'border-l-amber-500 bg-status-warning-bg' : 'border-l-purple-500 bg-primary/10/40'}`}>
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className={`text-xs font-medium ${oneToOneSla.overdue_count > 0 ? 'text-amber-700' : 'text-primary'}`}>1:1 Overdue</p>
-                                <div className={`rounded-full p-1.5 ${oneToOneSla.overdue_count > 0 ? 'bg-amber-100' : 'bg-primary/10'}`}>
-                                    <Users className={`h-4 w-4 ${oneToOneSla.overdue_count > 0 ? 'text-amber-600' : 'text-primary'}`} />
+                                <p className={`text-xs font-medium ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}>1:1 Overdue</p>
+                                <div className={`rounded-full p-1.5 ${oneToOneSla.overdue_count > 0 ? 'bg-status-warning-bg' : 'bg-primary/10'}`}>
+                                    <Users className={`h-4 w-4 ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`} />
                                 </div>
                             </div>
-                            <span className={`mt-1.5 block text-2xl font-bold ${oneToOneSla.overdue_count > 0 ? 'text-amber-800' : 'text-primary'}`}>{oneToOneSla.overdue_count}</span>
-                            <p className={`mt-0.5 text-xs ${oneToOneSla.overdue_count > 0 ? 'text-amber-600' : 'text-primary'}`}>{oneToOneSla.due_soon_count} due in 7 days</p>
+                            <span className={`mt-1.5 block text-2xl font-bold ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}>{oneToOneSla.overdue_count}</span>
+                            <p className={`mt-0.5 text-xs ${oneToOneSla.overdue_count > 0 ? 'text-status-warning' : 'text-primary'}`}>{oneToOneSla.due_soon_count} due in 7 days</p>
                         </CardContent>
                     </Card>
-                    <Card className={`border-l-4 ${engagementActionPlanSla.overdue > 0 ? 'border-l-orange-500 bg-orange-50/50' : 'border-l-cyan-500 bg-cyan-50/40'}`}>
+                    <Card className={`border-l-4 ${engagementActionPlanSla.overdue > 0 ? 'border-l-orange-500 bg-status-warning-bg' : 'border-l-cyan-500 bg-status-info-bg'}`}>
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
-                                <p className={`text-xs font-medium ${engagementActionPlanSla.overdue > 0 ? 'text-orange-700' : 'text-cyan-700'}`}>Open Action Plans</p>
-                                <div className={`rounded-full p-1.5 ${engagementActionPlanSla.overdue > 0 ? 'bg-orange-100' : 'bg-cyan-100'}`}>
-                                    <Target className={`h-4 w-4 ${engagementActionPlanSla.overdue > 0 ? 'text-orange-600' : 'text-cyan-600'}`} />
+                                <p className={`text-xs font-medium ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`}>Open Action Plans</p>
+                                <div className={`rounded-full p-1.5 ${engagementActionPlanSla.overdue > 0 ? 'bg-status-warning-bg' : 'bg-status-info-bg'}`}>
+                                    <Target className={`h-4 w-4 ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`} />
                                 </div>
                             </div>
-                            <span className={`mt-1.5 block text-2xl font-bold ${engagementActionPlanSla.overdue > 0 ? 'text-orange-800' : 'text-cyan-900'}`}>{engagementActionPlanSla.open_total}</span>
+                            <span className={`mt-1.5 block text-2xl font-bold ${engagementActionPlanSla.overdue > 0 ? 'text-status-warning' : 'text-status-info'}`}>{engagementActionPlanSla.open_total}</span>
                             {engagementActionPlanSla.overdue > 0 && (
-                                <p className="mt-0.5 text-xs text-orange-600">{engagementActionPlanSla.overdue} overdue</p>
+                                <p className="mt-0.5 text-xs text-status-warning">{engagementActionPlanSla.overdue} overdue</p>
                             )}
                         </CardContent>
                     </Card>
@@ -316,12 +316,12 @@ export default function PerformanceIndex({
                     </Link>
                     <Link href="/hr/performance/pips">
                         <Button size="sm" variant="outline" disabled={processing}>
-                            <ShieldAlert className="mr-1.5 h-4 w-4" /> PIPs {pipSummary.active > 0 && <Badge className="ml-1.5 bg-red-100 text-red-700 border-red-200 text-[10px] px-1.5">{pipSummary.active}</Badge>}
+                            <ShieldAlert className="mr-1.5 h-4 w-4" /> PIPs {pipSummary.active > 0 && <Badge className="ml-1.5 bg-status-critical-bg text-status-critical border-status-critical/30 text-[10px] px-1.5">{pipSummary.active}</Badge>}
                         </Button>
                     </Link>
                     <Link href="/hr/feedback">
                         <Button size="sm" variant="outline" disabled={processing}>
-                            <MessageSquare className="mr-1.5 h-4 w-4" /> Feedback {feedbackSummary.pending > 0 && <Badge className="ml-1.5 bg-amber-100 text-amber-700 border-amber-200 text-[10px] px-1.5">{feedbackSummary.pending}</Badge>}
+                            <MessageSquare className="mr-1.5 h-4 w-4" /> Feedback {feedbackSummary.pending > 0 && <Badge className="ml-1.5 bg-status-warning-bg text-status-warning border-status-warning/30 text-[10px] px-1.5">{feedbackSummary.pending}</Badge>}
                         </Button>
                     </Link>
                 </div>
@@ -334,7 +334,7 @@ export default function PerformanceIndex({
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                        <BarChart3 className="h-4 w-4 text-blue-500" />
+                                        <BarChart3 className="h-4 w-4 text-status-info" />
                                         Review Completion Trend
                                     </CardTitle>
                                 </CardHeader>
@@ -359,7 +359,7 @@ export default function PerformanceIndex({
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                        <Star className="h-4 w-4 text-amber-500" />
+                                        <Star className="h-4 w-4 text-status-warning" />
                                         Rating Distribution
                                     </CardTitle>
                                 </CardHeader>
@@ -386,7 +386,7 @@ export default function PerformanceIndex({
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                        <FileText className="h-4 w-4 text-blue-500" />
+                                        <FileText className="h-4 w-4 text-status-info" />
                                         Supervision Notes Frequency
                                     </CardTitle>
                                 </CardHeader>
@@ -410,7 +410,7 @@ export default function PerformanceIndex({
                                 <CardHeader className="pb-2">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                            <Target className="h-4 w-4 text-amber-500" />
+                                            <Target className="h-4 w-4 text-status-warning" />
                                             Competency Gaps
                                         </CardTitle>
                                         <Link href="/hr/development/goals">
@@ -432,7 +432,7 @@ export default function PerformanceIndex({
                                 <CardHeader className="pb-2">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                            <ShieldAlert className="h-4 w-4 text-red-500" />
+                                            <ShieldAlert className="h-4 w-4 text-status-critical" />
                                             PIP Status
                                         </CardTitle>
                                         <Link href="/hr/performance/pips">
@@ -495,12 +495,12 @@ export default function PerformanceIndex({
                                             </div>
                                             <div className="flex items-center justify-between gap-4">
                                                 <span className="text-muted-foreground">Completed</span>
-                                                <span className="font-medium text-green-600">{feedbackSummary.completed}</span>
+                                                <span className="font-medium text-status-success">{feedbackSummary.completed}</span>
                                             </div>
                                             {feedbackSummary.overdue > 0 && (
                                                 <div className="flex items-center justify-between gap-4">
                                                     <span className="text-muted-foreground">Overdue</span>
-                                                    <span className="font-medium text-red-600">{feedbackSummary.overdue}</span>
+                                                    <span className="font-medium text-status-critical">{feedbackSummary.overdue}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -517,7 +517,7 @@ export default function PerformanceIndex({
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                    <Calendar className="h-4 w-4 text-blue-500" />
+                                    <Calendar className="h-4 w-4 text-status-info" />
                                     Upcoming Reviews
                                 </CardTitle>
                                 <Link href="/hr/performance/reviews">
@@ -553,7 +553,7 @@ export default function PerformanceIndex({
                                 </Table>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                                    <Calendar className="mb-2 h-8 w-8 text-slate-300" />
+                                    <Calendar className="mb-2 h-8 w-8 text-muted-foreground" />
                                     <p className="text-sm text-muted-foreground">No upcoming reviews</p>
                                 </div>
                             )}
@@ -564,7 +564,7 @@ export default function PerformanceIndex({
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                    <Users className="h-4 w-4 text-blue-500" />
+                                    <Users className="h-4 w-4 text-status-info" />
                                     1:1 Session Follow-up
                                 </CardTitle>
                                 {can.manage && (
@@ -586,7 +586,7 @@ export default function PerformanceIndex({
                                         </div>
                                         <div className="text-right">
                                             <p className="text-xs text-muted-foreground">{formatDate(row.next_session_date)}</p>
-                                            <Badge className={`text-[10px] ${row.is_overdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>
+                                            <Badge className={`text-[10px] ${row.is_overdue ? 'bg-status-critical-bg text-status-critical border-status-critical/30' : 'bg-status-info-bg text-status-info border-status-info/30'}`}>
                                                 {row.is_overdue ? 'overdue' : 'scheduled'}
                                             </Badge>
                                         </div>
@@ -594,7 +594,7 @@ export default function PerformanceIndex({
                                 ))
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                                    <Users className="mb-2 h-8 w-8 text-slate-300" />
+                                    <Users className="mb-2 h-8 w-8 text-muted-foreground" />
                                     <p className="text-sm text-muted-foreground">No upcoming 1:1 sessions</p>
                                 </div>
                             )}
@@ -651,7 +651,7 @@ export default function PerformanceIndex({
                             </Table>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-8 text-center">
-                                <FileText className="mb-2 h-8 w-8 text-slate-300" />
+                                <FileText className="mb-2 h-8 w-8 text-muted-foreground" />
                                 <p className="text-sm text-muted-foreground">
                                     {filters.q ? 'No notes match your search.' : 'No supervision notes yet.'}
                                 </p>

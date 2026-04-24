@@ -240,11 +240,11 @@ export default function ScheduledStockCounts({
 
     const getStatusBadge = (status: string, isOverdue: boolean) => {
         if (isOverdue) {
-            return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
+            return <Badge className="bg-status-critical-bg text-status-critical">Overdue</Badge>;
         }
         const colors: Record<string, string> = {
-            pending: 'bg-amber-100 text-amber-800',
-            completed: 'bg-emerald-100 text-emerald-800',
+            pending: 'bg-status-warning-bg text-status-warning',
+            completed: 'bg-status-success-bg text-status-success',
         };
         return (
             <Badge className={colors[status] || 'bg-muted'}>{status}</Badge>
@@ -262,7 +262,7 @@ export default function ScheduledStockCounts({
                     <Package className="mr-1 h-3 w-3" />
                     Stock Counts
                     {pendingCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-status-critical text-[10px] text-white">
                             {pendingCount}
                         </span>
                     )}
@@ -361,7 +361,7 @@ export default function ScheduledStockCounts({
                                     key={count.id}
                                     className={`rounded-lg border p-3 ${
                                         count.is_overdue
-                                            ? 'border-red-200 bg-red-50'
+                                            ? 'border-status-critical/30 bg-status-critical-bg'
                                             : 'bg-muted'
                                     }`}
                                 >
@@ -416,7 +416,7 @@ export default function ScheduledStockCounts({
                                                 </span>
                                                 {count.discrepancy !== null &&
                                                     count.discrepancy !== 0 && (
-                                                        <span className="text-red-600">
+                                                        <span className="text-status-critical">
                                                             Discrepancy:{' '}
                                                             {(count.discrepancy ??
                                                                 0) > 0
@@ -442,7 +442,7 @@ export default function ScheduledStockCounts({
 
                                     {completingId === count.id && (
                                         <div className="mt-3 space-y-3 border-t border-border pt-3">
-                                            <div className="flex items-center gap-2 text-amber-700">
+                                            <div className="flex items-center gap-2 text-status-warning">
                                                 <AlertCircle className="h-4 w-4" />
                                                 <span className="text-sm">
                                                     Enter actual count details

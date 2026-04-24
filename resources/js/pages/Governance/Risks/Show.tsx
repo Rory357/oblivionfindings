@@ -94,10 +94,10 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
   const [submitting, setSubmitting] = useState(false);
 
   const getRiskColor = (score: number) => {
-    if (score >= 20) return 'bg-red-500';
-    if (score >= 15) return 'bg-orange-500';
-    if (score >= 10) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (score >= 20) return 'bg-status-critical';
+    if (score >= 15) return 'bg-status-warning';
+    if (score >= 10) return 'bg-status-warning';
+    return 'bg-status-success';
   };
 
   const getRiskLevel = (score: number) => {
@@ -161,7 +161,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back Link */}
           <div className="mb-4">
-            <Link href={risksIndex.url()} className="text-sm text-blue-600 hover:underline">
+            <Link href={risksIndex.url()} className="text-sm text-status-info hover:underline">
               ← Back to Risk Register
             </Link>
           </div>
@@ -265,8 +265,8 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                         <DialogTitle>Accept Risk Above Appetite</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
-                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                          <p className="text-sm text-orange-800">
+                        <div className="p-4 bg-status-warning-bg rounded-lg border border-status-warning/30">
+                          <p className="text-sm text-status-warning">
                             This risk is currently above the appetite threshold ({risk.appetite_threshold}).
                             Board acceptance is required to formally acknowledge and accept this risk.
                           </p>
@@ -366,7 +366,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                     </div>
                     <div className="mt-2">
                       {risk.within_appetite ? (
-                        <div className="flex items-center gap-2 text-green-600">
+                        <div className="flex items-center gap-2 text-status-success">
                           <CheckCircle className="w-4 h-4" />
                           <span className="text-sm">Within appetite</span>
                         </div>
@@ -407,16 +407,16 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                               </div>
                             </div>
                             <Badge className={cn(
-                              treatment.status === 'complete' && 'bg-green-100 text-green-800',
-                              treatment.status === 'in_progress' && 'bg-blue-100 text-blue-800',
-                              treatment.status === 'overdue' && 'bg-red-100 text-red-800',
+                              treatment.status === 'complete' && 'bg-status-success-bg text-status-success',
+                              treatment.status === 'in_progress' && 'bg-status-info-bg text-status-info',
+                              treatment.status === 'overdue' && 'bg-status-critical-bg text-status-critical',
                               treatment.status === 'planned' && 'bg-muted text-foreground',
                             )}>
                               {treatment.status}
                             </Badge>
                           </div>
                           {treatment.expected_score_reduction && (
-                            <p className="mt-2 text-sm text-green-600">
+                            <p className="mt-2 text-sm text-status-success">
                               Expected score reduction: -{treatment.expected_score_reduction}
                             </p>
                           )}
@@ -445,9 +445,9 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                             <span className="ml-2 text-sm">{event.event_reference}</span>
                           </div>
                           <Badge className={cn(
-                            event.event_severity === 'critical' && 'bg-red-100 text-red-800',
-                            event.event_severity === 'high' && 'bg-orange-100 text-orange-800',
-                            event.event_severity === 'medium' && 'bg-yellow-100 text-yellow-800',
+                            event.event_severity === 'critical' && 'bg-status-critical-bg text-status-critical',
+                            event.event_severity === 'high' && 'bg-status-warning-bg text-status-warning',
+                            event.event_severity === 'medium' && 'bg-status-warning-bg text-status-warning',
                           )}>
                             {event.event_severity}
                           </Badge>

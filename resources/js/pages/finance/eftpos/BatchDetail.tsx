@@ -72,16 +72,16 @@ const cardTypeLabels: Record<string, string> = {
 };
 
 const txnTypeConfig: Record<string, { label: string; className: string }> = {
-    purchase: { label: 'Purchase', className: 'bg-green-100 text-green-800' },
-    refund: { label: 'Refund', className: 'bg-red-100 text-red-800' },
-    cash_out: { label: 'Cash Out', className: 'bg-blue-100 text-blue-800' },
+    purchase: { label: 'Purchase', className: 'bg-status-success-bg text-status-success' },
+    refund: { label: 'Refund', className: 'bg-status-critical-bg text-status-critical' },
+    cash_out: { label: 'Cash Out', className: 'bg-status-info-bg text-status-info' },
 };
 
 const statusBadge: Record<string, { label: string; className: string }> = {
-    open: { label: 'Open', className: 'border-blue-300 text-blue-600' },
-    closed: { label: 'Closed', className: 'border-amber-300 text-amber-600' },
-    reconciled: { label: 'Reconciled', className: 'border-green-300 text-green-600' },
-    discrepancy: { label: 'Discrepancy', className: 'border-red-300 text-red-600' },
+    open: { label: 'Open', className: 'border-status-info/30 text-status-info' },
+    closed: { label: 'Closed', className: 'border-status-warning/30 text-status-warning' },
+    reconciled: { label: 'Reconciled', className: 'border-status-success/30 text-status-success' },
+    discrepancy: { label: 'Discrepancy', className: 'border-status-critical/30 text-status-critical' },
 };
 
 export default function EftposBatchDetail({ batch, transactions }: Props) {
@@ -140,7 +140,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Settlement</p>
-                            <p className="text-xl font-bold text-emerald-600">{formatCurrency(batch.settlement_amount)}</p>
+                            <p className="text-xl font-bold text-status-success">{formatCurrency(batch.settlement_amount)}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -266,7 +266,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     {txn.status === 'approved' ? (
-                                                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                                        <CheckCircle2 className="h-4 w-4 text-status-success" />
                                                     ) : txn.status === 'declined' ? (
                                                         <AlertTriangle className="h-4 w-4 text-destructive" />
                                                     ) : (

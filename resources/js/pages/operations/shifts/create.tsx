@@ -397,7 +397,7 @@ export default function ShiftCreate({
                     className="space-y-4"
                 >
                     {defaultSiteId ? (
-                        <div className="rounded-md border border-red-200 bg-red-50/70 p-3 text-sm text-red-800">
+                        <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                             <div className="font-medium">
                                 Coverage quick fill
                             </div>
@@ -441,7 +441,7 @@ export default function ShiftCreate({
                                         (role) => (
                                             <span
                                                 key={role.key}
-                                                className="rounded-full border border-red-200 bg-white/80 px-2 py-1 text-xs font-medium"
+                                                className="rounded-full border border-status-critical/30 bg-white/80 px-2 py-1 text-xs font-medium"
                                             >
                                                 {role.label ??
                                                     role.key.replace(
@@ -466,7 +466,7 @@ export default function ShiftCreate({
                                         .map((slot) => (
                                             <span
                                                 key={slot.slot_key}
-                                                className="rounded-full border border-red-200 bg-white/80 px-2 py-1 text-xs font-medium"
+                                                className="rounded-full border border-status-critical/30 bg-white/80 px-2 py-1 text-xs font-medium"
                                             >
                                                 {slot.label}{' '}
                                                 {slot.status === 'reserved'
@@ -477,11 +477,11 @@ export default function ShiftCreate({
                                 </div>
                             ) : null}
                             {coverageContext?.fill_intent?.action ? (
-                                <div className="mt-3 rounded-md border border-red-200 bg-white/70 p-3 text-xs">
-                                    <div className="font-medium text-red-800">
+                                <div className="mt-3 rounded-md border border-status-critical/30 bg-white/70 p-3 text-xs">
+                                    <div className="font-medium text-status-critical">
                                         Recommended setup
                                     </div>
-                                    <div className="mt-1 text-red-700">
+                                    <div className="mt-1 text-status-critical">
                                         {fillActionLabel(
                                             coverageContext.fill_intent.action,
                                         )}
@@ -499,7 +499,7 @@ export default function ShiftCreate({
                                 </div>
                             ) : null}
                             {!coverageReservationToken ? (
-                                <div className="mt-2 text-xs font-medium text-red-700">
+                                <div className="mt-2 text-xs font-medium text-status-critical">
                                     Live reservation could not be created for
                                     this gap. Save quickly or reopen the gap if
                                     someone else fills it first.
@@ -638,7 +638,7 @@ export default function ShiftCreate({
                                             reasons={eligPreview.warning_reasons}
                                         />
                                     ) : (
-                                        <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400">
+                                        <div className="flex items-center gap-2 text-xs text-status-success dark:text-status-success">
                                             <EligibilityStatusBadge status="eligible" />
                                             <span>All eligibility checks passed.</span>
                                         </div>
@@ -935,7 +935,7 @@ export default function ShiftCreate({
                                                     onClick={() =>
                                                         toggleWeekday(d)
                                                     }
-                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-slate-900 text-white dark:bg-white dark:text-foreground' : ''}`}
+                                                    className={`rounded-md border px-3 py-1 ${form.data.repeat_by_weekday.includes(d) ? 'bg-muted text-white dark:bg-white dark:text-foreground' : ''}`}
                                                 >
                                                     {d.toUpperCase()}
                                                 </button>

@@ -91,13 +91,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-status-success-bg text-status-success';
       case 'board_review':
         return 'bg-primary/10 text-primary';
       case 'peer_review':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info-bg text-status-info';
       case 'self_review':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning-bg text-status-warning';
       default:
         return 'bg-muted text-foreground';
     }
@@ -117,13 +117,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
   const getRatingColor = (rating: string | null) => {
     switch (rating) {
       case 'exceeds':
-        return 'bg-green-100 text-green-800';
+        return 'bg-status-success-bg text-status-success';
       case 'meets':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info-bg text-status-info';
       case 'needs_improvement':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning-bg text-status-warning';
       case 'unsatisfactory':
-        return 'bg-red-100 text-red-800';
+        return 'bg-status-critical-bg text-status-critical';
       default:
         return 'bg-muted text-foreground';
     }
@@ -132,13 +132,13 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
   const getGoalStatusColor = (status: string) => {
     switch (status) {
       case 'achieved':
-        return 'bg-green-100 text-green-800';
+        return 'bg-status-success-bg text-status-success';
       case 'partially_achieved':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning-bg text-status-warning';
       case 'missed':
-        return 'bg-red-100 text-red-800';
+        return 'bg-status-critical-bg text-status-critical';
       case 'in_progress':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info-bg text-status-info';
       default:
         return 'bg-muted text-foreground';
     }
@@ -186,7 +186,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back Link */}
           <div className="mb-4">
-            <Link href={performanceIndex.url()} className="text-sm text-blue-600 hover:underline">
+            <Link href={performanceIndex.url()} className="text-sm text-status-info hover:underline">
               ← Back to Performance Reviews
             </Link>
           </div>
@@ -284,8 +284,8 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                             <Progress
                               value={((goal.actual_score || 0) / goal.target_score) * 100}
                               className={cn(
-                                goal.status === 'achieved' && '[&>div]:bg-green-500',
-                                goal.status === 'missed' && '[&>div]:bg-red-500',
+                                goal.status === 'achieved' && '[&>div]:bg-status-success',
+                                goal.status === 'missed' && '[&>div]:bg-status-critical',
                               )}
                             />
                           </div>
@@ -346,7 +346,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center',
-                      review.self_assessment_submitted_at ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'
+                      review.self_assessment_submitted_at ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground'
                     )}>
                       <User className="w-4 h-4" />
                     </div>
@@ -361,7 +361,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                     <div className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center',
                       review.status === 'board_review' || review.status === 'completed'
-                        ? 'bg-green-100 text-green-600'
+                        ? 'bg-status-success-bg text-status-success'
                         : 'bg-muted text-muted-foreground'
                     )}>
                       <Star className="w-4 h-4" />
@@ -376,7 +376,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center',
-                      review.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'
+                      review.status === 'completed' ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground'
                     )}>
                       <Award className="w-4 h-4" />
                     </div>
@@ -393,10 +393,10 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
               {/* Rating Summary */}
               {review.overall_rating && (
                 <Card className={cn(
-                  review.overall_rating === 'exceeds' && 'border-green-200 bg-green-50',
-                  review.overall_rating === 'meets' && 'border-blue-200 bg-blue-50',
-                  review.overall_rating === 'needs_improvement' && 'border-yellow-200 bg-yellow-50',
-                  review.overall_rating === 'unsatisfactory' && 'border-red-200 bg-red-50',
+                  review.overall_rating === 'exceeds' && 'border-status-success/30 bg-status-success-bg',
+                  review.overall_rating === 'meets' && 'border-status-info/30 bg-status-info-bg',
+                  review.overall_rating === 'needs_improvement' && 'border-status-warning/30 bg-status-warning-bg',
+                  review.overall_rating === 'unsatisfactory' && 'border-status-critical/30 bg-status-critical-bg',
                 )}>
                   <CardHeader>
                     <CardTitle>Overall Rating</CardTitle>
@@ -405,10 +405,10 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                     <div className="text-center">
                       <Star className={cn(
                         'w-12 h-12 mx-auto mb-2',
-                        review.overall_rating === 'exceeds' && 'text-green-500',
-                        review.overall_rating === 'meets' && 'text-blue-500',
-                        review.overall_rating === 'needs_improvement' && 'text-yellow-500',
-                        review.overall_rating === 'unsatisfactory' && 'text-red-500',
+                        review.overall_rating === 'exceeds' && 'text-status-success',
+                        review.overall_rating === 'meets' && 'text-status-info',
+                        review.overall_rating === 'needs_improvement' && 'text-status-warning',
+                        review.overall_rating === 'unsatisfactory' && 'text-status-critical',
                       )} />
                       <p className="text-lg font-bold">{getRatingLabel(review.overall_rating)}</p>
                     </div>
@@ -441,7 +441,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                     <SelectItem value="unsatisfactory">Unsatisfactory</SelectItem>
                   </SelectContent>
                 </Select>
-                {errors.overall_rating && <p className="text-sm text-red-600">{errors.overall_rating}</p>}
+                {errors.overall_rating && <p className="text-sm text-status-critical">{errors.overall_rating}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="board_decision">Board Decision</Label>
@@ -459,7 +459,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                     <SelectItem value="performance_improvement">Performance improvement</SelectItem>
                   </SelectContent>
                 </Select>
-                {errors.board_decision && <p className="text-sm text-red-600">{errors.board_decision}</p>}
+                {errors.board_decision && <p className="text-sm text-status-critical">{errors.board_decision}</p>}
               </div>
             </div>
 
@@ -494,7 +494,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                         onChange={(e) => updateGoalAssessment(goal.id, 'score', e.target.value)}
                       />
                       {errors[`goal_assessments.${goal.id}.score`] && (
-                        <p className="text-xs text-red-600">{errors[`goal_assessments.${goal.id}.score`]}</p>
+                        <p className="text-xs text-status-critical">{errors[`goal_assessments.${goal.id}.score`]}</p>
                       )}
                     </div>
                   </div>
@@ -506,7 +506,7 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
                       rows={2}
                     />
                     {errors[`goal_assessments.${goal.id}.comments`] && (
-                      <p className="text-xs text-red-600">{errors[`goal_assessments.${goal.id}.comments`]}</p>
+                      <p className="text-xs text-status-critical">{errors[`goal_assessments.${goal.id}.comments`]}</p>
                     )}
                   </div>
                 </div>

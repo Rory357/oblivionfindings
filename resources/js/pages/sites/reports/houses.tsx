@@ -42,10 +42,10 @@ type Props = {
 };
 
 const severityColors: Record<string, string> = {
-    low: 'bg-slate-500/20 text-muted-foreground',
-    medium: 'bg-yellow-500/20 text-yellow-400',
-    high: 'bg-orange-500/20 text-orange-400',
-    critical: 'bg-red-500/20 text-red-400',
+    low: 'bg-muted-foreground/80/20 text-muted-foreground',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function HouseReports({ houses, stats, dateRange, regions }: Props) {
@@ -70,7 +70,7 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                             </Link>
                         </Button>
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Home className="w-5 h-5 text-emerald-400" />
+                            <Home className="w-5 h-5 text-status-success" />
                             House Reports
                         </h1>
                         <p className="text-sm text-muted-foreground">
@@ -105,21 +105,21 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                             <div className="text-sm text-muted-foreground">Clients</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-red-500/5 border-red-500/20">
+                    <Card className="bg-status-critical border-status-critical/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-red-400">{stats.open_hazards}</div>
+                            <div className="text-2xl font-bold text-status-critical">{stats.open_hazards}</div>
                             <div className="text-sm text-muted-foreground">Open Hazards</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-red-500/5 border-red-500/20">
+                    <Card className="bg-status-critical border-status-critical/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-red-400">{stats.critical_hazards}</div>
+                            <div className="text-2xl font-bold text-status-critical">{stats.critical_hazards}</div>
                             <div className="text-sm text-muted-foreground">Critical</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-emerald-400">{stats.checklist_completion_rate}%</div>
+                            <div className="text-2xl font-bold text-status-success">{stats.checklist_completion_rate}%</div>
                             <div className="text-sm text-muted-foreground">Checklist Completion</div>
                         </CardContent>
                     </Card>
@@ -183,17 +183,17 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                                         </div>
                                         <div className="flex items-center gap-3">
                                             {criticalHazards.length > 0 && (
-                                                <Badge className="bg-red-500/20 text-red-400">
+                                                <Badge className="bg-status-critical-bg text-status-critical">
                                                     <AlertTriangle className="w-3 h-3 mr-1" />
                                                     {criticalHazards.length} Critical
                                                 </Badge>
                                             )}
                                             {openHazards.length > 0 && (
-                                                <Badge variant="outline" className="text-amber-400">
+                                                <Badge variant="outline" className="text-status-warning">
                                                     {openHazards.length} Open Hazards
                                                 </Badge>
                                             )}
-                                            <Badge variant="outline" className={completionRate >= 80 ? 'text-emerald-400' : completionRate >= 50 ? 'text-amber-400' : 'text-red-400'}>
+                                            <Badge variant="outline" className={completionRate >= 80 ? 'text-status-success' : completionRate >= 50 ? 'text-status-warning' : 'text-status-critical'}>
                                                 <CheckCircle2 className="w-3 h-3 mr-1" />
                                                 {completionRate}%
                                             </Badge>

@@ -153,9 +153,9 @@ export default function GlobalVendorsCredentials({
                             <div className="text-sm text-muted-foreground">Credentials</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-amber-500/5 border-amber-500/20">
+                    <Card className="bg-status-warning border-status-warning/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-amber-400">
+                            <div className="text-2xl font-bold text-status-warning">
                                 {filteredCredentials.filter((c) => c.requires_reauth).length}
                             </div>
                             <div className="text-sm text-muted-foreground">Re-auth Required</div>
@@ -301,12 +301,12 @@ export default function GlobalVendorsCredentials({
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     {vendor.is_preferred && (
-                                                        <Badge variant="outline" className="border-yellow-500/30 text-yellow-400">
+                                                        <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                                             Preferred
                                                         </Badge>
                                                     )}
                                                     {!vendor.is_active && (
-                                                        <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
+                                                        <Badge variant="outline" className="border-border/30 text-muted-foreground">
                                                             Inactive
                                                         </Badge>
                                                     )}
@@ -342,11 +342,11 @@ export default function GlobalVendorsCredentials({
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
+                                                    <Badge variant="outline" className="border-border/30 text-muted-foreground">
                                                         {credential.value_preview}
                                                     </Badge>
                                                     {credential.requires_reauth && (
-                                                        <Badge variant="outline" className="border-amber-500/30 text-amber-400">
+                                                        <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                                             <ShieldCheck className="w-3 h-3 mr-1" />
                                                             Re-auth
                                                         </Badge>

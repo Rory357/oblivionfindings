@@ -168,13 +168,13 @@ export default function CarePlansIndex({
 
                 {/* ─── Compliance Alert Banner ─── */}
                 {showComplianceBanner && (
-                    <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4 shadow-sm dark:border-amber-800 dark:from-amber-950/30 dark:to-orange-950/30">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                    <div className="flex items-start gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 shadow-sm dark:border-status-warning/30 dark:from-amber-950/30 dark:to-orange-950/30">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                             <AlertTriangle className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Compliance Attention Required</p>
-                            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                            <p className="text-sm font-semibold text-status-warning dark:text-status-warning">Compliance Attention Required</p>
+                            <p className="mt-0.5 text-xs text-status-warning dark:text-status-warning">
                                 {s.review_due > 0 && <span>{s.review_due} plan{s.review_due !== 1 ? 's' : ''} overdue for review. </span>}
                                 {s.plans_without_goals > 0 && <span>{s.plans_without_goals} plan{s.plans_without_goals !== 1 ? 's' : ''} have no goals defined.</span>}
                             </p>
@@ -183,7 +183,7 @@ export default function CarePlansIndex({
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-7 border-amber-400 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                                        className="h-7 border-status-warning/30 text-xs font-medium text-status-warning hover:bg-status-warning-bg"
                                         onClick={() => updateFilters('review_due', '1')}
                                     >
                                         View Due Reviews
@@ -193,7 +193,7 @@ export default function CarePlansIndex({
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-7 border-amber-400 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                                        className="h-7 border-status-warning/30 text-xs font-medium text-status-warning hover:bg-status-warning-bg"
                                         onClick={() => updateFilters('status', 'active')}
                                     >
                                         View Plans Without Goals
@@ -245,7 +245,7 @@ export default function CarePlansIndex({
                     <Card className="overflow-hidden">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-100 text-emerald-600">
+                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-success-bg text-status-success">
                                     <TrendingUp className="h-3.5 w-3.5" />
                                 </div>
                                 Quick Insights
@@ -256,10 +256,10 @@ export default function CarePlansIndex({
                             <div>
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">Active Plan Rate</span>
-                                    <span className="font-bold text-emerald-600">{completionRate}%</span>
+                                    <span className="font-bold text-status-success">{completionRate}%</span>
                                 </div>
                                 <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
-                                    <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${completionRate}%` }} />
+                                    <div className="h-full rounded-full bg-status-success transition-all" style={{ width: `${completionRate}%` }} />
                                 </div>
                             </div>
                             {/* Key metrics */}
@@ -269,7 +269,7 @@ export default function CarePlansIndex({
                                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Active</div>
                                 </div>
                                 <div className="rounded-lg bg-muted p-2.5 text-center">
-                                    <div className="text-lg font-bold text-amber-600">{s.in_review}</div>
+                                    <div className="text-lg font-bold text-status-warning">{s.in_review}</div>
                                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">In Review</div>
                                 </div>
                                 <div className="rounded-lg bg-muted p-2.5 text-center">
@@ -277,7 +277,7 @@ export default function CarePlansIndex({
                                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Drafts</div>
                                 </div>
                                 <div className="rounded-lg bg-muted p-2.5 text-center">
-                                    <div className={`text-lg font-bold ${s.overdue_goals > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{s.overdue_goals}</div>
+                                    <div className={`text-lg font-bold ${s.overdue_goals > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}>{s.overdue_goals}</div>
                                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Overdue Goals</div>
                                 </div>
                             </div>
@@ -348,7 +348,7 @@ export default function CarePlansIndex({
                     <Button
                         size="sm"
                         variant={filters?.review_due ? 'default' : 'outline'}
-                        className={`h-9 gap-1 text-xs ${filters?.review_due ? '' : 'text-amber-600 border-amber-300 hover:bg-amber-50'}`}
+                        className={`h-9 gap-1 text-xs ${filters?.review_due ? '' : 'text-status-warning border-status-warning/30 hover:bg-status-warning-bg'}`}
                         onClick={() => updateFilters('review_due', filters?.review_due ? null : '1')}
                     >
                         <AlertTriangle className="h-3.5 w-3.5" />

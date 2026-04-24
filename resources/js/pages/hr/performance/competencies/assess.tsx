@@ -96,7 +96,7 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.employee_user_id && <p className="mt-1 text-xs text-red-500">{errors.employee_user_id}</p>}
+                                {errors.employee_user_id && <p className="mt-1 text-xs text-status-critical">{errors.employee_user_id}</p>}
                             </div>
                         </CardContent>
                     </Card>

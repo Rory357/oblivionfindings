@@ -197,13 +197,13 @@ function formatDateTime(d: string | null): string {
 
 const STATUS_COLORS: Record<string, string> = {
     draft: 'bg-muted text-foreground border-border',
-    pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
-    active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    pending_approval: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    active: 'bg-status-success-bg text-status-success border-status-success/30',
     under_review: 'bg-primary/10 text-primary border-primary',
-    renewed: 'bg-blue-50 text-blue-700 border-blue-200',
+    renewed: 'bg-status-info-bg text-status-info border-status-info/30',
     expired: 'bg-muted text-muted-foreground border-border',
-    terminated: 'bg-red-50 text-red-700 border-red-200',
-    suspended: 'bg-amber-50 text-amber-700 border-amber-200',
+    terminated: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    suspended: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 function statusBadge(status: string) {
@@ -247,10 +247,10 @@ function StatusTimeline({ status }: { status: string }) {
 
                         let dotCls = 'bg-muted text-muted-foreground border-border';
                         if (isCurrent) dotCls = 'bg-primary text-white border-primary ring-2 ring-ring';
-                        else if (isPast) dotCls = 'bg-emerald-500 text-white border-emerald-600';
+                        else if (isPast) dotCls = 'bg-status-success text-white border-status-success/30';
 
                         let lineCls = 'bg-muted';
-                        if (isPast || (currentIdx >= 0 && idx < currentIdx)) lineCls = 'bg-emerald-400';
+                        if (isPast || (currentIdx >= 0 && idx < currentIdx)) lineCls = 'bg-status-success';
 
                         return (
                             <div key={step.key} className="flex flex-1 flex-col items-center">
@@ -259,9 +259,9 @@ function StatusTimeline({ status }: { status: string }) {
                                     <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${dotCls}`}>
                                         {isPast ? <CheckCircle2 className="h-4 w-4" /> : idx + 1}
                                     </div>
-                                    {idx < TIMELINE_STEPS.length - 1 && <div className={`h-0.5 flex-1 ${idx < currentIdx ? 'bg-emerald-400' : 'bg-muted'}`} />}
+                                    {idx < TIMELINE_STEPS.length - 1 && <div className={`h-0.5 flex-1 ${idx < currentIdx ? 'bg-status-success' : 'bg-muted'}`} />}
                                 </div>
-                                <span className={`mt-1.5 text-center text-[10px] leading-tight ${isCurrent ? 'font-semibold text-primary' : isPast ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                <span className={`mt-1.5 text-center text-[10px] leading-tight ${isCurrent ? 'font-semibold text-primary' : isPast ? 'text-status-success' : 'text-muted-foreground'}`}>
                                     {step.label}
                                 </span>
                             </div>
@@ -271,7 +271,7 @@ function StatusTimeline({ status }: { status: string }) {
 
                 {isTerminal && (
                     <div className="mt-3 flex items-center justify-center gap-2">
-                        <div className={`rounded-full px-3 py-1 text-xs font-medium ${status === 'terminated' ? 'bg-red-100 text-red-700' : status === 'suspended' ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
+                        <div className={`rounded-full px-3 py-1 text-xs font-medium ${status === 'terminated' ? 'bg-status-critical-bg text-status-critical' : status === 'suspended' ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground'}`}>
                             {status === 'terminated' && <XCircle className="mr-1 inline h-3 w-3" />}
                             {status === 'suspended' && <Pause className="mr-1 inline h-3 w-3" />}
                             {status === 'expired' && <Clock className="mr-1 inline h-3 w-3" />}
@@ -377,7 +377,7 @@ function TransitionDialog({
                             placeholder="Why is this transition being made?"
                             rows={2}
                         />
-                        {errors.reason && <p className="mt-1 text-xs text-red-500">{errors.reason}</p>}
+                        {errors.reason && <p className="mt-1 text-xs text-status-critical">{errors.reason}</p>}
                     </div>
                     <div>
                         <Label htmlFor="notes">Notes</Label>
@@ -388,7 +388,7 @@ function TransitionDialog({
                             placeholder="Any additional notes..."
                             rows={2}
                         />
-                        {errors.notes && <p className="mt-1 text-xs text-red-500">{errors.notes}</p>}
+                        {errors.notes && <p className="mt-1 text-xs text-status-critical">{errors.notes}</p>}
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -481,7 +481,7 @@ function LineItemDialog({
                     <div>
                         <Label htmlFor="li-description">Description *</Label>
                         <Input id="li-description" value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} placeholder="Service description" />
-                        {form.errors.description && <p className="mt-1 text-xs text-red-500">{form.errors.description}</p>}
+                        {form.errors.description && <p className="mt-1 text-xs text-status-critical">{form.errors.description}</p>}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -490,7 +490,7 @@ function LineItemDialog({
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
                                 <Input id="li-unit-price" className="pl-7" type="number" step="0.01" min="0" value={form.data.unit_price} onChange={(e) => form.setData('unit_price', e.target.value)} />
                             </div>
-                            {form.errors.unit_price && <p className="mt-1 text-xs text-red-500">{form.errors.unit_price}</p>}
+                            {form.errors.unit_price && <p className="mt-1 text-xs text-status-critical">{form.errors.unit_price}</p>}
                         </div>
                         <div>
                             <Label htmlFor="li-unit">Unit *</Label>
@@ -599,7 +599,7 @@ function RateDialog({
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
                                 <Input id="rate-amount" className="pl-7" type="number" step="0.01" min="0" value={form.data.rate} onChange={(e) => form.setData('rate', e.target.value)} />
                             </div>
-                            {form.errors.rate && <p className="mt-1 text-xs text-red-500">{form.errors.rate}</p>}
+                            {form.errors.rate && <p className="mt-1 text-xs text-status-critical">{form.errors.rate}</p>}
                         </div>
                         <div>
                             <Label htmlFor="rate-unit">Unit *</Label>
@@ -659,11 +659,11 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
     }
 
     const milestoneDates = [
-        { label: 'NASC Assessment', value: ag.nasc_assessment_date, icon: <FileText className="h-4 w-4 text-blue-500" /> },
-        { label: 'Funding Approved', value: ag.funding_approved_date, icon: <DollarSign className="h-4 w-4 text-emerald-500" /> },
+        { label: 'NASC Assessment', value: ag.nasc_assessment_date, icon: <FileText className="h-4 w-4 text-status-info" /> },
+        { label: 'Funding Approved', value: ag.funding_approved_date, icon: <DollarSign className="h-4 w-4 text-status-success" /> },
         { label: 'Signed', value: ag.signed_date, icon: <ShieldCheck className="h-4 w-4 text-primary" /> },
-        { label: 'First Service', value: ag.first_service_date, icon: <Play className="h-4 w-4 text-teal-500" /> },
-        { label: 'Review Due', value: ag.review_due_date, icon: <Clock className="h-4 w-4 text-amber-500" /> },
+        { label: 'First Service', value: ag.first_service_date, icon: <Play className="h-4 w-4 text-status-info" /> },
+        { label: 'Review Due', value: ag.review_due_date, icon: <Clock className="h-4 w-4 text-status-warning" /> },
         { label: 'Renewal', value: ag.renewal_date, icon: <RefreshCw className="h-4 w-4 text-primary" /> },
     ];
 
@@ -688,7 +688,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                             <>
                                 <Button
                                     size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700"
+                                    className="bg-status-success hover:bg-status-success"
                                     onClick={() => router.post(`/operations/service-agreements/${ag.id}/approve`)}
                                 >
                                     <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
@@ -750,8 +750,8 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                         {(ag.nasc_assessor_name || ag.nasc_support_package_ref || ag.support_needs_level) && (
                             <div className="mt-3 grid gap-3 sm:grid-cols-3">
                                 {ag.nasc_assessor_name && (
-                                    <div className="flex items-center gap-3 rounded-lg border border-teal-200 bg-teal-50/50 p-3">
-                                        <UserCheck className="h-4 w-4 text-teal-500" />
+                                    <div className="flex items-center gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3">
+                                        <UserCheck className="h-4 w-4 text-status-info" />
                                         <div>
                                             <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">NASC Assessor</div>
                                             <div className="text-sm font-medium">{ag.nasc_assessor_name}</div>
@@ -759,8 +759,8 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                     </div>
                                 )}
                                 {ag.nasc_support_package_ref && (
-                                    <div className="flex items-center gap-3 rounded-lg border border-teal-200 bg-teal-50/50 p-3">
-                                        <FileText className="h-4 w-4 text-teal-500" />
+                                    <div className="flex items-center gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3">
+                                        <FileText className="h-4 w-4 text-status-info" />
                                         <div>
                                             <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Package Ref</div>
                                             <div className="text-sm font-medium">{ag.nasc_support_package_ref}</div>
@@ -768,8 +768,8 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                     </div>
                                 )}
                                 {ag.support_needs_level && (
-                                    <div className="flex items-center gap-3 rounded-lg border border-teal-200 bg-teal-50/50 p-3">
-                                        <ShieldCheck className="h-4 w-4 text-teal-500" />
+                                    <div className="flex items-center gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3">
+                                        <ShieldCheck className="h-4 w-4 text-status-info" />
                                         <div>
                                             <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Support Needs</div>
                                             <div className="text-sm font-medium">{SUPPORT_NEEDS_LABELS[ag.support_needs_level] ?? ag.support_needs_level}</div>
@@ -781,24 +781,24 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
 
                         {/* Terminated/Suspended info */}
                         {ag.terminated_at && (
-                            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
-                                <div className="flex items-center gap-2 text-sm font-medium text-red-700">
+                            <div className="mt-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3">
+                                <div className="flex items-center gap-2 text-sm font-medium text-status-critical">
                                     <XCircle className="h-4 w-4" /> Terminated on {formatDateTime(ag.terminated_at)}
                                 </div>
-                                {ag.terminated_reason && <p className="mt-1 text-xs text-red-600">{ag.terminated_reason}</p>}
+                                {ag.terminated_reason && <p className="mt-1 text-xs text-status-critical">{ag.terminated_reason}</p>}
                             </div>
                         )}
                         {ag.suspended_at && !ag.resumed_at && (
-                            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                                <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
+                            <div className="mt-3 rounded-lg border border-status-warning/30 bg-status-warning-bg p-3">
+                                <div className="flex items-center gap-2 text-sm font-medium text-status-warning">
                                     <AlertTriangle className="h-4 w-4" /> Suspended on {formatDateTime(ag.suspended_at)}
                                 </div>
-                                {ag.suspended_reason && <p className="mt-1 text-xs text-amber-600">{ag.suspended_reason}</p>}
+                                {ag.suspended_reason && <p className="mt-1 text-xs text-status-warning">{ag.suspended_reason}</p>}
                             </div>
                         )}
                         {ag.resumed_at && (
-                            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                                <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+                            <div className="mt-3 rounded-lg border border-status-success/30 bg-status-success-bg p-3">
+                                <div className="flex items-center gap-2 text-sm font-medium text-status-success">
                                     <Play className="h-4 w-4" /> Resumed on {formatDateTime(ag.resumed_at)}
                                 </div>
                             </div>
@@ -830,7 +830,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                                 {SERVICE_LEVEL_LABELS[ag.service_level] ?? ag.service_level}
                                             </span>
                                         )}
-                                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${ag.gst_inclusive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-border bg-muted text-muted-foreground'}`}>
+                                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${ag.gst_inclusive ? 'border-status-success/30 bg-status-success-bg text-status-success' : 'border-border bg-muted text-muted-foreground'}`}>
                                             {ag.gst_inclusive ? 'GST Inclusive' : 'GST Exclusive'}
                                         </span>
                                     </div>
@@ -850,7 +850,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                         {ag.hours_remaining != null && (
                                             <div className="rounded-lg border bg-muted/30 p-3">
                                                 <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Hours Remaining</div>
-                                                <div className="text-lg font-semibold tabular-nums text-emerald-600">{ag.hours_remaining}</div>
+                                                <div className="text-lg font-semibold tabular-nums text-status-success">{ag.hours_remaining}</div>
                                             </div>
                                         )}
                                         {ag.whaikaha_reference && (
@@ -902,7 +902,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <DollarSign className="h-4 w-4 text-emerald-500" />
+                                <DollarSign className="h-4 w-4 text-status-success" />
                                 Budget
                             </CardTitle>
                         </CardHeader>
@@ -930,7 +930,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                     </div>
                                     <div className="h-2.5 w-full rounded-full bg-muted">
                                         <div
-                                            className={`h-2.5 rounded-full transition-all ${utilPct > 90 ? 'bg-red-500' : utilPct > 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                            className={`h-2.5 rounded-full transition-all ${utilPct > 90 ? 'bg-status-critical' : utilPct > 70 ? 'bg-status-warning' : 'bg-status-success'}`}
                                             style={{ width: `${Math.min(utilPct, 100)}%` }}
                                         />
                                     </div>
@@ -942,7 +942,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Used</span>
-                                        <span className={`font-medium ${utilPct > 90 ? 'text-red-600' : utilPct > 70 ? 'text-amber-600' : ''}`}>{formatCurrency(bs.budget_used)}</span>
+                                        <span className={`font-medium ${utilPct > 90 ? 'text-status-critical' : utilPct > 70 ? 'text-status-warning' : ''}`}>{formatCurrency(bs.budget_used)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Allocated (Line Items)</span>
@@ -950,7 +950,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Remaining</span>
-                                        <span className="font-medium text-emerald-600">{formatCurrency(bs.budget_remaining)}</span>
+                                        <span className="font-medium text-status-success">{formatCurrency(bs.budget_remaining)}</span>
                                     </div>
                                     {ag.hourly_rate != null && Number(ag.hourly_rate) > 0 && (
                                         <div className="flex justify-between">
@@ -989,7 +989,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                 <div className="space-y-2">
                                     {ag.line_items.map((item) => {
                                         const itemPct = item.budget_allocated > 0 ? Math.round((item.budget_used / item.budget_allocated) * 100) : 0;
-                                        const barColor = itemPct > 90 ? 'bg-red-500' : itemPct > 70 ? 'bg-amber-500' : 'bg-emerald-500';
+                                        const barColor = itemPct > 90 ? 'bg-status-critical' : itemPct > 70 ? 'bg-status-warning' : 'bg-status-success';
                                         return (
                                             <div key={item.id} className="rounded-lg border p-3 space-y-2">
                                                 <div className="flex items-start justify-between">
@@ -998,20 +998,20 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                                         <div className="text-[11px] text-muted-foreground">
                                                             {formatCurrency(item.unit_price)}/{item.unit}
                                                             {item.quantity != null && <span className="ml-1">x {item.quantity}</span>}
-                                                            {item.category && <span className="ml-2 text-blue-500">{item.category}</span>}
+                                                            {item.category && <span className="ml-2 text-status-info">{item.category}</span>}
                                                             {item.ndis_line_item_code && <span className="ml-2 text-primary">#{item.ndis_line_item_code}</span>}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-start gap-2">
                                                         <div className="text-right">
-                                                            <div className={`text-sm font-semibold tabular-nums ${itemPct > 90 ? 'text-red-600' : itemPct > 70 ? 'text-amber-600' : 'text-foreground'}`}>{itemPct}%</div>
+                                                            <div className={`text-sm font-semibold tabular-nums ${itemPct > 90 ? 'text-status-critical' : itemPct > 70 ? 'text-status-warning' : 'text-foreground'}`}>{itemPct}%</div>
                                                             <div className="text-[10px] text-muted-foreground">{formatCurrency(item.budget_used)} / {formatCurrency(item.budget_allocated)}</div>
                                                         </div>
                                                         <div className="flex gap-1">
                                                             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditingLineItem(item); setLineItemDialogOpen(true); }}>
                                                                 <Pencil className="h-3 w-3" />
                                                             </Button>
-                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => { setDeletingLineItemId(item.id); setDeleteLineItemDialogOpen(true); }}>
+                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-status-critical hover:text-status-critical" onClick={() => { setDeletingLineItemId(item.id); setDeleteLineItemDialogOpen(true); }}>
                                                                 <Trash2 className="h-3 w-3" />
                                                             </Button>
                                                         </div>
@@ -1034,7 +1034,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <DollarSign className="h-4 w-4 text-emerald-500" />
+                                <DollarSign className="h-4 w-4 text-status-success" />
                                 Rate Structure ({ag.rates?.length ?? 0})
                             </CardTitle>
                             <Button size="sm" variant="outline" onClick={() => setRateDialogOpen(true)}>
@@ -1067,7 +1067,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                                 <td className="py-2 pr-4">{formatDate(rate.effective_from)}</td>
                                                 <td className="py-2 pr-4">{formatDate(rate.effective_to)}</td>
                                                 <td className="py-2">
-                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => { setDeletingRateId(rate.id); setDeleteRateDialogOpen(true); }}>
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-status-critical hover:text-status-critical" onClick={() => { setDeletingRateId(rate.id); setDeleteRateDialogOpen(true); }}>
                                                         <Trash2 className="h-3 w-3" />
                                                     </Button>
                                                 </td>
@@ -1217,7 +1217,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                             {/* Invoices */}
                             <div className="rounded-lg border p-4">
                                 <div className="flex items-center gap-2">
-                                    <DollarSign className="h-4 w-4 text-emerald-500" />
+                                    <DollarSign className="h-4 w-4 text-status-success" />
                                     <h4 className="text-sm font-semibold">Invoices</h4>
                                 </div>
                                 <p className="mt-2 text-xs text-muted-foreground">View related invoices for this client.</p>

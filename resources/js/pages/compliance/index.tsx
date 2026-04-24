@@ -96,10 +96,10 @@ function KpiCard({
 }
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-black',
-    low: 'bg-blue-500 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-black',
+    low: 'bg-status-info text-white',
 };
 
 function formatRelativeTime(isoString: string | null): string {
@@ -193,7 +193,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                                <Bell className="h-5 w-5 text-red-500" />
+                                <Bell className="h-5 w-5 text-status-critical" />
                                 Control Room Alerts
                             </CardTitle>
                             <Button asChild variant="outline" size="sm">
@@ -206,26 +206,26 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                            <div className="text-center p-3 rounded-lg bg-red-50 border border-red-100">
-                                <div className="flex items-center justify-center gap-1 text-red-600 mb-1">
+                            <div className="text-center p-3 rounded-lg bg-status-critical-bg border border-status-critical/30">
+                                <div className="flex items-center justify-center gap-1 text-status-critical mb-1">
                                     <Bell className="h-4 w-4" />
                                     <span className="text-xs font-medium">Open</span>
                                 </div>
-                                <div className="text-2xl font-bold text-red-700">{controlRoom.open}</div>
+                                <div className="text-2xl font-bold text-status-critical">{controlRoom.open}</div>
                             </div>
-                            <div className="text-center p-3 rounded-lg bg-orange-50 border border-orange-100">
-                                <div className="flex items-center justify-center gap-1 text-orange-600 mb-1">
+                            <div className="text-center p-3 rounded-lg bg-status-warning-bg border border-status-warning/30">
+                                <div className="flex items-center justify-center gap-1 text-status-warning mb-1">
                                     <AlertTriangle className="h-4 w-4" />
                                     <span className="text-xs font-medium">Critical</span>
                                 </div>
-                                <div className="text-2xl font-bold text-orange-700">{controlRoom.critical}</div>
+                                <div className="text-2xl font-bold text-status-warning">{controlRoom.critical}</div>
                             </div>
-                            <div className="text-center p-3 rounded-lg bg-yellow-50 border border-yellow-100">
-                                <div className="flex items-center justify-center gap-1 text-yellow-600 mb-1">
+                            <div className="text-center p-3 rounded-lg bg-status-warning-bg border border-status-warning/30">
+                                <div className="flex items-center justify-center gap-1 text-status-warning mb-1">
                                     <TrendingUp className="h-4 w-4" />
                                     <span className="text-xs font-medium">Escalated</span>
                                 </div>
-                                <div className="text-2xl font-bold text-yellow-700">{controlRoom.escalated}</div>
+                                <div className="text-2xl font-bold text-status-warning">{controlRoom.escalated}</div>
                             </div>
                         </div>
 
@@ -247,7 +247,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                                                         {alert.source} &middot; {formatRelativeTime(alert.triggered_at)}
                                                     </div>
                                                 </div>
-                                                <Badge className={severityColors[alert.severity] || 'bg-gray-500'}>
+                                                <Badge className={severityColors[alert.severity] || 'bg-muted-foreground/80'}>
                                                     {alert.severity}
                                                 </Badge>
                                             </Link>

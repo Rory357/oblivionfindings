@@ -257,7 +257,7 @@ const SmartMonitoring: React.FC = () => {
 
                             {/* Control Room Interface Mockup */}
                             <div className="relative">
-                                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-purple-500/20 blur-2xl" />
+                                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-primary/20 blur-2xl" />
                                 <div className="relative rounded-2xl border border-border bg-background p-4 shadow-2xl">
                                     <div className="mb-4 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -270,7 +270,7 @@ const SmartMonitoring: React.FC = () => {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                                            <span className="h-2 w-2 animate-pulse rounded-full bg-status-success" />
                                             <span className="text-xs text-muted-foreground">
                                                 System Online
                                             </span>
@@ -280,12 +280,12 @@ const SmartMonitoring: React.FC = () => {
                                     {/* Main Grid */}
                                     <div className="mb-3 grid grid-cols-2 gap-2">
                                         <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
-                                            <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
+                                            <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted" />
                                             <div className="absolute top-2 left-2 rounded bg-black/50 px-2 py-1 text-[10px] text-white">
                                                 Main Entrance - Cam 01
                                             </div>
-                                            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-emerald-500/20 px-2 py-1 text-[10px] text-emerald-400">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-status-success-bg px-2 py-1 text-[10px] text-status-success">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
                                                 Live
                                             </div>
                                             {/* AI Detection Box */}
@@ -296,47 +296,47 @@ const SmartMonitoring: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
-                                            <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
+                                            <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted" />
                                             <div className="absolute top-2 left-2 rounded bg-black/50 px-2 py-1 text-[10px] text-white">
                                                 Lounge - Cam 02
                                             </div>
-                                            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-emerald-500/20 px-2 py-1 text-[10px] text-emerald-400">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-status-success-bg px-2 py-1 text-[10px] text-status-success">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
                                                 Live
                                             </div>
                                         </div>
                                         <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
-                                            <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
+                                            <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted" />
                                             <div className="absolute top-2 left-2 rounded bg-black/50 px-2 py-1 text-[10px] text-white">
                                                 Kitchen - Cam 03
                                             </div>
-                                            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 text-[10px] text-amber-400">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-status-warning-bg px-2 py-1 text-[10px] text-status-warning">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-status-warning" />
                                                 Motion Detected
                                             </div>
                                         </div>
                                         <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
-                                            <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
+                                            <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted" />
                                             <div className="absolute top-2 left-2 rounded bg-black/50 px-2 py-1 text-[10px] text-white">
                                                 Garden - Cam 04
                                             </div>
-                                            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-emerald-500/20 px-2 py-1 text-[10px] text-emerald-400">
-                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-status-success-bg px-2 py-1 text-[10px] text-status-success">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
                                                 Live
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Alert Panel */}
-                                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                                    <div className="rounded-lg border border-status-warning/30 bg-status-warning p-3">
                                         <div className="flex items-start gap-3">
                                             <AlertTriangle
                                                 size={18}
-                                                className="mt-0.5 text-amber-500"
+                                                className="mt-0.5 text-status-warning"
                                             />
                                             <div className="flex-1">
                                                 <div className="flex items-center justify-between">
-                                                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                                                    <p className="text-sm font-medium text-status-warning dark:text-status-warning">
                                                         AI Alert: Unusual
                                                         Activity
                                                     </p>
@@ -351,10 +351,10 @@ const SmartMonitoring: React.FC = () => {
                                                     time period.
                                                 </p>
                                                 <div className="mt-2 flex gap-2">
-                                                    <button className="rounded bg-amber-500 px-2 py-1 text-[10px] text-white">
+                                                    <button className="rounded bg-status-warning px-2 py-1 text-[10px] text-white">
                                                         View Timeline
                                                     </button>
-                                                    <button className="rounded border border-amber-500/30 px-2 py-1 text-[10px] text-amber-600">
+                                                    <button className="rounded border border-status-warning/30 px-2 py-1 text-[10px] text-status-warning">
                                                         Dismiss
                                                     </button>
                                                 </div>
@@ -429,7 +429,7 @@ const SmartMonitoring: React.FC = () => {
                                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/5" />
                                 <CheckCircle2
                                     size={20}
-                                    className="shrink-0 text-emerald-500"
+                                    className="shrink-0 text-status-success"
                                 />
                                 <div>
                                     <p className="text-xs text-muted-foreground">
@@ -474,7 +474,7 @@ const SmartMonitoring: React.FC = () => {
                                     >
                                         <Shield
                                             size={18}
-                                            className="text-emerald-500"
+                                            className="text-status-success"
                                         />
                                         <span className="text-sm text-muted-foreground">
                                             {item}
@@ -567,7 +567,7 @@ const SmartMonitoring: React.FC = () => {
                                     <div className="relative flex items-center gap-3">
                                         <Clock
                                             size={20}
-                                            className="text-emerald-500"
+                                            className="text-status-success"
                                         />
                                         <span className="font-medium text-foreground">
                                             Timeline Reconstructed
@@ -602,7 +602,7 @@ const SmartMonitoring: React.FC = () => {
                                     >
                                         <CheckCircle2
                                             size={18}
-                                            className="mt-0.5 text-emerald-500"
+                                            className="mt-0.5 text-status-success"
                                         />
                                         <span className="text-sm text-muted-foreground">
                                             {item}

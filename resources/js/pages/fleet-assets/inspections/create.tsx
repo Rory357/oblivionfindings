@@ -62,7 +62,7 @@ type Props = {
 const CHECKLIST_SECTIONS = [
     {
         section: 'Exterior',
-        color: 'bg-blue-600',
+        color: 'bg-status-info',
         items: [
             { key: 'tyres_condition', label: 'Tyres - Condition & Pressure' },
             { key: 'lights_front', label: 'Lights - Front (headlights, indicators)' },
@@ -87,7 +87,7 @@ const CHECKLIST_SECTIONS = [
     },
     {
         section: 'Under Bonnet',
-        color: 'bg-amber-600',
+        color: 'bg-status-warning',
         items: [
             { key: 'oil_level', label: 'Oil Level' },
             { key: 'coolant', label: 'Coolant Level' },
@@ -349,8 +349,8 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                                             className={cn(
                                                                 "rounded-lg border-2 py-3 text-sm font-medium transition-all",
                                                                 val?.result === 'fail'
-                                                                    ? "border-red-600 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400 dark:border-red-500"
-                                                                    : "border-transparent bg-muted hover:border-red-300"
+                                                                    ? "border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30"
+                                                                    : "border-transparent bg-muted hover:border-status-critical/30"
                                                             )}
                                                         >
                                                             <XCircle className="mx-auto mb-1 h-4 w-4" />
@@ -362,7 +362,7 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                                             className={cn(
                                                                 "rounded-lg border-2 py-3 text-sm font-medium transition-all",
                                                                 val?.result === 'na'
-                                                                    ? "border-slate-600 bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground dark:border-slate-500"
+                                                                    ? "border-border bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground dark:border-border"
                                                                     : "border-transparent bg-muted hover:border-border"
                                                             )}
                                                         >
@@ -393,8 +393,8 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {pre_trip_results && (
-                                    <div className="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
-                                        <div className="mb-1 text-sm font-medium text-blue-800 dark:text-blue-400">Pre-Trip Comparison</div>
+                                    <div className="rounded-md border border-status-info/30 bg-status-info-bg p-3 dark:border-status-info/30 dark:bg-status-info">
+                                        <div className="mb-1 text-sm font-medium text-status-info dark:text-status-info">Pre-Trip Comparison</div>
                                         <div className="grid gap-2 text-xs sm:grid-cols-3">
                                             <div>
                                                 <span className="text-muted-foreground">Pre-trip odometer:</span>{' '}
@@ -406,7 +406,7 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                             </div>
                                             <div>
                                                 <span className="text-muted-foreground">Pre-trip result:</span>{' '}
-                                                <span className={`font-medium ${pre_trip_results.passed ? 'text-green-600' : 'text-red-600'}`}>
+                                                <span className={`font-medium ${pre_trip_results.passed ? 'text-status-success' : 'text-status-critical'}`}>
                                                     {pre_trip_results.passed ? 'All Clear' : 'Issues Found'}
                                                 </span>
                                             </div>
@@ -510,7 +510,7 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
                                         <XCircle className="mr-1 h-4 w-4" /> Issues Found
                                     </Badge>
                                 ) : (
-                                    <Badge variant="default" className="bg-green-600 text-sm">
+                                    <Badge variant="default" className="bg-status-success text-sm">
                                         <CheckCircle className="mr-1 h-4 w-4" /> All Clear
                                     </Badge>
                                 )}

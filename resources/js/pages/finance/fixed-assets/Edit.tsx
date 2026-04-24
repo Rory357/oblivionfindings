@@ -130,11 +130,11 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
                 </div>
 
                 {hasDepreciations && (
-                    <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
-                        <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                    <div className="rounded-lg bg-status-warning-bg border border-status-warning/30 p-4 flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-status-warning mt-0.5 shrink-0" />
                         <div>
-                            <p className="text-sm font-medium text-amber-800">Depreciation records exist</p>
-                            <p className="text-sm text-amber-700 mt-1">
+                            <p className="text-sm font-medium text-status-warning">Depreciation records exist</p>
+                            <p className="text-sm text-status-warning mt-1">
                                 Purchase cost and purchase date cannot be changed because depreciation has already been recorded
                                 for this asset.
                             </p>

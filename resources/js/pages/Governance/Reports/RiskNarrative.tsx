@@ -42,10 +42,10 @@ const severityBorder: Record<string, string> = {
 };
 
 const severityBadge: Record<string, string> = {
-    critical: 'bg-red-500 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-black',
-    low: 'bg-green-500 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-black',
+    low: 'bg-status-success text-white',
 };
 
 export default function RiskNarrative({ auth, risks, summary }: Props) {
@@ -71,25 +71,25 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
 
                 {/* Summary Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <Card className="border-red-200">
+                    <Card className="border-status-critical/30">
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-red-600">Critical</p>
-                                    <p className="text-3xl font-bold text-red-600">{summary.critical}</p>
+                                    <p className="text-sm text-status-critical">Critical</p>
+                                    <p className="text-3xl font-bold text-status-critical">{summary.critical}</p>
                                 </div>
-                                <AlertTriangle className="w-8 h-8 text-red-500" />
+                                <AlertTriangle className="w-8 h-8 text-status-critical" />
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-orange-200">
+                    <Card className="border-status-warning/30">
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-orange-600">High</p>
-                                    <p className="text-3xl font-bold text-orange-600">{summary.high}</p>
+                                    <p className="text-sm text-status-warning">High</p>
+                                    <p className="text-3xl font-bold text-status-warning">{summary.high}</p>
                                 </div>
-                                <AlertCircle className="w-8 h-8 text-orange-500" />
+                                <AlertCircle className="w-8 h-8 text-status-warning" />
                             </div>
                         </CardContent>
                     </Card>
@@ -127,7 +127,7 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                                         <CardTitle className="flex items-center gap-2 flex-wrap">
                                             {risk.title}
                                             <Badge variant="outline">{risk.reference}</Badge>
-                                            <Badge className={severityBadge[risk.severity] ?? 'bg-gray-500 text-white'}>
+                                            <Badge className={severityBadge[risk.severity] ?? 'bg-muted-foreground/80 text-white'}>
                                                 {risk.severity}
                                             </Badge>
                                             {!risk.within_appetite && (

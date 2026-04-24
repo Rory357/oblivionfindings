@@ -271,13 +271,13 @@ type Props = {
 function statusIcon(status: string) {
     switch (status) {
         case 'given':
-            return <Check className="h-4 w-4 text-green-600" />;
+            return <Check className="h-4 w-4 text-status-success" />;
         case 'refused':
-            return <XCircle className="h-4 w-4 text-orange-500" />;
+            return <XCircle className="h-4 w-4 text-status-warning" />;
         case 'withheld':
-            return <MinusCircle className="h-4 w-4 text-amber-500" />;
+            return <MinusCircle className="h-4 w-4 text-status-warning" />;
         case 'missed':
-            return <AlertTriangle className="h-4 w-4 text-red-500" />;
+            return <AlertTriangle className="h-4 w-4 text-status-critical" />;
         case 'pending':
             return <Clock className="h-4 w-4 text-muted-foreground" />;
         default:
@@ -704,19 +704,19 @@ export default function MarCharts({
                             {marData?.stats && (
                                 <div className="flex gap-3">
                                     <Badge variant="outline" className="gap-1">
-                                        <Check className="h-3 w-3 text-green-600" />{' '}
+                                        <Check className="h-3 w-3 text-status-success" />{' '}
                                         {marData.stats.given} Given
                                     </Badge>
                                     <Badge variant="outline" className="gap-1">
-                                        <XCircle className="h-3 w-3 text-orange-500" />{' '}
+                                        <XCircle className="h-3 w-3 text-status-warning" />{' '}
                                         {marData.stats.refused} Refused
                                     </Badge>
                                     <Badge variant="outline" className="gap-1">
-                                        <MinusCircle className="h-3 w-3 text-amber-500" />{' '}
+                                        <MinusCircle className="h-3 w-3 text-status-warning" />{' '}
                                         {marData.stats.withheld} Withheld
                                     </Badge>
                                     <Badge variant="outline" className="gap-1">
-                                        <AlertTriangle className="h-3 w-3 text-red-500" />{' '}
+                                        <AlertTriangle className="h-3 w-3 text-status-critical" />{' '}
                                         {marData.stats.missed} Missed
                                     </Badge>
                                     <Badge variant="outline" className="gap-1">
@@ -1273,7 +1273,7 @@ export default function MarCharts({
                                                                     <TooltipProvider>
                                                                         <Tooltip>
                                                                             <TooltipTrigger>
-                                                                                <Shield className="h-4 w-4 text-red-500" />
+                                                                                <Shield className="h-4 w-4 text-status-critical" />
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 Controlled
@@ -1286,7 +1286,7 @@ export default function MarCharts({
                                                                     <TooltipProvider>
                                                                         <Tooltip>
                                                                             <TooltipTrigger>
-                                                                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                                                                <AlertTriangle className="h-4 w-4 text-status-warning" />
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 High
@@ -1299,7 +1299,7 @@ export default function MarCharts({
                                                                     <TooltipProvider>
                                                                         <Tooltip>
                                                                             <TooltipTrigger>
-                                                                                <Eye className="h-4 w-4 text-blue-500" />
+                                                                                <Eye className="h-4 w-4 text-status-info" />
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 Witness
@@ -1335,16 +1335,16 @@ export default function MarCharts({
                                                                                                 className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
                                                                                                     a.status ===
                                                                                                     'given'
-                                                                                                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30'
+                                                                                                        ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success'
                                                                                                         : a.status ===
                                                                                                             'missed'
-                                                                                                          ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                                                                                          ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
                                                                                                           : a.status ===
                                                                                                               'refused'
-                                                                                                            ? 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30'
+                                                                                                            ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
                                                                                                             : a.status ===
                                                                                                                 'withheld'
-                                                                                                              ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'
+                                                                                                              ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning'
                                                                                                               : 'border-muted bg-muted/30'
                                                                                                 }`}
                                                                                             >
@@ -1631,7 +1631,7 @@ export default function MarCharts({
                                                     <td className="p-3">
                                                         <div className="flex items-center gap-2">
                                                             <span
-                                                                className={`text-sm font-medium ${med.prn_remaining === 0 ? 'text-red-600' : med.prn_remaining !== null && med.prn_remaining <= 1 ? 'text-amber-600' : ''}`}
+                                                                className={`text-sm font-medium ${med.prn_remaining === 0 ? 'text-status-critical' : med.prn_remaining !== null && med.prn_remaining <= 1 ? 'text-status-warning' : ''}`}
                                                             >
                                                                 {
                                                                     med.prn_count_24h

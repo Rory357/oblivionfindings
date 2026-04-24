@@ -99,28 +99,28 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const defaultStatusConfig = {
-    className: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+    className: 'border-status-info/30 text-status-info bg-status-info',
     label: 'Active',
 };
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     active: defaultStatusConfig,
     submitted: {
-        className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
+        className: 'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Submitted',
     },
     approved: {
-        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        className: 'border-status-success/30 text-status-success bg-status-success',
         label: 'Approved',
     },
     rejected: {
-        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        className: 'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Rejected',
     },
 };
 
 const defaultShiftTypeConfig = {
-    className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+    className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
     label: 'Standard',
 };
 
@@ -135,11 +135,11 @@ const shiftTypeConfig: Record<string, { className: string; label: string }> = {
         label: 'On-Call',
     },
     split: {
-        className: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10',
+        className: 'border-status-info/30 text-status-info bg-status-info',
         label: 'Split',
     },
     travel: {
-        className: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+        className: 'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Travel',
     },
 };
@@ -237,21 +237,21 @@ export default function MyTime({
                         suffix="h"
                         decimals={1}
                         description={`Target: 40h`}
-                        color="bg-emerald-500/10 text-emerald-500"
+                        color="bg-status-success-bg text-status-success"
                     />
                     <KpiCard
                         label="Pending Entries"
                         value={pendingCount}
                         icon={AlertTriangle}
                         description="Awaiting approval"
-                        color="bg-amber-500/10 text-amber-500"
+                        color="bg-status-warning-bg text-status-warning"
                     />
                     <KpiCard
                         label="Next Shift"
                         value={upcomingShifts.length}
                         icon={Calendar}
                         description={nextShiftLabel}
-                        color="bg-blue-500/10 text-blue-500"
+                        color="bg-status-info-bg text-status-info"
                     />
                 </div>
 
@@ -270,7 +270,7 @@ export default function MyTime({
                                     {activeClock ? (
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-2">
-                                                <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-400" />
+                                                <div className="h-3 w-3 animate-pulse rounded-full bg-status-success" />
                                                 <span className="text-sm font-medium">
                                                     Clocked in since{' '}
                                                     {activeClock.clock_in}
@@ -363,7 +363,7 @@ export default function MyTime({
                                     ) : (
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-2">
-                                                <div className="h-3 w-3 rounded-full bg-slate-400" />
+                                                <div className="h-3 w-3 rounded-full bg-muted" />
                                                 <span className="text-sm text-muted-foreground">
                                                     Not clocked in
                                                 </span>

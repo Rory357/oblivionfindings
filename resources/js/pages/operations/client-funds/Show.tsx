@@ -107,7 +107,7 @@ export default function ClientFundShow({ fund }: Props) {
                                     const Icon = isCredit ? ArrowUpCircle : ArrowDownCircle;
                                     return (
                                         <div key={transaction.id} className="flex items-center gap-3 rounded-lg border p-3">
-                                            <Icon className={isCredit ? 'h-5 w-5 text-emerald-600' : 'h-5 w-5 text-amber-600'} />
+                                            <Icon className={isCredit ? 'h-5 w-5 text-status-success' : 'h-5 w-5 text-status-warning'} />
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-medium">{transaction.description}</p>
                                                 <p className="text-xs text-muted-foreground">
@@ -116,7 +116,7 @@ export default function ClientFundShow({ fund }: Props) {
                                                 </p>
                                             </div>
                                             <div className="text-right text-sm tabular-nums">
-                                                <p className={isCredit ? 'font-semibold text-emerald-700' : 'font-semibold text-amber-700'}>
+                                                <p className={isCredit ? 'font-semibold text-status-success' : 'font-semibold text-status-warning'}>
                                                     {isCredit ? '+' : '-'}{money(transaction.amount)}
                                                 </p>
                                                 <p className="text-xs text-muted-foreground">{money(transaction.running_balance)}</p>

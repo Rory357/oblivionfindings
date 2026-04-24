@@ -195,7 +195,7 @@ export default function ShiftEdit({ shift, clients, staff, serviceContexts, defa
 
                         <div className="space-y-2">
                             <Label>Shift tasks (checklist)</Label>
-                            {taskError && <div className="text-sm text-red-500">{taskError}</div>}
+                            {taskError && <div className="text-sm text-status-critical">{taskError}</div>}
                             <div className="space-y-2">
                                 {(form.data.tasks as any[]).map((t, idx) => (
                                     <div key={t.id ?? idx} className="flex items-center gap-2">
@@ -230,7 +230,7 @@ export default function ShiftEdit({ shift, clients, staff, serviceContexts, defa
                     </div>
 
                     {Object.keys(form.errors).length > 0 && (
-                        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                        <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                             <p className="font-medium">Please fix the following errors:</p>
                             <ul className="mt-1 list-disc pl-5">
                                 {Object.entries(form.errors).map(([field, message]) => (

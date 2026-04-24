@@ -66,7 +66,7 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                     onChange={(e) => form.setData('title', e.target.value)}
                                     placeholder="Announcement title"
                                 />
-                                {form.errors.title && <p className="mt-1 text-xs text-red-500">{form.errors.title}</p>}
+                                {form.errors.title && <p className="mt-1 text-xs text-status-critical">{form.errors.title}</p>}
                             </div>
 
                             <div>
@@ -77,7 +77,7 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
                                     rows={6}
                                     placeholder="Write your announcement..."
                                 />
-                                {form.errors.content && <p className="mt-1 text-xs text-red-500">{form.errors.content}</p>}
+                                {form.errors.content && <p className="mt-1 text-xs text-status-critical">{form.errors.content}</p>}
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

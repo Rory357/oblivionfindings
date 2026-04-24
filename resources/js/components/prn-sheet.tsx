@@ -284,7 +284,7 @@ export default function PrnSheet({
                                 <ChevronLeft aria-hidden className="h-5 w-5" />
                             </Button>
                         )}
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-200">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                             <Zap className="h-5 w-5" />
                         </div>
                         <div className="min-w-0">
@@ -458,14 +458,14 @@ function PrnLimitPill({ med }: { med: PrnMedication }) {
     }
     if (med.over_limit) {
         return (
-            <span className="shrink-0 rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+            <span className="shrink-0 rounded-full border border-status-critical/30 bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                 At limit
             </span>
         );
     }
     if (med.near_limit) {
         return (
-            <span className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+            <span className="shrink-0 rounded-full border border-status-warning/30 bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                 {med.given_last_24h}/{med.max_per_day} in 24h
             </span>
         );
@@ -545,13 +545,13 @@ function RecordStep({
 
                 {/* Over-limit banner */}
                 {med.over_limit && (
-                    <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50/70 p-3 text-sm dark:border-red-900 dark:bg-red-950/20">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+                    <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm dark:border-status-critical/30 dark:bg-status-critical">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-critical dark:text-status-critical" />
                         <div className="min-w-0">
-                            <p className="font-medium text-red-800 dark:text-red-100">
+                            <p className="font-medium text-status-critical dark:text-status-critical">
                                 Already given {med.given_last_24h} of {med.max_per_day} in the last 24 hours
                             </p>
-                            <p className="mt-0.5 text-xs text-red-700 dark:text-red-200">
+                            <p className="mt-0.5 text-xs text-status-critical dark:text-status-critical">
                                 Don&rsquo;t give another dose without checking with your supervisor first.
                             </p>
                         </div>
@@ -562,13 +562,13 @@ function RecordStep({
                     still saves the record without a shift_id; we just tell the
                     worker that, so the reporting context isn't ambiguous. */}
                 {nullShiftNotice && (
-                    <div className="flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-sm dark:border-sky-900 dark:bg-sky-950/20">
-                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" />
+                    <div className="flex items-start gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30 dark:bg-status-info">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-info dark:text-status-info" />
                         <div className="min-w-0">
-                            <p className="font-medium text-sky-900 dark:text-sky-100">
+                            <p className="font-medium text-status-info dark:text-status-info">
                                 Not on shift for this client
                             </p>
-                            <p className="mt-0.5 text-xs text-sky-800 dark:text-sky-200">
+                            <p className="mt-0.5 text-xs text-status-info dark:text-status-info">
                                 The dose will still record, but it won&rsquo;t be linked to a
                                 shift. Add a note below if anything about the context
                                 matters.
@@ -691,7 +691,7 @@ function RecordStep({
                 </div>
 
                 {error && (
-                    <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+                    <p className="rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                         {error}
                     </p>
                 )}

@@ -123,7 +123,7 @@ export default function ApprovalChains({ chains, processTypes, roles, users }: P
                                             onChange={(e) => form.setData('name', e.target.value)}
                                             placeholder="e.g. Standard Leave Approval"
                                         />
-                                        {form.errors.name && <p className="text-sm text-red-500">{form.errors.name}</p>}
+                                        {form.errors.name && <p className="text-sm text-status-critical">{form.errors.name}</p>}
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Process Type</Label>
@@ -139,7 +139,7 @@ export default function ApprovalChains({ chains, processTypes, roles, users }: P
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {form.errors.process_type && <p className="text-sm text-red-500">{form.errors.process_type}</p>}
+                                        {form.errors.process_type && <p className="text-sm text-status-critical">{form.errors.process_type}</p>}
                                     </div>
                                 </div>
 
@@ -210,7 +210,7 @@ export default function ApprovalChains({ chains, processTypes, roles, users }: P
                                             />
                                             {steps.length > 1 && (
                                                 <Button type="button" variant="ghost" size="sm" onClick={() => removeStep(index)}>
-                                                    <Trash2 className="h-4 w-4 text-red-400" />
+                                                    <Trash2 className="h-4 w-4 text-status-critical" />
                                                 </Button>
                                             )}
                                         </div>
@@ -254,8 +254,8 @@ export default function ApprovalChains({ chains, processTypes, roles, users }: P
                                             <Badge
                                                 variant="outline"
                                                 className={chain.is_active
-                                                    ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                                                    : 'border-slate-500/30 text-muted-foreground bg-slate-500/10'
+                                                    ? 'border-status-success/30 text-status-success bg-status-success'
+                                                    : 'border-border/30 text-muted-foreground bg-muted-foreground/80/10'
                                                 }
                                             >
                                                 {chain.is_active ? 'Active' : 'Inactive'}

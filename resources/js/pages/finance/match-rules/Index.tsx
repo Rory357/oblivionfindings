@@ -377,7 +377,7 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                                                     variant="outline"
                                                     className={
                                                         rule.is_active
-                                                            ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
+                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
                                                             : 'bg-muted text-muted-foreground border-border'
                                                     }
                                                 >

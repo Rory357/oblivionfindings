@@ -65,11 +65,11 @@ const formatDateTime = (date: string | null) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-yellow-100 text-yellow-800' },
-    approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
-    partially_paid: { label: 'Partially Paid', className: 'bg-orange-100 text-orange-800' },
-    paid: { label: 'Paid', className: 'bg-green-100 text-green-800' },
-    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
+    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-status-warning-bg text-status-warning' },
+    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info' },
+    partially_paid: { label: 'Partially Paid', className: 'bg-status-warning-bg text-status-warning' },
+    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success' },
+    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
 };
 
 export default function BillShow({ auth, bill }: Props) {
@@ -109,7 +109,7 @@ export default function BillShow({ auth, bill }: Props) {
                                 {statusConfig[bill.status]?.label ?? bill.status}
                             </Badge>
                             {isOverdue && (
-                                <Badge className="bg-red-100 text-red-800">
+                                <Badge className="bg-status-critical-bg text-status-critical">
                                     <AlertTriangle className="w-3 h-3 mr-1" />
                                     Overdue
                                 </Badge>
@@ -157,14 +157,14 @@ export default function BillShow({ auth, bill }: Props) {
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Due Date</span>
-                                <span className={cn('font-medium', isOverdue && 'text-red-600')}>
+                                <span className={cn('font-medium', isOverdue && 'text-status-critical')}>
                                     {formatDate(bill.due_date)}
                                 </span>
                             </div>
                             {bill.purchase_order && (
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Purchase Order</span>
-                                    <Link href={`/finance/purchase-orders/${bill.purchase_order.id}`} className="text-blue-600 hover:underline font-medium">
+                                    <Link href={`/finance/purchase-orders/${bill.purchase_order.id}`} className="text-status-info hover:underline font-medium">
                                         {bill.purchase_order.po_number}
                                     </Link>
                                 </div>
@@ -209,12 +209,12 @@ export default function BillShow({ auth, bill }: Props) {
                                 <span>Total</span>
                                 <span>{formatCurrency(bill.total_amount)}</span>
                             </div>
-                            <div className="flex justify-between text-green-700">
+                            <div className="flex justify-between text-status-success">
                                 <span>Paid</span>
                                 <span>{formatCurrency(bill.amount_paid)}</span>
                             </div>
                             <Separator />
-                            <div className={cn('flex justify-between font-bold', amountDue > 0 ? 'text-red-600' : 'text-green-600')}>
+                            <div className={cn('flex justify-between font-bold', amountDue > 0 ? 'text-status-critical' : 'text-status-success')}>
                                 <span>Amount Due</span>
                                 <span>{formatCurrency(amountDue)}</span>
                             </div>
@@ -231,13 +231,13 @@ export default function BillShow({ auth, bill }: Props) {
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Journal #</span>
-                                        <Link href={`/finance/journals/${bill.journal.id}`} className="text-blue-600 hover:underline font-medium">
+                                        <Link href={`/finance/journals/${bill.journal.id}`} className="text-status-info hover:underline font-medium">
                                             {bill.journal.journal_number}
                                         </Link>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Status</span>
-                                        <Badge className="bg-green-100 text-green-800">{bill.journal.status}</Badge>
+                                        <Badge className="bg-status-success-bg text-status-success">{bill.journal.status}</Badge>
                                     </div>
                                     {bill.journal.posted_at && (
                                         <div className="flex justify-between">

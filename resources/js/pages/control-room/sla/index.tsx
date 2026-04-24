@@ -106,10 +106,10 @@ const ALERT_TYPE_OPTIONS = ['geofence_breach', 'sos_alert', 'fall_detected', 'sp
 const DAY_LABELS: Record<number, string> = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun' };
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-white',
-    low: 'bg-blue-500 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-white',
+    low: 'bg-status-info text-white',
 };
 
 // --- Helpers ---
@@ -816,7 +816,7 @@ export default function SlaIndex({ slaDefinitions, can }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+                            <p className="text-2xl font-bold text-status-success">{activeCount}</p>
                         </CardContent>
                     </Card>
                     <Card>

@@ -51,14 +51,14 @@ const formatDateTime = (date: string | null) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground' },
-    approved: { label: 'Approved', className: 'bg-green-100 text-green-800' },
-    applied: { label: 'Applied', className: 'bg-blue-100 text-blue-800' },
-    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
+    approved: { label: 'Approved', className: 'bg-status-success-bg text-status-success' },
+    applied: { label: 'Applied', className: 'bg-status-info-bg text-status-info' },
+    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical' },
 };
 
 const typeConfig: Record<string, { label: string; className: string }> = {
     payable: { label: 'Accounts Payable', className: 'bg-primary/10 text-primary' },
-    receivable: { label: 'Accounts Receivable', className: 'bg-teal-100 text-teal-800' },
+    receivable: { label: 'Accounts Receivable', className: 'bg-status-info-bg text-status-info' },
 };
 
 export default function CreditNoteShow({ auth, creditNote }: Props) {
@@ -174,13 +174,13 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Journal #</span>
-                                        <Link href={`/finance/journals/${creditNote.journal.id}`} className="text-blue-600 hover:underline font-medium">
+                                        <Link href={`/finance/journals/${creditNote.journal.id}`} className="text-status-info hover:underline font-medium">
                                             {creditNote.journal.journal_number}
                                         </Link>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-muted-foreground">Status</span>
-                                        <Badge className="bg-green-100 text-green-800">{creditNote.journal.status}</Badge>
+                                        <Badge className="bg-status-success-bg text-status-success">{creditNote.journal.status}</Badge>
                                     </div>
                                     {creditNote.journal.posted_at && (
                                         <div className="flex justify-between">

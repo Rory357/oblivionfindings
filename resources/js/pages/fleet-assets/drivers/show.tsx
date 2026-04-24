@@ -89,8 +89,8 @@ function getLicenceExpiryDays(dateStr: string | null | undefined): number | null
 
 const statusBannerColors: Record<string, string> = {
     eligible: 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
-    suspended: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
-    expired: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
+    suspended: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
+    expired: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
     unknown: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
 };
 
@@ -166,14 +166,14 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                 {/* License expiry warning banner */}
                 {(isExpired || isExpiringSoon) && (
                     <div className={cn('rounded-lg border p-4', {
-                        'border-red-500/30 bg-red-500/10': isExpired,
-                        'border-orange-500/30 bg-orange-500/10': !isExpired && expiryDays !== null && expiryDays <= 30,
-                        'border-yellow-500/30 bg-yellow-500/10': !isExpired && expiryDays !== null && expiryDays > 30,
+                        'border-status-critical/30 bg-status-critical': isExpired,
+                        'border-status-warning/30 bg-status-warning': !isExpired && expiryDays !== null && expiryDays <= 30,
+                        'border-status-warning/30 bg-status-warning': !isExpired && expiryDays !== null && expiryDays > 30,
                     })}>
                         <div className="flex items-center gap-3">
-                            <AlertTriangle className={cn('h-5 w-5', isExpired ? 'text-red-500' : 'text-orange-500')} />
+                            <AlertTriangle className={cn('h-5 w-5', isExpired ? 'text-status-critical' : 'text-status-warning')} />
                             <div>
-                                <p className={cn('text-sm font-medium', isExpired ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400')}>
+                                <p className={cn('text-sm font-medium', isExpired ? 'text-status-critical dark:text-status-critical' : 'text-status-warning dark:text-status-warning')}>
                                     {isExpired
                                         ? `Driver licence expired ${Math.abs(expiryDays!)} days ago`
                                         : `Driver licence expires in ${expiryDays} days`
@@ -221,7 +221,7 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                                                         <Badge variant="destructive" className="text-[10px]">Expired</Badge>
                                                     )}
                                                     {!isExpired && isExpiringSoon && expiryDays !== null && (
-                                                        <Badge className={cn('text-[10px]', expiryDays <= 30 ? 'bg-orange-500 text-white' : 'bg-yellow-500 text-white')}>
+                                                        <Badge className={cn('text-[10px]', expiryDays <= 30 ? 'bg-status-warning text-white' : 'bg-status-warning text-white')}>
                                                             {expiryDays}d left
                                                         </Badge>
                                                     )}
@@ -297,12 +297,12 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
                                         <div className="text-3xl font-bold">{safeSessions.length}</div>
                                         <div className="mt-1 text-xs text-muted-foreground">Sessions</div>
                                     </div>
-                                    <div className="rounded-lg bg-amber-50 p-3 text-center dark:bg-amber-950/20">
-                                        <div className="text-2xl font-bold text-amber-600">{aggregatedMetrics.harsh_brakes}</div>
+                                    <div className="rounded-lg bg-status-warning-bg p-3 text-center dark:bg-status-warning">
+                                        <div className="text-2xl font-bold text-status-warning">{aggregatedMetrics.harsh_brakes}</div>
                                         <div className="mt-1 text-xs text-muted-foreground">Harsh Brakes</div>
                                     </div>
-                                    <div className="rounded-lg bg-red-50 p-3 text-center dark:bg-red-950/20">
-                                        <div className="text-2xl font-bold text-red-600">{aggregatedMetrics.speeding_events}</div>
+                                    <div className="rounded-lg bg-status-critical-bg p-3 text-center dark:bg-status-critical">
+                                        <div className="text-2xl font-bold text-status-critical">{aggregatedMetrics.speeding_events}</div>
                                         <div className="mt-1 text-xs text-muted-foreground">Speeding Events</div>
                                     </div>
                                 </div>

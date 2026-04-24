@@ -113,9 +113,9 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 {isGain ? (
-                                    <TrendingUp className="h-5 w-5 text-green-600" />
+                                    <TrendingUp className="h-5 w-5 text-status-success" />
                                 ) : isLoss ? (
-                                    <TrendingDown className="h-5 w-5 text-red-600" />
+                                    <TrendingDown className="h-5 w-5 text-status-critical" />
                                 ) : (
                                     <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
                                 )}
@@ -125,7 +125,7 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                             </div>
                             <div
                                 className={`text-2xl font-bold font-mono tabular-nums ${
-                                    isGain ? 'text-green-600' : isLoss ? 'text-red-600' : 'text-foreground'
+                                    isGain ? 'text-status-success' : isLoss ? 'text-status-critical' : 'text-foreground'
                                 }`}
                             >
                                 {isLoss ? '(' : ''}
@@ -186,9 +186,9 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                                     <td
                                                         className={`py-3 text-right font-mono font-semibold tabular-nums ${
                                                             itemGain
-                                                                ? 'text-green-600'
+                                                                ? 'text-status-success'
                                                                 : itemLoss
-                                                                  ? 'text-red-600'
+                                                                  ? 'text-status-critical'
                                                                   : ''
                                                         }`}
                                                     >

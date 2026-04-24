@@ -65,7 +65,7 @@ export default function PayrollAdjustmentsPending({ amendments }: Props) {
             >
                 {amendments.data.length === 0 ? (
                     <EmptyList
-                        icon={<Check className="h-10 w-10 text-green-500" />}
+                        icon={<Check className="h-10 w-10 text-status-success" />}
                         title="No pending payroll adjustments"
                         heading="No pending payroll adjustments"
                         description="All approved amendments have been processed."

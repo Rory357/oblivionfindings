@@ -59,8 +59,8 @@ const basisLabels: Record<string, string> = {
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground border-border' },
-    filed: { label: 'Filed', className: 'bg-green-100 text-green-700 border-green-300' },
-    amended: { label: 'Amended', className: 'bg-blue-100 text-blue-700 border-blue-300' },
+    filed: { label: 'Filed', className: 'bg-status-success-bg text-status-success border-status-success/30' },
+    amended: { label: 'Amended', className: 'bg-status-info-bg text-status-info border-status-info/30' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -114,8 +114,8 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-500/10 p-2">
-                                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                                <div className="rounded-lg bg-status-success p-2">
+                                    <TrendingUp className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">GST Collected</p>
@@ -127,8 +127,8 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-500/10 p-2">
-                                    <TrendingDown className="h-5 w-5 text-blue-600" />
+                                <div className="rounded-lg bg-status-info p-2">
+                                    <TrendingDown className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">GST Paid</p>
@@ -140,12 +140,12 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-amber-500/10 p-2">
-                                    <DollarSign className="h-5 w-5 text-amber-600" />
+                                <div className="rounded-lg bg-status-warning p-2">
+                                    <DollarSign className="h-5 w-5 text-status-warning" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Net Payable</p>
-                                    <p className={`text-xl font-bold font-mono tabular-nums ${kpis.totalPayable < 0 ? 'text-emerald-600' : ''}`}>
+                                    <p className={`text-xl font-bold font-mono tabular-nums ${kpis.totalPayable < 0 ? 'text-status-success' : ''}`}>
                                         {formatNZD(Math.abs(kpis.totalPayable))}
                                         {kpis.totalPayable < 0 ? ' (Refund)' : ''}
                                     </p>
@@ -156,7 +156,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-gray-500/10 p-2">
+                                <div className="rounded-lg bg-muted-foreground/80/10 p-2">
                                     <FileText className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <div>
@@ -274,7 +274,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                     </td>
                                                     <td
                                                         className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
-                                                            isRefund ? 'text-emerald-600' : 'text-destructive'
+                                                            isRefund ? 'text-status-success' : 'text-destructive'
                                                         }`}
                                                     >
                                                         {isRefund ? '(' : ''}

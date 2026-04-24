@@ -114,9 +114,9 @@ export default function SiteZones({ site, zones }: Props) {
                             <div className="text-sm text-muted-foreground">Total Zones</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-emerald-400">{activeZones.length}</div>
+                            <div className="text-2xl font-bold text-status-success">{activeZones.length}</div>
                             <div className="text-sm text-muted-foreground">Active</div>
                         </CardContent>
                     </Card>
@@ -203,7 +203,7 @@ export default function SiteZones({ site, zones }: Props) {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                        className="text-status-critical hover:text-status-critical hover:bg-status-critical"
                                                         onClick={() => handleDeactivate(zone)}
                                                         disabled={deleteForm.processing}
                                                     >

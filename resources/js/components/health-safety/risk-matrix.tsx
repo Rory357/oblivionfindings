@@ -8,14 +8,14 @@
  */
 
 const CELL_COLORS: Record<string, string> = {
-    low: 'bg-green-100 dark:bg-green-900/30',
-    medium: 'bg-yellow-100 dark:bg-yellow-900/30',
-    high: 'bg-orange-100 dark:bg-orange-900/30',
-    extreme: 'bg-red-100 dark:bg-red-900/30',
+    low: 'bg-status-success-bg dark:bg-status-success',
+    medium: 'bg-status-warning-bg dark:bg-status-warning',
+    high: 'bg-status-warning-bg dark:bg-status-warning',
+    extreme: 'bg-status-critical-bg dark:bg-status-critical',
 };
 
 const ACTIVE_RING = 'ring-2 ring-offset-1 ring-slate-900 dark:ring-white';
-const RESIDUAL_RING = 'ring-2 ring-offset-1 ring-blue-500 ring-dashed';
+const RESIDUAL_RING = 'ring-2 ring-offset-1 ring-status-info ring-dashed';
 
 function scoreToLevel(score: number): string {
     if (score >= 16) return 'extreme';
@@ -128,7 +128,7 @@ export function RiskMatrix({
                         Inherent
                     </span>
                     <span className="flex items-center gap-1">
-                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-blue-500 ring-dashed ring-offset-1 bg-muted" />
+                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-status-info ring-dashed ring-offset-1 bg-muted" />
                         Residual
                     </span>
                 </div>

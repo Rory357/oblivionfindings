@@ -24,7 +24,7 @@ export default function InhalerAdminFields({ form, errors, onChange }: Props) {
                 </Label>
             </div>
             {errors.inhaler_technique_observed && (
-                <p className="text-xs text-red-600">{errors.inhaler_technique_observed}</p>
+                <p className="text-xs text-status-critical">{errors.inhaler_technique_observed}</p>
             )}
 
             <div className="flex items-center space-x-2">
@@ -38,7 +38,7 @@ export default function InhalerAdminFields({ form, errors, onChange }: Props) {
                 </Label>
             </div>
             {errors.spacer_used && (
-                <p className="text-xs text-red-600">{errors.spacer_used}</p>
+                <p className="text-xs text-status-critical">{errors.spacer_used}</p>
             )}
 
             <div>
@@ -52,7 +52,7 @@ export default function InhalerAdminFields({ form, errors, onChange }: Props) {
                     placeholder="Optional"
                 />
                 {errors.peak_flow_before && (
-                    <p className="mt-1 text-xs text-red-600">{errors.peak_flow_before}</p>
+                    <p className="mt-1 text-xs text-status-critical">{errors.peak_flow_before}</p>
                 )}
             </div>
 
@@ -67,7 +67,7 @@ export default function InhalerAdminFields({ form, errors, onChange }: Props) {
                     placeholder="Optional"
                 />
                 {errors.peak_flow_after && (
-                    <p className="mt-1 text-xs text-red-600">{errors.peak_flow_after}</p>
+                    <p className="mt-1 text-xs text-status-critical">{errors.peak_flow_after}</p>
                 )}
             </div>
         </div>

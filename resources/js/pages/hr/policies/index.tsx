@@ -56,12 +56,12 @@ const formatDate = (value?: string | null) => {
 
 const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-        'employment': 'bg-blue-100 text-blue-800 border-blue-200',
-        'health_and_safety': 'bg-green-100 text-green-800 border-green-200',
+        'employment': 'bg-status-info-bg text-status-info border-status-info/30',
+        'health_and_safety': 'bg-status-success-bg text-status-success border-status-success/30',
         'safeguarding': 'bg-primary/10 text-primary border-primary',
-        'data_protection': 'bg-amber-100 text-amber-800 border-amber-200',
-        'conduct': 'bg-red-100 text-red-800 border-red-200',
-        'leave': 'bg-teal-100 text-teal-800 border-teal-200',
+        'data_protection': 'bg-status-warning-bg text-status-warning border-status-warning/30',
+        'conduct': 'bg-status-critical-bg text-status-critical border-status-critical/30',
+        'leave': 'bg-status-info-bg text-status-info border-status-info/30',
         'training': 'bg-primary/10 text-primary border-primary',
         'general': 'bg-muted text-foreground border-border',
     };
@@ -180,7 +180,7 @@ export default function PoliciesIndex({ policies, categories, filters, can }: Pr
                                         </TableCell>
                                         <TableCell>
                                             {policy.is_active ? (
-                                                <Badge className="bg-green-100 text-green-800 border-green-200">
+                                                <Badge className="bg-status-success-bg text-status-success border-status-success/30">
                                                     <CheckCircle className="mr-1 h-3 w-3" />
                                                     Active
                                                 </Badge>
@@ -206,7 +206,7 @@ export default function PoliciesIndex({ policies, categories, filters, can }: Pr
                                         </TableCell>
                                         <TableCell>
                                             {policy.requires_attestation ? (
-                                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                                     <ShieldCheck className="mr-1 h-3 w-3" />
                                                     Required
                                                 </Badge>

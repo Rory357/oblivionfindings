@@ -74,12 +74,12 @@ const formatDateTime = (value?: string | null) => {
 
 const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-        'employment': 'bg-blue-100 text-blue-800 border-blue-200',
-        'health_and_safety': 'bg-green-100 text-green-800 border-green-200',
+        'employment': 'bg-status-info-bg text-status-info border-status-info/30',
+        'health_and_safety': 'bg-status-success-bg text-status-success border-status-success/30',
         'safeguarding': 'bg-primary/10 text-primary border-primary',
-        'data_protection': 'bg-amber-100 text-amber-800 border-amber-200',
-        'conduct': 'bg-red-100 text-red-800 border-red-200',
-        'leave': 'bg-teal-100 text-teal-800 border-teal-200',
+        'data_protection': 'bg-status-warning-bg text-status-warning border-status-warning/30',
+        'conduct': 'bg-status-critical-bg text-status-critical border-status-critical/30',
+        'leave': 'bg-status-info-bg text-status-info border-status-info/30',
         'training': 'bg-primary/10 text-primary border-primary',
         'general': 'bg-muted text-foreground border-border',
     };
@@ -115,7 +115,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                 {policy.category.replace(/_/g, ' ')}
                             </Badge>
                             {policy.is_active ? (
-                                <Badge className="bg-green-100 text-green-800 border-green-200">
+                                <Badge className="bg-status-success-bg text-status-success border-status-success/30">
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Active
                                 </Badge>
@@ -123,7 +123,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                 <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
                             )}
                             {policy.requires_attestation && (
-                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                     <ShieldCheck className="mr-1 h-3 w-3" />
                                     Attestation Required
                                 </Badge>
@@ -198,7 +198,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                 <div className="flex items-center gap-2">
                                     <div className="text-2xl font-bold">{attestationStats.requires}</div>
                                     {attestationStats.total < attestationStats.requires && (
-                                        <span className="text-sm text-amber-600">
+                                        <span className="text-sm text-status-warning">
                                             ({attestationStats.requires - attestationStats.total} outstanding)
                                         </span>
                                     )}
@@ -212,7 +212,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <FileText className="h-5 w-5 text-blue-500" />
+                                <FileText className="h-5 w-5 text-status-info" />
                                 Current Version (v{policy.currentVersion.version_number})
                             </CardTitle>
                             <div className="text-xs text-muted-foreground">
@@ -251,7 +251,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                         <TableCell className="font-medium">
                                             v{version.version_number}
                                             {policy.currentVersion?.id === version.id && (
-                                                <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">
+                                                <Badge className="ml-2 bg-status-success-bg text-status-success border-status-success/30">
                                                     Current
                                                 </Badge>
                                             )}
@@ -279,7 +279,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <ShieldCheck className="h-5 w-5 text-amber-500" />
+                                <ShieldCheck className="h-5 w-5 text-status-warning" />
                                 Recent Attestations
                             </CardTitle>
                         </CardHeader>

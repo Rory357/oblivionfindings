@@ -250,7 +250,7 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
                                                     const days = Math.ceil((new Date(fleet.eligibility.licence_expires_at!).getTime() - Date.now()) / 86400000);
                                                     if (days < 0) return <Badge variant="destructive" className="text-[9px]">Expired</Badge>;
                                                     if (days <= 30) return <Badge variant="destructive" className="text-[9px]">{days}d</Badge>;
-                                                    if (days <= 90) return <Badge className="text-[9px] bg-amber-500">{days}d</Badge>;
+                                                    if (days <= 90) return <Badge className="text-[9px] bg-status-warning">{days}d</Badge>;
                                                     return null;
                                                 })()}
                                             </div>
@@ -259,15 +259,15 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
                                             <div className="text-xs text-muted-foreground">Can Drive Residents</div>
                                             <div className="text-sm font-medium flex items-center gap-1.5">
                                                 {fleet.eligibility.can_drive_clients ? (
-                                                    <><CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> Approved</>
+                                                    <><CheckCircle2 className="h-3.5 w-3.5 text-status-success" /> Approved</>
                                                 ) : (
-                                                    <><XCircle className="h-3.5 w-3.5 text-red-500" /> Not approved</>
+                                                    <><XCircle className="h-3.5 w-3.5 text-status-critical" /> Not approved</>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                        <span>Status: <span className={`font-medium ${fleet.eligibility.status === 'eligible' ? 'text-green-600' : fleet.eligibility.status === 'suspended' ? 'text-red-600' : 'text-muted-foreground'}`}>{fleet.eligibility.status}</span></span>
+                                        <span>Status: <span className={`font-medium ${fleet.eligibility.status === 'eligible' ? 'text-status-success' : fleet.eligibility.status === 'suspended' ? 'text-status-critical' : 'text-muted-foreground'}`}>{fleet.eligibility.status}</span></span>
                                         {fleet.eligibility.incident_free_since && <span>· Incident-free since {fleet.eligibility.incident_free_since}</span>}
                                     </div>
                                 </div>
@@ -282,7 +282,7 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
                             {/* Stats Row */}
                             <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
                                 <div className="rounded-md border p-3 text-center">
-                                    <Route className="mx-auto h-4 w-4 text-blue-500 mb-1" />
+                                    <Route className="mx-auto h-4 w-4 text-status-info mb-1" />
                                     <div className="text-lg font-bold">{fleet.stats.trips_30d}</div>
                                     <div className="text-[10px] text-muted-foreground">Trips (30d)</div>
                                 </div>
@@ -292,13 +292,13 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
                                     <div className="text-[10px] text-muted-foreground">Distance (30d)</div>
                                 </div>
                                 <div className="rounded-md border p-3 text-center">
-                                    <Shield className="mx-auto h-4 w-4 text-green-500 mb-1" />
+                                    <Shield className="mx-auto h-4 w-4 text-status-success mb-1" />
                                     <div className="text-lg font-bold">{fleet.stats.safety_score ?? '—'}<span className="text-xs font-normal text-muted-foreground">/100</span></div>
                                     <div className="text-[10px] text-muted-foreground">Safety Score</div>
                                 </div>
-                                <div className={`rounded-md border p-3 text-center ${fleet.stats.incidents_30d > 0 ? 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : ''}`}>
-                                    <AlertTriangle className={`mx-auto h-4 w-4 mb-1 ${fleet.stats.incidents_30d > 0 ? 'text-red-500' : 'text-muted-foreground'}`} />
-                                    <div className={`text-lg font-bold ${fleet.stats.incidents_30d > 0 ? 'text-red-600' : ''}`}>{fleet.stats.incidents_30d}</div>
+                                <div className={`rounded-md border p-3 text-center ${fleet.stats.incidents_30d > 0 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : ''}`}>
+                                    <AlertTriangle className={`mx-auto h-4 w-4 mb-1 ${fleet.stats.incidents_30d > 0 ? 'text-status-critical' : 'text-muted-foreground'}`} />
+                                    <div className={`text-lg font-bold ${fleet.stats.incidents_30d > 0 ? 'text-status-critical' : ''}`}>{fleet.stats.incidents_30d}</div>
                                     <div className="text-[10px] text-muted-foreground">Incidents (30d)</div>
                                 </div>
                             </div>

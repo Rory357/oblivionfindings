@@ -53,9 +53,9 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
 
   const getStatusColor = (status: string) => ({
     not_started: 'bg-muted text-foreground',
-    in_progress: 'bg-yellow-100 text-yellow-800',
-    implemented: 'bg-blue-100 text-blue-800',
-    embedded: 'bg-green-100 text-green-800',
+    in_progress: 'bg-status-warning-bg text-status-warning',
+    implemented: 'bg-status-info-bg text-status-info',
+    embedded: 'bg-status-success-bg text-status-success',
   }[status] || 'bg-muted text-foreground');
 
   const getStatusLabel = (status: string) => ({
@@ -139,14 +139,14 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Landmark className="w-6 h-6 text-teal-600" />
+                    <Landmark className="w-6 h-6 text-status-info" />
                     <div>
                       <CardTitle>{principle.label}</CardTitle>
                       <CardDescription>{stats.total} obligation(s) &middot; {stats.progress}% implemented</CardDescription>
                     </div>
                   </div>
                   <div className="w-32 bg-muted rounded-full h-2">
-                    <div className="bg-teal-600 h-2 rounded-full" style={{ width: `${stats.progress}%` }} />
+                    <div className="bg-status-info h-2 rounded-full" style={{ width: `${stats.progress}%` }} />
                   </div>
                 </div>
               </CardHeader>

@@ -81,16 +81,16 @@ const errorTypeLabels: Record<string, string> = {
 
 const severityColors: Record<string, string> = {
     near_miss: 'bg-muted text-foreground',
-    minor: 'bg-blue-100 text-blue-700',
-    moderate: 'bg-amber-100 text-amber-700',
-    major: 'bg-orange-100 text-orange-700',
-    critical: 'bg-red-100 text-red-700',
+    minor: 'bg-status-info-bg text-status-info',
+    moderate: 'bg-status-warning-bg text-status-warning',
+    major: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 const statusColors: Record<string, string> = {
-    reported: 'bg-amber-100 text-amber-700',
-    investigating: 'bg-blue-100 text-blue-700',
-    resolved: 'bg-green-100 text-green-700',
+    reported: 'bg-status-warning-bg text-status-warning',
+    investigating: 'bg-status-info-bg text-status-info',
+    resolved: 'bg-status-success-bg text-status-success',
     closed: 'bg-muted text-muted-foreground',
 };
 
@@ -158,7 +158,7 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                                 </SelectContent>
                             </Select>
                             {form.errors.client_id && (
-                                <p className="text-xs text-red-600">
+                                <p className="text-xs text-status-critical">
                                     {form.errors.client_id}
                                 </p>
                             )}
@@ -208,7 +208,7 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                                 </SelectContent>
                             </Select>
                             {form.errors.error_type && (
-                                <p className="text-xs text-red-600">
+                                <p className="text-xs text-status-critical">
                                     {form.errors.error_type}
                                 </p>
                             )}
@@ -240,7 +240,7 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                                 </SelectContent>
                             </Select>
                             {form.errors.severity && (
-                                <p className="text-xs text-red-600">
+                                <p className="text-xs text-status-critical">
                                     {form.errors.severity}
                                 </p>
                             )}
@@ -259,7 +259,7 @@ function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
                             placeholder="Describe the medication error in detail..."
                         />
                         {form.errors.description && (
-                            <p className="text-xs text-red-600">
+                            <p className="text-xs text-status-critical">
                                 {form.errors.description}
                             </p>
                         )}
@@ -383,7 +383,7 @@ function ReviewDialog({ error }: { error: any }) {
                             placeholder="Enter your review notes..."
                         />
                         {form.errors.review_notes && (
-                            <p className="text-xs text-red-600">
+                            <p className="text-xs text-status-critical">
                                 {form.errors.review_notes}
                             </p>
                         )}
@@ -477,7 +477,7 @@ function ResolveDialog({ error }: { error: any }) {
                             placeholder="Describe the outcome of this error..."
                         />
                         {form.errors.outcome && (
-                            <p className="text-xs text-red-600">
+                            <p className="text-xs text-status-critical">
                                 {form.errors.outcome}
                             </p>
                         )}
@@ -500,7 +500,7 @@ function ResolveDialog({ error }: { error: any }) {
                             placeholder="What actions will be taken to prevent recurrence?"
                         />
                         {form.errors.preventive_actions && (
-                            <p className="text-xs text-red-600">
+                            <p className="text-xs text-status-critical">
                                 {form.errors.preventive_actions}
                             </p>
                         )}
@@ -580,8 +580,8 @@ export default function MedicationErrors({
                 <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-amber-100 p-2 dark:bg-amber-900">
-                                <Clock className="h-5 w-5 text-amber-600" />
+                            <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                                <Clock className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">
@@ -595,8 +595,8 @@ export default function MedicationErrors({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-red-100 p-2 dark:bg-red-900">
-                                <ShieldAlert className="h-5 w-5 text-red-600" />
+                            <div className="rounded-lg bg-status-critical-bg p-2 dark:bg-status-critical">
+                                <ShieldAlert className="h-5 w-5 text-status-critical" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">
@@ -610,8 +610,8 @@ export default function MedicationErrors({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900">
-                                <AlertTriangle className="h-5 w-5 text-blue-600" />
+                            <div className="rounded-lg bg-status-info-bg p-2 dark:bg-status-info">
+                                <AlertTriangle className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">
@@ -625,8 +625,8 @@ export default function MedicationErrors({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900">
-                                <CheckCircle className="h-5 w-5 text-green-600" />
+                            <div className="rounded-lg bg-status-success-bg p-2 dark:bg-status-success">
+                                <CheckCircle className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">

@@ -42,7 +42,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Course Catalog', href: '/hr/training/catalog' },
 ];
 
-const DELIVERY_COLORS: Record<string, string> = { online: 'bg-blue-100 text-blue-700', in_person: 'bg-emerald-100 text-emerald-700', blended: 'bg-primary/10 text-primary', self_paced: 'bg-amber-100 text-amber-700' };
+const DELIVERY_COLORS: Record<string, string> = { online: 'bg-status-info-bg text-status-info', in_person: 'bg-status-success-bg text-status-success', blended: 'bg-primary/10 text-primary', self_paced: 'bg-status-warning-bg text-status-warning' };
 const DELIVERY_ICONS: Record<string, typeof Monitor> = { online: Monitor, in_person: MapPin, blended: Layers, self_paced: Zap };
 const deliveryLabels: Record<string, string> = { online: 'Online', in_person: 'In Person', blended: 'Blended', self_paced: 'Self-Paced' };
 
@@ -94,7 +94,7 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
 
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-white shadow-lg">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
                     <div className="absolute left-1/3 -top-4 h-28 w-28 rounded-full bg-white/5" />
@@ -132,11 +132,11 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
                     {[
-                        { label: 'Courses', value: summary.total_courses, icon: BookOpen, gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-primary/10', iconColor: 'text-primary', borderHover: 'hover:border-primary' },
-                        { label: 'Mandatory', value: summary.mandatory_courses, icon: ShieldCheck, gradient: 'from-red-500/10 to-rose-500/5', iconBg: 'bg-red-100', iconColor: 'text-red-600', borderHover: 'hover:border-red-300' },
-                        { label: 'Enrollments', value: summary.total_enrollments, icon: Users, gradient: 'from-blue-500/10 to-indigo-500/5', iconBg: 'bg-blue-100', iconColor: 'text-blue-600', borderHover: 'hover:border-blue-300' },
-                        { label: 'Completion', value: `${summary.completion_rate}%`, icon: CheckCircle2, gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', borderHover: 'hover:border-emerald-300' },
-                        { label: 'Upcoming', value: summary.upcoming_sessions, icon: Calendar, gradient: 'from-amber-500/10 to-yellow-500/5', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', borderHover: 'hover:border-amber-300' },
+                        { label: 'Courses', value: summary.total_courses, icon: BookOpen, gradient: 'from-primary/10 to-primary/5', iconBg: 'bg-primary/10', iconColor: 'text-primary', borderHover: 'hover:border-primary' },
+                        { label: 'Mandatory', value: summary.mandatory_courses, icon: ShieldCheck, gradient: 'from-status-critical/10 to-status-critical/5', iconBg: 'bg-status-critical-bg', iconColor: 'text-status-critical', borderHover: 'hover:border-status-critical/30' },
+                        { label: 'Enrollments', value: summary.total_enrollments, icon: Users, gradient: 'from-status-info/10 to-primary/5', iconBg: 'bg-status-info-bg', iconColor: 'text-status-info', borderHover: 'hover:border-status-info/30' },
+                        { label: 'Completion', value: `${summary.completion_rate}%`, icon: CheckCircle2, gradient: 'from-status-success/10 to-status-success/5', iconBg: 'bg-status-success-bg', iconColor: 'text-status-success', borderHover: 'hover:border-status-success/30' },
+                        { label: 'Upcoming', value: summary.upcoming_sessions, icon: Calendar, gradient: 'from-status-warning/10 to-status-warning/5', iconBg: 'bg-status-warning-bg', iconColor: 'text-status-warning', borderHover: 'hover:border-status-warning/30' },
                     ].map((kpi) => {
                         const Icon = kpi.icon;
                         return (
@@ -209,20 +209,20 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                             return (
                                 <Card key={c.id} className="group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-primary"
                                     onClick={() => router.get(`/hr/training/courses/${c.id}`)}>
-                                    <div className={`h-1 ${c.is_mandatory ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-violet-400 to-purple-500'}`} />
+                                    <div className={`h-1 ${c.is_mandatory ? 'bg-gradient-to-r from-status-critical to-status-critical' : 'bg-primary'}`} />
                                     <CardContent className="pt-4">
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="font-semibold text-sm leading-tight line-clamp-2">{c.title}</h3>
                                                 <p className="mt-1 font-mono text-[10px] text-muted-foreground">{c.code}</p>
                                             </div>
-                                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${c.is_mandatory ? 'bg-red-50' : 'bg-primary/10'} transition-transform group-hover:scale-110`}>
-                                                <DmIcon className={`h-4 w-4 ${c.is_mandatory ? 'text-red-500' : 'text-primary'}`} />
+                                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${c.is_mandatory ? 'bg-status-critical-bg' : 'bg-primary/10'} transition-transform group-hover:scale-110`}>
+                                                <DmIcon className={`h-4 w-4 ${c.is_mandatory ? 'text-status-critical' : 'text-primary'}`} />
                                             </div>
                                         </div>
 
                                         <div className="mt-3 flex flex-wrap gap-1.5">
-                                            {c.is_mandatory && <Badge className="border-0 bg-red-100 text-[9px] text-red-600">Mandatory</Badge>}
+                                            {c.is_mandatory && <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">Mandatory</Badge>}
                                             {c.category && <Badge variant="outline" className="text-[9px] capitalize">{c.category}</Badge>}
                                             <Badge className={`border-0 text-[9px] ${dmColor}`}>{deliveryLabels[c.delivery_method]}</Badge>
                                         </div>
@@ -235,7 +235,7 @@ export default function TrainingCatalog({ courses, categories, summary, filters,
                                             </div>
                                             <div className="flex items-center gap-1.5">
                                                 {c.cost && <span className="text-[11px] font-medium text-muted-foreground">{formatCurrency(c.cost)}</span>}
-                                                <Badge variant={c.is_active ? 'default' : 'secondary'} className={c.is_active ? 'border-0 bg-emerald-100 text-[9px] text-emerald-700' : 'text-[9px]'}>
+                                                <Badge variant={c.is_active ? 'default' : 'secondary'} className={c.is_active ? 'border-0 bg-status-success-bg text-[9px] text-status-success' : 'text-[9px]'}>
                                                     {c.is_active ? 'Active' : 'Inactive'}
                                                 </Badge>
                                             </div>

@@ -41,8 +41,8 @@ const formatDate = (dateStr: string) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
-    posted: { label: 'Posted', className: 'bg-green-500/10 text-green-600 border-green-500/30' },
-    reversed: { label: 'Reversed', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
+    posted: { label: 'Posted', className: 'bg-status-success-bg text-status-success border-status-success/30' },
+    reversed: { label: 'Reversed', className: 'bg-status-critical-bg text-status-critical border-status-critical/30' },
 };
 
 export default function FxRevaluationsIndex({ revaluations }: PageProps) {
@@ -81,11 +81,11 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                 {revaluations.data.length > 0 && (
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isGain ? 'bg-green-500/10' : isLoss ? 'bg-red-500/10' : 'bg-muted'}`}>
+                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isGain ? 'bg-status-success' : isLoss ? 'bg-status-critical' : 'bg-muted'}`}>
                                 {isGain ? (
-                                    <TrendingUp className="h-5 w-5 text-green-600" />
+                                    <TrendingUp className="h-5 w-5 text-status-success" />
                                 ) : isLoss ? (
-                                    <TrendingDown className="h-5 w-5 text-red-600" />
+                                    <TrendingDown className="h-5 w-5 text-status-critical" />
                                 ) : (
                                     <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
                                 )}
@@ -94,7 +94,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                 <p className="text-sm text-muted-foreground">
                                     Total Unrealised {isGain ? 'Gain' : isLoss ? 'Loss' : 'Gain/Loss'}
                                 </p>
-                                <p className={`text-2xl font-bold font-mono tabular-nums ${isGain ? 'text-green-600' : isLoss ? 'text-red-600' : 'text-foreground'}`}>
+                                <p className={`text-2xl font-bold font-mono tabular-nums ${isGain ? 'text-status-success' : isLoss ? 'text-status-critical' : 'text-foreground'}`}>
                                     {isLoss ? '(' : ''}{formatCurrency(Math.abs(totalGainLoss))}{isLoss ? ')' : ''}
                                 </p>
                             </div>
@@ -145,9 +145,9 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                                     <td
                                                         className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
                                                             rowIsGain
-                                                                ? 'text-green-600'
+                                                                ? 'text-status-success'
                                                                 : rowIsLoss
-                                                                  ? 'text-red-600'
+                                                                  ? 'text-status-critical'
                                                                   : ''
                                                         }`}
                                                     >

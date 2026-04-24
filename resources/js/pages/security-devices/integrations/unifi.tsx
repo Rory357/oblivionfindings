@@ -97,16 +97,16 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const connectionStatusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle }> = {
-    connected: { label: 'Connected', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle },
+    connected: { label: 'Connected', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success', icon: CheckCircle },
     disconnected: { label: 'Disconnected', className: 'bg-muted text-foreground dark:bg-muted/50 dark:text-muted-foreground', icon: XCircle },
-    error: { label: 'Error', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: ShieldAlert },
+    error: { label: 'Error', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical', icon: ShieldAlert },
 };
 
 const syncStatusConfig: Record<string, string> = {
-    success: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-    failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    started: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    success: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
+    partial: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    failed: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    started: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
 };
 
 function siteTypeLabel(type?: string | null): string {
@@ -125,17 +125,17 @@ function fmt(value?: string | null): string {
 function deviceStatusBadge(status?: string | null): { label: string; className: string } {
     switch (status) {
         case 'active':
-            return { label: 'Online', className: 'border-emerald-500/30 text-emerald-500' };
+            return { label: 'Online', className: 'border-status-success/30 text-status-success' };
         case 'offline':
-            return { label: 'Offline', className: 'border-red-500/30 text-red-500' };
+            return { label: 'Offline', className: 'border-status-critical/30 text-status-critical' };
         case 'degraded':
-            return { label: 'Degraded', className: 'border-amber-500/30 text-amber-500' };
+            return { label: 'Degraded', className: 'border-status-warning/30 text-status-warning' };
         case 'maintenance':
-            return { label: 'Maintenance', className: 'border-blue-500/30 text-blue-500' };
+            return { label: 'Maintenance', className: 'border-status-info/30 text-status-info' };
         case 'decommissioned':
-            return { label: 'Retired', className: 'border-slate-500/30 text-muted-foreground' };
+            return { label: 'Retired', className: 'border-border/30 text-muted-foreground' };
         default:
-            return { label: status || 'Unknown', className: 'border-slate-500/30 text-muted-foreground' };
+            return { label: status || 'Unknown', className: 'border-border/30 text-muted-foreground' };
     }
 }
 
@@ -438,7 +438,7 @@ export default function UnifiIntegration({
                                     <TableBody>{syncLogs.map((log) => (
                                         <TableRow key={log.id}>
                                             <TableCell className="font-medium">{log.action}</TableCell>
-                                            <TableCell><Badge className={syncStatusConfig[log.status] ?? syncStatusConfig.started}>{log.status}</Badge>{log.error_message && <p className="mt-1 text-xs text-red-400">{log.error_message}</p>}</TableCell>
+                                            <TableCell><Badge className={syncStatusConfig[log.status] ?? syncStatusConfig.started}>{log.status}</Badge>{log.error_message && <p className="mt-1 text-xs text-status-critical">{log.error_message}</p>}</TableCell>
                                             <TableCell className="text-xs text-muted-foreground">{log.items_processed} processed{log.items_created > 0 && `, ${log.items_created} created`}{log.items_updated > 0 && `, ${log.items_updated} updated`}{log.items_errored > 0 && `, ${log.items_errored} errored`}</TableCell>
                                             <TableCell className="text-sm">{log.started_at}</TableCell>
                                             <TableCell className="text-sm">{log.completed_at ?? '---'}</TableCell>

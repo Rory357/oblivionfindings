@@ -75,15 +75,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
-        className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
+        className: 'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Draft',
     },
     locked: {
-        className: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+        className: 'border-status-info/30 text-status-info bg-status-info',
         label: 'Locked',
     },
     exported: {
-        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        className: 'border-status-success/30 text-status-success bg-status-success',
         label: 'Exported',
     },
 };
@@ -307,8 +307,8 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                 </div>
 
                 {lockError ? (
-                    <Card className="border-red-400/40 bg-red-500/5">
-                        <CardContent className="py-3 text-sm text-red-500">
+                    <Card className="border-status-critical/40 bg-status-critical">
+                        <CardContent className="py-3 text-sm text-status-critical">
                             {Array.isArray(lockError)
                                 ? lockError.join(' ')
                                 : lockError}
@@ -316,8 +316,8 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                     </Card>
                 ) : null}
                 {exportError ? (
-                    <Card className="border-red-400/40 bg-red-500/5">
-                        <CardContent className="py-3 text-sm text-red-500">
+                    <Card className="border-status-critical/40 bg-status-critical">
+                        <CardContent className="py-3 text-sm text-status-critical">
                             {Array.isArray(exportError)
                                 ? exportError.join(' ')
                                 : exportError}
@@ -361,7 +361,7 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                                     (typeof periodError === 'string'
                                         ? periodError
                                         : null)) && (
-                                    <p className="text-xs text-red-500">
+                                    <p className="text-xs text-status-critical">
                                         {errors.period_start ||
                                             (typeof periodError === 'string'
                                                 ? periodError
@@ -385,7 +385,7 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                                     required
                                 />
                                 {errors.period_end && (
-                                    <p className="text-xs text-red-500">
+                                    <p className="text-xs text-status-critical">
                                         {errors.period_end}
                                     </p>
                                 )}
@@ -435,7 +435,7 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                                         onChange={(event) => setProfileData('name', event.target.value)}
                                         required
                                     />
-                                    {profileErrors.name && <p className="text-xs text-red-500">{profileErrors.name}</p>}
+                                    {profileErrors.name && <p className="text-xs text-status-critical">{profileErrors.name}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="provider_key">Provider key (optional)</Label>
@@ -513,9 +513,9 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                                     Use field sources: {exportFieldOptions.map((field) => field.value).join(', ')}, plus <code>static</code>.
                                 </p>
                                 {(profileErrors.mappings_json || profileMappingsError) && (
-                                    <p className="text-xs text-red-500">{profileErrors.mappings_json || profileMappingsError}</p>
+                                    <p className="text-xs text-status-critical">{profileErrors.mappings_json || profileMappingsError}</p>
                                 )}
-                                {profileJsonError && <p className="text-xs text-red-500">{profileJsonError}</p>}
+                                {profileJsonError && <p className="text-xs text-status-critical">{profileJsonError}</p>}
                             </div>
                             <DialogFooter>
                                 <Button type="button" variant="outline" onClick={() => setIsProfileDialogOpen(false)}>
@@ -630,7 +630,7 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                                                 </span>
                                                 {run.validation_errors?.length >
                                                 0 ? (
-                                                    <div className="mt-1 text-xs text-red-500">
+                                                    <div className="mt-1 text-xs text-status-critical">
                                                         {
                                                             run
                                                                 .validation_errors[0]

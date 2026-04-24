@@ -86,7 +86,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Activity className="h-5 w-5 text-green-500" />
+                                <Activity className="h-5 w-5 text-status-success" />
                                 Assessment Overview
                             </CardTitle>
                         </CardHeader>
@@ -98,7 +98,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                         value={data.assessment_name}
                                         onChange={(e) => setData('assessment_name', e.target.value)}
                                     />
-                                    {errors.assessment_name && <p className="text-xs text-red-500">{errors.assessment_name}</p>}
+                                    {errors.assessment_name && <p className="text-xs text-status-critical">{errors.assessment_name}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Project or Process *</Label>
@@ -106,7 +106,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                         value={data.project_or_process}
                                         onChange={(e) => setData('project_or_process', e.target.value)}
                                     />
-                                    {errors.project_or_process && <p className="text-xs text-red-500">{errors.project_or_process}</p>}
+                                    {errors.project_or_process && <p className="text-xs text-status-critical">{errors.project_or_process}</p>}
                                 </div>
                             </div>
 
@@ -123,7 +123,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.assessment_type && <p className="text-xs text-red-500">{errors.assessment_type}</p>}
+                                    {errors.assessment_type && <p className="text-xs text-status-critical">{errors.assessment_type}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Review Date</Label>
@@ -132,7 +132,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                         value={data.review_date}
                                         onChange={(e) => setData('review_date', e.target.value)}
                                     />
-                                    {errors.review_date && <p className="text-xs text-red-500">{errors.review_date}</p>}
+                                    {errors.review_date && <p className="text-xs text-status-critical">{errors.review_date}</p>}
                                 </div>
                             </div>
 
@@ -143,7 +143,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                     onChange={(e) => setData('description', e.target.value)}
                                     rows={3}
                                 />
-                                {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
+                                {errors.description && <p className="text-xs text-status-critical">{errors.description}</p>}
                             </div>
                         </CardContent>
                     </Card>
@@ -160,7 +160,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                     onChange={(e) => setData('processing_purpose', e.target.value)}
                                     rows={3}
                                 />
-                                {errors.processing_purpose && <p className="text-xs text-red-500">{errors.processing_purpose}</p>}
+                                {errors.processing_purpose && <p className="text-xs text-status-critical">{errors.processing_purpose}</p>}
                             </div>
 
                             <div className="space-y-2">
@@ -170,7 +170,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                     onChange={(e) => setData('legal_basis', e.target.value)}
                                     rows={3}
                                 />
-                                {errors.legal_basis && <p className="text-xs text-red-500">{errors.legal_basis}</p>}
+                                {errors.legal_basis && <p className="text-xs text-status-critical">{errors.legal_basis}</p>}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -182,7 +182,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                         rows={3}
                                         placeholder="Comma or newline separated"
                                     />
-                                    {errors.personal_data_types && <p className="text-xs text-red-500">{errors.personal_data_types}</p>}
+                                    {errors.personal_data_types && <p className="text-xs text-status-critical">{errors.personal_data_types}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Data Subjects</Label>
@@ -192,7 +192,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                         rows={3}
                                         placeholder="Comma or newline separated"
                                     />
-                                    {errors.data_subjects && <p className="text-xs text-red-500">{errors.data_subjects}</p>}
+                                    {errors.data_subjects && <p className="text-xs text-status-critical">{errors.data_subjects}</p>}
                                 </div>
                             </div>
                         </CardContent>
@@ -211,7 +211,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                     rows={3}
                                     placeholder="Comma or newline separated"
                                 />
-                                {errors.identified_risks && <p className="text-xs text-red-500">{errors.identified_risks}</p>}
+                                {errors.identified_risks && <p className="text-xs text-status-critical">{errors.identified_risks}</p>}
                             </div>
 
                             <div className="space-y-2">
@@ -222,7 +222,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                     rows={3}
                                     placeholder="Comma or newline separated"
                                 />
-                                {errors.mitigation_measures && <p className="text-xs text-red-500">{errors.mitigation_measures}</p>}
+                                {errors.mitigation_measures && <p className="text-xs text-status-critical">{errors.mitigation_measures}</p>}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -238,7 +238,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.overall_risk_level && <p className="text-xs text-red-500">{errors.overall_risk_level}</p>}
+                                    {errors.overall_risk_level && <p className="text-xs text-status-critical">{errors.overall_risk_level}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Residual Risk Level</Label>
@@ -252,7 +252,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.residual_risk_level && <p className="text-xs text-red-500">{errors.residual_risk_level}</p>}
+                                    {errors.residual_risk_level && <p className="text-xs text-status-critical">{errors.residual_risk_level}</p>}
                                 </div>
                             </div>
                         </CardContent>

@@ -59,12 +59,12 @@ const goalTypeIcons: Record<string, typeof Building2> = {
 
 const statusColors: Record<string, string> = {
     draft: 'bg-muted text-foreground',
-    active: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-    on_track: 'bg-green-100 text-green-800',
-    at_risk: 'bg-amber-100 text-amber-800',
-    behind: 'bg-red-100 text-red-800',
+    active: 'bg-status-info-bg text-status-info',
+    completed: 'bg-status-success-bg text-status-success',
+    cancelled: 'bg-status-critical-bg text-status-critical',
+    on_track: 'bg-status-success-bg text-status-success',
+    at_risk: 'bg-status-warning-bg text-status-warning',
+    behind: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function CreateGoal({ users, parentGoals, parentContext, goalTypes, priorities }: Props) {
@@ -111,7 +111,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Green Gradient Header */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/90 via-emerald-600 to-emerald-500/80 p-6 text-white md:p-8">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-success/90 via-status-success to-status-success/80 p-6 text-white md:p-8">
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-6 -left-6 h-28 w-28 rounded-full bg-white/5" />
                     <div className="relative flex items-center gap-4">
@@ -127,7 +127,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                             </div>
                             <div>
                                 <h1 className="text-xl font-bold md:text-2xl">Create Objective</h1>
-                                <p className="text-sm text-emerald-100">
+                                <p className="text-sm text-status-success">
                                     Define a new objective or key result for your organisation
                                 </p>
                             </div>
@@ -144,20 +144,20 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <Target className="h-4 w-4 text-emerald-600" />
+                                        <Target className="h-4 w-4 text-status-success" />
                                         Objective Details
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div>
-                                        <Label>Title <span className="text-red-500">*</span></Label>
+                                        <Label>Title <span className="text-status-critical">*</span></Label>
                                         <Input
                                             value={form.data.title}
                                             onChange={(e) => set('title', e.target.value)}
                                             placeholder="e.g. Increase customer satisfaction score to 90%"
                                             required
                                         />
-                                        {form.errors.title && <p className="mt-1 text-sm text-red-600">{form.errors.title}</p>}
+                                        {form.errors.title && <p className="mt-1 text-sm text-status-critical">{form.errors.title}</p>}
                                     </div>
 
                                     <div>
@@ -168,12 +168,12 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                             rows={3}
                                             placeholder="Provide additional context about this objective..."
                                         />
-                                        {form.errors.description && <p className="mt-1 text-sm text-red-600">{form.errors.description}</p>}
+                                        {form.errors.description && <p className="mt-1 text-sm text-status-critical">{form.errors.description}</p>}
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
-                                            <Label>Objective Type <span className="text-red-500">*</span></Label>
+                                            <Label>Objective Type <span className="text-status-critical">*</span></Label>
                                             <Select value={form.data.goal_type} onValueChange={(val) => set('goal_type', val)}>
                                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                                 <SelectContent>
@@ -182,7 +182,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {form.errors.goal_type && <p className="mt-1 text-sm text-red-600">{form.errors.goal_type}</p>}
+                                            {form.errors.goal_type && <p className="mt-1 text-sm text-status-critical">{form.errors.goal_type}</p>}
                                         </div>
 
                                         <div>
@@ -192,7 +192,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                 onChange={(e) => set('category', e.target.value)}
                                                 placeholder="e.g. Sales, Engineering, Quality"
                                             />
-                                            {form.errors.category && <p className="mt-1 text-sm text-red-600">{form.errors.category}</p>}
+                                            {form.errors.category && <p className="mt-1 text-sm text-status-critical">{form.errors.category}</p>}
                                         </div>
                                     </div>
                                 </CardContent>
@@ -202,14 +202,14 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <Users className="h-4 w-4 text-emerald-600" />
+                                        <Users className="h-4 w-4 text-status-success" />
                                         Assignment & Priority
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
-                                            <Label>Assigned To <span className="text-red-500">*</span></Label>
+                                            <Label>Assigned To <span className="text-status-critical">*</span></Label>
                                             <Select value={form.data.user_id} onValueChange={(val) => set('user_id', val)}>
                                                 <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                                                 <SelectContent>
@@ -218,11 +218,11 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {form.errors.user_id && <p className="mt-1 text-sm text-red-600">{form.errors.user_id}</p>}
+                                            {form.errors.user_id && <p className="mt-1 text-sm text-status-critical">{form.errors.user_id}</p>}
                                         </div>
 
                                         <div>
-                                            <Label>Priority <span className="text-red-500">*</span></Label>
+                                            <Label>Priority <span className="text-status-critical">*</span></Label>
                                             <Select value={form.data.priority} onValueChange={(val) => set('priority', val)}>
                                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                                 <SelectContent>
@@ -231,31 +231,31 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {form.errors.priority && <p className="mt-1 text-sm text-red-600">{form.errors.priority}</p>}
+                                            {form.errors.priority && <p className="mt-1 text-sm text-status-critical">{form.errors.priority}</p>}
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
-                                            <Label>Start Date <span className="text-red-500">*</span></Label>
+                                            <Label>Start Date <span className="text-status-critical">*</span></Label>
                                             <Input
                                                 type="date"
                                                 value={form.data.start_date}
                                                 onChange={(e) => set('start_date', e.target.value)}
                                                 required
                                             />
-                                            {form.errors.start_date && <p className="mt-1 text-sm text-red-600">{form.errors.start_date}</p>}
+                                            {form.errors.start_date && <p className="mt-1 text-sm text-status-critical">{form.errors.start_date}</p>}
                                         </div>
 
                                         <div>
-                                            <Label>Due Date <span className="text-red-500">*</span></Label>
+                                            <Label>Due Date <span className="text-status-critical">*</span></Label>
                                             <Input
                                                 type="date"
                                                 value={form.data.due_date}
                                                 onChange={(e) => set('due_date', e.target.value)}
                                                 required
                                             />
-                                            {form.errors.due_date && <p className="mt-1 text-sm text-red-600">{form.errors.due_date}</p>}
+                                            {form.errors.due_date && <p className="mt-1 text-sm text-status-critical">{form.errors.due_date}</p>}
                                         </div>
                                     </div>
                                 </CardContent>
@@ -265,7 +265,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <Target className="h-4 w-4 text-emerald-600" />
+                                        <Target className="h-4 w-4 text-status-success" />
                                         Target & Parent
                                     </CardTitle>
                                 </CardHeader>
@@ -280,7 +280,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                 onChange={(e) => set('target_value', e.target.value)}
                                                 placeholder="e.g. 100"
                                             />
-                                            {form.errors.target_value && <p className="mt-1 text-sm text-red-600">{form.errors.target_value}</p>}
+                                            {form.errors.target_value && <p className="mt-1 text-sm text-status-critical">{form.errors.target_value}</p>}
                                         </div>
 
                                         <div>
@@ -290,7 +290,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                 onChange={(e) => set('unit', e.target.value)}
                                                 placeholder="e.g. %, deals, hours"
                                             />
-                                            {form.errors.unit && <p className="mt-1 text-sm text-red-600">{form.errors.unit}</p>}
+                                            {form.errors.unit && <p className="mt-1 text-sm text-status-critical">{form.errors.unit}</p>}
                                         </div>
                                     </div>
 
@@ -317,7 +317,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                   ? 'Showing team-level objectives as potential parents'
                                                   : 'Company objectives have no parent'}
                                         </p>
-                                        {form.errors.parent_goal_id && <p className="mt-1 text-sm text-red-600">{form.errors.parent_goal_id}</p>}
+                                        {form.errors.parent_goal_id && <p className="mt-1 text-sm text-status-critical">{form.errors.parent_goal_id}</p>}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -329,7 +329,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex gap-4">
-                                        <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition hover:bg-muted has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
+                                        <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition hover:bg-muted has-[:checked]:border-status-success/30 has-[:checked]:bg-status-success-bg">
                                             <input
                                                 type="radio"
                                                 name="status"
@@ -343,7 +343,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                                 <div className="text-xs text-muted-foreground">Save as draft for review before activation</div>
                                             </div>
                                         </label>
-                                        <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition hover:bg-muted has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
+                                        <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition hover:bg-muted has-[:checked]:border-status-success/30 has-[:checked]:bg-status-success-bg">
                                             <input
                                                 type="radio"
                                                 name="status"
@@ -358,7 +358,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                             </div>
                                         </label>
                                     </div>
-                                    {form.errors.status && <p className="mt-1 text-sm text-red-600">{form.errors.status}</p>}
+                                    {form.errors.status && <p className="mt-1 text-sm text-status-critical">{form.errors.status}</p>}
                                 </CardContent>
                             </Card>
 
@@ -367,7 +367,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                 <Link href="/hr/goals">
                                     <Button type="button" variant="outline">Cancel</Button>
                                 </Link>
-                                <Button type="submit" disabled={form.processing} className="bg-emerald-600 hover:bg-emerald-700">
+                                <Button type="submit" disabled={form.processing} className="bg-status-success hover:bg-status-success">
                                     <Target className="mr-2 h-4 w-4" />
                                     Create Objective
                                 </Button>
@@ -388,7 +388,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                         {(() => {
                                             const Icon = goalTypeIcons[parentContext.goal_type] ?? Target;
                                             return (
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
                                                     <Icon className="h-4 w-4" />
                                                 </div>
                                             );
@@ -419,7 +419,7 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                                         </div>
                                         <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                                             <div
-                                                className="h-full rounded-full bg-emerald-500 transition-all"
+                                                className="h-full rounded-full bg-status-success transition-all"
                                                 style={{ width: `${parentContext.progress_percentage}%` }}
                                             />
                                         </div>
@@ -444,22 +444,22 @@ export default function CreateGoal({ users, parentGoals, parentContext, goalType
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <Lightbulb className="h-4 w-4 text-amber-500" />
+                                    <Lightbulb className="h-4 w-4 text-status-warning" />
                                     OKR Tips
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <ul className="space-y-3 text-sm text-muted-foreground">
                                     <li className="flex gap-2">
-                                        <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                                        <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
                                         <span>Company objectives cascade to teams, which cascade to individuals.</span>
                                     </li>
                                     <li className="flex gap-2">
-                                        <Target className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                                        <Target className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
                                         <span>Add Key Results after creating the objective to define measurable outcomes.</span>
                                     </li>
                                     <li className="flex gap-2">
-                                        <Users className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                                        <Users className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
                                         <span>Keep objectives ambitious but achievable. Aim for 70% completion as a healthy target.</span>
                                     </li>
                                 </ul>

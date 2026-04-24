@@ -95,7 +95,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info">
                                 <TrendingUp className="h-5 w-5" />
                             </div>
                             <div>
@@ -106,7 +106,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                                 <Clock className="h-5 w-5" />
                             </div>
                             <div>
@@ -117,7 +117,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical">
                                 <AlertTriangle className="h-5 w-5" />
                             </div>
                             <div>
@@ -137,9 +137,9 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
 
                 {/* Pending Effectiveness Reviews */}
                 {pendingReviews.length > 0 && (
-                    <Card className="mb-6 border-amber-200 dark:border-amber-800">
+                    <Card className="mb-6 border-status-warning/30 dark:border-status-warning/30">
                         <CardHeader className="pb-3">
-                            <CardTitle className="flex items-center gap-2 text-base text-amber-700 dark:text-amber-400">
+                            <CardTitle className="flex items-center gap-2 text-base text-status-warning dark:text-status-warning">
                                 <Clock className="h-4 w-4" /> Effectiveness Reviews Due ({pendingReviews.length})
                             </CardTitle>
                         </CardHeader>
@@ -191,7 +191,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                                             <SelectItem value="not_effective">Not Effective</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    {effectivenessForm.errors.effectiveness && <p className="text-sm text-red-600">{effectivenessForm.errors.effectiveness}</p>}
+                                    {effectivenessForm.errors.effectiveness && <p className="text-sm text-status-critical">{effectivenessForm.errors.effectiveness}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Review Minutes After Administration (optional)</Label>
@@ -202,7 +202,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                                         onChange={(e) => effectivenessForm.setData('review_minutes_after', e.target.value)}
                                         placeholder="e.g. 30"
                                     />
-                                    {effectivenessForm.errors.review_minutes_after && <p className="text-sm text-red-600">{effectivenessForm.errors.review_minutes_after}</p>}
+                                    {effectivenessForm.errors.review_minutes_after && <p className="text-sm text-status-critical">{effectivenessForm.errors.review_minutes_after}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Observations</Label>
@@ -212,7 +212,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                                         rows={3}
                                         placeholder="Describe the client's response to the medication..."
                                     />
-                                    {effectivenessForm.errors.observations && <p className="text-sm text-red-600">{effectivenessForm.errors.observations}</p>}
+                                    {effectivenessForm.errors.observations && <p className="text-sm text-status-critical">{effectivenessForm.errors.observations}</p>}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Checkbox
@@ -224,7 +224,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                                 </div>
                                 {effectivenessForm.data.escalation_needed && (
                                     <div className="space-y-2">
-                                        <Label>Escalation Action <span className="text-red-500">*</span></Label>
+                                        <Label>Escalation Action <span className="text-status-critical">*</span></Label>
                                         <Textarea
                                             value={effectivenessForm.data.escalation_action}
                                             onChange={(e) => effectivenessForm.setData('escalation_action', e.target.value)}
@@ -232,7 +232,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                                             placeholder="Describe the escalation action taken or required..."
                                             required
                                         />
-                                        {effectivenessForm.errors.escalation_action && <p className="text-sm text-red-600">{effectivenessForm.errors.escalation_action}</p>}
+                                        {effectivenessForm.errors.escalation_action && <p className="text-sm text-status-critical">{effectivenessForm.errors.escalation_action}</p>}
                                     </div>
                                 )}
                             </div>
@@ -274,7 +274,7 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                                             <td className="p-3 font-medium">{a.medication?.name}</td>
                                             <td className="p-3">{a.medication?.dosage}</td>
                                             <td className="p-3 text-xs">{a.reason ?? a.notes ?? '—'}</td>
-                                            <td className="p-3">{a.status === 'given' ? <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">Given</Badge> : <Badge variant="secondary">{a.status}</Badge>}</td>
+                                            <td className="p-3">{a.status === 'given' ? <Badge className="bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success">Given</Badge> : <Badge variant="secondary">{a.status}</Badge>}</td>
                                             <td className="p-3 text-xs">{a.administered_by?.name ?? '—'}</td>
                                         </tr>
                                     ))}

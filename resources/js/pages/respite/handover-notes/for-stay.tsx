@@ -39,8 +39,8 @@ export default function HandoverNotesForStay({ stay, notes }: Props) {
                                         <div className="flex-1">
                                             <div className="mt-1 flex flex-wrap gap-2">
                                                 <Badge variant="outline">{n.handover_type?.replace(/_/g, ' ')}</Badge>
-                                                {!n.acknowledged_at && <Badge className="bg-amber-100 text-amber-800">Unacknowledged</Badge>}
-                                                {n.acknowledged_at && <Badge className="bg-green-100 text-green-800">Acknowledged</Badge>}
+                                                {!n.acknowledged_at && <Badge className="bg-status-warning-bg text-status-warning">Unacknowledged</Badge>}
+                                                {n.acknowledged_at && <Badge className="bg-status-success-bg text-status-success">Acknowledged</Badge>}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{n.notes}</div>
                                             <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(n.created_at)}</div>

@@ -5,27 +5,27 @@ import type { LucideIcon } from 'lucide-react';
 const config: Record<string, { label: string; className: string; icon: LucideIcon }> = {
     draft: {
         label: 'Draft',
-        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+        className: 'border-border text-muted-foreground bg-muted',
         icon: Clock,
     },
     scheduled: {
         label: 'Scheduled',
-        className: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         icon: CalendarCheck,
     },
     in_progress: {
         label: 'In Progress',
-        className: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+        className: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
         icon: Play,
     },
     completed: {
         label: 'Completed',
-        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        className: 'border-status-success/30 text-status-success bg-status-success-bg',
         icon: CheckCircle2,
     },
     cancelled: {
         label: 'Cancelled',
-        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        className: 'border-status-critical/30 text-status-critical bg-status-critical-bg',
         icon: XCircle,
     },
 };

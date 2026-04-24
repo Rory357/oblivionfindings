@@ -137,18 +137,18 @@ function AvailabilityCalendar({ bookings, selectedStart, selectedEnd }: {
                             'h-8 flex items-center justify-center text-xs rounded-md relative transition-colors',
                             cell.isToday && 'font-bold ring-1 ring-ring',
                             cell.isSelected && 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70',
-                            hasBooking && !cell.isSelected && 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+                            hasBooking && !cell.isSelected && 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
                             !hasBooking && !cell.isSelected && 'hover:bg-muted/50',
                         )} title={hasBooking ? cell.bookings.map(b => `${b.purpose} (${b.user_name})`).join(', ') : ''}>
                             {cell.day}
-                            {hasBooking && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-red-500" />}
+                            {hasBooking && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-status-critical" />}
                         </div>
                     );
                 })}
             </div>
             <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary" /> Your selection</span>
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Booked</span>
+                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-status-critical" /> Booked</span>
                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-white ring-1 ring-ring" /> Today</span>
             </div>
         </div>
@@ -314,7 +314,7 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
                                             {selected_vehicle_status}
                                         </Badge>
                                         {selected_vehicle_status === 'maintenance' && (
-                                            <span className="text-xs text-yellow-600">This vehicle is currently in maintenance</span>
+                                            <span className="text-xs text-status-warning">This vehicle is currently in maintenance</span>
                                         )}
                                     </div>
                                 )}
@@ -342,14 +342,14 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
 
                             {/* Compatibility Warnings */}
                             {compatibilityWarnings.length > 0 && (
-                                <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50/50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/20">
+                                <div className="sm:col-span-2 rounded-lg border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/30 dark:bg-status-warning">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <AlertTriangle className="h-4 w-4 text-amber-600" />
-                                        <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Accessibility Mismatch</span>
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" />
+                                        <span className="text-sm font-medium text-status-warning dark:text-status-warning">Accessibility Mismatch</span>
                                     </div>
                                     <ul className="space-y-1">
                                         {compatibilityWarnings.map((w, i) => (
-                                            <li key={i} className="text-xs text-amber-700 dark:text-amber-400">- {w}</li>
+                                            <li key={i} className="text-xs text-status-warning dark:text-status-warning">- {w}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -490,9 +490,9 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
                     )}
 
                     {safeConflicts.length > 0 && (
-                        <Card className="border-yellow-300 dark:border-yellow-800">
+                        <Card className="border-status-warning/30 dark:border-status-warning/30">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base text-yellow-700 dark:text-yellow-400">
+                                <CardTitle className="flex items-center gap-2 text-base text-status-warning dark:text-status-warning">
                                     <AlertTriangle className="h-4 w-4" />
                                     Conflicting Bookings ({safeConflicts.length})
                                 </CardTitle>
@@ -503,7 +503,7 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
                                 </p>
                                 <div className="space-y-2">
                                     {safeConflicts.map((c) => (
-                                        <div key={c.id} className="flex items-center justify-between rounded-md border border-yellow-200 bg-yellow-50/50 px-3 py-2 dark:border-yellow-900/30 dark:bg-yellow-950/20">
+                                        <div key={c.id} className="flex items-center justify-between rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 dark:border-status-warning/30 dark:bg-status-warning">
                                             <div>
                                                 <p className="text-sm font-medium">{c.user_name}</p>
                                                 <p className="text-xs text-muted-foreground">{c.purpose}</p>
@@ -525,7 +525,7 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
                     )}
 
                     {form.data.asset_id && form.data.starts_at && form.data.ends_at && safeConflicts.length === 0 && (
-                        <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50/50 px-4 py-3 text-sm text-green-700 dark:border-green-900/30 dark:bg-green-950/20 dark:text-green-400">
+                        <div className="flex items-center gap-2 rounded-lg border border-status-success/30 bg-status-success-bg px-4 py-3 text-sm text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
                             <Calendar className="h-4 w-4" />
                             Vehicle is available for the selected dates.
                         </div>

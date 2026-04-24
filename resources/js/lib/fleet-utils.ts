@@ -119,11 +119,11 @@ export function expiryStatus(isoDate: string | null | undefined): 'ok' | 'warnin
 
 export function expiryBadgeClass(status: string): string {
     switch (status) {
-        case 'expired': return 'bg-red-600 text-white';
-        case 'critical': return 'bg-orange-500 text-white';
-        case 'warning': return 'bg-amber-500 text-white';
+        case 'expired': return 'bg-status-critical text-white';
+        case 'critical': return 'bg-status-warning text-white';
+        case 'warning': return 'bg-status-warning text-white';
         case 'ok': return 'bg-primary text-white';
-        default: return 'bg-slate-400 text-white';
+        default: return 'bg-muted text-white';
     }
 }
 
@@ -133,14 +133,14 @@ export function expiryBadgeClass(status: string): string {
 
 export function severityColor(severity: string): string {
     switch (severity) {
-        case 'critical': return 'bg-red-900';
-        case 'major': return 'bg-red-600';
-        case 'high': return 'bg-red-500';
-        case 'moderate': return 'bg-orange-500';
-        case 'medium': return 'bg-amber-500';
-        case 'minor': return 'bg-yellow-500';
-        case 'low': return 'bg-slate-400';
-        default: return 'bg-slate-400';
+        case 'critical': return 'bg-status-critical';
+        case 'major': return 'bg-status-critical';
+        case 'high': return 'bg-status-critical';
+        case 'moderate': return 'bg-status-warning';
+        case 'medium': return 'bg-status-warning';
+        case 'minor': return 'bg-status-warning';
+        case 'low': return 'bg-muted';
+        default: return 'bg-muted';
     }
 }
 
@@ -155,21 +155,21 @@ export function severityVariant(severity: string): 'default' | 'secondary' | 'de
 export function statusColor(status: string): string {
     switch (status) {
         case 'online': case 'active': case 'completed': case 'accepted': case 'passed': case 'resolved': return 'bg-primary text-white';
-        case 'pending': case 'pending_acceptance': case 'reported': return 'bg-amber-500 text-white';
-        case 'approved': case 'investigating': case 'in_progress': return 'bg-blue-600 text-white';
+        case 'pending': case 'pending_acceptance': case 'reported': return 'bg-status-warning text-white';
+        case 'approved': case 'investigating': case 'in_progress': return 'bg-status-info text-white';
         case 'checked_out': case 'moving': return 'bg-primary text-white';
-        case 'offline': case 'rejected': case 'cancelled': case 'failed': case 'disputed': return 'bg-red-500 text-white';
-        case 'returned': case 'closed': case 'idle': return 'bg-slate-500 text-white';
-        default: return 'bg-slate-400 text-white';
+        case 'offline': case 'rejected': case 'cancelled': case 'failed': case 'disputed': return 'bg-status-critical text-white';
+        case 'returned': case 'closed': case 'idle': return 'bg-muted-foreground/80 text-white';
+        default: return 'bg-muted text-white';
     }
 }
 
 export function priorityColor(priority: string): string {
     switch (priority) {
-        case 'critical': return 'bg-red-900 text-white';
-        case 'high': return 'bg-red-500 text-white';
-        case 'medium': return 'bg-amber-500 text-white';
-        case 'low': return 'bg-blue-500 text-white';
-        default: return 'bg-slate-400 text-white';
+        case 'critical': return 'bg-status-critical text-white';
+        case 'high': return 'bg-status-critical text-white';
+        case 'medium': return 'bg-status-warning text-white';
+        case 'low': return 'bg-status-info text-white';
+        default: return 'bg-muted text-white';
     }
 }

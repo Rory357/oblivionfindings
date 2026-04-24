@@ -23,11 +23,11 @@ type Props = {
 };
 
 const orderStatusColors: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-700',
-    confirmed: 'bg-blue-100 text-blue-700',
-    dispensed: 'bg-green-100 text-green-700',
+    pending: 'bg-status-warning-bg text-status-warning',
+    confirmed: 'bg-status-info-bg text-status-info',
+    dispensed: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
-    expired: 'bg-red-100 text-red-700',
+    expired: 'bg-status-critical-bg text-status-critical',
 };
 
 function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
@@ -79,9 +79,9 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {isVerbalOrTelephone && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                            <p className="text-sm text-amber-700 dark:text-amber-400">
+                        <div className="flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30 dark:bg-status-warning">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
+                            <p className="text-sm text-status-warning dark:text-status-warning">
                                 Verbal and telephone orders require prescriber countersignature within 72 hours.
                             </p>
                         </div>
@@ -102,7 +102,7 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {form.errors.client_id && <p className="text-xs text-red-600">{form.errors.client_id}</p>}
+                            {form.errors.client_id && <p className="text-xs text-status-critical">{form.errors.client_id}</p>}
                         </div>
 
                         <div className="space-y-1.5">
@@ -119,7 +119,7 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                                     <SelectItem value="telephone">Telephone</SelectItem>
                                 </SelectContent>
                             </Select>
-                            {form.errors.order_type && <p className="text-xs text-red-600">{form.errors.order_type}</p>}
+                            {form.errors.order_type && <p className="text-xs text-status-critical">{form.errors.order_type}</p>}
                         </div>
                     </div>
 
@@ -131,7 +131,7 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                                 value={form.data.prescriber_name}
                                 onChange={(e) => form.setData('prescriber_name', e.target.value)}
                             />
-                            {form.errors.prescriber_name && <p className="text-xs text-red-600">{form.errors.prescriber_name}</p>}
+                            {form.errors.prescriber_name && <p className="text-xs text-status-critical">{form.errors.prescriber_name}</p>}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="prescriber_registration">Registration #</Label>
@@ -163,24 +163,24 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                             value={form.data.medication_name}
                             onChange={(e) => form.setData('medication_name', e.target.value)}
                         />
-                        {form.errors.medication_name && <p className="text-xs text-red-600">{form.errors.medication_name}</p>}
+                        {form.errors.medication_name && <p className="text-xs text-status-critical">{form.errors.medication_name}</p>}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="dose">Dose *</Label>
                             <Input id="dose" value={form.data.dose} onChange={(e) => form.setData('dose', e.target.value)} />
-                            {form.errors.dose && <p className="text-xs text-red-600">{form.errors.dose}</p>}
+                            {form.errors.dose && <p className="text-xs text-status-critical">{form.errors.dose}</p>}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="route">Route *</Label>
                             <Input id="route" value={form.data.route} onChange={(e) => form.setData('route', e.target.value)} />
-                            {form.errors.route && <p className="text-xs text-red-600">{form.errors.route}</p>}
+                            {form.errors.route && <p className="text-xs text-status-critical">{form.errors.route}</p>}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="frequency">Frequency *</Label>
                             <Input id="frequency" value={form.data.frequency} onChange={(e) => form.setData('frequency', e.target.value)} />
-                            {form.errors.frequency && <p className="text-xs text-red-600">{form.errors.frequency}</p>}
+                            {form.errors.frequency && <p className="text-xs text-status-critical">{form.errors.frequency}</p>}
                         </div>
                     </div>
 
@@ -211,7 +211,7 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                                 value={form.data.order_date}
                                 onChange={(e) => form.setData('order_date', e.target.value)}
                             />
-                            {form.errors.order_date && <p className="text-xs text-red-600">{form.errors.order_date}</p>}
+                            {form.errors.order_date && <p className="text-xs text-status-critical">{form.errors.order_date}</p>}
                         </div>
                     </div>
 
@@ -307,7 +307,7 @@ function NewCovertDialog({ clients }: { clients: Props['clients'] }) {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {form.errors.client_id && <p className="text-xs text-red-600">{form.errors.client_id}</p>}
+                            {form.errors.client_id && <p className="text-xs text-status-critical">{form.errors.client_id}</p>}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="client_medication_id">Medication *</Label>
@@ -317,7 +317,7 @@ function NewCovertDialog({ clients }: { clients: Props['clients'] }) {
                                 value={form.data.client_medication_id}
                                 onChange={(e) => form.setData('client_medication_id', e.target.value)}
                             />
-                            {form.errors.client_medication_id && <p className="text-xs text-red-600">{form.errors.client_medication_id}</p>}
+                            {form.errors.client_medication_id && <p className="text-xs text-status-critical">{form.errors.client_medication_id}</p>}
                         </div>
                     </div>
 
@@ -329,7 +329,7 @@ function NewCovertDialog({ clients }: { clients: Props['clients'] }) {
                                 value={form.data.authorised_by_name}
                                 onChange={(e) => form.setData('authorised_by_name', e.target.value)}
                             />
-                            {form.errors.authorised_by_name && <p className="text-xs text-red-600">{form.errors.authorised_by_name}</p>}
+                            {form.errors.authorised_by_name && <p className="text-xs text-status-critical">{form.errors.authorised_by_name}</p>}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="authorised_by_registration">Registration #</Label>
@@ -349,7 +349,7 @@ function NewCovertDialog({ clients }: { clients: Props['clients'] }) {
                             value={form.data.clinical_justification}
                             onChange={(e) => form.setData('clinical_justification', e.target.value)}
                         />
-                        {form.errors.clinical_justification && <p className="text-xs text-red-600">{form.errors.clinical_justification}</p>}
+                        {form.errors.clinical_justification && <p className="text-xs text-status-critical">{form.errors.clinical_justification}</p>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -390,7 +390,7 @@ function NewCovertDialog({ clients }: { clients: Props['clients'] }) {
                                 value={form.data.authorised_date}
                                 onChange={(e) => form.setData('authorised_date', e.target.value)}
                             />
-                            {form.errors.authorised_date && <p className="text-xs text-red-600">{form.errors.authorised_date}</p>}
+                            {form.errors.authorised_date && <p className="text-xs text-status-critical">{form.errors.authorised_date}</p>}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor="review_date">Review Date</Label>
@@ -453,10 +453,10 @@ export default function Prescriptions({ orders, pendingCountersigns, covertAutho
                 />
                 {/* Alerts */}
                 {pendingCountersigns > 0 && (
-                    <Card className="mb-6 border-amber-200 dark:border-amber-800">
+                    <Card className="mb-6 border-status-warning/30 dark:border-status-warning/30">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <PenTool className="h-5 w-5 text-amber-600" />
-                            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{pendingCountersigns} order(s) awaiting prescriber countersignature</span>
+                            <PenTool className="h-5 w-5 text-status-warning" />
+                            <span className="text-sm font-medium text-status-warning dark:text-status-warning">{pendingCountersigns} order(s) awaiting prescriber countersignature</span>
                         </CardContent>
                     </Card>
                 )}
@@ -529,14 +529,14 @@ export default function Prescriptions({ orders, pendingCountersigns, covertAutho
                                                             <PenTool className="mr-1 h-3 w-3" /> Countersign
                                                         </Button>
                                                     ) : o.countersigned_at ? (
-                                                        <span className="text-xs text-green-600">Done</span>
+                                                        <span className="text-xs text-status-success">Done</span>
                                                     ) : (
                                                         <span className="text-xs text-muted-foreground">N/A</span>
                                                     )}
                                                 </td>
                                                 <td className="p-3 text-right">
                                                     {o.status === 'pending' && (
-                                                        <Button size="sm" variant="ghost" className="h-6 text-xs text-red-600 hover:text-red-700" onClick={() => handleCancelOrder(o.id)}>
+                                                        <Button size="sm" variant="ghost" className="h-6 text-xs text-status-critical hover:text-status-critical" onClick={() => handleCancelOrder(o.id)}>
                                                             <X className="mr-1 h-3 w-3" /> Cancel
                                                         </Button>
                                                     )}
@@ -585,7 +585,7 @@ export default function Prescriptions({ orders, pendingCountersigns, covertAutho
                                                 </td>
                                                 <td className="p-3 text-right">
                                                     {!c.revoked_at && (
-                                                        <Button size="sm" variant="ghost" className="h-6 text-xs text-red-600 hover:text-red-700" onClick={() => handleRevokeCovert(c.id)}>
+                                                        <Button size="sm" variant="ghost" className="h-6 text-xs text-status-critical hover:text-status-critical" onClick={() => handleRevokeCovert(c.id)}>
                                                             <X className="mr-1 h-3 w-3" /> Revoke
                                                         </Button>
                                                     )}

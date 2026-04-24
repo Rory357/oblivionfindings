@@ -57,7 +57,7 @@ type Props = {
 
 function resultBadge(passed: boolean) {
     return passed ? (
-        <Badge variant="default" className="bg-green-600"><CheckCircle className="mr-1 h-3 w-3" /> Pass</Badge>
+        <Badge variant="default" className="bg-status-success"><CheckCircle className="mr-1 h-3 w-3" /> Pass</Badge>
     ) : (
         <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Fail</Badge>
     );
@@ -117,8 +117,8 @@ export default function InspectionsIndex({ inspections, vehicles, filters, can }
                 {/* Dark KPI Cards + ProgressRing */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     <FleetStatCard label="TOTAL INSPECTIONS" value={totalCount} icon={ClipboardCheck} subtitle="All inspections" />
-                    <FleetStatCard label="PASSED" value={passedCount} icon={CheckCircle} color="amber" valueClassName="text-green-400" subtitle="Passed inspections" />
-                    <FleetStatCard label="FAILED" value={failedCount} icon={XCircle} color="red" valueClassName="text-red-400" subtitle="Failed inspections" />
+                    <FleetStatCard label="PASSED" value={passedCount} icon={CheckCircle} color="amber" valueClassName="text-status-success" subtitle="Passed inspections" />
+                    <FleetStatCard label="FAILED" value={failedCount} icon={XCircle} color="red" valueClassName="text-status-critical" subtitle="Failed inspections" />
                     <FleetStatCard label="PENDING" value={0} icon={FileCheck} subtitle="Awaiting review" />
                     <Card className="border bg-primary/10 dark:bg-primary/20">
                         <CardContent className="flex items-center justify-center p-4">

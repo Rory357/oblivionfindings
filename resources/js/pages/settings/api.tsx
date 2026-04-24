@@ -260,7 +260,7 @@ export default function Api() {
                     {statusMessage && (
                         <Card>
                             <CardContent className="py-4">
-                                <div className={`text-sm font-medium ${statusMessage.type === 'success' ? 'text-emerald-700' : 'text-red-700'}`}>
+                                <div className={`text-sm font-medium ${statusMessage.type === 'success' ? 'text-status-success' : 'text-status-critical'}`}>
                                     {statusMessage.text}
                                 </div>
                             </CardContent>
@@ -334,7 +334,7 @@ export default function Api() {
                                                         size="sm"
                                                         onClick={() => revokeKey(key.id)}
                                                         disabled={revokingKeyId === key.id}
-                                                        className="text-red-600 hover:text-red-700"
+                                                        className="text-status-critical hover:text-status-critical"
                                                     >
                                                         Revoke
                                                     </Button>
@@ -420,7 +420,7 @@ export default function Api() {
                                                             dusk={`api-webhook-delete-${webhook.id}`}
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="text-red-600 hover:text-red-700"
+                                                            className="text-status-critical hover:text-status-critical"
                                                             onClick={() => deleteWebhook(webhook.id)}
                                                             disabled={deletingWebhookId === webhook.id}
                                                         >
@@ -519,8 +519,8 @@ export default function Api() {
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                                    <p className="text-sm font-medium text-amber-800">
+                                <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3">
+                                    <p className="text-sm font-medium text-status-warning">
                                         Copy this key now. You will not be able to see it again.
                                     </p>
                                 </div>
@@ -529,7 +529,7 @@ export default function Api() {
                                         {generatedKey}
                                     </code>
                                     <Button dusk="api-key-copy" variant="outline" size="icon" onClick={handleCopyKey}>
-                                        {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                                        {copied ? <Check className="h-4 w-4 text-status-success" /> : <Copy className="h-4 w-4" />}
                                     </Button>
                                 </div>
                                 <DialogFooter>
@@ -592,8 +592,8 @@ export default function Api() {
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                                    <p className="text-sm font-medium text-amber-800">
+                                <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3">
+                                    <p className="text-sm font-medium text-status-warning">
                                         Copy this signing secret now. You will not be able to see it again.
                                     </p>
                                 </div>

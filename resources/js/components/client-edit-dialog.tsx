@@ -461,7 +461,7 @@ function Field({
             {hint && !error && (
                 <p className="text-xs text-muted-foreground">{hint}</p>
             )}
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs text-status-critical">{error}</p>}
         </div>
     );
 }

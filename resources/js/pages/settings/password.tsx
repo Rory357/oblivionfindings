@@ -37,10 +37,10 @@ const requirements: PasswordRequirement[] = [
 function getStrength(password: string): { level: number; label: string; color: string; bgColor: string } {
     if (!password) return { level: 0, label: '', color: '', bgColor: '' };
     const passed = requirements.filter((r) => r.test(password)).length;
-    if (passed <= 1) return { level: 1, label: 'Weak', color: 'bg-red-500', bgColor: 'text-red-600' };
-    if (passed <= 2) return { level: 2, label: 'Fair', color: 'bg-amber-500', bgColor: 'text-amber-600' };
-    if (passed <= 4) return { level: 3, label: 'Strong', color: 'bg-green-500', bgColor: 'text-green-600' };
-    return { level: 4, label: 'Excellent', color: 'bg-emerald-500', bgColor: 'text-emerald-600' };
+    if (passed <= 1) return { level: 1, label: 'Weak', color: 'bg-status-critical', bgColor: 'text-status-critical' };
+    if (passed <= 2) return { level: 2, label: 'Fair', color: 'bg-status-warning', bgColor: 'text-status-warning' };
+    if (passed <= 4) return { level: 3, label: 'Strong', color: 'bg-status-success', bgColor: 'text-status-success' };
+    return { level: 4, label: 'Excellent', color: 'bg-status-success', bgColor: 'text-status-success' };
 }
 
 export default function Password() {
@@ -176,7 +176,7 @@ export default function Password() {
                                                             className="flex items-center gap-2 text-sm"
                                                         >
                                                             {met ? (
-                                                                <Check className="h-3.5 w-3.5 text-green-600" />
+                                                                <Check className="h-3.5 w-3.5 text-status-success" />
                                                             ) : (
                                                                 <X className="h-3.5 w-3.5 text-muted-foreground/50" />
                                                             )}
@@ -212,7 +212,7 @@ export default function Password() {
                                             leave="transition ease-in-out"
                                             leaveTo="opacity-0"
                                         >
-                                            <p className="text-sm text-green-600">
+                                            <p className="text-sm text-status-success">
                                                 Password updated
                                             </p>
                                         </Transition>

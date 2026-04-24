@@ -56,7 +56,7 @@ function consentBadge(status: string) {
             return <Badge variant="destructive"><ShieldAlert className="mr-1 h-3 w-3" />Expired</Badge>;
         case 'pending':
         default:
-            return <Badge variant="outline" className="border-amber-400 text-amber-600 dark:text-amber-400"><Clock className="mr-1 h-3 w-3" />Pending</Badge>;
+            return <Badge variant="outline" className="border-status-warning/30 text-status-warning dark:text-status-warning"><Clock className="mr-1 h-3 w-3" />Pending</Badge>;
     }
 }
 
@@ -124,10 +124,10 @@ export default function DeviceConsentManagement({ devices, stats }: Props) {
                 {/* KPI Cards */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     <FleetStatCard label="TOTAL DEVICES" value={stats.total} icon={Shield} subtitle="All paired trackers" />
-                    <FleetStatCard label="CONSENTED" value={stats.consented} icon={ShieldCheck} color="purple" valueClassName="text-green-400" subtitle="Active consent" />
-                    <FleetStatCard label="REVOKED" value={stats.revoked} icon={ShieldOff} color="red" valueClassName="text-red-400" subtitle="Consent withdrawn" />
-                    <FleetStatCard label="PENDING" value={stats.pending} icon={Clock} color="amber" valueClassName="text-amber-400" subtitle="No consent recorded" />
-                    <FleetStatCard label="EXPIRED" value={stats.expired} icon={ShieldAlert} color="red" valueClassName="text-orange-400" subtitle="Consent expired" />
+                    <FleetStatCard label="CONSENTED" value={stats.consented} icon={ShieldCheck} color="purple" valueClassName="text-status-success" subtitle="Active consent" />
+                    <FleetStatCard label="REVOKED" value={stats.revoked} icon={ShieldOff} color="red" valueClassName="text-status-critical" subtitle="Consent withdrawn" />
+                    <FleetStatCard label="PENDING" value={stats.pending} icon={Clock} color="amber" valueClassName="text-status-warning" subtitle="No consent recorded" />
+                    <FleetStatCard label="EXPIRED" value={stats.expired} icon={ShieldAlert} color="red" valueClassName="text-status-warning" subtitle="Consent expired" />
                 </div>
 
                 {/* Search */}

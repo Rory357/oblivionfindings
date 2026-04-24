@@ -97,36 +97,36 @@ type Props = PageProps & {
 };
 
 const statusStyles: Record<string, string> = {
-  good: 'bg-green-100 text-green-800 border-green-200',
-  done: 'bg-green-100 text-green-800 border-green-200',
-  warning: 'bg-amber-100 text-amber-800 border-amber-200',
-  todo: 'bg-amber-100 text-amber-800 border-amber-200',
-  in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
-  critical: 'bg-red-100 text-red-800 border-red-200',
-  blocked: 'bg-red-100 text-red-800 border-red-200',
+  good: 'bg-status-success-bg text-status-success border-status-success/30',
+  done: 'bg-status-success-bg text-status-success border-status-success/30',
+  warning: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  todo: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
+  critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+  blocked: 'bg-status-critical-bg text-status-critical border-status-critical/30',
   unknown: 'bg-muted text-foreground border-border',
-  fresh: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  stable: 'bg-sky-100 text-sky-800 border-sky-200',
-  stale: 'bg-orange-100 text-orange-800 border-orange-200',
+  fresh: 'bg-status-success-bg text-status-success border-status-success/30',
+  stable: 'bg-status-info-bg text-status-info border-status-info/30',
+  stale: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 const metricToneStyles: Record<string, string> = {
   default: 'text-foreground',
-  warning: 'text-amber-700',
-  critical: 'text-red-700',
+  warning: 'text-status-warning',
+  critical: 'text-status-critical',
   muted: 'text-muted-foreground',
 };
 
 const workflowPriorityStyles: Record<string, string> = {
-  critical: 'bg-red-100 text-red-800 border-red-200',
-  high: 'bg-orange-100 text-orange-800 border-orange-200',
-  medium: 'bg-blue-100 text-blue-800 border-blue-200',
+  critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+  high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  medium: 'bg-status-info-bg text-status-info border-status-info/30',
   low: 'bg-muted text-foreground border-border',
 };
 
 const workflowStatusStyles: Record<string, string> = {
-  overdue: 'bg-red-100 text-red-800 border-red-200',
-  due_soon: 'bg-amber-100 text-amber-800 border-amber-200',
+  overdue: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+  due_soon: 'bg-status-warning-bg text-status-warning border-status-warning/30',
   pending: 'bg-muted text-foreground border-border',
 };
 
@@ -134,15 +134,15 @@ const cardIcon = (key: string) => {
   switch (key) {
     case 'meeting_readiness':
     case 'compliance_calendar':
-      return <Calendar className="h-5 w-5 text-sky-600" />;
+      return <Calendar className="h-5 w-5 text-status-info" />;
     case 'follow_through':
-      return <ClipboardList className="h-5 w-5 text-orange-600" />;
+      return <ClipboardList className="h-5 w-5 text-status-warning" />;
     case 'decisions_required':
-      return <AlertOctagon className="h-5 w-5 text-amber-600" />;
+      return <AlertOctagon className="h-5 w-5 text-status-warning" />;
     case 'client_safety':
     case 'privacy_data':
     case 'hs_backbone':
-      return <Shield className="h-5 w-5 text-emerald-600" />;
+      return <Shield className="h-5 w-5 text-status-success" />;
     case 'workforce':
       return <Users className="h-5 w-5 text-primary" />;
     default:
@@ -198,7 +198,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold text-foreground" dusk="governance-cockpit-heading">Executive & Board Cockpit</h1>
               {isBoardMember && boardRole && (
-                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                <Badge className="bg-status-info-bg text-status-info border-status-info/30">
                   {formatLabel(boardRole)}
                 </Badge>
               )}
@@ -238,8 +238,8 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline">{workflow?.summary.total ?? 0} open actions</Badge>
-                <Badge className="bg-red-100 text-red-800 border-red-200">{workflow?.summary.critical ?? 0} critical</Badge>
-                <Badge className="bg-amber-100 text-amber-800 border-amber-200">{workflow?.summary.overdue ?? 0} overdue</Badge>
+                <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">{workflow?.summary.critical ?? 0} critical</Badge>
+                <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">{workflow?.summary.overdue ?? 0} overdue</Badge>
               </div>
 
               {workflow?.actions.length ? (
@@ -359,13 +359,13 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
           <h2 className="mb-4 text-lg font-semibold text-foreground">Governance Modules</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
             {[
-              { label: 'Policies', href: '/governance/policies', icon: <BookOpen className="h-5 w-5" />, color: 'text-blue-600 bg-blue-50' },
+              { label: 'Policies', href: '/governance/policies', icon: <BookOpen className="h-5 w-5" />, color: 'text-status-info bg-status-info-bg' },
               { label: 'CEO Reports', href: '/governance/ceo-reports', icon: <FileText className="h-5 w-5" />, color: 'text-primary bg-primary/10' },
               { label: 'Interests', href: '/governance/interests/mine', icon: <ClipboardList className="h-5 w-5" />, color: 'text-primary bg-primary/10' },
-              { label: 'Evaluations', href: '/governance/evaluations', icon: <Star className="h-5 w-5" />, color: 'text-amber-600 bg-amber-50' },
-              { label: 'Documents', href: '/governance/documents', icon: <FolderOpen className="h-5 w-5" />, color: 'text-emerald-600 bg-emerald-50' },
-              { label: 'Clinical', href: '/governance/clinical', icon: <HeartPulse className="h-5 w-5" />, color: 'text-rose-600 bg-rose-50' },
-              { label: 'Te Tiriti', href: '/governance/te-tiriti', icon: <Landmark className="h-5 w-5" />, color: 'text-teal-600 bg-teal-50' },
+              { label: 'Evaluations', href: '/governance/evaluations', icon: <Star className="h-5 w-5" />, color: 'text-status-warning bg-status-warning-bg' },
+              { label: 'Documents', href: '/governance/documents', icon: <FolderOpen className="h-5 w-5" />, color: 'text-status-success bg-status-success-bg' },
+              { label: 'Clinical', href: '/governance/clinical', icon: <HeartPulse className="h-5 w-5" />, color: 'text-status-critical bg-status-critical-bg' },
+              { label: 'Te Tiriti', href: '/governance/te-tiriti', icon: <Landmark className="h-5 w-5" />, color: 'text-status-info bg-status-info-bg' },
             ].map((tile) => (
               <Link
                 key={tile.href}

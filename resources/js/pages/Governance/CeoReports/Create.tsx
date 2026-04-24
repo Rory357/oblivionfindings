@@ -50,7 +50,7 @@ export default function CeoReportCreate({ auth, meetings }: Props) {
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.governance_meeting_id && <p className="text-red-500 text-sm mt-1">{errors.governance_meeting_id}</p>}
+                {errors.governance_meeting_id && <p className="text-status-critical text-sm mt-1">{errors.governance_meeting_id}</p>}
               </div>
 
               <div>
@@ -61,7 +61,7 @@ export default function CeoReportCreate({ auth, meetings }: Props) {
               <div>
                 <Label>Executive Summary</Label>
                 <Textarea value={data.operational_summary} onChange={e => setData('operational_summary', e.target.value)} rows={8} />
-                {errors.operational_summary && <p className="text-red-500 text-sm mt-1">{errors.operational_summary}</p>}
+                {errors.operational_summary && <p className="text-status-critical text-sm mt-1">{errors.operational_summary}</p>}
               </div>
 
               <div className="flex justify-end gap-3">

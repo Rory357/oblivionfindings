@@ -28,8 +28,8 @@ interface Props extends PageProps {
 export default function EvaluationsIndex({ auth, evaluations }: Props) {
   const getStatusColor = (status: string) => ({
     draft: 'bg-muted text-foreground',
-    active: 'bg-blue-100 text-blue-800',
-    closed: 'bg-green-100 text-green-800',
+    active: 'bg-status-info-bg text-status-info',
+    closed: 'bg-status-success-bg text-status-success',
   }[status] || 'bg-muted text-foreground');
 
   const getTypeLabel = (type: string) => ({
@@ -60,8 +60,8 @@ export default function EvaluationsIndex({ auth, evaluations }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-3">
-                      <Star className="w-5 h-5 text-amber-500" />
-                      <Link href={`/governance/evaluations/${evaluation.id}`} className="text-lg font-medium hover:text-blue-600">
+                      <Star className="w-5 h-5 text-status-warning" />
+                      <Link href={`/governance/evaluations/${evaluation.id}`} className="text-lg font-medium hover:text-status-info">
                         {evaluation.title}
                       </Link>
                       <Badge variant="outline">{getTypeLabel(evaluation.evaluation_type)}</Badge>

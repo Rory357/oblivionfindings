@@ -61,10 +61,10 @@ type Props = {
 };
 
 const resultColors: Record<string, string> = {
-    pass: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-    fail: 'border-red-500/30 text-red-400 bg-red-500/10',
-    partial: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
-    na: 'border-slate-500/30 text-muted-foreground',
+    pass: 'border-status-success/30 text-status-success bg-status-success',
+    fail: 'border-status-critical/30 text-status-critical bg-status-critical',
+    partial: 'border-status-warning/30 text-status-warning bg-status-warning',
+    na: 'border-border/30 text-muted-foreground',
 };
 
 export default function GlobalSiteInspections({
@@ -133,21 +133,21 @@ export default function GlobalSiteInspections({
                             <div className="text-sm text-muted-foreground">Schedules</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-red-500/5 border-red-500/20">
+                    <Card className="bg-status-critical border-status-critical/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-red-400">{overdueCount}</div>
+                            <div className="text-2xl font-bold text-status-critical">{overdueCount}</div>
                             <div className="text-sm text-muted-foreground">Overdue</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-amber-500/5 border-amber-500/20">
+                    <Card className="bg-status-warning border-status-warning/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-amber-400">{dueSoonCount}</div>
+                            <div className="text-2xl font-bold text-status-warning">{dueSoonCount}</div>
                             <div className="text-sm text-muted-foreground">Due In 7 Days</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-emerald-400">{completedPassCount}</div>
+                            <div className="text-2xl font-bold text-status-success">{completedPassCount}</div>
                             <div className="text-sm text-muted-foreground">Passed Records</div>
                         </CardContent>
                     </Card>
@@ -261,17 +261,17 @@ export default function GlobalSiteInspections({
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {!schedule.is_active && (
-                                                    <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
+                                                    <Badge variant="outline" className="border-border/30 text-muted-foreground">
                                                         Inactive
                                                     </Badge>
                                                 )}
                                                 {overdue ? (
-                                                    <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/10">
+                                                    <Badge variant="outline" className="border-status-critical/30 text-status-critical bg-status-critical">
                                                         <AlertTriangle className="w-3 h-3 mr-1" />
                                                         Overdue
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="border-slate-500/30 text-slate-300">
+                                                    <Badge variant="outline" className="border-border/30 text-muted-foreground">
                                                         <Clock className="w-3 h-3 mr-1" />
                                                         Scheduled
                                                     </Badge>
@@ -311,7 +311,7 @@ export default function GlobalSiteInspections({
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {record.result && (
-                                                <Badge variant="outline" className={resultColors[record.result] || 'border-slate-500/30 text-muted-foreground'}>
+                                                <Badge variant="outline" className={resultColors[record.result] || 'border-border/30 text-muted-foreground'}>
                                                     {record.result === 'pass' ? <CheckCircle2 className="w-3 h-3 mr-1" /> : null}
                                                     {record.result.toUpperCase()}
                                                 </Badge>

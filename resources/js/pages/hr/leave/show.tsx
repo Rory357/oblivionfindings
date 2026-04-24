@@ -35,10 +35,10 @@ interface Props {
 }
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
-    approved: 'bg-green-500/10 text-green-500 border-green-500/30',
-    declined: 'bg-red-500/10 text-red-500 border-red-500/30',
-    cancelled: 'bg-slate-500/10 text-muted-foreground border-slate-500/30',
+    pending: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    approved: 'bg-status-success-bg text-status-success border-status-success/30',
+    declined: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    cancelled: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
 };
 
 export default function ShowLeave({ request, can }: Props) {
@@ -188,7 +188,7 @@ export default function ShowLeave({ request, can }: Props) {
                                 <Button 
                                     variant="default" 
                                     onClick={handleApprove}
-                                    className="bg-green-600 hover:bg-green-700"
+                                    className="bg-status-success hover:bg-status-success"
                                 >
                                     <CheckCircle className="mr-2 h-4 w-4" />
                                     Approve

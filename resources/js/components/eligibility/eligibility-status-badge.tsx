@@ -18,17 +18,17 @@ const config: Record<EligibilityStatus, {
     eligible: {
         label: 'Eligible',
         icon: CheckCircle2,
-        badgeClass: 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400',
+        badgeClass: 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success',
     },
     warnings: {
         label: 'Warnings',
         icon: AlertTriangle,
-        badgeClass: 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400',
+        badgeClass: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning',
     },
     blocked: {
         label: 'Blocked',
         icon: XCircle,
-        badgeClass: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400',
+        badgeClass: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical',
     },
 };
 

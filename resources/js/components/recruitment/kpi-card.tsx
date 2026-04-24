@@ -27,7 +27,7 @@ export function KpiCard({ label, value, icon: Icon, trend, prefix, suffix, decim
                             </p>
                             {trend && (
                                 <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${
-                                    trend.direction === 'up' ? 'text-green-500' : 'text-red-500'
+                                    trend.direction === 'up' ? 'text-status-success' : 'text-status-critical'
                                 }`}>
                                     {trend.direction === 'up' ? (
                                         <TrendingUp className="h-3 w-3" />

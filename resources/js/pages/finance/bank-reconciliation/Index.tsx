@@ -53,9 +53,9 @@ const formatNZD = (amount: number | string) =>
 const statusBadge = (status: string) => {
     switch (status) {
         case 'completed':
-            return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">Completed</Badge>;
+            return <Badge className="bg-status-success-bg text-status-success border-status-success/30">Completed</Badge>;
         case 'in_progress':
-            return <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30">In Progress</Badge>;
+            return <Badge className="bg-status-info-bg text-status-info border-status-info/30">In Progress</Badge>;
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
@@ -108,8 +108,8 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-blue-500/10 p-2">
-                                        <ListChecks className="h-5 w-5 text-blue-600" />
+                                    <div className="rounded-lg bg-status-info p-2">
+                                        <ListChecks className="h-5 w-5 text-status-info" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Total Reconciliations</p>
@@ -121,8 +121,8 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-emerald-500/10 p-2">
-                                        <CheckCircle className="h-5 w-5 text-emerald-600" />
+                                    <div className="rounded-lg bg-status-success p-2">
+                                        <CheckCircle className="h-5 w-5 text-status-success" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Completed (this page)</p>
@@ -134,8 +134,8 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-amber-500/10 p-2">
-                                        <Clock className="h-5 w-5 text-amber-600" />
+                                    <div className="rounded-lg bg-status-warning p-2">
+                                        <Clock className="h-5 w-5 text-status-warning" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">In Progress (this page)</p>

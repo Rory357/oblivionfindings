@@ -184,8 +184,8 @@ export default function SecuritySettings({
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-100 p-2">
-                                    <Timer className="h-5 w-5 text-blue-600" />
+                                <div className="rounded-lg bg-status-info-bg p-2">
+                                    <Timer className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
                                     <CardTitle>Session Security</CardTitle>
@@ -268,8 +268,8 @@ export default function SecuritySettings({
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-100 p-2">
-                                    <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                                <div className="rounded-lg bg-status-success-bg p-2">
+                                    <ShieldCheck className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>
                                     <CardTitle>Two-Factor Authentication</CardTitle>
@@ -290,7 +290,7 @@ export default function SecuritySettings({
                                         authentication on their next login.
                                     </p>
                                     {form.data.force_2fa && (
-                                        <div className="mt-2 flex items-center gap-2 text-xs text-amber-600">
+                                        <div className="mt-2 flex items-center gap-2 text-xs text-status-warning">
                                             <AlertTriangle className="h-3.5 w-3.5" />
                                             <span>
                                                 Users without 2FA will be prompted to set it up immediately.
@@ -310,8 +310,8 @@ export default function SecuritySettings({
                                     variant="outline"
                                     className={
                                         twoFaEnabled === twoFaTotal && twoFaTotal > 0
-                                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                            : 'border-amber-300 bg-amber-50 text-amber-700'
+                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                            : 'border-status-warning/30 bg-status-warning-bg text-status-warning'
                                     }
                                 >
                                     <ShieldCheck className="mr-1 h-3 w-3" />

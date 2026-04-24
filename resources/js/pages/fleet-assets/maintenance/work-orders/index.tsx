@@ -162,9 +162,9 @@ export default function WorkOrdersIndex({ work_orders, filters, users }: Props) 
                 {/* Dark KPI Cards */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     <FleetStatCard label="TOTAL" value={totalCount} icon={ClipboardList} subtitle="All work orders" />
-                    <FleetStatCard label="OPEN" value={openCount} icon={Wrench} color="amber" valueClassName="text-amber-400" subtitle="Awaiting action" />
-                    <FleetStatCard label="IN PROGRESS" value={inProgressCount} icon={Loader} color="blue" valueClassName="text-blue-400" subtitle="Being worked on" />
-                    <FleetStatCard label="COMPLETED" value={completedCount} icon={CheckCircle} color="amber" valueClassName="text-green-400" subtitle="Done" />
+                    <FleetStatCard label="OPEN" value={openCount} icon={Wrench} color="amber" valueClassName="text-status-warning" subtitle="Awaiting action" />
+                    <FleetStatCard label="IN PROGRESS" value={inProgressCount} icon={Loader} color="blue" valueClassName="text-status-info" subtitle="Being worked on" />
+                    <FleetStatCard label="COMPLETED" value={completedCount} icon={CheckCircle} color="amber" valueClassName="text-status-success" subtitle="Done" />
                     <Card className="border bg-primary/10 dark:bg-primary/20 sm:col-span-2 md:col-span-3 lg:col-span-4">
                         <CardContent className="p-4">
                             <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">PRIORITY DISTRIBUTION</p>

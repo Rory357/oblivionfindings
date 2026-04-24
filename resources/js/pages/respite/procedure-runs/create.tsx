@@ -77,7 +77,7 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                         </CardHeader>
                         <CardContent className="grid gap-4 sm:grid-cols-2">
                             {!hasTemplates && (
-                                <div className="sm:col-span-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                <div className="sm:col-span-2 rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning">
                                     No active procedure templates are available yet. Create or activate a template before starting a procedure run.
                                 </div>
                             )}
@@ -93,7 +93,7 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.procedure_template_id && <div className="mt-1 text-xs text-red-500">{errors.procedure_template_id}</div>}
+                                {errors.procedure_template_id && <div className="mt-1 text-xs text-status-critical">{errors.procedure_template_id}</div>}
                             </div>
 
                             <div>
@@ -106,7 +106,7 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.subject_type && <div className="mt-1 text-xs text-red-500">{errors.subject_type}</div>}
+                                {errors.subject_type && <div className="mt-1 text-xs text-status-critical">{errors.subject_type}</div>}
                             </div>
 
                             <div>
@@ -118,7 +118,7 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                                     onChange={(event) => setData('subject_id', event.target.value)}
                                     placeholder="Enter the related record ID"
                                 />
-                                {errors.subject_id && <div className="mt-1 text-xs text-red-500">{errors.subject_id}</div>}
+                                {errors.subject_id && <div className="mt-1 text-xs text-status-critical">{errors.subject_id}</div>}
                             </div>
                         </CardContent>
                     </Card>

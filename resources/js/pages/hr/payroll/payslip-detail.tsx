@@ -76,9 +76,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Draft' },
-    approved: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Approved' },
-    paid: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Paid' },
+    draft: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Draft' },
+    approved: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Approved' },
+    paid: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Paid' },
 };
 
 function formatCurrency(amount: string | number): string {
@@ -209,31 +209,31 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
                                 <TableBody>
                                     <TableRow>
                                         <TableCell>PAYE</TableCell>
-                                        <TableCell className="text-right text-red-400">{formatCurrency(payslip.paye)}</TableCell>
+                                        <TableCell className="text-right text-status-critical">{formatCurrency(payslip.paye)}</TableCell>
                                     </TableRow>
                                     <TableRow>
                                         <TableCell>ACC Earner Levy</TableCell>
-                                        <TableCell className="text-right text-red-400">{formatCurrency(payslip.acc_levy)}</TableCell>
+                                        <TableCell className="text-right text-status-critical">{formatCurrency(payslip.acc_levy)}</TableCell>
                                     </TableRow>
                                     <TableRow>
                                         <TableCell>KiwiSaver ({payslip.kiwisaver_rate}%)</TableCell>
-                                        <TableCell className="text-right text-red-400">{formatCurrency(payslip.kiwisaver_employee)}</TableCell>
+                                        <TableCell className="text-right text-status-critical">{formatCurrency(payslip.kiwisaver_employee)}</TableCell>
                                     </TableRow>
                                     {Number(payslip.student_loan) > 0 && (
                                         <TableRow>
                                             <TableCell>Student Loan</TableCell>
-                                            <TableCell className="text-right text-red-400">{formatCurrency(payslip.student_loan)}</TableCell>
+                                            <TableCell className="text-right text-status-critical">{formatCurrency(payslip.student_loan)}</TableCell>
                                         </TableRow>
                                     )}
                                     {(payslip.other_deductions ?? []).map((d, i) => (
                                         <TableRow key={i}>
                                             <TableCell>{d.name}</TableCell>
-                                            <TableCell className="text-right text-red-400">{formatCurrency(d.amount)}</TableCell>
+                                            <TableCell className="text-right text-status-critical">{formatCurrency(d.amount)}</TableCell>
                                         </TableRow>
                                     ))}
                                     <TableRow className="font-bold">
                                         <TableCell>Total Deductions</TableCell>
-                                        <TableCell className="text-right text-red-400">{formatCurrency(payslip.total_deductions)}</TableCell>
+                                        <TableCell className="text-right text-status-critical">{formatCurrency(payslip.total_deductions)}</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>
@@ -254,11 +254,11 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
                             </div>
                             <div className="text-center">
                                 <p className="text-sm text-muted-foreground">Total Deductions</p>
-                                <p className="text-xl font-bold text-red-400">{formatCurrency(payslip.total_deductions)}</p>
+                                <p className="text-xl font-bold text-status-critical">{formatCurrency(payslip.total_deductions)}</p>
                             </div>
                             <div className="text-center">
                                 <p className="text-sm text-muted-foreground">Net Pay</p>
-                                <p className="text-2xl font-bold text-emerald-400">{formatCurrency(payslip.net_pay)}</p>
+                                <p className="text-2xl font-bold text-status-success">{formatCurrency(payslip.net_pay)}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -297,15 +297,15 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
                                 </TableRow>
                                 <TableRow>
                                     <TableCell>PAYE</TableCell>
-                                    <TableCell className="text-right text-red-400">{formatCurrency(ytd.paye ?? 0)}</TableCell>
+                                    <TableCell className="text-right text-status-critical">{formatCurrency(ytd.paye ?? 0)}</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell>ACC Earner Levy</TableCell>
-                                    <TableCell className="text-right text-red-400">{formatCurrency(ytd.acc_levy ?? 0)}</TableCell>
+                                    <TableCell className="text-right text-status-critical">{formatCurrency(ytd.acc_levy ?? 0)}</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell>KiwiSaver Employee</TableCell>
-                                    <TableCell className="text-right text-red-400">{formatCurrency(ytd.kiwisaver_employee ?? 0)}</TableCell>
+                                    <TableCell className="text-right text-status-critical">{formatCurrency(ytd.kiwisaver_employee ?? 0)}</TableCell>
                                 </TableRow>
                                 <TableRow>
                                     <TableCell>KiwiSaver Employer</TableCell>
@@ -314,7 +314,7 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
                                 {Number(ytd.student_loan ?? 0) > 0 && (
                                     <TableRow>
                                         <TableCell>Student Loan</TableCell>
-                                        <TableCell className="text-right text-red-400">{formatCurrency(ytd.student_loan ?? 0)}</TableCell>
+                                        <TableCell className="text-right text-status-critical">{formatCurrency(ytd.student_loan ?? 0)}</TableCell>
                                     </TableRow>
                                 )}
                                 {Number(ytd.holiday_pay ?? 0) > 0 && (
@@ -325,7 +325,7 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
                                 )}
                                 <TableRow className="font-bold">
                                     <TableCell>Net Pay</TableCell>
-                                    <TableCell className="text-right text-emerald-400">{formatCurrency(ytd.net_pay ?? 0)}</TableCell>
+                                    <TableCell className="text-right text-status-success">{formatCurrency(ytd.net_pay ?? 0)}</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>

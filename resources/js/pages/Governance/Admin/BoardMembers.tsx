@@ -165,7 +165,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
                       </TableCell>
                       <TableCell>
                         {member.is_active ? (
-                          <Badge className="bg-green-100 text-green-800">Active</Badge>
+                          <Badge className="bg-status-success-bg text-status-success">Active</Badge>
                         ) : (
                           <Badge className="bg-muted text-foreground">Inactive</Badge>
                         )}

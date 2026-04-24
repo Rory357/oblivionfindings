@@ -88,10 +88,10 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
 
     const getSeverityBadge = (severity: string) => {
         const colors: Record<string, string> = {
-            minor: 'bg-blue-100 text-blue-800',
-            moderate: 'bg-yellow-100 text-yellow-800',
-            major: 'bg-orange-100 text-orange-800',
-            contraindicated: 'bg-red-100 text-red-800',
+            minor: 'bg-status-info-bg text-status-info',
+            moderate: 'bg-status-warning-bg text-status-warning',
+            major: 'bg-status-warning-bg text-status-warning',
+            contraindicated: 'bg-status-critical-bg text-status-critical',
         };
         return <Badge className={colors[severity] || 'bg-muted'}>{severity}</Badge>;
     };
@@ -201,9 +201,9 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                                     key={interaction.id}
                                     className={`rounded-lg border p-3 ${
                                         interaction.severity === 'contraindicated'
-                                            ? 'border-red-200 bg-red-50'
+                                            ? 'border-status-critical/30 bg-status-critical-bg'
                                             : interaction.severity === 'major'
-                                            ? 'border-orange-200 bg-orange-50'
+                                            ? 'border-status-warning/30 bg-status-warning-bg'
                                             : 'bg-muted'
                                     }`}
                                 >
@@ -228,7 +228,7 @@ export default function DrugInteractionManager({ canManage }: DrugInteractionMan
                                             )}
                                         </div>
                                         {interaction.severity === 'contraindicated' && (
-                                            <AlertTriangle className="h-5 w-5 text-red-500 ml-2" />
+                                            <AlertTriangle className="h-5 w-5 text-status-critical ml-2" />
                                         )}
                                     </div>
                                 </div>

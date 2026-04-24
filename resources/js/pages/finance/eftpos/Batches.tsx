@@ -73,10 +73,10 @@ const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; className: string }> = {
-    open: { label: 'Open', icon: Clock, className: 'border-blue-300 text-blue-600' },
-    closed: { label: 'Closed', icon: Clock, className: 'border-amber-300 text-amber-600' },
-    reconciled: { label: 'Reconciled', icon: CheckCircle2, className: 'border-green-300 text-green-600' },
-    discrepancy: { label: 'Discrepancy', icon: AlertTriangle, className: 'border-red-300 text-red-600' },
+    open: { label: 'Open', icon: Clock, className: 'border-status-info/30 text-status-info' },
+    closed: { label: 'Closed', icon: Clock, className: 'border-status-warning/30 text-status-warning' },
+    reconciled: { label: 'Reconciled', icon: CheckCircle2, className: 'border-status-success/30 text-status-success' },
+    discrepancy: { label: 'Discrepancy', icon: AlertTriangle, className: 'border-status-critical/30 text-status-critical' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -120,8 +120,8 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-500/10 p-2">
-                                    <DollarSign className="h-5 w-5 text-emerald-600" />
+                                <div className="rounded-lg bg-status-success p-2">
+                                    <DollarSign className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Settlement</p>
@@ -133,8 +133,8 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-amber-500/10 p-2">
-                                    <DollarSign className="h-5 w-5 text-amber-600" />
+                                <div className="rounded-lg bg-status-warning p-2">
+                                    <DollarSign className="h-5 w-5 text-status-warning" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Fees</p>
@@ -146,8 +146,8 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-500/10 p-2">
-                                    <Hash className="h-5 w-5 text-blue-600" />
+                                <div className="rounded-lg bg-status-info p-2">
+                                    <Hash className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Transactions</p>
@@ -159,8 +159,8 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-red-500/10 p-2">
-                                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                                <div className="rounded-lg bg-status-critical p-2">
+                                    <AlertTriangle className="h-5 w-5 text-status-critical" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Unreconciled</p>

@@ -66,9 +66,9 @@ function daysUntil(dateStr: string | null): number | null {
 function expiryColor(dateStr: string | null): string {
     const days = daysUntil(dateStr);
     if (days === null) return 'text-muted-foreground';
-    if (days < 0) return 'text-red-600 dark:text-red-400';
-    if (days <= 30) return 'text-orange-600 dark:text-orange-400';
-    if (days <= 60) return 'text-yellow-600 dark:text-yellow-400';
+    if (days < 0) return 'text-status-critical dark:text-status-critical';
+    if (days <= 30) return 'text-status-warning dark:text-status-warning';
+    if (days <= 60) return 'text-status-warning dark:text-status-warning';
     return 'text-primary dark:text-primary';
 }
 
@@ -136,40 +136,40 @@ export default function ComplianceIndex({ vehicles, summary, filters }: Props) {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground">Expired WOF</CardTitle>
-                            <XCircle className="h-4 w-4 text-red-500" />
+                            <XCircle className="h-4 w-4 text-status-critical" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.expired_wof}</div>
+                            <div className="text-2xl font-bold text-status-critical dark:text-status-critical">{summary.expired_wof}</div>
                             <p className="text-xs text-muted-foreground">vehicles need attention</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground">Expired Rego</CardTitle>
-                            <XCircle className="h-4 w-4 text-red-500" />
+                            <XCircle className="h-4 w-4 text-status-critical" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.expired_rego}</div>
+                            <div className="text-2xl font-bold text-status-critical dark:text-status-critical">{summary.expired_rego}</div>
                             <p className="text-xs text-muted-foreground">vehicles need attention</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground">Expiring 30d</CardTitle>
-                            <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            <AlertTriangle className="h-4 w-4 text-status-warning" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{summary.expiring_30}</div>
+                            <div className="text-2xl font-bold text-status-warning dark:text-status-warning">{summary.expiring_30}</div>
                             <p className="text-xs text-muted-foreground">upcoming renewals</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground">Expiring 60d</CardTitle>
-                            <Clock className="h-4 w-4 text-yellow-500" />
+                            <Clock className="h-4 w-4 text-status-warning" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{summary.expiring_60}</div>
+                            <div className="text-2xl font-bold text-status-warning dark:text-status-warning">{summary.expiring_60}</div>
                             <p className="text-xs text-muted-foreground">plan ahead</p>
                         </CardContent>
                     </Card>

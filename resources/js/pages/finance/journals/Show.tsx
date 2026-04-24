@@ -108,16 +108,16 @@ const formatNZD = (amount: string | number) =>
 const statusBadge = (status: string) => {
     const map: Record<string, string> = {
         draft: 'bg-muted text-foreground',
-        posted: 'bg-green-100 text-green-800',
-        reversed: 'bg-red-100 text-red-800',
+        posted: 'bg-status-success-bg text-status-success',
+        reversed: 'bg-status-critical-bg text-status-critical',
     };
     return map[status] ?? 'bg-muted text-foreground';
 };
 
 const typeBadge = (type: string) => {
     const map: Record<string, string> = {
-        standard: 'bg-blue-100 text-blue-800',
-        adjustment: 'bg-yellow-100 text-yellow-800',
+        standard: 'bg-status-info-bg text-status-info',
+        adjustment: 'bg-status-warning-bg text-status-warning',
         opening: 'bg-primary/10 text-primary',
     };
     return map[type] ?? 'bg-muted text-foreground';
@@ -309,8 +309,8 @@ export default function JournalsShow({ auth, journal }: Props) {
 
                 {/* Reversed notice */}
                 {journal.reversed_by_journal && (
-                    <div className="mb-6 rounded-md bg-red-50 border border-red-200 p-4">
-                        <p className="text-sm text-red-800">
+                    <div className="mb-6 rounded-md bg-status-critical-bg border border-status-critical/30 p-4">
+                        <p className="text-sm text-status-critical">
                             This journal has been reversed by{' '}
                             <Link
                                 href={`/finance/journals/${journal.reversed_by_journal.id}`}

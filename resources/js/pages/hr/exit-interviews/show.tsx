@@ -62,7 +62,7 @@ function SatisfactionStars({ rating }: { rating: number | null }) {
             {[1, 2, 3, 4, 5].map((star) => (
                 <Star
                     key={star}
-                    className={`h-5 w-5 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'}`}
+                    className={`h-5 w-5 ${star <= rating ? 'fill-yellow-400 text-status-warning' : 'text-muted-foreground'}`}
                 />
             ))}
             <span className="ml-2 text-sm text-muted-foreground">{rating}/5</span>
@@ -133,11 +133,11 @@ export default function ExitInterviewShow({ interview, can }: Props) {
                                     {interview.would_recommend === null ? (
                                         <span className="text-sm text-muted-foreground">Not specified</span>
                                     ) : interview.would_recommend ? (
-                                        <Badge className="mt-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                                        <Badge className="mt-1 border-status-success/30 bg-status-success-bg text-status-success">
                                             <ThumbsUp className="mr-1 h-3 w-3" /> Yes
                                         </Badge>
                                     ) : (
-                                        <Badge className="mt-1 border-red-500/30 bg-red-500/10 text-red-400">
+                                        <Badge className="mt-1 border-status-critical/30 bg-status-critical-bg text-status-critical">
                                             <ThumbsDown className="mr-1 h-3 w-3" /> No
                                         </Badge>
                                     )}

@@ -162,32 +162,32 @@ function statusBadgeClass(status: string): string {
         case 'current':
         case 'active':
         case 'completed':
-            return 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10';
+            return 'border-status-success/30 text-status-success bg-status-success';
         case 'expiring':
         case 'expiring_soon':
-            return 'border-amber-500/30 text-amber-400 bg-amber-500/10';
+            return 'border-status-warning/30 text-status-warning bg-status-warning';
         case 'expired':
         case 'overdue':
-            return 'border-red-500/30 text-red-400 bg-red-500/10';
+            return 'border-status-critical/30 text-status-critical bg-status-critical';
         case 'scheduled':
-            return 'border-blue-500/30 text-blue-400 bg-blue-500/10';
+            return 'border-status-info/30 text-status-info bg-status-info';
         default:
-            return 'border-slate-500/30 text-muted-foreground';
+            return 'border-border/30 text-muted-foreground';
     }
 }
 
 function riskBadgeClass(rating?: string): string {
     switch (rating?.toLowerCase()) {
         case 'critical':
-            return 'border-red-500/30 text-red-400 bg-red-500/10';
+            return 'border-status-critical/30 text-status-critical bg-status-critical';
         case 'high':
-            return 'border-orange-500/30 text-orange-400 bg-orange-500/10';
+            return 'border-status-warning/30 text-status-warning bg-status-warning';
         case 'medium':
-            return 'border-amber-500/30 text-amber-400 bg-amber-500/10';
+            return 'border-status-warning/30 text-status-warning bg-status-warning';
         case 'low':
-            return 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10';
+            return 'border-status-success/30 text-status-success bg-status-success';
         default:
-            return 'border-slate-500/30 text-muted-foreground';
+            return 'border-border/30 text-muted-foreground';
     }
 }
 
@@ -411,9 +411,9 @@ export default function SiteComplianceIndex({
 
                 {/* Alert Banner */}
                 {alertCount > 0 && (
-                    <div className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-                        <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
-                        <p className="text-sm font-medium text-red-300">
+                    <div className="flex items-center gap-3 rounded-lg border border-status-critical/30 bg-status-critical px-4 py-3">
+                        <AlertTriangle className="h-5 w-5 shrink-0 text-status-critical" />
+                        <p className="text-sm font-medium text-status-critical">
                             {stats.expired > 0 && (
                                 <span>
                                     {stats.expired} certification{stats.expired !== 1 ? 's' : ''} expired
@@ -527,10 +527,10 @@ export default function SiteComplianceIndex({
                                                                         <span
                                                                             className={`ml-1 text-xs font-medium ${
                                                                                 days < 0
-                                                                                    ? 'text-red-400'
+                                                                                    ? 'text-status-critical'
                                                                                     : days <= 30
-                                                                                      ? 'text-amber-400'
-                                                                                      : 'text-emerald-400'
+                                                                                      ? 'text-status-warning'
+                                                                                      : 'text-status-success'
                                                                             }`}
                                                                         >
                                                                             {days < 0
@@ -576,7 +576,7 @@ export default function SiteComplianceIndex({
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="text-red-400 hover:text-red-300"
+                                                            className="text-status-critical hover:text-status-critical"
                                                             onClick={() => handleDeleteCert(cert.id)}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
@@ -651,7 +651,7 @@ export default function SiteComplianceIndex({
                                                 <div className="mt-2 space-y-1 text-sm text-muted-foreground">
                                                     {isCompleted && check.completed_date ? (
                                                         <div className="flex items-center gap-1">
-                                                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                                                            <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
                                                             <span>
                                                                 Completed {fmtDate(check.completed_date)}
                                                                 {check.completed_by && (
@@ -715,7 +715,7 @@ export default function SiteComplianceIndex({
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                                                            className="border-status-success/30 text-status-success hover:bg-status-success"
                                                             onClick={() =>
                                                                 openCompleteDialog(check.id)
                                                             }
@@ -1024,7 +1024,7 @@ export default function SiteComplianceIndex({
                                 Cancel
                             </Button>
                             <Button
-                                className="bg-emerald-600 hover:bg-emerald-700"
+                                className="bg-status-success hover:bg-status-success"
                                 onClick={handleCompleteCheck}
                             >
                                 <CheckCircle2 className="mr-1 h-4 w-4" />

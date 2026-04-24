@@ -61,7 +61,7 @@ export default function CareersApply({ posting }: Props) {
                         <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> {employmentTypeLabels[posting.employment_type]}</span>
                         {posting.department && <span>{posting.department}</span>}
                         {posting.location && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {posting.location}</span>}
-                        {posting.is_remote && <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-400 bg-blue-500/10"><Wifi className="h-3 w-3" /> Remote</Badge>}
+                        {posting.is_remote && <Badge variant="outline" className="text-xs gap-1 border-status-info/30 text-status-info bg-status-info"><Wifi className="h-3 w-3" /> Remote</Badge>}
                     </div>
                 </div>
 

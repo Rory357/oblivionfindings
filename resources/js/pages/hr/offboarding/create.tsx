@@ -94,7 +94,7 @@ export default function CreateOffboarding({ employees, defaultEndDate }: Props) 
                                         </SelectContent>
                                     </Select>
                                     {errors.employee_profile_id && (
-                                        <p className="text-sm text-red-500">{errors.employee_profile_id}</p>
+                                        <p className="text-sm text-status-critical">{errors.employee_profile_id}</p>
                                     )}
                                 </div>
 
@@ -106,7 +106,7 @@ export default function CreateOffboarding({ employees, defaultEndDate }: Props) 
                                         value={data.end_date}
                                         onChange={(e) => setData('end_date', e.target.value)}
                                     />
-                                    {errors.end_date && <p className="text-sm text-red-500">{errors.end_date}</p>}
+                                    {errors.end_date && <p className="text-sm text-status-critical">{errors.end_date}</p>}
                                 </div>
 
                                 <div className="flex items-center justify-end gap-3">

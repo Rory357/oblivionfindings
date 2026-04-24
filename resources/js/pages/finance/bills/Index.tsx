@@ -64,11 +64,11 @@ const formatDate = (date: string) =>
 
 const statusConfig: Record<string, { label: string; className: string }> = {
     draft: { label: 'Draft', className: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground' },
-    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' },
-    approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
-    partially_paid: { label: 'Partially Paid', className: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300' },
-    paid: { label: 'Paid', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
-    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
+    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' },
+    approved: { label: 'Approved', className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info' },
+    partially_paid: { label: 'Partially Paid', className: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' },
+    paid: { label: 'Paid', className: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success' },
+    cancelled: { label: 'Cancelled', className: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -132,8 +132,8 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900">
-                                    <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                <div className="rounded-lg bg-status-info-bg p-2 dark:bg-status-info">
+                                    <DollarSign className="h-5 w-5 text-status-info dark:text-status-info" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Unpaid</p>
@@ -145,8 +145,8 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-red-100 p-2 dark:bg-red-900">
-                                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                <div className="rounded-lg bg-status-critical-bg p-2 dark:bg-status-critical">
+                                    <AlertTriangle className="h-5 w-5 text-status-critical dark:text-status-critical" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Overdue</p>
@@ -158,8 +158,8 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-amber-100 p-2 dark:bg-amber-900">
-                                    <CalendarClock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                                    <CalendarClock className="h-5 w-5 text-status-warning dark:text-status-warning" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Due This Week</p>
@@ -261,7 +261,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                                         key={bill.id}
                                         className={cn(
                                             'cursor-pointer hover:bg-muted/50',
-                                            isOverdue(bill) && 'bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30',
+                                            isOverdue(bill) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:bg-status-critical dark:hover:bg-status-critical',
                                         )}
                                         onClick={() => router.get(`/finance/bills/${bill.id}`)}
                                     >
@@ -275,8 +275,8 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                                         <TableCell>{formatDate(bill.bill_date)}</TableCell>
                                         <TableCell>
                                             <span className="inline-flex items-center gap-1">
-                                                {isOverdue(bill) && <AlertTriangle className="w-3.5 h-3.5 text-red-500" />}
-                                                <span className={cn(isOverdue(bill) && 'text-red-600 font-medium dark:text-red-400')}>
+                                                {isOverdue(bill) && <AlertTriangle className="w-3.5 h-3.5 text-status-critical" />}
+                                                <span className={cn(isOverdue(bill) && 'text-status-critical font-medium dark:text-status-critical')}>
                                                     {formatDate(bill.due_date)}
                                                 </span>
                                             </span>

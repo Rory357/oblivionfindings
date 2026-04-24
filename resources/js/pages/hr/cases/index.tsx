@@ -91,26 +91,26 @@ const formatDate = (value?: string | null) => {
 };
 
 const badgeClassByStatus: Record<string, string> = {
-    open: 'bg-blue-100 text-blue-800 border-blue-200',
+    open: 'bg-status-info-bg text-status-info border-status-info/30',
     under_investigation: 'bg-primary/10 text-primary border-primary',
-    awaiting_response: 'bg-amber-100 text-amber-800 border-amber-200',
-    resolved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    awaiting_response: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    resolved: 'bg-status-success-bg text-status-success border-status-success/30',
     closed: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassByCaseType: Record<string, string> = {
-    disciplinary: 'bg-red-100 text-red-800 border-red-200',
-    grievance: 'bg-orange-100 text-orange-800 border-orange-200',
+    disciplinary: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    grievance: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     investigation: 'bg-primary/10 text-primary border-primary',
-    welfare: 'bg-green-100 text-green-800 border-green-200',
-    complaint: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    welfare: 'bg-status-success-bg text-status-success border-status-success/30',
+    complaint: 'bg-status-info-bg text-status-info border-status-info/30',
     other: 'bg-muted text-foreground border-border',
 };
 
 const badgeClassBySeverity: Record<string, string> = {
-    critical: 'bg-red-100 text-red-800 border-red-200',
-    high: 'bg-orange-100 text-orange-800 border-orange-200',
-    medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    medium: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     low: 'bg-muted text-foreground border-border',
 };
 
@@ -177,7 +177,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                         </div>
                         <div className="rounded-md border p-3">
                             <div className="text-xs text-muted-foreground">SLA Watch</div>
-                            <div className="mt-1 flex items-center gap-2 text-xl font-semibold text-amber-700">
+                            <div className="mt-1 flex items-center gap-2 text-xl font-semibold text-status-warning">
                                 <Clock3 className="h-4 w-4" />
                                 {summary.disciplinary_sla_due_24h}
                             </div>
@@ -185,7 +185,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                         </div>
                         <div className="rounded-md border p-3">
                             <div className="text-xs text-muted-foreground">Escalation Risk</div>
-                            <div className="mt-1 flex items-center gap-2 text-xl font-semibold text-red-700">
+                            <div className="mt-1 flex items-center gap-2 text-xl font-semibold text-status-critical">
                                 <AlertTriangle className="h-4 w-4" />
                                 {summary.escalation_candidates}
                             </div>

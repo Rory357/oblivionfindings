@@ -224,17 +224,17 @@ const EMOTION_INFO: Record<
     happy: {
         emoji: '😊',
         label: 'Happy',
-        color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+        color: 'bg-status-success-bg text-status-success border-status-success/30',
     },
     calm: {
         emoji: '😌',
         label: 'Calm',
-        color: 'bg-sky-100 text-sky-700 border-sky-200',
+        color: 'bg-status-info-bg text-status-info border-status-info/30',
     },
     excited: {
         emoji: '🤩',
         label: 'Excited',
-        color: 'bg-amber-100 text-amber-700 border-amber-200',
+        color: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     },
     tired: {
         emoji: '😴',
@@ -244,17 +244,17 @@ const EMOTION_INFO: Record<
     anxious: {
         emoji: '😰',
         label: 'Anxious',
-        color: 'bg-orange-100 text-orange-700 border-orange-200',
+        color: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     },
     sad: {
         emoji: '😢',
         label: 'Sad',
-        color: 'bg-blue-100 text-blue-700 border-blue-200',
+        color: 'bg-status-info-bg text-status-info border-status-info/30',
     },
     frustrated: {
         emoji: '😤',
         label: 'Frustrated',
-        color: 'bg-red-100 text-red-700 border-red-200',
+        color: 'bg-status-critical-bg text-status-critical border-status-critical/30',
     },
     confused: {
         emoji: '😕',
@@ -293,13 +293,13 @@ function formatShiftTypeLabel(value?: string | null): string {
 }
 
 const statusColors: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-amber-100 text-amber-800',
-    completed: 'bg-emerald-100 text-emerald-800',
+    scheduled: 'bg-status-info-bg text-status-info',
+    in_progress: 'bg-status-warning-bg text-status-warning',
+    completed: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
-    pending: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-emerald-100 text-emerald-800',
-    declined: 'bg-red-100 text-red-800',
+    pending: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-success-bg text-status-success',
+    declined: 'bg-status-critical-bg text-status-critical',
 };
 
 const visitTypeLabels: Record<
@@ -312,10 +312,10 @@ const visitTypeLabels: Record<
 };
 
 const severityColors: Record<string, string> = {
-    low: 'bg-blue-100 text-blue-800',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
+    low: 'bg-status-info-bg text-status-info',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 function calculateAge(dob: string): number {
@@ -420,10 +420,10 @@ export default function FamilyDashboard({
 
             <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
                 {/* ── Hero header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-r from-amber-50 via-orange-50/30 to-rose-50/20 p-6 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-rose-950/10">
+                <div className="relative overflow-hidden rounded-2xl border bg-primary/10/20 p-6 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-rose-950/10">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
-                            <Avatar className="h-16 w-16 ring-2 ring-amber-200 ring-offset-2 dark:ring-amber-700">
+                            <Avatar className="h-16 w-16 ring-2 ring-status-warning ring-offset-2 dark:ring-status-warning">
                                 <AvatarImage
                                     src={
                                         client.avatar ??
@@ -432,7 +432,7 @@ export default function FamilyDashboard({
                                     }
                                     alt={fullName}
                                 />
-                                <AvatarFallback className="bg-amber-100 text-lg font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                <AvatarFallback className="bg-status-warning-bg text-lg font-semibold text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                                     {getInitials(fullName)}
                                 </AvatarFallback>
                             </Avatar>
@@ -447,7 +447,7 @@ export default function FamilyDashboard({
                                     {relation && (
                                         <Badge
                                             variant="outline"
-                                            className="border-amber-200 bg-amber-50 text-amber-700 capitalize dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                                            className="border-status-warning/30 bg-status-warning-bg text-status-warning capitalize dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
                                         >
                                             <Heart className="mr-1 h-3 w-3" />
                                             {relation}
@@ -464,7 +464,7 @@ export default function FamilyDashboard({
                                             variant="secondary"
                                             className={
                                                 client.status === 'active'
-                                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                                    ? 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success'
                                                     : ''
                                             }
                                         >
@@ -517,7 +517,7 @@ export default function FamilyDashboard({
                                             }
                                         />
                                         {form.errors.requested_date && (
-                                            <p className="mt-1 text-xs text-red-500">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {form.errors.requested_date}
                                             </p>
                                         )}
@@ -695,7 +695,7 @@ export default function FamilyDashboard({
                                 ? `${stats.shiftsToday} visit${stats.shiftsToday !== 1 ? 's' : ''} planned for today`
                                 : 'A quiet day \u2014 no visits scheduled'
                         }
-                        bgClass="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/20"
+                        bgClass="bg-status-info-bg dark:from-sky-950/20 dark:to-blue-950/20"
                     />
                     <GlanceCard
                         emoji={
@@ -712,7 +712,7 @@ export default function FamilyDashboard({
                                   ? `${stats.shiftsThisWeek} visit${stats.shiftsThisWeek !== 1 ? 's' : ''} this week`
                                   : 'A clear week ahead \u2014 enjoy!'
                         }
-                        bgClass="bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20"
+                        bgClass="bg-primary/10 dark:from-violet-950/20 dark:to-purple-950/20"
                     />
                     <GlanceCard
                         emoji={stats.pendingVisitRequests > 0 ? '⏳' : '✅'}
@@ -721,7 +721,7 @@ export default function FamilyDashboard({
                                 ? `${stats.pendingVisitRequests} visit request${stats.pendingVisitRequests !== 1 ? 's' : ''} being reviewed`
                                 : 'All caught up! No pending requests'
                         }
-                        bgClass="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20"
+                        bgClass="bg-status-warning-bg dark:from-amber-950/20 dark:to-yellow-950/20"
                     />
                 </div>
 
@@ -828,13 +828,13 @@ export default function FamilyDashboard({
                             <CardContent>
                                 <div className="mb-3 flex items-center gap-4">
                                     <span className="text-sm">
-                                        <span className="font-bold text-blue-700">
+                                        <span className="font-bold text-status-info">
                                             {familyNotesSummary.open}
                                         </span>{' '}
                                         open
                                     </span>
                                     {familyNotesSummary.overdue > 0 && (
-                                        <span className="text-sm font-medium text-red-600">
+                                        <span className="text-sm font-medium text-status-critical">
                                             {familyNotesSummary.overdue} overdue
                                         </span>
                                     )}
@@ -845,7 +845,7 @@ export default function FamilyDashboard({
                                         {familyNotesSummary.recent.map((n) => (
                                             <div
                                                 key={n.id}
-                                                className={`flex items-center justify-between rounded-lg border p-2 ${n.is_overdue ? 'border-red-200 bg-red-50/30' : ''}`}
+                                                className={`flex items-center justify-between rounded-lg border p-2 ${n.is_overdue ? 'border-status-critical/30 bg-status-critical-bg' : ''}`}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm">
@@ -963,7 +963,7 @@ export default function FamilyDashboard({
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    <div className="flex items-center gap-3 rounded-lg bg-amber-50/50 p-3 dark:bg-amber-950/10">
+                                    <div className="flex items-center gap-3 rounded-lg bg-status-warning-bg p-3 dark:bg-status-warning">
                                         <span className="text-2xl">
                                             {dailySummary.completedToday > 0 &&
                                             dailySummary.scheduledToday === 0
@@ -1046,15 +1046,15 @@ export default function FamilyDashboard({
                                             {carePlan.goals_completed ===
                                                 carePlan.goals_count &&
                                                 carePlan.goals_count > 0 && (
-                                                    <p className="mt-1.5 text-xs font-medium text-emerald-600">
+                                                    <p className="mt-1.5 text-xs font-medium text-status-success">
                                                         All goals achieved! 🎉
                                                     </p>
                                                 )}
                                         </div>
                                     )}
                                     {carePlan.important_to_me && (
-                                        <div className="rounded-lg bg-amber-50/70 p-3 dark:bg-amber-950/10">
-                                            <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                                        <div className="rounded-lg bg-status-warning-bg p-3 dark:bg-status-warning">
+                                            <p className="mb-1 text-xs font-medium text-status-warning dark:text-status-warning">
                                                 ⭐ What's Important to Me
                                             </p>
                                             <p className="text-sm leading-relaxed">
@@ -1085,21 +1085,21 @@ export default function FamilyDashboard({
                                     {(carePlan.likes || carePlan.dislikes) && (
                                         <div className="grid grid-cols-2 gap-3">
                                             {carePlan.likes && (
-                                                <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/20">
-                                                    <p className="mb-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                                                <div className="rounded-lg bg-status-success-bg p-3 dark:bg-status-success">
+                                                    <p className="mb-1 text-xs font-medium text-status-success dark:text-status-success">
                                                         💚 Things I Love
                                                     </p>
-                                                    <p className="text-xs leading-relaxed text-emerald-800 dark:text-emerald-300">
+                                                    <p className="text-xs leading-relaxed text-status-success dark:text-status-success">
                                                         {carePlan.likes}
                                                     </p>
                                                 </div>
                                             )}
                                             {carePlan.dislikes && (
-                                                <div className="rounded-lg bg-rose-50 p-3 dark:bg-rose-950/20">
-                                                    <p className="mb-1 text-xs font-medium text-rose-700 dark:text-rose-400">
+                                                <div className="rounded-lg bg-status-critical-bg p-3 dark:bg-rose-950/20">
+                                                    <p className="mb-1 text-xs font-medium text-status-critical dark:text-status-critical">
                                                         Not a Fan Of
                                                     </p>
-                                                    <p className="text-xs leading-relaxed text-rose-800 dark:text-rose-300">
+                                                    <p className="text-xs leading-relaxed text-status-critical dark:text-status-critical">
                                                         {carePlan.dislikes}
                                                     </p>
                                                 </div>
@@ -1237,11 +1237,11 @@ export default function FamilyDashboard({
                                                                     className={`h-1.5 w-1.5 rounded-full ${
                                                                         s.status ===
                                                                         'completed'
-                                                                            ? 'bg-emerald-500'
+                                                                            ? 'bg-status-success'
                                                                             : s.status ===
                                                                                 'in_progress'
-                                                                              ? 'bg-amber-500'
-                                                                              : 'bg-blue-500'
+                                                                              ? 'bg-status-warning'
+                                                                              : 'bg-status-info'
                                                                     }`}
                                                                     title={`${s.staff_name ?? 'Staff'} - ${s.status}`}
                                                                 />
@@ -1274,7 +1274,7 @@ export default function FamilyDashboard({
 
                         {/* Consent Requests */}
                         {pendingConsentRequests.length > 0 && (
-                            <Card className="border-amber-300 bg-amber-50">
+                            <Card className="border-status-warning/30 bg-status-warning-bg">
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span>🔏</span>
@@ -1395,7 +1395,7 @@ export default function FamilyDashboard({
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
-                                                                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                                                                className="h-7 w-7 p-0 text-muted-foreground hover:text-status-critical"
                                                                 onClick={() =>
                                                                     cancelVisit(
                                                                         visit.id,
@@ -1613,7 +1613,7 @@ export default function FamilyDashboard({
 
                         {/* On Shift Now */}
                         {(currentShiftWorker || nextShiftWorker) && (
-                            <Card className="border-emerald-200 bg-emerald-50/30 dark:bg-emerald-950/10">
+                            <Card className="border-status-success/30 bg-status-success-bg dark:bg-status-success">
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <span>🟢</span>
@@ -1653,7 +1653,7 @@ export default function FamilyDashboard({
                                                             currentShiftWorker.name
                                                         }
                                                     </p>
-                                                    <p className="text-[10px] text-emerald-600">
+                                                    <p className="text-[10px] text-status-success">
                                                         Currently on shift
                                                     </p>
                                                     {(currentShiftWorker.shift_type ||
@@ -1783,7 +1783,7 @@ export default function FamilyDashboard({
                                 <CardContent>
                                     <div className="flex items-center gap-3">
                                         <div className="relative">
-                                            <Avatar className="h-11 w-11 ring-2 ring-amber-100 ring-offset-1 dark:ring-amber-800">
+                                            <Avatar className="h-11 w-11 ring-2 ring-status-warning ring-offset-1 dark:ring-status-warning">
                                                 <AvatarImage
                                                     src={
                                                         keyWorker.avatar ??
@@ -1791,7 +1791,7 @@ export default function FamilyDashboard({
                                                     }
                                                     alt={keyWorker.name}
                                                 />
-                                                <AvatarFallback className="bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                                                <AvatarFallback className="bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
                                                     {getInitials(
                                                         keyWorker.name,
                                                     )}
@@ -1924,10 +1924,10 @@ export default function FamilyDashboard({
                                     <CardContent className="space-y-3 text-sm">
                                         {medicalSummary.allergies && (
                                             <div>
-                                                <p className="mb-1 text-xs font-medium tracking-wider text-rose-600 uppercase">
+                                                <p className="mb-1 text-xs font-medium tracking-wider text-status-critical uppercase">
                                                     Allergies
                                                 </p>
-                                                <p className="rounded-md bg-rose-50 px-3 py-2 text-rose-800">
+                                                <p className="rounded-md bg-status-critical-bg px-3 py-2 text-status-critical">
                                                     {medicalSummary.allergies}
                                                 </p>
                                             </div>
@@ -1960,9 +1960,9 @@ export default function FamilyDashboard({
 
                         {/* Critical Alerts */}
                         {criticalAlerts.length > 0 && (
-                            <Card className="border-red-200 bg-red-50/30">
+                            <Card className="border-status-critical/30 bg-status-critical-bg">
                                 <CardHeader className="pb-3">
-                                    <CardTitle className="flex items-center gap-2 text-base text-red-700">
+                                    <CardTitle className="flex items-center gap-2 text-base text-status-critical">
                                         <ShieldAlert className="h-4 w-4" />
                                         Critical Alerts
                                     </CardTitle>
@@ -1972,7 +1972,7 @@ export default function FamilyDashboard({
                                         {criticalAlerts.map((alert) => (
                                             <div
                                                 key={alert.id}
-                                                className="rounded-lg border border-red-200 bg-white p-3"
+                                                className="rounded-lg border border-status-critical/30 bg-white p-3"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <span className="text-sm font-medium">
@@ -2006,7 +2006,7 @@ export default function FamilyDashboard({
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" />
                                         Recent Incidents
                                     </CardTitle>
                                 </CardHeader>

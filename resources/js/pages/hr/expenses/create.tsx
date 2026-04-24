@@ -101,7 +101,7 @@ export default function CreateExpense({ categories }: Props) {
                         </CardHeader>
                         <CardContent className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
+                                <Label htmlFor="title">Title <span className="text-status-critical">*</span></Label>
                                 <Input
                                     id="title"
                                     value={title}
@@ -109,7 +109,7 @@ export default function CreateExpense({ categories }: Props) {
                                     placeholder="e.g. March Client Visit Expenses"
                                     required
                                 />
-                                {errors.title && <p className="text-sm text-red-600">{errors.title}</p>}
+                                {errors.title && <p className="text-sm text-status-critical">{errors.title}</p>}
                             </div>
                             <div className="space-y-2 sm:col-span-2">
                                 <Label htmlFor="notes">Notes (optional)</Label>
@@ -120,7 +120,7 @@ export default function CreateExpense({ categories }: Props) {
                                     onChange={(e) => setNotes(e.target.value)}
                                     placeholder="Any additional notes for this claim..."
                                 />
-                                {errors.notes && <p className="text-sm text-red-600">{errors.notes}</p>}
+                                {errors.notes && <p className="text-sm text-status-critical">{errors.notes}</p>}
                             </div>
                         </CardContent>
                     </Card>
@@ -148,14 +148,14 @@ export default function CreateExpense({ categories }: Props) {
                                     </div>
                                     <div className="grid gap-3 sm:grid-cols-3">
                                         <div className="space-y-2 sm:col-span-2">
-                                            <Label>Description <span className="text-red-500">*</span></Label>
+                                            <Label>Description <span className="text-status-critical">*</span></Label>
                                             <Input
                                                 value={item.description}
                                                 onChange={(e) => updateItem(index, 'description', e.target.value)}
                                                 placeholder="What was the expense for?"
                                                 required
                                             />
-                                            {errors[`items.${index}.description`] && <p className="text-sm text-red-600">{errors[`items.${index}.description`]}</p>}
+                                            {errors[`items.${index}.description`] && <p className="text-sm text-status-critical">{errors[`items.${index}.description`]}</p>}
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Category</Label>
@@ -171,10 +171,10 @@ export default function CreateExpense({ categories }: Props) {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            {errors[`items.${index}.category`] && <p className="text-sm text-red-600">{errors[`items.${index}.category`]}</p>}
+                                            {errors[`items.${index}.category`] && <p className="text-sm text-status-critical">{errors[`items.${index}.category`]}</p>}
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Amount ($) <span className="text-red-500">*</span></Label>
+                                            <Label>Amount ($) <span className="text-status-critical">*</span></Label>
                                             <Input
                                                 type="number"
                                                 step="0.01"
@@ -183,17 +183,17 @@ export default function CreateExpense({ categories }: Props) {
                                                 onChange={(e) => updateItem(index, 'amount', e.target.value)}
                                                 required
                                             />
-                                            {errors[`items.${index}.amount`] && <p className="text-sm text-red-600">{errors[`items.${index}.amount`]}</p>}
+                                            {errors[`items.${index}.amount`] && <p className="text-sm text-status-critical">{errors[`items.${index}.amount`]}</p>}
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Date <span className="text-red-500">*</span></Label>
+                                            <Label>Date <span className="text-status-critical">*</span></Label>
                                             <Input
                                                 type="date"
                                                 value={item.expense_date}
                                                 onChange={(e) => updateItem(index, 'expense_date', e.target.value)}
                                                 required
                                             />
-                                            {errors[`items.${index}.expense_date`] && <p className="text-sm text-red-600">{errors[`items.${index}.expense_date`]}</p>}
+                                            {errors[`items.${index}.expense_date`] && <p className="text-sm text-status-critical">{errors[`items.${index}.expense_date`]}</p>}
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Tax Amount ($)</Label>
@@ -205,7 +205,7 @@ export default function CreateExpense({ categories }: Props) {
                                                 onChange={(e) => updateItem(index, 'tax_amount', e.target.value)}
                                                 placeholder="Optional"
                                             />
-                                            {errors[`items.${index}.tax_amount`] && <p className="text-sm text-red-600">{errors[`items.${index}.tax_amount`]}</p>}
+                                            {errors[`items.${index}.tax_amount`] && <p className="text-sm text-status-critical">{errors[`items.${index}.tax_amount`]}</p>}
                                         </div>
                                     </div>
                                 </div>

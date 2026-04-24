@@ -50,7 +50,7 @@ export default function EditPerformance({ auth, review }: { auth: any; review: R
             <Head title={`Edit: ${review.review_cycle} Review`} />
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center gap-3 mb-6">
-                    <UserCheck className="w-8 h-8 text-blue-600" />
+                    <UserCheck className="w-8 h-8 text-status-info" />
                     <h1 className="text-3xl font-bold text-foreground">Edit Performance Review</h1>
                 </div>
                 <Card>

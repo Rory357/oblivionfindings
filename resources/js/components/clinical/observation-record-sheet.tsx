@@ -390,9 +390,9 @@ export default function ObservationRecordSheet({
 
                     {/* Validation errors */}
                     {Object.keys(errors).length > 0 && (
-                        <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                        <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3">
                             {Object.entries(errors).map(([key, msg]) => (
-                                <p key={key} className="text-xs text-red-600">
+                                <p key={key} className="text-xs text-status-critical">
                                     {msg}
                                 </p>
                             ))}

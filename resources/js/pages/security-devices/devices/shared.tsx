@@ -117,8 +117,8 @@ export function StatCard({ label, value, icon: Icon, variant = 'default' }: {
     return (
         <Card>
             <CardContent className="flex items-center gap-4 p-4">
-                <div className={`rounded-lg p-2 ${variant === 'warning' && value > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}>
-                    <Icon className={`h-5 w-5 ${variant === 'warning' && value > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`} />
+                <div className={`rounded-lg p-2 ${variant === 'warning' && value > 0 ? 'bg-status-warning-bg dark:bg-status-warning' : 'bg-muted'}`}>
+                    <Icon className={`h-5 w-5 ${variant === 'warning' && value > 0 ? 'text-status-warning dark:text-status-warning' : 'text-muted-foreground'}`} />
                 </div>
                 <div>
                     <p className="text-2xl font-semibold">{value}</p>

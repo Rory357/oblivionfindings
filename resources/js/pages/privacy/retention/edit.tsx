@@ -67,7 +67,7 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                     onChange={(e) => setData('policy_name', e.target.value)}
                                 />
                                 {errors.policy_name && (
-                                    <p className="text-xs text-red-500">{errors.policy_name}</p>
+                                    <p className="text-xs text-status-critical">{errors.policy_name}</p>
                                 )}
                             </div>
 

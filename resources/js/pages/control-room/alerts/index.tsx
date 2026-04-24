@@ -93,10 +93,10 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-black',
-    low: 'bg-green-600 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-black',
+    low: 'bg-status-success text-white',
 };
 
 const severityBorders: Record<string, string> = {
@@ -107,10 +107,10 @@ const severityBorders: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-    open: 'bg-red-100 text-red-800 border-red-200',
-    ack: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    triaging: 'bg-blue-100 text-blue-800 border-blue-200',
-    resolved: 'bg-green-100 text-green-800 border-green-200',
+    open: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    ack: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    triaging: 'bg-status-info-bg text-status-info border-status-info/30',
+    resolved: 'bg-status-success-bg text-status-success border-status-success/30',
     closed: 'bg-muted text-foreground border-border',
 };
 
@@ -123,9 +123,9 @@ const statusLabels: Record<string, string> = {
 };
 
 const slaColors: Record<string, string> = {
-    green: 'text-green-500',
-    yellow: 'text-yellow-500',
-    red: 'text-red-500',
+    green: 'text-status-success',
+    yellow: 'text-status-warning',
+    red: 'text-status-critical',
 };
 
 function formatRelativeTime(isoString: string | null): string {
@@ -592,7 +592,7 @@ export default function AlertsIndex({
                                                     alert.escalation_level > 0 && (
                                                         <Badge
                                                             variant="outline"
-                                                            className="border-orange-300 text-orange-700 text-[10px] px-1 py-0"
+                                                            className="border-status-warning/30 text-status-warning text-[10px] px-1 py-0"
                                                         >
                                                             L{alert.escalation_level}
                                                         </Badge>
@@ -613,7 +613,7 @@ export default function AlertsIndex({
                                             <Badge
                                                 className={`inline-flex items-center gap-1 ${
                                                     severityColors[alert.severity] ??
-                                                    'bg-gray-500 text-white'
+                                                    'bg-muted-foreground/80 text-white'
                                                 }`}
                                             >
                                                 {severityIcon(alert.severity)}

@@ -150,7 +150,7 @@ function DepartmentDialog({
                                 onChange={(e) => form.setData('name', e.target.value)}
                                 placeholder="e.g. Care Services"
                             />
-                            {form.errors.name && <p className="text-xs text-red-600">{form.errors.name}</p>}
+                            {form.errors.name && <p className="text-xs text-status-critical">{form.errors.name}</p>}
                         </div>
 
                         <div className="space-y-2">
@@ -394,8 +394,8 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                                                     variant="outline"
                                                     className={
                                                         dept.is_active
-                                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                                            : 'border-border bg-muted text-muted-foreground dark:border-slate-500/30 dark:bg-slate-500/10 dark:text-muted-foreground'
+                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success'
+                                                            : 'border-border bg-muted text-muted-foreground dark:border-border/30 dark:bg-muted-foreground/80/10 dark:text-muted-foreground'
                                                     }
                                                 >
                                                     {dept.is_active ? 'Active' : 'Inactive'}
@@ -411,7 +411,7 @@ export default function DepartmentsIndex({ departments, managers, parentOptions,
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => handleDeactivate(dept)}
-                                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                                            className="h-8 w-8 p-0 text-status-critical hover:text-status-critical"
                                                         >
                                                             <Trash2 className="h-3.5 w-3.5" />
                                                         </Button>

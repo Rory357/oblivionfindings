@@ -86,22 +86,22 @@ export default function SiteDetailReport({
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-amber-400" />
+                            <AlertTriangle className="w-4 h-4 text-status-warning" />
                             Hazards
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-4 sm:grid-cols-4">
                             <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-amber-400">{hazardStats.open}</div>
+                                <div className="text-2xl font-bold text-status-warning">{hazardStats.open}</div>
                                 <div className="text-sm text-muted-foreground">Open</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-emerald-400">{hazardStats.closed}</div>
+                                <div className="text-2xl font-bold text-status-success">{hazardStats.closed}</div>
                                 <div className="text-sm text-muted-foreground">Closed</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-red-400">{hazardStats.overdue}</div>
+                                <div className="text-2xl font-bold text-status-critical">{hazardStats.overdue}</div>
                                 <div className="text-sm text-muted-foreground">Overdue</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
@@ -118,7 +118,7 @@ export default function SiteDetailReport({
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base flex items-center gap-2">
-                            <ClipboardList className="w-4 h-4 text-blue-400" />
+                            <ClipboardList className="w-4 h-4 text-status-info" />
                             Checklists
                         </CardTitle>
                     </CardHeader>
@@ -129,15 +129,15 @@ export default function SiteDetailReport({
                                 <div className="text-sm text-muted-foreground">Total Runs</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-emerald-400">{checklistStats.completed_runs}</div>
+                                <div className="text-2xl font-bold text-status-success">{checklistStats.completed_runs}</div>
                                 <div className="text-sm text-muted-foreground">Completed</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-red-400">{checklistStats.overdue_runs}</div>
+                                <div className="text-2xl font-bold text-status-critical">{checklistStats.overdue_runs}</div>
                                 <div className="text-sm text-muted-foreground">Overdue</div>
                             </div>
                             <div className="text-center p-3 rounded-lg border">
-                                <div className="text-2xl font-bold text-blue-400">{checklistStats.completion_rate}%</div>
+                                <div className="text-2xl font-bold text-status-info">{checklistStats.completion_rate}%</div>
                                 <div className="text-sm text-muted-foreground">Completion Rate</div>
                             </div>
                         </div>
@@ -160,11 +160,11 @@ export default function SiteDetailReport({
                                     <div className="text-sm text-muted-foreground">Scheduled</div>
                                 </div>
                                 <div className="text-center p-3 rounded-lg border">
-                                    <div className="text-2xl font-bold text-emerald-400">{inspectionStats.completed}</div>
+                                    <div className="text-2xl font-bold text-status-success">{inspectionStats.completed}</div>
                                     <div className="text-sm text-muted-foreground">Completed</div>
                                 </div>
                                 <div className="text-center p-3 rounded-lg border">
-                                    <div className="text-2xl font-bold text-red-400">{inspectionStats.overdue}</div>
+                                    <div className="text-2xl font-bold text-status-critical">{inspectionStats.overdue}</div>
                                     <div className="text-sm text-muted-foreground">Overdue</div>
                                 </div>
                             </div>
@@ -174,7 +174,7 @@ export default function SiteDetailReport({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Key className="w-4 h-4 text-orange-400" />
+                                <Key className="w-4 h-4 text-status-warning" />
                                 Credentials
                             </CardTitle>
                         </CardHeader>
@@ -185,7 +185,7 @@ export default function SiteDetailReport({
                                     <div className="text-sm text-muted-foreground">Total</div>
                                 </div>
                                 <div className="text-center p-3 rounded-lg border">
-                                    <div className="text-2xl font-bold text-orange-400">{credentialStats.requiring_reauth}</div>
+                                    <div className="text-2xl font-bold text-status-warning">{credentialStats.requiring_reauth}</div>
                                     <div className="text-sm text-muted-foreground">Requiring Reauth</div>
                                 </div>
                             </div>

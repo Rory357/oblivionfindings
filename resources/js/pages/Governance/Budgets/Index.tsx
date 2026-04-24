@@ -32,19 +32,19 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
   const getStatusColor = (status: string) => {
     return {
       drafting: 'bg-muted text-foreground',
-      proposed: 'bg-yellow-100 text-yellow-800',
-      under_review: 'bg-blue-100 text-blue-800',
-      approved: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800',
+      proposed: 'bg-status-warning-bg text-status-warning',
+      under_review: 'bg-status-info-bg text-status-info',
+      approved: 'bg-status-success-bg text-status-success',
+      rejected: 'bg-status-critical-bg text-status-critical',
     }[status] || 'bg-muted text-foreground';
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'approved': return <CheckCircle className="w-4 h-4 text-status-success" />;
       case 'proposed':
-      case 'under_review': return <Clock className="w-4 h-4 text-yellow-600" />;
-      case 'rejected': return <AlertTriangle className="w-4 h-4 text-red-600" />;
+      case 'under_review': return <Clock className="w-4 h-4 text-status-warning" />;
+      case 'rejected': return <AlertTriangle className="w-4 h-4 text-status-critical" />;
       default: return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
   };
@@ -100,11 +100,11 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Approved</p>
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-2xl font-bold text-status-success">
                       {budgetItems.filter(b => b.status === 'approved').length}
                     </p>
                   </div>
-                  <CheckCircle className="w-8 h-8 text-green-400" />
+                  <CheckCircle className="w-8 h-8 text-status-success" />
                 </div>
               </CardContent>
             </Card>
@@ -113,11 +113,11 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Pending Review</p>
-                    <p className="text-2xl font-bold text-yellow-600">
+                    <p className="text-2xl font-bold text-status-warning">
                       {budgetItems.filter(b => ['proposed', 'under_review'].includes(b.status)).length}
                     </p>
                   </div>
-                  <Clock className="w-8 h-8 text-yellow-400" />
+                  <Clock className="w-8 h-8 text-status-warning" />
                 </div>
               </CardContent>
             </Card>
@@ -129,7 +129,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
           <Card>
             <CardContent className="pt-6">
               <div className="text-center py-12">
-                <DollarSign className="mx-auto h-12 w-12 text-gray-300" />
+                <DollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-2 text-sm font-semibold text-foreground">No budgets yet</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Create your first budget to start financial planning.</p>
                 <div className="mt-6">
@@ -157,7 +157,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
                           <h3 className="text-xl font-semibold">
                             <Link
                               href={showBudget.url({ budget: budget.id })}
-                              className="hover:text-blue-600"
+                              className="hover:text-status-info"
                             >
                               {budget.title || `Budget ${budget.fiscal_year}`}
                             </Link>
@@ -190,7 +190,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
                           {getStatusIcon(budget.status)}
                           <span className={cn(
                             'text-sm',
-                            budget.approved_by_board_at ? 'text-green-600' : 'text-yellow-600',
+                            budget.approved_by_board_at ? 'text-status-success' : 'text-status-warning',
                           )}>
                             {budget.approved_by_board_at ? 'Approved' : 'Pending Approval'}
                           </span>
@@ -198,7 +198,7 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
                         {variance !== 0 && budget.total_allocated > 0 && (
                           <p className={cn(
                             'text-xs mt-1',
-                            variance > 0 ? 'text-red-500' : 'text-green-500',
+                            variance > 0 ? 'text-status-critical' : 'text-status-success',
                           )}>
                             {variance > 0 ? '+' : ''}{formatCurrency(variance)} variance
                           </p>

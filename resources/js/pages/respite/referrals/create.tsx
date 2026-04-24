@@ -64,7 +64,7 @@ export default function RespiteReferralCreate({ clients }: Props) {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.client_id && <div className="mt-1 text-xs text-red-500">{errors.client_id}</div>}
+                                    {errors.client_id && <div className="mt-1 text-xs text-status-critical">{errors.client_id}</div>}
                                 </div>
                                 <div>
                                     <Label>Urgency *</Label>
@@ -76,7 +76,7 @@ export default function RespiteReferralCreate({ clients }: Props) {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.urgency && <div className="mt-1 text-xs text-red-500">{errors.urgency}</div>}
+                                    {errors.urgency && <div className="mt-1 text-xs text-status-critical">{errors.urgency}</div>}
                                 </div>
                             </div>
 
@@ -105,7 +105,7 @@ export default function RespiteReferralCreate({ clients }: Props) {
                                 <div>
                                     <Label>Referrer Name *</Label>
                                     <Input value={data.referrer_name} onChange={(e) => setData('referrer_name', e.target.value)} />
-                                    {errors.referrer_name && <div className="mt-1 text-xs text-red-500">{errors.referrer_name}</div>}
+                                    {errors.referrer_name && <div className="mt-1 text-xs text-status-critical">{errors.referrer_name}</div>}
                                 </div>
                             </div>
 
@@ -117,7 +117,7 @@ export default function RespiteReferralCreate({ clients }: Props) {
                             <div>
                                 <Label>Referral Reason *</Label>
                                 <Textarea value={data.referral_reason} onChange={(e) => setData('referral_reason', e.target.value)} rows={4} />
-                                {errors.referral_reason && <div className="mt-1 text-xs text-red-500">{errors.referral_reason}</div>}
+                                {errors.referral_reason && <div className="mt-1 text-xs text-status-critical">{errors.referral_reason}</div>}
                             </div>
                         </CardContent>
                     </Card>

@@ -344,17 +344,17 @@ export default function GeofencesIndex({ geofences, sites, filters }: Props) {
                                                 <Badge
                                                     variant="outline"
                                                     className={`text-xs ${
-                                                        gf.alert_config.severity === 'critical' ? 'border-red-500 text-red-600' :
-                                                        gf.alert_config.severity === 'high' ? 'border-orange-500 text-orange-600' :
-                                                        gf.alert_config.severity === 'medium' ? 'border-yellow-500 text-yellow-600' :
-                                                        'border-green-500 text-green-600'
+                                                        gf.alert_config.severity === 'critical' ? 'border-status-critical/30 text-status-critical' :
+                                                        gf.alert_config.severity === 'high' ? 'border-status-warning/30 text-status-warning' :
+                                                        gf.alert_config.severity === 'medium' ? 'border-status-warning/30 text-status-warning' :
+                                                        'border-status-success/30 text-status-success'
                                                     }`}
                                                 >
                                                     {gf.alert_config.severity}
                                                 </Badge>
                                             )}
                                             {gf.alert_config.notify_control_room && (
-                                                <Badge variant="outline" className="text-xs border-blue-500 text-blue-600">
+                                                <Badge variant="outline" className="text-xs border-status-info/30 text-status-info">
                                                     Control Room
                                                 </Badge>
                                             )}

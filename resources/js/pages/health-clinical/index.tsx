@@ -79,16 +79,16 @@ function KpiCard({
     variant?: 'default' | 'warning' | 'danger' | 'success';
 }) {
     const colorMap = {
-        default: 'from-slate-50 to-slate-100 text-muted-foreground',
-        warning: 'from-amber-50 to-orange-50 text-amber-600',
-        danger: 'from-red-50 to-rose-50 text-red-600',
-        success: 'from-emerald-50 to-green-50 text-emerald-600',
+        default: 'from-muted to-muted text-muted-foreground',
+        warning: 'from-status-warning-bg to-status-warning-bg text-status-warning',
+        danger: 'from-status-critical-bg to-status-critical-bg text-status-critical',
+        success: 'from-status-success-bg to-status-success-bg text-status-success',
     };
     const iconColorMap = {
         default: 'text-muted-foreground',
-        warning: 'text-amber-500',
-        danger: 'text-red-500',
-        success: 'text-emerald-500',
+        warning: 'text-status-warning',
+        danger: 'text-status-critical',
+        success: 'text-status-success',
     };
 
     return (
@@ -119,9 +119,9 @@ function formatTimeAgo(iso: string): string {
 }
 
 const severityColor: Record<string, string> = {
-    critical: 'bg-red-100 text-red-700 border-red-200',
-    high: 'bg-orange-100 text-orange-700 border-orange-200',
-    medium: 'bg-amber-100 text-amber-700 border-amber-200',
+    critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    medium: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     low: 'bg-muted text-muted-foreground border-border',
 };
 
@@ -208,7 +208,7 @@ export default function HealthClinicalDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <AlertTriangle className="h-4 w-4 text-red-500" />
+                                <AlertTriangle className="h-4 w-4 text-status-critical" />
                                 Overdue Observations
                                 {overdue_items.length > 0 && (
                                     <Badge
@@ -243,7 +243,7 @@ export default function HealthClinicalDashboard({
                                                             item.observation_type_label
                                                         }
                                                     </Badge>
-                                                    <span className="text-xs font-medium text-red-600">
+                                                    <span className="text-xs font-medium text-status-critical">
                                                         {item.hours_overdue}h
                                                         overdue
                                                     </span>
@@ -270,7 +270,7 @@ export default function HealthClinicalDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Stethoscope className="h-4 w-4 text-amber-500" />
+                                <Stethoscope className="h-4 w-4 text-status-warning" />
                                 Recent Clinical Events
                             </CardTitle>
                         </CardHeader>

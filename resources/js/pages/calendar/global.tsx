@@ -48,9 +48,9 @@ type Props = {
 };
 
 const typeColors: Record<string, string> = {
-    head_office: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    house: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    facility: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    head_office: 'bg-status-info-bg text-status-info border-status-info/30',
+    house: 'bg-status-success-bg text-status-success border-status-success/30',
+    facility: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 type CalendarViewProps = {
@@ -106,7 +106,7 @@ function CalendarView({ currentDate, setCurrentDate, events, getEventTypeColor, 
                         <div
                             key={day}
                             className={`min-h-[100px] border rounded-lg p-2 ${
-                                isToday ? 'bg-primary/10 border-primary/30' : 'border-slate-700'
+                                isToday ? 'bg-primary/10 border-primary/30' : 'border-border'
                             }`}
                         >
                             <div className={`text-sm font-medium mb-1 ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -323,7 +323,7 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                                 {filteredEvents.sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()).map(event => (
                                     <div
                                         key={event.id}
-                                        className="flex items-start justify-between p-3 rounded-lg border hover:bg-slate-500/10 transition-colors"
+                                        className="flex items-start justify-between p-3 rounded-lg border hover:bg-muted-foreground/80/10 transition-colors"
                                     >
                                         <div className="flex items-start gap-3 flex-1">
                                             <div

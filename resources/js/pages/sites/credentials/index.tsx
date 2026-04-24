@@ -336,7 +336,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                 <span className="font-medium">{cred.label}</span>
                                                 <Badge variant="outline">{cred.credential_type}</Badge>
                                                 {cred.requires_reauth && (
-                                                    <Badge variant="outline" className="border-amber-500/30 text-amber-400">
+                                                    <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                                         <Lock className="w-3 h-3 mr-1" />
                                                         Protected
                                                     </Badge>
@@ -411,7 +411,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                     </Button>
                                                     <AlertDialog>
                                                         <AlertDialogTrigger asChild>
-                                                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                                                            <Button variant="ghost" size="sm" className="text-status-critical hover:text-status-critical">
                                                                 <Trash2 className="w-4 h-4" />
                                                             </Button>
                                                         </AlertDialogTrigger>
@@ -425,7 +425,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                                 <AlertDialogAction
-                                                                    className="bg-red-600 hover:bg-red-700"
+                                                                    className="bg-status-critical hover:bg-status-critical"
                                                                     onClick={() => router.delete(`/sites/${site.id}/credentials/${cred.id}`)}
                                                                 >
                                                                     Delete

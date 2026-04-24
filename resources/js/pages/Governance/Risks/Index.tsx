@@ -41,10 +41,10 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
   const [searchQuery, setSearchQuery] = useState('');
 
   const getRiskColor = (score: number) => {
-    if (score >= 20) return 'bg-red-500';
-    if (score >= 15) return 'bg-orange-500';
-    if (score >= 10) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (score >= 20) return 'bg-status-critical';
+    if (score >= 15) return 'bg-status-warning';
+    if (score >= 10) return 'bg-status-warning';
+    return 'bg-status-success';
   };
 
   const getRiskLevel = (score: number) => {
@@ -103,25 +103,25 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-red-200">
+            <Card className="border-status-critical/30">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-red-600">Critical</p>
-                    <p className="text-3xl font-bold text-red-600">{totalStats.critical}</p>
+                    <p className="text-sm text-status-critical">Critical</p>
+                    <p className="text-3xl font-bold text-status-critical">{totalStats.critical}</p>
                   </div>
-                  <AlertTriangle className="w-8 h-8 text-red-500" />
+                  <AlertTriangle className="w-8 h-8 text-status-critical" />
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-orange-200">
+            <Card className="border-status-warning/30">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-orange-600">High</p>
-                    <p className="text-3xl font-bold text-orange-600">{totalStats.high}</p>
+                    <p className="text-sm text-status-warning">High</p>
+                    <p className="text-3xl font-bold text-status-warning">{totalStats.high}</p>
                   </div>
-                  <AlertCircle className="w-8 h-8 text-orange-500" />
+                  <AlertCircle className="w-8 h-8 text-status-warning" />
                 </div>
               </CardContent>
             </Card>
@@ -197,7 +197,7 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
                         <div className="flex items-center gap-2">
                           <Link 
                             href={showRisk.url({ risk: risk.id })}
-                            className="font-semibold text-foreground hover:text-blue-600"
+                            className="font-semibold text-foreground hover:text-status-info"
                           >
                             {risk.title}
                           </Link>

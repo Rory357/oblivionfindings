@@ -483,8 +483,8 @@ export default function ControlRoomMap({
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-blue-50 p-2 dark:bg-blue-950">
-                                <Radio className="h-5 w-5 text-blue-600" />
+                            <div className="rounded-lg bg-status-info-bg p-2 dark:bg-status-info">
+                                <Radio className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Total Devices</p>
@@ -494,34 +494,34 @@ export default function ControlRoomMap({
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-green-50 p-2 dark:bg-green-950">
-                                <Wifi className="h-5 w-5 text-green-600" />
+                            <div className="rounded-lg bg-status-success-bg p-2 dark:bg-status-success">
+                                <Wifi className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Online</p>
-                                <p className="text-2xl font-bold text-green-600">{stats.online}</p>
+                                <p className="text-2xl font-bold text-status-success">{stats.online}</p>
                             </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-red-50 p-2 dark:bg-red-950">
-                                <WifiOff className="h-5 w-5 text-red-500" />
+                            <div className="rounded-lg bg-status-critical-bg p-2 dark:bg-status-critical">
+                                <WifiOff className="h-5 w-5 text-status-critical" />
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Offline</p>
-                                <p className="text-2xl font-bold text-red-500">{stats.offline}</p>
+                                <p className="text-2xl font-bold text-status-critical">{stats.offline}</p>
                             </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-amber-50 p-2 dark:bg-amber-950">
-                                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                            <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                                <AlertTriangle className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
                                 <p className="text-xs text-muted-foreground">Active Alerts</p>
-                                <p className="text-2xl font-bold text-amber-600">
+                                <p className="text-2xl font-bold text-status-warning">
                                     {stats.active_alerts}
                                 </p>
                             </div>
@@ -634,15 +634,15 @@ export default function ControlRoomMap({
                                 <h3 className="text-sm font-semibold">Legend</h3>
                                 <div className="space-y-1.5 text-xs">
                                     <div className="flex items-center gap-2">
-                                        <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
+                                        <span className="inline-block h-3 w-3 rounded-full bg-status-success" />
                                         <span>Vehicle - Online</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="inline-block h-3 w-3 rounded-full bg-blue-500" />
+                                        <span className="inline-block h-3 w-3 rounded-full bg-status-info" />
                                         <span>Vehicle - Moving</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
+                                        <span className="inline-block h-3 w-3 rounded-full bg-status-critical" />
                                         <span>Vehicle - Offline</span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -650,13 +650,13 @@ export default function ControlRoomMap({
                                         <span>Resident Tracker</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="inline-block h-3 w-3 rounded-full bg-orange-500" />
+                                        <span className="inline-block h-3 w-3 rounded-full bg-status-warning" />
                                         <span>Site</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="relative inline-block h-3 w-3">
-                                            <span className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-75" />
-                                            <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
+                                            <span className="absolute inset-0 animate-ping rounded-full bg-status-critical opacity-75" />
+                                            <span className="inline-block h-3 w-3 rounded-full bg-status-critical" />
                                         </span>
                                         <span>Active Alert</span>
                                     </div>
@@ -703,9 +703,9 @@ export default function ControlRoomMap({
                                                         ? 'bg-primary'
                                                         : d.status === 'online'
                                                           ? isRecentlySeen(d.last_seen_at, 5)
-                                                              ? 'bg-blue-500'
-                                                              : 'bg-green-500'
-                                                          : 'bg-red-500'
+                                                              ? 'bg-status-info'
+                                                              : 'bg-status-success'
+                                                          : 'bg-status-critical'
                                                 }`}
                                             />
                                             <span className="min-w-0 flex-1 truncate">

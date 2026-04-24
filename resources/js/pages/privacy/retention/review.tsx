@@ -47,7 +47,7 @@ export default function ReviewRetention({ policies }: Props) {
                                         <Badge variant="outline">
                                             {policy.model_type}
                                         </Badge>
-                                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                                        <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info">
                                             <Clock className="mr-1 h-3 w-3" />
                                             {policy.retention_period_years} year retention
                                         </Badge>

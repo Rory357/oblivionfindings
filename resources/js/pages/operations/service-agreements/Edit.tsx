@@ -54,13 +54,13 @@ function SectionHeader({ icon: Icon, iconBg, title, description }: { icon: Lucid
 
 const STATUS_COLORS: Record<string, string> = {
     draft: 'bg-muted text-foreground border-border',
-    pending_approval: 'bg-amber-50 text-amber-700 border-amber-200',
-    active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    pending_approval: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    active: 'bg-status-success-bg text-status-success border-status-success/30',
     under_review: 'bg-primary/10 text-primary border-primary',
-    renewed: 'bg-blue-50 text-blue-700 border-blue-200',
+    renewed: 'bg-status-info-bg text-status-info border-status-info/30',
     expired: 'bg-muted text-muted-foreground border-border',
-    terminated: 'bg-red-50 text-red-700 border-red-200',
-    suspended: 'bg-amber-50 text-amber-700 border-amber-200',
+    terminated: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    suspended: 'bg-status-warning-bg text-status-warning border-status-warning/30',
 };
 
 function statusBadge(status: string) {
@@ -318,7 +318,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={Building2}
-                                iconBg="bg-emerald-100 text-emerald-600"
+                                iconBg="bg-status-success-bg text-status-success"
                                 title="Funding Source"
                                 description="Who is funding this agreement and their reference details."
                             />
@@ -400,7 +400,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={DollarSign}
-                                iconBg="bg-amber-100 text-amber-600"
+                                iconBg="bg-status-warning-bg text-status-warning"
                                 title="Budget & Rates"
                                 description="Allocated funding and service rates in NZD."
                             />
@@ -530,7 +530,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={UserCheck}
-                                iconBg="bg-teal-100 text-teal-600"
+                                iconBg="bg-status-info-bg text-status-info"
                                 title="NASC Details"
                                 description="Needs Assessment and Service Coordination information."
                             />
@@ -590,7 +590,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={FileText}
-                                iconBg="bg-blue-100 text-blue-600"
+                                iconBg="bg-status-info-bg text-status-info"
                                 title="Terms & Notes"
                                 description="Agreement terms, conditions, and any additional notes."
                             />
@@ -622,7 +622,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={Paperclip}
-                                iconBg="bg-cyan-100 text-cyan-600"
+                                iconBg="bg-status-info-bg text-status-info"
                                 title="Documents"
                                 description="Upload signed agreement, addendums, or supporting documents."
                             />
@@ -666,7 +666,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                className="h-6 px-2 text-xs text-red-500 hover:text-red-700"
+                                                className="h-6 px-2 text-xs text-status-critical hover:text-status-critical"
                                                 onClick={(e) => { e.stopPropagation(); removeFile(index); }}
                                             >
                                                 Remove
@@ -680,19 +680,19 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
 
                     {/* Section 7: Approval Workflow (conditional) */}
                     {showApprovalSection && (
-                        <Card className="border-amber-200 bg-amber-50/30">
+                        <Card className="border-status-warning/30 bg-status-warning-bg">
                             <CardContent className="p-5">
                                 <SectionHeader
                                     icon={Send}
-                                    iconBg="bg-amber-100 text-amber-600"
+                                    iconBg="bg-status-warning-bg text-status-warning"
                                     title="Approval Workflow"
                                     description="Submit this agreement for manager review and approval."
                                 />
                                 {agreement.status === 'draft' && (
                                     <div className="space-y-4">
-                                        <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                                            <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
-                                            <div className="text-xs text-blue-700">
+                                        <div className="flex items-start gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3">
+                                            <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-info" />
+                                            <div className="text-xs text-status-info">
                                                 <p className="font-medium">How the approval workflow works:</p>
                                                 <ol className="mt-1.5 list-inside list-decimal space-y-0.5">
                                                     <li>Save your changes first using the button below</li>
@@ -705,7 +705,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                         <Button
                                             type="button"
                                             onClick={handleSubmitForApproval}
-                                            className="bg-amber-600 hover:bg-amber-700"
+                                            className="bg-status-warning hover:bg-status-warning"
                                         >
                                             <Send className="mr-1.5 h-3.5 w-3.5" />
                                             Submit for Approval
@@ -713,9 +713,9 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                     </div>
                                 )}
                                 {agreement.status === 'pending_approval' && (
-                                    <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                                        <div className="text-xs text-amber-700">
+                                    <div className="flex items-start gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg p-3">
+                                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
+                                        <div className="text-xs text-status-warning">
                                             <p className="font-medium">Pending Approval</p>
                                             {agreement.submitted_for_approval_by && (
                                                 <p className="mt-1">

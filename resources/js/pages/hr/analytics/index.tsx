@@ -259,13 +259,13 @@ export default function AnalyticsDashboard({
                                                 {item.type.replace(/_/g, ' ')}
                                             </span>
                                             <div className="flex gap-2">
-                                                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                                                <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
                                                     {item.approved} approved
                                                 </Badge>
-                                                <Badge variant="outline" className="border-yellow-500/30 bg-yellow-500/10 text-yellow-400">
+                                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                                     {item.pending} pending
                                                 </Badge>
-                                                <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-400">
+                                                <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                                     {item.declined} declined
                                                 </Badge>
                                             </div>

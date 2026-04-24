@@ -53,7 +53,7 @@ export default function PolicyEdit({ auth, policy }: Props) {
               <div>
                 <Label htmlFor="title">Policy Title</Label>
                 <Input id="title" value={data.title} onChange={e => setData('title', e.target.value)} />
-                {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
+                {errors.title && <p className="text-status-critical text-sm mt-1">{errors.title}</p>}
               </div>
 
               <div>

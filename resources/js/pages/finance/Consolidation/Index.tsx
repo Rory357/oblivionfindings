@@ -215,7 +215,7 @@ export default function ConsolidationIndex({ groups }: PageProps) {
                                                     variant="outline"
                                                     className={
                                                         group.is_active
-                                                            ? 'bg-green-500/10 text-green-600 border-green-500/30'
+                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
                                                             : 'bg-muted text-muted-foreground border-border'
                                                     }
                                                 >

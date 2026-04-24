@@ -124,9 +124,9 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
 
                 {/* Skill Gaps Alert */}
                 {skillGaps.length > 0 && (
-                    <Card className="border-yellow-500/30">
+                    <Card className="border-status-warning/30">
                         <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-sm text-yellow-400">
+                            <CardTitle className="flex items-center gap-2 text-sm text-status-warning">
                                 <AlertTriangle className="h-4 w-4" />
                                 Skill Gaps Detected
                             </CardTitle>
@@ -134,7 +134,7 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
                         <CardContent>
                             <div className="flex flex-wrap gap-2">
                                 {skillGaps.slice(0, 8).map((gap) => (
-                                    <Badge key={gap.skill_id} variant="outline" className="border-yellow-500/30 bg-yellow-500/10 text-yellow-400">
+                                    <Badge key={gap.skill_id} variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                         {gap.name}: {gap.coverage_pct}% coverage
                                     </Badge>
                                 ))}
@@ -175,8 +175,8 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
                                                 variant="outline"
                                                 className={
                                                     skill.is_active
-                                                        ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
-                                                        : 'border-slate-500/30 text-muted-foreground bg-slate-500/10'
+                                                        ? 'border-status-success/30 text-status-success bg-status-success'
+                                                        : 'border-border/30 text-muted-foreground bg-muted-foreground/80/10'
                                                 }
                                             >
                                                 {skill.is_active ? 'Active' : 'Inactive'}

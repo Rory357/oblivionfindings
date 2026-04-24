@@ -160,10 +160,10 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                 </div>
 
                 {account.is_system && (
-                    <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-                        <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+                    <div className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning p-4">
+                        <AlertTriangle className="h-5 w-5 text-status-warning shrink-0" />
                         <div>
-                            <p className="text-sm font-medium text-amber-600">System Account</p>
+                            <p className="text-sm font-medium text-status-warning">System Account</p>
                             <p className="text-sm text-muted-foreground">
                                 This is a system account. The account code and type cannot be changed.
                             </p>
@@ -172,10 +172,10 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                 )}
 
                 {hasJournalLines && !account.is_system && (
-                    <div className="flex items-center gap-3 rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
-                        <AlertTriangle className="h-5 w-5 text-blue-500 shrink-0" />
+                    <div className="flex items-center gap-3 rounded-lg border border-status-info/30 bg-status-info p-4">
+                        <AlertTriangle className="h-5 w-5 text-status-info shrink-0" />
                         <div>
-                            <p className="text-sm font-medium text-blue-600">Has Journal Entries</p>
+                            <p className="text-sm font-medium text-status-info">Has Journal Entries</p>
                             <p className="text-sm text-muted-foreground">
                                 This account has journal entries. The account type cannot be changed.
                             </p>

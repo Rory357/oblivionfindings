@@ -116,9 +116,9 @@ const KPI_CONFIG: Array<{
         label: 'Incidents (30 days)',
         icon: AlertTriangle,
         href: '/incidents',
-        color: (v) => (v > 5 ? 'text-red-700' : v > 0 ? 'text-amber-700' : 'text-foreground'),
-        bgColor: (v) => (v > 5 ? 'border-red-200 bg-red-50/60' : v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-border bg-white'),
-        iconBg: (v) => (v > 5 ? 'bg-red-100 text-red-600' : v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'),
+        color: (v) => (v > 5 ? 'text-status-critical' : v > 0 ? 'text-status-warning' : 'text-foreground'),
+        bgColor: (v) => (v > 5 ? 'border-status-critical/30 bg-status-critical-bg' : v > 0 ? 'border-status-warning/30 bg-status-warning-bg' : 'border-border bg-white'),
+        iconBg: (v) => (v > 5 ? 'bg-status-critical-bg text-status-critical' : v > 0 ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'near_misses_30d',
@@ -127,70 +127,70 @@ const KPI_CONFIG: Array<{
         href: '/incidents?type=near_miss',
         color: () => 'text-foreground',
         bgColor: () => 'border-border bg-white',
-        iconBg: () => 'bg-blue-100 text-blue-600',
+        iconBg: () => 'bg-status-info-bg text-status-info',
     },
     {
         key: 'open_hazards',
         label: 'Open Hazards',
         icon: Flame,
         href: '/compliance/hazards',
-        color: (v) => (v > 0 ? 'text-orange-700' : 'text-green-700'),
-        bgColor: (v) => (v > 0 ? 'border-orange-200 bg-orange-50/60' : 'border-green-200 bg-green-50/60'),
-        iconBg: (v) => (v > 0 ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'),
+        color: (v) => (v > 0 ? 'text-status-warning' : 'text-status-success'),
+        bgColor: (v) => (v > 0 ? 'border-status-warning/30 bg-status-warning-bg' : 'border-status-success/30 bg-status-success-bg'),
+        iconBg: (v) => (v > 0 ? 'bg-status-warning-bg text-status-warning' : 'bg-status-success-bg text-status-success'),
     },
     {
         key: 'overdue_actions',
         label: 'Overdue Actions',
         icon: Clock,
         href: '/compliance/hazards?status=open',
-        color: (v) => (v > 0 ? 'text-red-700' : 'text-green-700'),
-        bgColor: (v) => (v > 0 ? 'border-red-200 bg-red-50/60' : 'border-green-200 bg-green-50/60'),
-        iconBg: (v) => (v > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'),
+        color: (v) => (v > 0 ? 'text-status-critical' : 'text-status-success'),
+        bgColor: (v) => (v > 0 ? 'border-status-critical/30 bg-status-critical-bg' : 'border-status-success/30 bg-status-success-bg'),
+        iconBg: (v) => (v > 0 ? 'bg-status-critical-bg text-status-critical' : 'bg-status-success-bg text-status-success'),
     },
     {
         key: 'workplace_injuries_ytd',
         label: 'Workplace Injuries (YTD)',
         icon: Heart,
         href: '/health-safety/injuries',
-        color: (v) => (v > 0 ? 'text-red-700' : 'text-foreground'),
-        bgColor: (v) => (v > 0 ? 'border-red-200 bg-red-50/60' : 'border-border bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-red-100 text-red-600' : 'bg-muted text-muted-foreground'),
+        color: (v) => (v > 0 ? 'text-status-critical' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-status-critical/30 bg-status-critical-bg' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-status-critical-bg text-status-critical' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'lost_time_days_ytd',
         label: 'Lost Time Days (YTD)',
         icon: Activity,
         href: '/health-safety/injuries',
-        color: (v) => (v > 0 ? 'text-amber-700' : 'text-foreground'),
-        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-border bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'),
+        color: (v) => (v > 0 ? 'text-status-warning' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-status-warning/30 bg-status-warning-bg' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'days_since_notifiable',
         label: 'Days Since Notifiable',
         icon: FileWarning,
         href: '/governance/compliance',
-        color: (v) => (v > 30 ? 'text-green-700' : 'text-red-700'),
-        bgColor: (v) => (v > 30 ? 'border-green-200 bg-green-50/60' : 'border-red-200 bg-red-50/60'),
-        iconBg: (v) => (v > 30 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'),
+        color: (v) => (v > 30 ? 'text-status-success' : 'text-status-critical'),
+        bgColor: (v) => (v > 30 ? 'border-status-success/30 bg-status-success-bg' : 'border-status-critical/30 bg-status-critical-bg'),
+        iconBg: (v) => (v > 30 ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'),
     },
     {
         key: 'drill_compliance_pct',
         label: 'Drill Compliance',
         icon: CalendarCheck,
         href: '/health-safety/drills',
-        color: (v) => (v >= 90 ? 'text-green-700' : v >= 70 ? 'text-amber-700' : 'text-red-700'),
-        bgColor: (v) => (v >= 90 ? 'border-green-200 bg-green-50/60' : v >= 70 ? 'border-amber-200 bg-amber-50/60' : 'border-red-200 bg-red-50/60'),
-        iconBg: (v) => (v >= 90 ? 'bg-green-100 text-green-600' : v >= 70 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'),
+        color: (v) => (v >= 90 ? 'text-status-success' : v >= 70 ? 'text-status-warning' : 'text-status-critical'),
+        bgColor: (v) => (v >= 90 ? 'border-status-success/30 bg-status-success-bg' : v >= 70 ? 'border-status-warning/30 bg-status-warning-bg' : 'border-status-critical/30 bg-status-critical-bg'),
+        iconBg: (v) => (v >= 90 ? 'bg-status-success-bg text-status-success' : v >= 70 ? 'bg-status-warning-bg text-status-warning' : 'bg-status-critical-bg text-status-critical'),
     },
     {
         key: 'active_alerts',
         label: 'Active Alerts',
         icon: Bell,
         href: '/health-safety/lone-workers',
-        color: (v) => (v > 0 ? 'text-amber-700' : 'text-foreground'),
-        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-border bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'),
+        color: (v) => (v > 0 ? 'text-status-warning' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-status-warning/30 bg-status-warning-bg' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'open_safeguarding',
@@ -206,27 +206,27 @@ const KPI_CONFIG: Array<{
         label: 'Fleet Incidents (30 days)',
         icon: Truck,
         href: '/fleet-assets/incidents',
-        color: (v) => (v > 0 ? 'text-amber-700' : 'text-foreground'),
-        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-border bg-white'),
-        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-muted text-muted-foreground'),
+        color: (v) => (v > 0 ? 'text-status-warning' : 'text-foreground'),
+        bgColor: (v) => (v > 0 ? 'border-status-warning/30 bg-status-warning-bg' : 'border-border bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground'),
     },
     {
         key: 'fleet_unresolved',
         label: 'Fleet Unresolved',
         icon: Car,
         href: '/fleet-assets/incidents',
-        color: (v) => (v > 0 ? 'text-amber-700' : 'text-green-700'),
-        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-green-200 bg-green-50/60'),
-        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'),
+        color: (v) => (v > 0 ? 'text-status-warning' : 'text-status-success'),
+        bgColor: (v) => (v > 0 ? 'border-status-warning/30 bg-status-warning-bg' : 'border-status-success/30 bg-status-success-bg'),
+        iconBg: (v) => (v > 0 ? 'bg-status-warning-bg text-status-warning' : 'bg-status-success-bg text-status-success'),
     },
     {
         key: 'staff_compliance_pct',
         label: 'Staff Compliance',
         icon: Users,
         href: '/hr/compliance',
-        color: (v) => (v >= 90 ? 'text-green-700' : v >= 70 ? 'text-amber-700' : 'text-red-700'),
-        bgColor: (v) => (v >= 90 ? 'border-green-200 bg-green-50/60' : v >= 70 ? 'border-amber-200 bg-amber-50/60' : 'border-red-200 bg-red-50/60'),
-        iconBg: (v) => (v >= 90 ? 'bg-green-100 text-green-600' : v >= 70 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'),
+        color: (v) => (v >= 90 ? 'text-status-success' : v >= 70 ? 'text-status-warning' : 'text-status-critical'),
+        bgColor: (v) => (v >= 90 ? 'border-status-success/30 bg-status-success-bg' : v >= 70 ? 'border-status-warning/30 bg-status-warning-bg' : 'border-status-critical/30 bg-status-critical-bg'),
+        iconBg: (v) => (v >= 90 ? 'bg-status-success-bg text-status-success' : v >= 70 ? 'bg-status-warning-bg text-status-warning' : 'bg-status-critical-bg text-status-critical'),
     },
 ];
 
@@ -263,18 +263,18 @@ const HAZARD_COLORS: Record<string, string> = {
 
 function severityColor(s: string) {
     switch (s) {
-        case 'critical': return 'bg-red-100 text-red-800 border-red-200';
-        case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
-        case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        case 'low': return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'critical': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
+        case 'high': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'medium': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'low': return 'bg-status-info-bg text-status-info border-status-info/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
 
 function statusColor(s: string) {
     switch (s) {
-        case 'closed': case 'resolved': return 'bg-green-100 text-green-800 border-green-200';
-        case 'open': case 'reported': return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'closed': case 'resolved': return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'open': case 'reported': return 'bg-status-info-bg text-status-info border-status-info/30';
         case 'in_progress': return 'bg-primary/10 text-primary border-primary';
         default: return 'bg-muted text-foreground border-border';
     }
@@ -282,19 +282,19 @@ function statusColor(s: string) {
 
 function riskColor(r: string) {
     switch (r) {
-        case 'extreme': return 'bg-red-100 text-red-800 border-red-200';
-        case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
-        case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        case 'low': return 'bg-green-100 text-green-800 border-green-200';
+        case 'extreme': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
+        case 'high': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'medium': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'low': return 'bg-status-success-bg text-status-success border-status-success/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
 
 function drillStatusBadge(status: string) {
     switch (status) {
-        case 'compliant': return 'bg-green-100 text-green-800 border-green-200';
-        case 'due_soon': return 'bg-amber-100 text-amber-800 border-amber-200';
-        case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
+        case 'compliant': return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'due_soon': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'overdue': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
@@ -398,7 +398,7 @@ export default function HealthSafetyDashboard({
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (!active || !payload?.length) return null;
         return (
-            <div className="rounded-lg border-0 bg-slate-800 px-3 py-2 text-xs text-white shadow-lg">
+            <div className="rounded-lg border-0 bg-muted px-3 py-2 text-xs text-white shadow-lg">
                 <p className="mb-1 font-medium">{label}</p>
                 {payload.map((p: any, i: number) => (
                     <p key={i} className="flex items-center gap-1.5">
@@ -572,7 +572,7 @@ export default function HealthSafetyDashboard({
                                                     if (!active || !payload?.length) return null;
                                                     const d = payload[0];
                                                     return (
-                                                        <div className="rounded-lg border-0 bg-slate-800 px-3 py-2 text-xs text-white shadow-lg">
+                                                        <div className="rounded-lg border-0 bg-muted px-3 py-2 text-xs text-white shadow-lg">
                                                             <span className="font-medium">{d.name}</span>: {d.value} incidents
                                                         </div>
                                                     );
@@ -663,10 +663,10 @@ export default function HealthSafetyDashboard({
                                     <div className="mt-2 text-2xl font-bold">{backbone.investigations.active_investigations}</div>
                                     <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
                                         {backbone.investigations.overdue_investigations > 0 && (
-                                            <span className="text-red-600 font-medium">{backbone.investigations.overdue_investigations} overdue</span>
+                                            <span className="text-status-critical font-medium">{backbone.investigations.overdue_investigations} overdue</span>
                                         )}
                                         {backbone.investigations.awaiting_review > 0 && (
-                                            <span className="text-amber-600">{backbone.investigations.awaiting_review} awaiting review</span>
+                                            <span className="text-status-warning">{backbone.investigations.awaiting_review} awaiting review</span>
                                         )}
                                     </div>
                                 </CardContent>
@@ -675,19 +675,19 @@ export default function HealthSafetyDashboard({
 
                         {/* Corrective Actions */}
                         <Link href={backbone.corrective_actions.overdue_actions > 0 ? '/health-safety/corrective-actions?overdue=true' : '/health-safety/corrective-actions'} className="group">
-                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.corrective_actions.overdue_actions > 0 ? 'border-red-200 bg-red-50/40' : ''}`}>
+                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.corrective_actions.overdue_actions > 0 ? 'border-status-critical/30 bg-status-critical-bg' : ''}`}>
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-medium text-muted-foreground">Open Corrective Actions</span>
-                                        <Clock className="h-4 w-4 text-amber-500" />
+                                        <Clock className="h-4 w-4 text-status-warning" />
                                     </div>
                                     <div className="mt-2 text-2xl font-bold">{backbone.corrective_actions.open_actions}</div>
                                     <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
                                         {backbone.corrective_actions.overdue_actions > 0 && (
-                                            <span className="text-red-600 font-medium">{backbone.corrective_actions.overdue_actions} overdue</span>
+                                            <span className="text-status-critical font-medium">{backbone.corrective_actions.overdue_actions} overdue</span>
                                         )}
                                         {backbone.corrective_actions.awaiting_verification > 0 && (
-                                            <span className="text-blue-600">{backbone.corrective_actions.awaiting_verification} awaiting verification</span>
+                                            <span className="text-status-info">{backbone.corrective_actions.awaiting_verification} awaiting verification</span>
                                         )}
                                     </div>
                                 </CardContent>
@@ -696,19 +696,19 @@ export default function HealthSafetyDashboard({
 
                         {/* Risk Assessments */}
                         <Link href={backbone.risk_assessments.due_for_review > 0 ? '/health-safety/risk-assessments?due_for_review=true' : '/health-safety/risk-assessments?status=active'} className="group">
-                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.risk_assessments.due_for_review > 0 ? 'border-amber-200 bg-amber-50/40' : ''}`}>
+                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.risk_assessments.due_for_review > 0 ? 'border-status-warning/30 bg-status-warning-bg' : ''}`}>
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-medium text-muted-foreground">Active Risk Assessments</span>
-                                        <Shield className="h-4 w-4 text-blue-500" />
+                                        <Shield className="h-4 w-4 text-status-info" />
                                     </div>
                                     <div className="mt-2 text-2xl font-bold">{backbone.risk_assessments.active_assessments}</div>
                                     <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
                                         {backbone.risk_assessments.high_extreme_active > 0 && (
-                                            <span className="text-orange-600 font-medium">{backbone.risk_assessments.high_extreme_active} high/extreme</span>
+                                            <span className="text-status-warning font-medium">{backbone.risk_assessments.high_extreme_active} high/extreme</span>
                                         )}
                                         {backbone.risk_assessments.due_for_review > 0 && (
-                                            <span className="text-amber-600">{backbone.risk_assessments.due_for_review} due for review</span>
+                                            <span className="text-status-warning">{backbone.risk_assessments.due_for_review} due for review</span>
                                         )}
                                     </div>
                                 </CardContent>
@@ -717,7 +717,7 @@ export default function HealthSafetyDashboard({
 
                         {/* H&S Events Summary */}
                         <Link href="/health-safety/events?status=open" className="group">
-                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.events.worksafe_notifiable_open > 0 ? 'border-red-200 bg-red-50/40' : ''}`}>
+                            <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${backbone.events.worksafe_notifiable_open > 0 ? 'border-status-critical/30 bg-status-critical-bg' : ''}`}>
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-medium text-muted-foreground">Open H&S Events</span>
@@ -726,10 +726,10 @@ export default function HealthSafetyDashboard({
                                     <div className="mt-2 text-2xl font-bold">{backbone.events.open_events}</div>
                                     <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
                                         {backbone.events.open_events_high_critical > 0 && (
-                                            <span className="text-red-600 font-medium">{backbone.events.open_events_high_critical} high/critical</span>
+                                            <span className="text-status-critical font-medium">{backbone.events.open_events_high_critical} high/critical</span>
                                         )}
                                         {backbone.events.worksafe_notifiable_open > 0 && (
-                                            <span className="text-red-700 font-semibold">{backbone.events.worksafe_notifiable_open} WorkSafe notifiable</span>
+                                            <span className="text-status-critical font-semibold">{backbone.events.worksafe_notifiable_open} WorkSafe notifiable</span>
                                         )}
                                     </div>
                                 </CardContent>
@@ -763,7 +763,7 @@ export default function HealthSafetyDashboard({
                                             if (!active || !payload?.length) return null;
                                             const d = payload[0];
                                             return (
-                                                <div className="rounded-lg border-0 bg-slate-800 px-3 py-2 text-xs text-white shadow-lg">
+                                                <div className="rounded-lg border-0 bg-muted px-3 py-2 text-xs text-white shadow-lg">
                                                     <span className="font-medium">{d.payload?.level}</span>: {d.value} hazards
                                                 </div>
                                             );
@@ -807,7 +807,7 @@ export default function HealthSafetyDashboard({
                                                 <td className="py-2 font-medium">{site.name}</td>
                                                 <td className="py-2 text-muted-foreground">
                                                     {site.last_drill_date ? formatDate(site.last_drill_date) : (
-                                                        <span className="font-medium text-red-600">Never</span>
+                                                        <span className="font-medium text-status-critical">Never</span>
                                                     )}
                                                 </td>
                                                 <td className="py-2 text-right text-muted-foreground">{site.days_since ?? '-'}</td>
@@ -842,10 +842,10 @@ export default function HealthSafetyDashboard({
                             </CardTitle>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
-                                    <span className="inline-block h-2 w-6 rounded-full bg-blue-500" /> Current
+                                    <span className="inline-block h-2 w-6 rounded-full bg-status-info" /> Current
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-slate-400" /> Previous
+                                    <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-border" /> Previous
                                 </span>
                             </div>
                         </CardHeader>

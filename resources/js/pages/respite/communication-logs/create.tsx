@@ -66,7 +66,7 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {!hasStays && (
-                                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning">
                                     No respite stays are available yet. Create or admit a stay before logging communication.
                                 </div>
                             )}
@@ -83,7 +83,7 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.stay_id && <div className="mt-1 text-xs text-red-500">{errors.stay_id}</div>}
+                                    {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
                                 </div>
                                 <div>
                                     <Label>Channel</Label>
@@ -95,7 +95,7 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.channel && <div className="mt-1 text-xs text-red-500">{errors.channel}</div>}
+                                    {errors.channel && <div className="mt-1 text-xs text-status-critical">{errors.channel}</div>}
                                 </div>
                             </div>
                             <div>
@@ -105,7 +105,7 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
                                     value={data.occurred_at}
                                     onChange={(e) => setData('occurred_at', e.target.value)}
                                 />
-                                {errors.occurred_at && <div className="mt-1 text-xs text-red-500">{errors.occurred_at}</div>}
+                                {errors.occurred_at && <div className="mt-1 text-xs text-status-critical">{errors.occurred_at}</div>}
                             </div>
                             <div>
                                 <Label>Summary</Label>
@@ -114,7 +114,7 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
                                     onChange={(e) => setData('summary', e.target.value)}
                                     rows={4}
                                 />
-                                {errors.summary && <div className="mt-1 text-xs text-red-500">{errors.summary}</div>}
+                                {errors.summary && <div className="mt-1 text-xs text-status-critical">{errors.summary}</div>}
                             </div>
                         </CardContent>
                     </Card>
@@ -149,7 +149,7 @@ export default function CommunicationLogCreate({ stays, stayId, channels }: Prop
                                     )}
                                 </div>
                             ))}
-                            {errors.participants && <div className="mt-1 text-xs text-red-500">{errors.participants}</div>}
+                            {errors.participants && <div className="mt-1 text-xs text-status-critical">{errors.participants}</div>}
                             <Button type="button" variant="outline" size="sm" onClick={addParticipant}>
                                 Add Participant
                             </Button>

@@ -111,8 +111,8 @@ const GOAL_STATUS_COLORS: Record<string, string> = {
 
 const PRIORITY_COLORS: Record<string, string> = {
     low: 'text-muted-foreground',
-    medium: 'text-amber-600',
-    high: 'text-red-600',
+    medium: 'text-status-warning',
+    high: 'text-status-critical',
 };
 
 const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -138,17 +138,17 @@ const SUPPORT_NEED_LABELS: Record<string, string> = {
 };
 
 const SUPPORT_NEED_COLORS: Record<string, string> = {
-    daily_living: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    daily_living: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     personal_care: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
-    community_access: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    health_management: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-    communication: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-    behaviour_support: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    community_access: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
+    health_management: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    communication: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    behaviour_support: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     employment: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
     education_training: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
-    social_participation: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
-    cultural_needs: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-    spiritual_needs: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+    social_participation: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    cultural_needs: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    spiritual_needs: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     financial_management: 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground',
 };
 
@@ -391,7 +391,7 @@ export default function CarePlanShow({
                             <div className="text-right">
                                 <span className="text-sm font-medium">{formatDate(plan.next_review_at)}</span>
                                 {plan.next_review_at && (
-                                    <p className={`text-[10px] ${new Date(plan.next_review_at) <= new Date() ? 'font-medium text-amber-600' : 'text-muted-foreground'}`}>
+                                    <p className={`text-[10px] ${new Date(plan.next_review_at) <= new Date() ? 'font-medium text-status-warning' : 'text-muted-foreground'}`}>
                                         {daysUntil(plan.next_review_at)}
                                     </p>
                                 )}
@@ -406,7 +406,7 @@ export default function CarePlanShow({
                 <Badge variant="outline" className="gap-1.5 px-3 py-1">
                     <Target className="h-3 w-3" /> {safeProgressStats.total_goals} Total Goals
                 </Badge>
-                <Badge variant="outline" className="gap-1.5 border-emerald-300 bg-emerald-50 px-3 py-1 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                <Badge variant="outline" className="gap-1.5 border-status-success/30 bg-status-success-bg px-3 py-1 text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
                     <CheckCircle2 className="h-3 w-3" /> {safeProgressStats.completed} Completed
                 </Badge>
                 <Badge variant="outline" className="gap-1.5 border-primary bg-primary/10 px-3 py-1 text-primary dark:border-primary/30 dark:bg-primary/30 dark:text-primary/70">
@@ -605,7 +605,7 @@ export default function CarePlanShow({
                             <div className="flex items-start gap-3">
                                 <div className="mt-0.5">
                                     {goal.status === 'completed' ? (
-                                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                        <CheckCircle2 className="h-5 w-5 text-status-success" />
                                     ) : goal.status === 'in_progress' ? (
                                         <Circle className="h-5 w-5 text-primary" />
                                     ) : (
@@ -631,9 +631,9 @@ export default function CarePlanShow({
                                         <p className="mt-0.5 text-xs text-muted-foreground">{goal.description}</p>
                                     )}
                                     {goal.outcome_notes && (
-                                        <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50/50 px-2.5 py-1.5">
-                                            <p className="text-[10px] font-medium uppercase tracking-wide text-amber-600">Notes</p>
-                                            <p className="mt-0.5 text-xs text-amber-800">{goal.outcome_notes}</p>
+                                        <div className="mt-1.5 rounded-md border border-status-warning/30 bg-status-warning-bg px-2.5 py-1.5">
+                                            <p className="text-[10px] font-medium uppercase tracking-wide text-status-warning">Notes</p>
+                                            <p className="mt-0.5 text-xs text-status-warning">{goal.outcome_notes}</p>
                                         </div>
                                     )}
                                     {/* Progress bar + slider */}
@@ -660,7 +660,7 @@ export default function CarePlanShow({
                                     {/* Actions row */}
                                     <div className="mt-2.5 flex items-center gap-2">
                                         {goal.status !== 'completed' && (
-                                            <Button size="sm" className="h-7 gap-1 bg-emerald-600 px-3 text-xs text-white hover:bg-emerald-700"
+                                            <Button size="sm" className="h-7 gap-1 bg-status-success px-3 text-xs text-white hover:bg-status-success"
                                                 onClick={() => updateGoalProgress(goal.id, 100, 'completed')}>
                                                 <CheckCircle2 className="h-3.5 w-3.5" />
                                                 Mark Achieved
@@ -673,7 +673,7 @@ export default function CarePlanShow({
                                             </Button>
                                         )}
                                         {goal.status === 'completed' && (
-                                            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                                            <span className="flex items-center gap-1 text-xs font-medium text-status-success">
                                                 <CheckCircle2 className="h-4 w-4" />
                                                 Completed
                                             </span>
@@ -1007,7 +1007,7 @@ export default function CarePlanShow({
                         </span>
                     )}
                     {plan.next_review_at && (
-                        <span className={`text-xs ${new Date(plan.next_review_at) <= new Date() ? 'font-medium text-amber-600' : 'text-muted-foreground'}`}>
+                        <span className={`text-xs ${new Date(plan.next_review_at) <= new Date() ? 'font-medium text-status-warning' : 'text-muted-foreground'}`}>
                             Next review: {formatDate(plan.next_review_at)}
                         </span>
                     )}

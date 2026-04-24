@@ -39,21 +39,21 @@ type Props = {
 
 function categoryBadge(cat: string) {
     switch (cat) {
-        case 'fire_safety': return 'bg-red-100 text-red-800 border-red-200';
+        case 'fire_safety': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         case 'chemical_handling': return 'bg-primary/10 text-primary border-primary';
-        case 'manual_handling': return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'infection_control': return 'bg-green-100 text-green-800 border-green-200';
-        case 'emergency_procedures': return 'bg-orange-100 text-orange-800 border-orange-200';
+        case 'manual_handling': return 'bg-status-info-bg text-status-info border-status-info/30';
+        case 'infection_control': return 'bg-status-success-bg text-status-success border-status-success/30';
+        case 'emergency_procedures': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
 
 function statusBadge(status: string) {
     switch (status) {
-        case 'approved': return 'bg-green-100 text-green-800 border-green-200';
+        case 'approved': return 'bg-status-success-bg text-status-success border-status-success/30';
         case 'draft': return 'bg-muted text-foreground border-border';
-        case 'under_review': return 'bg-amber-100 text-amber-800 border-amber-200';
-        case 'archived': return 'bg-red-100 text-red-800 border-red-200';
+        case 'under_review': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'archived': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
@@ -82,7 +82,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5 text-blue-600" />
+                                    <FileText className="h-5 w-5 text-status-info" />
                                     <h1 className="text-xl font-semibold">{procedure.title}</h1>
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -151,13 +151,13 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                             {(procedure.steps ?? []).map((step) => (
                                 <div key={step.step_number} className="rounded-lg border p-4">
                                     <div className="flex items-start gap-3">
-                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-status-info-bg text-sm font-bold text-status-info">
                                             {step.step_number}
                                         </div>
                                         <div className="flex-1">
                                             <p className="text-sm text-foreground whitespace-pre-wrap">{step.description}</p>
                                             {step.safety_notes && (
-                                                <div className="mt-2 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                                                <div className="mt-2 flex items-start gap-1.5 rounded border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
                                                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                                                     <span className="whitespace-pre-wrap">{step.safety_notes}</span>
                                                 </div>
@@ -187,7 +187,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                             {(procedure.ppe_required ?? []).length > 0 ? (
                                 <div className="flex flex-wrap gap-1.5">
                                     {procedure.ppe_required.map((item) => (
-                                        <Badge key={item} variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                                        <Badge key={item} variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info">
                                             {item}
                                         </Badge>
                                     ))}
@@ -252,7 +252,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2 text-sm">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <CheckCircle className="h-4 w-4 text-status-success" />
                                 <span>
                                     Approved by <span className="font-medium">{procedure.approved_by.name}</span>
                                     {procedure.approved_at && (

@@ -275,7 +275,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
                         />
 
                         {form.errors.status && (
-                            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+                            <p className="mt-3 rounded-md border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                 {form.errors.status}
                             </p>
                         )}
@@ -316,7 +316,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
                     <div className="mx-auto grid max-w-2xl grid-cols-3 gap-2">
                         <Button
                             size="lg"
-                            className="h-14 w-full bg-emerald-600 text-base font-semibold text-white hover:bg-emerald-700"
+                            className="h-14 w-full bg-status-success text-base font-semibold text-white hover:bg-status-success"
                             disabled={!!current.administration || form.processing}
                             onClick={() => openAction('given')}
                         >
@@ -326,7 +326,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
                         <Button
                             size="lg"
                             variant="outline"
-                            className="h-14 w-full border-orange-300 bg-orange-50 text-base font-semibold text-orange-800 hover:bg-orange-100 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-100"
+                            className="h-14 w-full border-status-warning/30 bg-status-warning-bg text-base font-semibold text-status-warning hover:bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
                             disabled={!!current.administration || form.processing}
                             onClick={() => openAction('refused')}
                         >
@@ -336,7 +336,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
                         <Button
                             size="lg"
                             variant="outline"
-                            className="h-14 w-full border-amber-300 bg-amber-50 text-base font-semibold text-amber-900 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
+                            className="h-14 w-full border-status-warning/30 bg-status-warning-bg text-base font-semibold text-status-warning hover:bg-status-warning-bg dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
                             disabled={!!current.administration || form.processing}
                             onClick={() => openAction('held')}
                         >
@@ -405,7 +405,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
                     )}
 
                     {pendingAction === 'given' && current?.requires_witness && (
-                        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                        <p className="rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-xs text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                             This med usually needs a witness. If no one is with you,
                             hold it and tell your supervisor.
                         </p>
@@ -430,7 +430,7 @@ export default function GuidedRound({ round, items, progress }: Props) {
                             }
                             className={
                                 pendingAction === 'given'
-                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                    ? 'bg-status-success text-white hover:bg-status-success'
                                     : ''
                             }
                         >
@@ -490,7 +490,7 @@ function RoundCompleteView({
     return (
         <div className="space-y-4">
             <div className="flex flex-col items-center rounded-2xl border bg-card p-6 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success">
                     <CheckCircle2 className="h-7 w-7" />
                 </div>
                 <h2 className="mt-3 text-lg font-semibold">Round complete</h2>
@@ -499,20 +499,20 @@ function RoundCompleteView({
                 </p>
 
                 <div className="mt-4 grid w-full grid-cols-3 gap-2 text-center text-sm">
-                    <div className="rounded-lg bg-emerald-50 p-2 dark:bg-emerald-950/30">
-                        <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                    <div className="rounded-lg bg-status-success-bg p-2 dark:bg-status-success">
+                        <p className="text-lg font-bold text-status-success dark:text-status-success">
                             {progress.given}
                         </p>
                         <p className="text-xs text-muted-foreground">Given</p>
                     </div>
-                    <div className="rounded-lg bg-orange-50 p-2 dark:bg-orange-950/30">
-                        <p className="text-lg font-bold text-orange-700 dark:text-orange-300">
+                    <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                        <p className="text-lg font-bold text-status-warning dark:text-status-warning">
                             {progress.refused}
                         </p>
                         <p className="text-xs text-muted-foreground">Refused</p>
                     </div>
-                    <div className="rounded-lg bg-amber-50 p-2 dark:bg-amber-950/30">
-                        <p className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                    <div className="rounded-lg bg-status-warning-bg p-2 dark:bg-status-warning">
+                        <p className="text-lg font-bold text-status-warning dark:text-status-warning">
                             {progress.held}
                         </p>
                         <p className="text-xs text-muted-foreground">Held</p>

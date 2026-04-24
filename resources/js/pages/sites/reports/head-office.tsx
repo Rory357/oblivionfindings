@@ -60,7 +60,7 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
                             </Link>
                         </Button>
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Building2 className="w-5 h-5 text-blue-400" />
+                            <Building2 className="w-5 h-5 text-status-info" />
                             Head Office Reports
                         </h1>
                         <p className="text-sm text-muted-foreground">
@@ -95,15 +95,15 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
                             <div className="text-sm text-muted-foreground">Bookings</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-red-500/5 border-red-500/20">
+                    <Card className="bg-status-critical border-status-critical/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-red-400">{stats.open_hazards}</div>
+                            <div className="text-2xl font-bold text-status-critical">{stats.open_hazards}</div>
                             <div className="text-sm text-muted-foreground">Open Hazards</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-emerald-500/5 border-emerald-500/20">
+                    <Card className="bg-status-success border-status-success/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-emerald-400">{stats.safety_compliance_rate}%</div>
+                            <div className="text-2xl font-bold text-status-success">{stats.safety_compliance_rate}%</div>
                             <div className="text-sm text-muted-foreground">Safety Compliance</div>
                         </CardContent>
                     </Card>
@@ -166,12 +166,12 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
                                         </div>
                                         <div className="flex items-center gap-3">
                                             {openHazards.length > 0 && (
-                                                <Badge className="bg-red-500/20 text-red-400">
+                                                <Badge className="bg-status-critical-bg text-status-critical">
                                                     <AlertTriangle className="w-3 h-3 mr-1" />
                                                     {openHazards.length} Open
                                                 </Badge>
                                             )}
-                                            <Badge variant="outline" className={completionRate >= 80 ? 'text-emerald-400' : completionRate >= 50 ? 'text-amber-400' : 'text-red-400'}>
+                                            <Badge variant="outline" className={completionRate >= 80 ? 'text-status-success' : completionRate >= 50 ? 'text-status-warning' : 'text-status-critical'}>
                                                 <CheckCircle2 className="w-3 h-3 mr-1" />
                                                 {completionRate}%
                                             </Badge>

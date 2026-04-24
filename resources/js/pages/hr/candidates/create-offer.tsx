@@ -80,15 +80,15 @@ const formatCurrency = (amount: number | null) => {
 };
 
 const recColors: Record<string, string> = {
-    strong_yes: 'text-green-600', yes: 'text-emerald-600', maybe: 'text-amber-600',
-    no: 'text-orange-600', strong_no: 'text-red-600',
+    strong_yes: 'text-status-success', yes: 'text-status-success', maybe: 'text-status-warning',
+    no: 'text-status-warning', strong_no: 'text-status-critical',
 };
 
 const refStatusColors: Record<string, string> = {
-    completed: 'border-emerald-500/30 text-emerald-600 bg-emerald-500/10',
-    received: 'border-blue-500/30 text-blue-600 bg-blue-500/10',
-    requested: 'border-amber-500/30 text-amber-600 bg-amber-500/10',
-    pending: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+    completed: 'border-status-success/30 text-status-success bg-status-success',
+    received: 'border-status-info/30 text-status-info bg-status-info',
+    requested: 'border-status-warning/30 text-status-warning bg-status-warning',
+    pending: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
 };
 
 export default function CreateOffer({ application, sites, roles }: Props) {
@@ -166,7 +166,7 @@ export default function CreateOffer({ application, sites, roles }: Props) {
             <Head title={`Create Offer - ${candidateName}`} />
             <div className="flex flex-col gap-6 p-6">
                 {/* Header */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/90 via-emerald-600 to-emerald-500/80 p-6 text-white md:p-8">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-success/90 via-status-success to-status-success/80 p-6 text-white md:p-8">
                     <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
                     <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
                     <div className="relative flex items-center gap-5">
@@ -238,8 +238,8 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {jp && (jp.salary_range_min || jp.salary_range_max) && (
-                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm flex items-center gap-2">
-                                        <DollarSign className="h-4 w-4 text-emerald-600 shrink-0" />
+                                    <div className="rounded-lg border border-status-success/20 bg-status-success p-3 text-sm flex items-center gap-2">
+                                        <DollarSign className="h-4 w-4 text-status-success shrink-0" />
                                         <span>
                                             <strong>Job posting salary range:</strong>{' '}
                                             {formatCurrency(jp.salary_range_min)} – {formatCurrency(jp.salary_range_max)}
@@ -300,7 +300,7 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                                     <Input type="file" accept=".pdf,.doc,.docx" className="mx-auto max-w-xs" onChange={(e) => form.setData('offer_letter', e.target.files?.[0] ?? null)} />
                                 </div>
                                 {form.data.offer_letter && (
-                                    <p className="mt-2 text-sm text-emerald-600 flex items-center gap-1">
+                                    <p className="mt-2 text-sm text-status-success flex items-center gap-1">
                                         <FileText className="h-3.5 w-3.5" /> {form.data.offer_letter.name}
                                     </p>
                                 )}
@@ -355,7 +355,7 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                                         {jp.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{jp.location}</span>}
                                     </div>
                                     {(jp.salary_range_min || jp.salary_range_max) && (
-                                        <div className="flex items-center gap-1 text-emerald-600 font-medium">
+                                        <div className="flex items-center gap-1 text-status-success font-medium">
                                             <DollarSign className="h-3.5 w-3.5" />
                                             {formatCurrency(jp.salary_range_min)} – {formatCurrency(jp.salary_range_max)}
                                         </div>
@@ -373,8 +373,8 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                                 <CardContent className="space-y-2">
                                     {avgRating && (
                                         <div className="flex items-center gap-2">
-                                            <div className="flex items-center gap-1 rounded-lg bg-amber-500/10 px-2.5 py-1">
-                                                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                                            <div className="flex items-center gap-1 rounded-lg bg-status-warning px-2.5 py-1">
+                                                <Star className="h-4 w-4 fill-amber-400 text-status-warning" />
                                                 <span className="text-sm font-bold">{avgRating}</span>
                                                 <span className="text-xs text-muted-foreground">/ 5</span>
                                             </div>
@@ -426,12 +426,12 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                                 <CardContent className="space-y-1.5">
                                     {application.documents.map((doc, idx) => (
                                         <div key={idx} className="flex items-center gap-2 text-xs">
-                                            <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                                            <CheckCircle2 className="h-3 w-3 text-status-success shrink-0" />
                                             <span className="truncate">{doc.category_label}</span>
                                         </div>
                                     ))}
                                     {['police_vetting', 'first_aid', 'qualification'].some(cat => !application.documents.find(d => d.category === cat)) && (
-                                        <div className="mt-2 rounded-md bg-amber-500/10 p-2 text-xs text-amber-600 flex items-start gap-1.5">
+                                        <div className="mt-2 rounded-md bg-status-warning-bg p-2 text-xs text-status-warning flex items-start gap-1.5">
                                             <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                                             <span>
                                                 Missing:{' '}

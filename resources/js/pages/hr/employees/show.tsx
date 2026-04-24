@@ -69,8 +69,8 @@ interface Props {
 /* ------------------------------------------------------------------ */
 
 const AVATAR_COLORS = [
-    'bg-blue-500 text-white', 'bg-primary text-white', 'bg-emerald-500 text-white', 'bg-amber-500 text-white',
-    'bg-pink-500 text-white', 'bg-cyan-500 text-white', 'bg-rose-500 text-white', 'bg-primary text-white',
+    'bg-status-info text-white', 'bg-primary text-white', 'bg-status-success text-white', 'bg-status-warning text-white',
+    'bg-status-critical text-white', 'bg-status-info text-white', 'bg-status-critical text-white', 'bg-primary text-white',
 ];
 
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
@@ -86,18 +86,18 @@ function formatLabel(s: string) { return s.replace(/_/g, ' ').replace(/\b\w/g, c
 
 function StatusBadge({ status }: { status: string }) {
     const map: Record<string, string> = {
-        compliant: 'border-emerald-200 bg-emerald-50 text-emerald-700', active: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        eligible: 'border-emerald-200 bg-emerald-50 text-emerald-700', clear: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        completed: 'border-emerald-200 bg-emerald-50 text-emerald-700', approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        expiring_soon: 'border-amber-200 bg-amber-50 text-amber-700', pending: 'border-amber-200 bg-amber-50 text-amber-700',
-        pending_review: 'border-amber-200 bg-amber-50 text-amber-700', in_progress: 'border-blue-200 bg-blue-50 text-blue-700',
-        enrolled: 'border-blue-200 bg-blue-50 text-blue-700', open: 'border-blue-200 bg-blue-50 text-blue-700',
-        expired: 'border-red-200 bg-red-50 text-red-700', suspended: 'border-red-200 bg-red-50 text-red-700',
-        adverse: 'border-red-200 bg-red-50 text-red-700', flagged: 'border-orange-200 bg-orange-50 text-orange-700',
+        compliant: 'border-status-success/30 bg-status-success-bg text-status-success', active: 'border-status-success/30 bg-status-success-bg text-status-success',
+        eligible: 'border-status-success/30 bg-status-success-bg text-status-success', clear: 'border-status-success/30 bg-status-success-bg text-status-success',
+        completed: 'border-status-success/30 bg-status-success-bg text-status-success', approved: 'border-status-success/30 bg-status-success-bg text-status-success',
+        expiring_soon: 'border-status-warning/30 bg-status-warning-bg text-status-warning', pending: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+        pending_review: 'border-status-warning/30 bg-status-warning-bg text-status-warning', in_progress: 'border-status-info/30 bg-status-info-bg text-status-info',
+        enrolled: 'border-status-info/30 bg-status-info-bg text-status-info', open: 'border-status-info/30 bg-status-info-bg text-status-info',
+        expired: 'border-status-critical/30 bg-status-critical-bg text-status-critical', suspended: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+        adverse: 'border-status-critical/30 bg-status-critical-bg text-status-critical', flagged: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
         not_started: 'border-border bg-muted text-muted-foreground', draft: 'border-border bg-muted text-muted-foreground',
         closed: 'border-border bg-muted text-muted-foreground', cancelled: 'border-border bg-muted text-muted-foreground',
-        rejected: 'border-red-200 bg-red-50 text-red-700', high: 'border-orange-200 bg-orange-50 text-orange-700',
-        critical: 'border-red-200 bg-red-50 text-red-700', medium: 'border-amber-200 bg-amber-50 text-amber-700',
+        rejected: 'border-status-critical/30 bg-status-critical-bg text-status-critical', high: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+        critical: 'border-status-critical/30 bg-status-critical-bg text-status-critical', medium: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
         low: 'border-border bg-muted text-muted-foreground',
     };
     return <Badge variant="outline" className={map[status] || 'border-border bg-muted text-muted-foreground'}>{formatLabel(status)}</Badge>;
@@ -196,16 +196,16 @@ export default function EmployeeShow({
                             <p className="mt-1 text-lg text-white/80">{p.position_title}</p>
 
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                <Badge className={p.is_active ? 'bg-emerald-400/20 text-emerald-100 border-emerald-300/30' : 'bg-red-400/20 text-red-100 border-red-300/30'}>
+                                <Badge className={p.is_active ? 'bg-status-success-bg text-status-success border-status-success/30' : 'bg-status-critical-bg text-status-critical border-status-critical/30'}>
                                     {p.is_active ? 'Active' : 'Inactive'}
                                 </Badge>
                                 <Badge className="bg-white/10 text-white/90 border-white/20">{formatLabel(p.employment_type)}</Badge>
                                 {p.department && <Badge className="bg-white/10 text-white/90 border-white/20"><Briefcase className="mr-1 h-3 w-3" />{p.department}</Badge>}
                                 {p.team && <Badge className="bg-white/10 text-white/90 border-white/20"><Users className="mr-1 h-3 w-3" />{p.team}</Badge>}
                                 {p.primary_site && <Badge className="bg-white/10 text-white/90 border-white/20"><MapPin className="mr-1 h-3 w-3" />{p.primary_site.name}</Badge>}
-                                {p.is_first_aider && <Badge className="bg-emerald-400/20 text-emerald-100 border-emerald-300/30"><Heart className="mr-1 h-3 w-3" />First Aider</Badge>}
-                                {p.is_fire_warden && <Badge className="bg-orange-400/20 text-orange-100 border-orange-300/30"><Flame className="mr-1 h-3 w-3" />Fire Warden</Badge>}
-                                {p.can_drive_clients && <Badge className="bg-blue-400/20 text-blue-100 border-blue-300/30"><Car className="mr-1 h-3 w-3" />Driver</Badge>}
+                                {p.is_first_aider && <Badge className="bg-status-success-bg text-status-success border-status-success/30"><Heart className="mr-1 h-3 w-3" />First Aider</Badge>}
+                                {p.is_fire_warden && <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30"><Flame className="mr-1 h-3 w-3" />Fire Warden</Badge>}
+                                {p.can_drive_clients && <Badge className="bg-status-info-bg text-status-info border-status-info/30"><Car className="mr-1 h-3 w-3" />Driver</Badge>}
                             </div>
 
                             {tenure && (
@@ -333,9 +333,9 @@ export default function EmployeeShow({
                                 {(p.is_first_aider || p.is_fire_warden || p.can_drive_clients) && (
                                     <Card><CardHeader><CardTitle className="text-base">Safety Roles</CardTitle></CardHeader>
                                         <CardContent className="space-y-2">
-                                            {p.is_first_aider && <div className="flex items-center gap-2 text-sm"><Heart className="h-4 w-4 text-emerald-500" />First Aider</div>}
-                                            {p.is_fire_warden && <div className="flex items-center gap-2 text-sm"><Flame className="h-4 w-4 text-orange-500" />Fire Warden</div>}
-                                            {p.can_drive_clients && <div className="flex items-center gap-2 text-sm"><Car className="h-4 w-4 text-blue-500" />Can Drive Clients</div>}
+                                            {p.is_first_aider && <div className="flex items-center gap-2 text-sm"><Heart className="h-4 w-4 text-status-success" />First Aider</div>}
+                                            {p.is_fire_warden && <div className="flex items-center gap-2 text-sm"><Flame className="h-4 w-4 text-status-warning" />Fire Warden</div>}
+                                            {p.can_drive_clients && <div className="flex items-center gap-2 text-sm"><Car className="h-4 w-4 text-status-info" />Can Drive Clients</div>}
                                         </CardContent>
                                     </Card>
                                 )}
@@ -367,7 +367,7 @@ export default function EmployeeShow({
                                                 <td className="hidden px-4 py-3 sm:table-cell"><Badge variant="outline">{d.category ? formatLabel(d.category) : 'Other'}</Badge></td>
                                                 <td className="px-4 py-3 text-muted-foreground">{formatDate(d.created_at)}</td>
                                                 <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{formatDate(d.expires_at)}</td>
-                                                <td className="px-4 py-3">{d.signed_by_employee ? <Check className="h-4 w-4 text-emerald-500" /> : <X className="h-4 w-4 text-muted-foreground/30" />}</td>
+                                                <td className="px-4 py-3">{d.signed_by_employee ? <Check className="h-4 w-4 text-status-success" /> : <X className="h-4 w-4 text-muted-foreground/30" />}</td>
                                             </tr>
                                         ))}
                                     </tbody></table>
@@ -390,27 +390,27 @@ export default function EmployeeShow({
 
                             {/* Summary Cards */}
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-orange-50 p-3 text-center">
+                                <div className="rounded-xl border bg-status-warning-bg p-3 text-center">
                                     {performanceSummary.latest_rating ? (
-                                        <div className="flex items-center justify-center gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className={`h-4 w-4 ${i < performanceSummary.latest_rating! ? 'fill-amber-400 text-amber-400' : 'text-amber-200'}`} />)}</div>
-                                    ) : <div className="text-xl font-bold text-amber-400">&mdash;</div>}
-                                    <div className="mt-1 text-[10px] uppercase tracking-wider text-amber-600">Latest Rating</div>
+                                        <div className="flex items-center justify-center gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className={`h-4 w-4 ${i < performanceSummary.latest_rating! ? 'fill-amber-400 text-status-warning' : 'text-status-warning'}`} />)}</div>
+                                    ) : <div className="text-xl font-bold text-status-warning">&mdash;</div>}
+                                    <div className="mt-1 text-[10px] uppercase tracking-wider text-status-warning">Latest Rating</div>
                                 </div>
-                                <div className={`rounded-xl border p-3 text-center ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'bg-gradient-to-br from-red-50 to-rose-50' : ''}`}>
-                                    <div className={`text-sm font-bold ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'text-red-600' : 'text-foreground'}`}>
+                                <div className={`rounded-xl border p-3 text-center ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'bg-status-critical-bg' : ''}`}>
+                                    <div className={`text-sm font-bold ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'text-status-critical' : 'text-foreground'}`}>
                                         {performanceSummary.next_review_date ? formatDate(performanceSummary.next_review_date) : 'Not scheduled'}
                                     </div>
                                     <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">Next Review</div>
                                 </div>
-                                <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 p-3 text-center">
-                                    <div className="text-xl font-bold text-blue-700">{performanceSummary.active_goals_count}</div>
-                                    <div className="mt-0.5 text-[10px] uppercase tracking-wider text-blue-500">Active Goals</div>
+                                <div className="rounded-xl border bg-primary/10 p-3 text-center">
+                                    <div className="text-xl font-bold text-status-info">{performanceSummary.active_goals_count}</div>
+                                    <div className="mt-0.5 text-[10px] uppercase tracking-wider text-status-info">Active Goals</div>
                                     {performanceSummary.active_goals_count > 0 && (
-                                        <div className="mt-1.5"><ProgressBar value={performanceSummary.active_goals_avg} max={100} color="bg-blue-500" /></div>
+                                        <div className="mt-1.5"><ProgressBar value={performanceSummary.active_goals_avg} max={100} color="bg-status-info" /></div>
                                     )}
                                 </div>
-                                <div className={`rounded-xl border p-3 text-center ${performanceSummary.has_active_pip ? 'bg-gradient-to-br from-red-50 to-rose-50' : ''}`}>
-                                    <div className={`text-xl font-bold ${performanceSummary.has_active_pip ? 'text-red-600' : 'text-emerald-600'}`}>
+                                <div className={`rounded-xl border p-3 text-center ${performanceSummary.has_active_pip ? 'bg-status-critical-bg' : ''}`}>
+                                    <div className={`text-xl font-bold ${performanceSummary.has_active_pip ? 'text-status-critical' : 'text-status-success'}`}>
                                         {performanceSummary.has_active_pip ? 'Active' : 'None'}
                                     </div>
                                     <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">PIP Status</div>
@@ -436,12 +436,12 @@ export default function EmployeeShow({
                                                 <tr key={r.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => router.visit(`/hr/performance/reviews/${r.id}`)} role="link" tabIndex={0} onKeyDown={e => e.key === 'Enter' && router.visit(`/hr/performance/reviews/${r.id}`)}>
                                                     <td className="px-4 py-3 font-medium">{formatLabel(r.review_type)}</td>
                                                     <td className="px-4 py-3 text-muted-foreground">{formatDate(r.period_start)} &ndash; {formatDate(r.period_end)}</td>
-                                                    <td className="hidden px-4 py-3 sm:table-cell">{r.overall_rating ? <div className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className={`h-3.5 w-3.5 ${i < r.overall_rating! ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/20'}`} />)}</div> : '\u2014'}</td>
+                                                    <td className="hidden px-4 py-3 sm:table-cell">{r.overall_rating ? <div className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className={`h-3.5 w-3.5 ${i < r.overall_rating! ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground/20'}`} />)}</div> : '\u2014'}</td>
                                                     <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{r.reviewer_name || '\u2014'}</td>
                                                     <td className="hidden px-4 py-3 lg:table-cell">
                                                         <div className="flex items-center gap-1.5">
-                                                            <span title={r.employee_signed_off ? 'Employee signed off' : 'Employee not signed'}>{r.employee_signed_off ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <X className="h-3.5 w-3.5 text-muted-foreground/30" />}</span>
-                                                            <span title={r.manager_signed_off ? 'Manager signed off' : 'Manager not signed'}>{r.manager_signed_off ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <X className="h-3.5 w-3.5 text-muted-foreground/30" />}</span>
+                                                            <span title={r.employee_signed_off ? 'Employee signed off' : 'Employee not signed'}>{r.employee_signed_off ? <CheckCircle2 className="h-3.5 w-3.5 text-status-success" /> : <X className="h-3.5 w-3.5 text-muted-foreground/30" />}</span>
+                                                            <span title={r.manager_signed_off ? 'Manager signed off' : 'Manager not signed'}>{r.manager_signed_off ? <CheckCircle2 className="h-3.5 w-3.5 text-status-success" /> : <X className="h-3.5 w-3.5 text-muted-foreground/30" />}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
@@ -476,7 +476,7 @@ export default function EmployeeShow({
                                                 </div>
                                                 <StatusBadge status={g.status} />
                                             </div>
-                                            <ProgressBar value={g.progress_percent} max={100} color="bg-blue-500" />
+                                            <ProgressBar value={g.progress_percent} max={100} color="bg-status-info" />
                                             <div className="flex justify-between text-xs text-muted-foreground"><span>{g.progress_percent}%</span>{g.due_date && <span>Due {formatDate(g.due_date)}</span>}</div>
                                         </div>
                                     ))}
@@ -510,7 +510,7 @@ export default function EmployeeShow({
                                                                         </div>
                                                                         <div className="relative h-2 rounded-full bg-muted">
                                                                             <div className="absolute inset-y-0 left-0 rounded-full bg-primary/15" style={{ width: `${(target / 5) * 100}%` }} />
-                                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${(current / 5) * 100}%` }} />
+                                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-status-success' : 'bg-primary'}`} style={{ width: `${(current / 5) * 100}%` }} />
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -530,7 +530,7 @@ export default function EmployeeShow({
                                     <CardContent>
                                         <div className="relative space-y-4 pl-6 before:absolute before:left-[7px] before:top-2 before:h-[calc(100%-16px)] before:w-0.5 before:bg-muted">
                                             {probationReviews.map(r => {
-                                                const dotColor = r.status === 'completed' || r.status === 'passed' ? 'bg-emerald-500' : r.status === 'in_progress' || r.status === 'scheduled' ? 'bg-amber-500' : r.status === 'failed' ? 'bg-red-500' : 'bg-slate-300';
+                                                const dotColor = r.status === 'completed' || r.status === 'passed' ? 'bg-status-success' : r.status === 'in_progress' || r.status === 'scheduled' ? 'bg-status-warning' : r.status === 'failed' ? 'bg-status-critical' : 'bg-muted';
                                                 return (
                                                     <div key={r.id} className="relative">
                                                         <div className={`absolute -left-6 top-1.5 h-3.5 w-3.5 rounded-full border-2 border-white ${dotColor}`} />
@@ -538,7 +538,7 @@ export default function EmployeeShow({
                                                             <div>
                                                                 <p className="font-medium text-sm">Review #{r.review_number}</p>
                                                                 <p className="text-xs text-muted-foreground">{formatDate(r.review_date)} &middot; {r.reviewer_name}</p>
-                                                                {r.extension_weeks && <p className="text-xs text-amber-600">Extended by {r.extension_weeks} weeks</p>}
+                                                                {r.extension_weeks && <p className="text-xs text-status-warning">Extended by {r.extension_weeks} weeks</p>}
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 {r.recommendation && <Badge variant="outline">{formatLabel(r.recommendation)}</Badge>}
@@ -607,21 +607,21 @@ export default function EmployeeShow({
                                 const inProgressCount = courseEnrollments.filter(e => e.status === 'enrolled' || e.status === 'in_progress').length;
                                 return (
                                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                        <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                        <div className="rounded-xl border bg-primary/10 p-3 text-center">
                                             <div className="text-xl font-bold text-primary">{courseEnrollments.length}</div>
                                             <div className="text-[10px] uppercase tracking-wider text-primary">Enrolments</div>
                                         </div>
-                                        <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
-                                            <div className="text-xl font-bold text-emerald-700">{completedCount}</div>
-                                            <div className="text-[10px] uppercase tracking-wider text-emerald-500">Completed</div>
+                                        <div className="rounded-xl border bg-status-success-bg p-3 text-center">
+                                            <div className="text-xl font-bold text-status-success">{completedCount}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-status-success">Completed</div>
                                         </div>
-                                        <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 p-3 text-center">
-                                            <div className="text-xl font-bold text-blue-700">{inProgressCount}</div>
-                                            <div className="text-[10px] uppercase tracking-wider text-blue-500">In Progress</div>
+                                        <div className="rounded-xl border bg-primary/10 p-3 text-center">
+                                            <div className="text-xl font-bold text-status-info">{inProgressCount}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-status-info">In Progress</div>
                                         </div>
-                                        <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-yellow-50 p-3 text-center">
-                                            <div className="text-xl font-bold text-amber-700">{employeeSkills.length}</div>
-                                            <div className="text-[10px] uppercase tracking-wider text-amber-500">Skills</div>
+                                        <div className="rounded-xl border bg-status-warning-bg p-3 text-center">
+                                            <div className="text-xl font-bold text-status-warning">{employeeSkills.length}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-status-warning">Skills</div>
                                         </div>
                                     </div>
                                 );
@@ -664,7 +664,7 @@ export default function EmployeeShow({
                                         <div className="flex flex-wrap gap-2">
                                             {employeeSkills.map(s => (
                                                 <div key={s.id} className="flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors hover:bg-muted/50">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-100"><Target className="h-3 w-3 text-amber-600" /></div>
+                                                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-warning-bg"><Target className="h-3 w-3 text-status-warning" /></div>
                                                     <span className="text-sm font-medium">{s.skill_name}</span>
                                                     {s.proficiency_level && <Badge variant="secondary" className="text-[9px]">Lv.{s.proficiency_level}</Badge>}
                                                     {s.self_assessed && <span className="text-[9px] text-muted-foreground">(self)</span>}
@@ -695,13 +695,13 @@ export default function EmployeeShow({
                                                                 {a.category && <Badge variant="outline" className="text-[9px]">{a.category}</Badge>}
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className={`text-xs font-medium ${meetsTarget ? 'text-emerald-600' : 'text-amber-600'}`}>{current}/{target}</span>
+                                                                <span className={`text-xs font-medium ${meetsTarget ? 'text-status-success' : 'text-status-warning'}`}>{current}/{target}</span>
                                                                 <span className="text-[10px] text-muted-foreground">{formatDate(a.assessment_date)}</span>
                                                             </div>
                                                         </div>
                                                         <div className="relative h-2 rounded-full bg-muted">
                                                             <div className="absolute inset-y-0 left-0 rounded-full bg-primary/15" style={{ width: `${(target / 5) * 100}%` }} />
-                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${(current / 5) * 100}%` }} />
+                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-status-success' : 'bg-primary'}`} style={{ width: `${(current / 5) * 100}%` }} />
                                                         </div>
                                                     </div>
                                                 );
@@ -722,7 +722,7 @@ export default function EmployeeShow({
                                 <InfoRow label="Licence Class" value={driverEligibility.licence_class} />
                                 {driverEligibility.licence_endorsements?.length ? <InfoRow label="Endorsements" value={driverEligibility.licence_endorsements.join(', ')} /> : null}
                                 <InfoRow label="Licence Expires" value={formatDate(driverEligibility.licence_expires_at)} />
-                                <InfoRow label="Can Drive Clients" value={driverEligibility.can_drive_clients ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">Yes</Badge> : <Badge variant="outline">No</Badge>} />
+                                <InfoRow label="Can Drive Clients" value={driverEligibility.can_drive_clients ? <Badge className="border-status-success/30 bg-status-success-bg text-status-success">Yes</Badge> : <Badge variant="outline">No</Badge>} />
                                 <InfoRow label="Incident Free Since" value={formatDate(driverEligibility.incident_free_since)} />
                                 <InfoRow label="Next Review" value={formatDate(driverEligibility.next_review_at)} />
                             </CardContent></>
@@ -766,9 +766,9 @@ export default function EmployeeShow({
                                 ]} />
                                 <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
                                     {[
-                                        { label: 'Compliant', value: complianceSummary.compliant, cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-                                        { label: 'Expiring Soon', value: complianceSummary.expiring_soon, cls: 'border-amber-200 bg-amber-50 text-amber-700' },
-                                        { label: 'Expired', value: complianceSummary.expired, cls: 'border-red-200 bg-red-50 text-red-700' },
+                                        { label: 'Compliant', value: complianceSummary.compliant, cls: 'border-status-success/30 bg-status-success-bg text-status-success' },
+                                        { label: 'Expiring Soon', value: complianceSummary.expiring_soon, cls: 'border-status-warning/30 bg-status-warning-bg text-status-warning' },
+                                        { label: 'Expired', value: complianceSummary.expired, cls: 'border-status-critical/30 bg-status-critical-bg text-status-critical' },
                                         { label: 'Not Started', value: complianceSummary.not_started, cls: 'border-border bg-muted text-foreground' },
                                     ].map(s => (
                                         <div key={s.label} className={`rounded-lg border p-3 text-center ${s.cls}`}>
@@ -822,12 +822,12 @@ export default function EmployeeShow({
                             {leaveBalances.length > 0 && (
                                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                     {leaveBalances.map(lb => {
-                                        const colors: Record<string, string> = { annual: 'bg-blue-500', sick: 'bg-red-500', personal: 'bg-primary', bereavement: 'bg-slate-500', parental: 'bg-pink-500' };
+                                        const colors: Record<string, string> = { annual: 'bg-status-info', sick: 'bg-status-critical', personal: 'bg-primary', bereavement: 'bg-muted-foreground/80', parental: 'bg-status-critical' };
                                         return (
                                             <Card key={lb.id}><CardContent className="pt-4">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <p className="text-sm font-medium">{formatLabel(lb.leave_type)}</p>
-                                                    <p className={`text-lg font-bold ${lb.balance_hours < 0 ? 'text-red-600' : ''}`}>{lb.balance_hours.toFixed(1)}h</p>
+                                                    <p className={`text-lg font-bold ${lb.balance_hours < 0 ? 'text-status-critical' : ''}`}>{lb.balance_hours.toFixed(1)}h</p>
                                                 </div>
                                                 <ProgressBar value={lb.used_hours} max={lb.accrued_hours} color={colors[lb.leave_type] || 'bg-primary'} />
                                                 <div className="mt-1.5 flex justify-between text-xs text-muted-foreground"><span>Used: {lb.used_hours.toFixed(1)}h</span><span>Accrued: {lb.accrued_hours.toFixed(1)}h</span></div>
@@ -874,7 +874,7 @@ export default function EmployeeShow({
                                         <Card key={cl.id}>
                                             <CardHeader>
                                                 <div className="flex items-center justify-between"><CardTitle className="text-base">{cl.name}</CardTitle><div className="flex items-center gap-2"><StatusBadge status={cl.status} /><span className="text-sm font-medium">{pct}%</span></div></div>
-                                                <ProgressBar value={done} max={total} color={pct === 100 ? 'bg-emerald-500' : 'bg-primary'} />
+                                                <ProgressBar value={done} max={total} color={pct === 100 ? 'bg-status-success' : 'bg-primary'} />
                                                 <div className="flex gap-4 text-xs text-muted-foreground mt-1">
                                                     <span>{done}/{total} tasks</span>
                                                     {cl.due_date && <span>Due: {formatDate(cl.due_date)}</span>}
@@ -887,12 +887,12 @@ export default function EmployeeShow({
                                                         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{category}</p>
                                                         <div className="space-y-1.5">
                                                             {tasks.map(t => (
-                                                                <div key={t.id} className={`flex items-start gap-3 rounded-lg border p-3 ${t.status === 'completed' ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-500/5 dark:border-emerald-500/20' : ''}`}>
-                                                                    {t.status === 'completed' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /> : <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/30" />}
+                                                                <div key={t.id} className={`flex items-start gap-3 rounded-lg border p-3 ${t.status === 'completed' ? 'bg-status-success-bg border-status-success/30 dark:bg-status-success dark:border-status-success/20' : ''}`}>
+                                                                    {t.status === 'completed' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-status-success" /> : <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 border-muted-foreground/30" />}
                                                                     <div className="min-w-0 flex-1">
                                                                         <div className="flex items-center gap-2">
                                                                             <p className={`text-sm font-medium ${t.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>{t.title}</p>
-                                                                            {t.is_required && <Badge variant="outline" className="text-[10px] border-red-200 bg-red-50 text-red-600">Required</Badge>}
+                                                                            {t.is_required && <Badge variant="outline" className="text-[10px] border-status-critical/30 bg-status-critical-bg text-status-critical">Required</Badge>}
                                                                             {t.sign_off_required && <Badge variant="outline" className="text-[10px]">Sign-off</Badge>}
                                                                         </div>
                                                                         {t.description && <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>}
@@ -983,7 +983,7 @@ export default function EmployeeShow({
                                             <td className="hidden px-4 py-3 font-mono text-xs text-muted-foreground sm:table-cell">{a.asset_tag || '\u2014'}</td>
                                             <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{a.category ? formatLabel(a.category) : '\u2014'}</td>
                                             <td className="px-4 py-3 text-muted-foreground">{formatDate(a.assigned_at)}</td>
-                                            <td className="px-4 py-3">{a.returned_at ? <Badge variant="outline" className="border-border bg-muted text-muted-foreground">Returned</Badge> : <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Active</Badge>}</td>
+                                            <td className="px-4 py-3">{a.returned_at ? <Badge variant="outline" className="border-border bg-muted text-muted-foreground">Returned</Badge> : <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">Active</Badge>}</td>
                                         </tr>
                                     ))}
                                 </tbody></table>

@@ -436,7 +436,7 @@ export default function GeofenceEdit({ geofence, assets, sites }: Props) {
                                             </div>
                                         )}
                                         {polygonPoints.length > 0 && polygonPoints.length < 3 && (
-                                            <p className="text-xs text-amber-600">
+                                            <p className="text-xs text-status-warning">
                                                 Need {3 - polygonPoints.length} more point{3 - polygonPoints.length > 1 ? 's' : ''} to complete polygon.
                                             </p>
                                         )}

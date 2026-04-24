@@ -38,12 +38,12 @@ export default function PortalLogin() {
                         <CardContent className="space-y-6">
                             {/* Flash messages */}
                             {flash?.success && (
-                                <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+                                <div className="rounded-md bg-status-success-bg p-3 text-sm text-status-success">
                                     {flash.success}
                                 </div>
                             )}
                             {flash?.error && (
-                                <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+                                <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical">
                                     {flash.error}
                                 </div>
                             )}
@@ -61,7 +61,7 @@ export default function PortalLogin() {
                                         autoComplete="email"
                                     />
                                     {form.errors.email && (
-                                        <p className="text-sm text-red-600">{form.errors.email}</p>
+                                        <p className="text-sm text-status-critical">{form.errors.email}</p>
                                     )}
                                 </div>
                                 <div className="space-y-2">
@@ -75,7 +75,7 @@ export default function PortalLogin() {
                                         autoComplete="current-password"
                                     />
                                     {form.errors.password && (
-                                        <p className="text-sm text-red-600">{form.errors.password}</p>
+                                        <p className="text-sm text-status-critical">{form.errors.password}</p>
                                     )}
                                 </div>
                                 <Button
@@ -101,7 +101,7 @@ export default function PortalLogin() {
                             <div className="grid gap-3">
                                 <Button
                                     variant="outline"
-                                    className="w-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                    className="w-full border-status-info/30 bg-status-info-bg text-status-info hover:bg-status-info-bg"
                                     asChild
                                 >
                                     <a href="/portal/auth/microsoft/redirect">

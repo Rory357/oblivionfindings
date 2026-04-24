@@ -153,7 +153,7 @@ export default function InterviewKits({ kits, roles, can }: Props) {
                                                 <div className="flex items-center justify-between">
                                                     <Label>Evaluation Criteria</Label>
                                                     <div className={`flex items-center gap-1.5 text-xs font-medium ${
-                                                        totalWeight === 100 ? 'text-green-500' : 'text-amber-500'
+                                                        totalWeight === 100 ? 'text-status-success' : 'text-status-warning'
                                                     }`}>
                                                         {totalWeight === 100 ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
                                                         Total: {totalWeight}%
@@ -199,7 +199,7 @@ export default function InterviewKits({ kits, roles, can }: Props) {
                                                         <div className="flex h-4 rounded-full overflow-hidden bg-muted/50">
                                                             {criteria.filter(c => c.label.trim()).map((c, i) => {
                                                                 const w = Number(c.weight) || 0;
-                                                                const colors = ['bg-blue-500', 'bg-primary', 'bg-amber-500', 'bg-emerald-500', 'bg-primary', 'bg-cyan-500', 'bg-pink-500', 'bg-orange-500'];
+                                                                const colors = ['bg-status-info', 'bg-primary', 'bg-status-warning', 'bg-status-success', 'bg-primary', 'bg-status-info', 'bg-status-critical', 'bg-status-warning'];
                                                                 return (
                                                                     <div key={i} className={`${colors[i % colors.length]} transition-all`} style={{ width: `${(w / Math.max(totalWeight, 1)) * 100}%` }} title={`${c.label}: ${w}%`} />
                                                                 );
@@ -207,7 +207,7 @@ export default function InterviewKits({ kits, roles, can }: Props) {
                                                         </div>
                                                         <div className="flex flex-wrap gap-2 mt-2">
                                                             {criteria.filter(c => c.label.trim()).map((c, i) => {
-                                                                const colors = ['bg-blue-500', 'bg-primary', 'bg-amber-500', 'bg-emerald-500', 'bg-primary', 'bg-cyan-500', 'bg-pink-500', 'bg-orange-500'];
+                                                                const colors = ['bg-status-info', 'bg-primary', 'bg-status-warning', 'bg-status-success', 'bg-primary', 'bg-status-info', 'bg-status-critical', 'bg-status-warning'];
                                                                 return (
                                                                     <span key={i} className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                                                         <span className={`h-2 w-2 rounded-full ${colors[i % colors.length]}`} />
@@ -251,7 +251,7 @@ export default function InterviewKits({ kits, roles, can }: Props) {
                 ) : (
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {kits.data.map((kit) => {
-                            const colors = ['bg-blue-500', 'bg-primary', 'bg-amber-500', 'bg-emerald-500', 'bg-primary', 'bg-cyan-500'];
+                            const colors = ['bg-status-info', 'bg-primary', 'bg-status-warning', 'bg-status-success', 'bg-primary', 'bg-status-info'];
                             const kitTotalWeight = kit.criteria.reduce((sum, c) => sum + (c.weight ?? 0), 0);
                             return (
                                 <Card key={kit.id} className={`hover:shadow-md transition-shadow ${!kit.is_active ? 'opacity-60' : ''}`}>

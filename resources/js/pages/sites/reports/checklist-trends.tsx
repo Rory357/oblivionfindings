@@ -42,7 +42,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                         </Link>
                     </Button>
                     <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <TrendingDown className="w-5 h-5 text-orange-400" />
+                        <TrendingDown className="w-5 h-5 text-status-warning" />
                         Checklist Failure Trends
                     </h1>
                     <p className="text-sm text-muted-foreground">
@@ -61,7 +61,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-orange-400">
+                            <div className="text-2xl font-bold text-status-warning">
                                 {failedItems.reduce((sum, i) => sum + i.failure_count, 0)}
                             </div>
                             <div className="text-sm text-muted-foreground">Total Failures</div>
@@ -117,18 +117,18 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                                                 <TableCell>
                                                     <Badge className={
                                                         item.failure_count >= 10
-                                                            ? 'bg-red-500/20 text-red-400'
+                                                            ? 'bg-status-critical-bg text-status-critical'
                                                             : item.failure_count >= 5
-                                                            ? 'bg-orange-500/20 text-orange-400'
-                                                            : 'bg-yellow-500/20 text-yellow-400'
+                                                            ? 'bg-status-warning-bg text-status-warning'
+                                                            : 'bg-status-warning-bg text-status-warning'
                                                     }>
                                                         {item.failure_count}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="w-24 bg-slate-800 rounded-full h-2">
+                                                    <div className="w-24 bg-muted rounded-full h-2">
                                                         <div
-                                                            className="bg-orange-400 h-2 rounded-full"
+                                                            className="bg-status-warning h-2 rounded-full"
                                                             style={{ width: `${barWidth}%` }}
                                                         />
                                                     </div>

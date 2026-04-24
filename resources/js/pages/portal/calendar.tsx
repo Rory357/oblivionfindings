@@ -62,22 +62,22 @@ const viewOptions: { key: ViewKey; label: string }[] = [
 
 const categories = [
     {
-        dot: 'bg-blue-500',
+        dot: 'bg-status-info',
         label: 'Support Visits',
         icon: CalendarDays,
-        bg: 'bg-blue-50 dark:bg-blue-950/40',
+        bg: 'bg-status-info-bg dark:bg-status-info',
     },
     {
-        dot: 'bg-green-500',
+        dot: 'bg-status-success',
         label: 'Family Visits',
         icon: Users,
-        bg: 'bg-green-50 dark:bg-green-950/40',
+        bg: 'bg-status-success-bg dark:bg-status-success',
     },
     {
-        dot: 'bg-amber-500',
+        dot: 'bg-status-warning',
         label: 'GP Visits',
         icon: Stethoscope,
-        bg: 'bg-amber-50 dark:bg-amber-950/40',
+        bg: 'bg-status-warning-bg dark:bg-status-warning',
     },
     {
         dot: 'bg-primary',
@@ -86,16 +86,16 @@ const categories = [
         bg: 'bg-primary/10 dark:bg-primary/40',
     },
     {
-        dot: 'bg-pink-500',
+        dot: 'bg-status-critical',
         label: 'Therapy',
         icon: Heart,
-        bg: 'bg-pink-50 dark:bg-pink-950/40',
+        bg: 'bg-status-critical-bg dark:bg-pink-950/40',
     },
     {
-        dot: 'bg-cyan-500',
+        dot: 'bg-status-info',
         label: 'Activities',
         icon: Calendar,
-        bg: 'bg-cyan-50 dark:bg-cyan-950/40',
+        bg: 'bg-status-info-bg dark:bg-status-info',
     },
 ];
 
@@ -109,9 +109,9 @@ const visitTypeLabels: Record<
 };
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-emerald-100 text-emerald-800',
-    declined: 'bg-red-100 text-red-800',
+    pending: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-success-bg text-status-success',
+    declined: 'bg-status-critical-bg text-status-critical',
     cancelled: 'bg-muted text-muted-foreground',
 };
 
@@ -348,7 +348,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                 <CardTitle className="flex items-center justify-between text-sm font-semibold">
                                     Your Visits
                                     {pendingCount > 0 && (
-                                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                                        <span className="rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
                                             {pendingCount} pending
                                         </span>
                                     )}
@@ -396,7 +396,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                                         onClick={() =>
                                                             cancelVisit(v.id)
                                                         }
-                                                        className="text-muted-foreground hover:text-red-500"
+                                                        className="text-muted-foreground hover:text-status-critical"
                                                     >
                                                         <X className="h-3 w-3" />
                                                     </button>
@@ -794,7 +794,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                 setBookingOpen(true);
                             }}
                         >
-                            <CalendarPlus className="h-4 w-4 text-green-500" />
+                            <CalendarPlus className="h-4 w-4 text-status-success" />
                             <span>Request a Visit</span>
                         </button>
                         <hr />

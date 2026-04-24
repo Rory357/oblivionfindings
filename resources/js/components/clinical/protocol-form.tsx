@@ -113,7 +113,7 @@ export default function ProtocolForm({
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {structuralLocked ? (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
                             Observation type and frequency are locked because this protocol already has schedule history.
                         </div>
                     ) : null}

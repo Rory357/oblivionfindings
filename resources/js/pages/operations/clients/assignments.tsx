@@ -65,7 +65,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
             />
             <PageShell>
                 {status === 'error' && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                         Something went wrong saving assignments. Please try again.
                     </div>
                 )}
@@ -84,7 +84,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                         {assignedWorkers.length === 0 ? (
                             <Card className="border-dashed">
                                 <CardContent className="flex flex-col items-center justify-center py-10">
-                                    <Users className="mb-2 h-8 w-8 text-slate-300" />
+                                    <Users className="mb-2 h-8 w-8 text-muted-foreground" />
                                     <p className="text-sm text-muted-foreground">No workers assigned yet</p>
                                     <p className="text-xs text-muted-foreground">Select workers from the list on the right</p>
                                 </CardContent>
@@ -102,7 +102,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="text-sm font-medium">{w.name}</span>
                                                         {client.key_worker_id === w.id && (
-                                                            <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                                            <span className="flex items-center gap-0.5 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-medium text-status-warning">
                                                                 <Star className="h-2.5 w-2.5" /> Key Worker
                                                             </span>
                                                         )}
@@ -110,7 +110,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                                                     <p className="text-xs text-muted-foreground">{w.email}</p>
                                                 </div>
                                             </div>
-                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:bg-red-50 hover:text-red-600"
+                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
                                                 onClick={() => toggle(w.id)} title="Remove">
                                                 <X className="h-4 w-4" />
                                             </Button>
@@ -124,7 +124,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                     {/* Right: Available Workers */}
                     <div>
                         <div className="mb-3 flex items-center gap-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
                                 <UserPlus className="h-4 w-4" />
                             </div>
                             <h2 className="text-sm font-semibold">Available Workers</h2>
@@ -140,7 +140,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                         {unassignedWorkers.length === 0 ? (
                             <Card className="border-dashed">
                                 <CardContent className="flex flex-col items-center justify-center py-10">
-                                    <CheckCircle2 className="mb-2 h-8 w-8 text-emerald-300" />
+                                    <CheckCircle2 className="mb-2 h-8 w-8 text-status-success" />
                                     <p className="text-sm text-muted-foreground">
                                         {search ? 'No workers match your search' : 'All workers are assigned!'}
                                     </p>
@@ -150,7 +150,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                             <div className="space-y-1.5 rounded-xl border bg-white p-2">
                                 {unassignedWorkers.map(w => (
                                     <button key={w.id} onClick={() => toggle(w.id)}
-                                        className="flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-all hover:bg-emerald-50">
+                                        className="flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-all hover:bg-status-success-bg">
                                         <Avatar className="h-8 w-8">
                                             <AvatarFallback className="bg-muted text-xs">{getInitials(w.name)}</AvatarFallback>
                                         </Avatar>
@@ -158,7 +158,7 @@ export default function ClientAssignments({ client, workers, assignedIds }: { cl
                                             <span className="text-sm font-medium">{w.name}</span>
                                             <p className="text-xs text-muted-foreground">{w.email}</p>
                                         </div>
-                                        <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-dashed border-emerald-300 text-emerald-500">
+                                        <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-dashed border-status-success/30 text-status-success">
                                             <UserPlus className="h-3.5 w-3.5" />
                                         </div>
                                     </button>

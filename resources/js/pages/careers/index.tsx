@@ -107,12 +107,12 @@ export default function CareersIndex({ postings, departments, locations, filters
                                                 </span>
                                             )}
                                             {posting.is_remote && (
-                                                <Badge variant="outline" className="text-xs gap-1 border-blue-500/30 text-blue-400 bg-blue-500/10">
+                                                <Badge variant="outline" className="text-xs gap-1 border-status-info/30 text-status-info bg-status-info">
                                                     <Wifi className="h-3 w-3" /> Remote
                                                 </Badge>
                                             )}
                                             {posting.salary_range && (
-                                                <span className="text-xs text-emerald-400 flex items-center gap-1">
+                                                <span className="text-xs text-status-success flex items-center gap-1">
                                                     <DollarSign className="h-3 w-3" /> {posting.salary_range}
                                                 </span>
                                             )}

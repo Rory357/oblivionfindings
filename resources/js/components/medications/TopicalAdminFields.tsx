@@ -9,8 +9,8 @@ interface Props {
 
 export default function TopicalAdminFields({ form, errors, onChange }: Props) {
     return (
-        <div className="space-y-3 rounded-md border border-green-200 bg-green-50/50 p-3">
-            <div className="text-sm font-medium text-green-800">Topical Application</div>
+        <div className="space-y-3 rounded-md border border-status-success/30 bg-status-success-bg p-3">
+            <div className="text-sm font-medium text-status-success">Topical Application</div>
 
             <div>
                 <Label htmlFor="topical_area">Where was the medication applied?</Label>
@@ -21,7 +21,7 @@ export default function TopicalAdminFields({ form, errors, onChange }: Props) {
                     placeholder="e.g., Left forearm, Lower back"
                 />
                 {errors.topical_area && (
-                    <p className="mt-1 text-xs text-red-600">{errors.topical_area}</p>
+                    <p className="mt-1 text-xs text-status-critical">{errors.topical_area}</p>
                 )}
             </div>
 
@@ -34,7 +34,7 @@ export default function TopicalAdminFields({ form, errors, onChange }: Props) {
                     placeholder="e.g., Intact, Dry, Red, Broken"
                 />
                 {errors.topical_skin_condition && (
-                    <p className="mt-1 text-xs text-red-600">{errors.topical_skin_condition}</p>
+                    <p className="mt-1 text-xs text-status-critical">{errors.topical_skin_condition}</p>
                 )}
             </div>
         </div>

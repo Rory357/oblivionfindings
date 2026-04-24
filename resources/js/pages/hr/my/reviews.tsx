@@ -46,10 +46,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Draft' },
-    in_progress: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'In Progress' },
-    completed: { className: 'border-amber-500/30 text-amber-400 bg-amber-500/10', label: 'Completed' },
-    signed_off: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Signed Off' },
+    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
+    in_progress: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'In Progress' },
+    completed: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Completed' },
+    signed_off: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Signed Off' },
 };
 
 function RatingStars({ rating }: { rating: number | null }) {
@@ -57,7 +57,7 @@ function RatingStars({ rating }: { rating: number | null }) {
     return (
         <div className="flex items-center gap-0.5">
             {Array.from({ length: 5 }, (_, i) => (
-                <Star key={i} className={`h-4 w-4 ${i < rating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                <Star key={i} className={`h-4 w-4 ${i < rating ? 'fill-amber-400 text-status-warning' : 'text-muted-foreground'}`} />
             ))}
         </div>
     );
@@ -99,7 +99,7 @@ function ReviewCard({ review }: { review: Review }) {
                                 </CardTitle>
                                 <Badge variant="outline" className={sc.className}>{sc.label}</Badge>
                                 {review.employee_signed_off && (
-                                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 bg-emerald-500/10 text-xs">
+                                    <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success text-xs">
                                         You signed off
                                     </Badge>
                                 )}

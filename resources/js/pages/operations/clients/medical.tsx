@@ -223,7 +223,7 @@ export default function ClientMedical({
                 />
 
                 {/* ── Hero Header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600/90 via-rose-500 to-pink-500/80 p-6 text-white md:p-8">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-critical/90 via-status-critical to-status-critical/80 p-6 text-white md:p-8">
                     <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
                     <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
 
@@ -240,7 +240,7 @@ export default function ClientMedical({
 
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
                                 {profile?.allergies && (
-                                    <Badge className="bg-red-400/30 text-red-100 border-red-300/40">
+                                    <Badge className="bg-status-critical-bg text-status-critical border-status-critical/40">
                                         <AlertTriangle className="mr-1 h-3 w-3" />Allergies: {profile.allergies}
                                     </Badge>
                                 )}
@@ -271,11 +271,11 @@ export default function ClientMedical({
                 </div>
 
                 {has_open_controlled_discrepancy && (
-                    <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
-                        <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
+                    <div className="flex items-center gap-3 rounded-xl border-2 border-status-warning/30 bg-status-warning-bg p-4">
+                        <AlertTriangle className="h-6 w-6 shrink-0 text-status-warning" />
                         <div>
-                            <p className="text-sm font-bold text-amber-800">Open Controlled Drug Discrepancy</p>
-                            <p className="text-sm text-amber-700">
+                            <p className="text-sm font-bold text-status-warning">Open Controlled Drug Discrepancy</p>
+                            <p className="text-sm text-status-warning">
                                 There is an open controlled-drug discrepancy for this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. Review and resolve before further controlled stock edits (unless override is granted).
                             </p>
                         </div>
@@ -356,24 +356,24 @@ export default function ClientMedical({
                     <div className="space-y-4">
                         {/* KPI Row */}
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                            <div className="rounded-xl border bg-gradient-to-br from-rose-50 to-pink-50 p-4 dark:from-rose-950/20 dark:to-pink-950/20">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-500">Allergies</p>
-                                <p className="mt-1 text-lg font-bold text-rose-900 dark:text-rose-300">{profile?.allergies || 'None recorded'}</p>
+                            <div className="rounded-xl border bg-status-critical-bg p-4 dark:from-rose-950/20 dark:to-pink-950/20">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-status-critical">Allergies</p>
+                                <p className="mt-1 text-lg font-bold text-status-critical dark:text-status-critical">{profile?.allergies || 'None recorded'}</p>
                             </div>
-                            <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4 dark:from-violet-950/20 dark:to-purple-950/20">
+                            <div className="rounded-xl border bg-primary/10 p-4 dark:from-violet-950/20 dark:to-purple-950/20">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Active Medications</p>
                                 <p className="mt-1 text-lg font-bold text-primary dark:text-primary/70">{medications.filter((m: any) => m.active !== false && m.state !== 'ceased').length}</p>
                                 {medications.some((m: any) => m.controlled_drug || m.is_controlled_drug) && (
-                                    <p className="mt-0.5 text-[10px] text-amber-600">{medications.filter((m: any) => m.controlled_drug || m.is_controlled_drug).length} controlled</p>
+                                    <p className="mt-0.5 text-[10px] text-status-warning">{medications.filter((m: any) => m.controlled_drug || m.is_controlled_drug).length} controlled</p>
                                 )}
                             </div>
-                            <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-4 dark:from-blue-950/20 dark:to-sky-950/20">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">Conditions</p>
-                                <p className="mt-1 text-lg font-bold text-blue-900 dark:text-blue-300">{conditions.length || 'None'}</p>
+                            <div className="rounded-xl border bg-status-info-bg p-4 dark:from-blue-950/20 dark:to-sky-950/20">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-status-info">Conditions</p>
+                                <p className="mt-1 text-lg font-bold text-status-info dark:text-status-info">{conditions.length || 'None'}</p>
                             </div>
-                            <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-4 dark:from-emerald-950/20 dark:to-green-950/20">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500">Emergency Contacts</p>
-                                <p className="mt-1 text-lg font-bold text-emerald-900 dark:text-emerald-300">{emergency_contacts.length || 'None'}</p>
+                            <div className="rounded-xl border bg-status-success-bg p-4 dark:from-emerald-950/20 dark:to-green-950/20">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-status-success">Emergency Contacts</p>
+                                <p className="mt-1 text-lg font-bold text-status-success dark:text-status-success">{emergency_contacts.length || 'None'}</p>
                             </div>
                         </div>
 
@@ -384,7 +384,7 @@ export default function ClientMedical({
                                     <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
                                         {(profile?.gp_name || profile?.gp_practice) && (
                                             <div className="flex items-start gap-3">
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
                                                     <Stethoscope className="h-4 w-4" />
                                                 </div>
                                                 <div>
@@ -396,7 +396,7 @@ export default function ClientMedical({
                                         )}
                                         {profile?.gp_phone && (
                                             <div className="flex items-start gap-3">
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-info-bg text-status-info">
                                                     <Phone className="h-4 w-4" />
                                                 </div>
                                                 <div>
@@ -407,7 +407,7 @@ export default function ClientMedical({
                                         )}
                                         {profile?.hospital_preference && (
                                             <div className="flex items-start gap-3">
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                                                     <Home className="h-4 w-4" />
                                                 </div>
                                                 <div>
@@ -418,7 +418,7 @@ export default function ClientMedical({
                                         )}
                                         {profile?.blood_type && (
                                             <div className="flex items-start gap-3">
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
                                                     <Heart className="h-4 w-4" />
                                                 </div>
                                                 <div>
@@ -454,8 +454,8 @@ export default function ClientMedical({
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-sm font-medium">{m.name}</span>
                                                             {m.is_prn && <Badge variant="outline" className="text-[9px]">PRN</Badge>}
-                                                            {(m.controlled_drug || m.is_controlled_drug) && <Badge variant="outline" className="text-[9px] border-amber-200 bg-amber-50 text-amber-700">CD</Badge>}
-                                                            {(m.high_risk || m.is_high_risk) && <Badge variant="outline" className="text-[9px] border-red-200 bg-red-50 text-red-700">High Risk</Badge>}
+                                                            {(m.controlled_drug || m.is_controlled_drug) && <Badge variant="outline" className="text-[9px] border-status-warning/30 bg-status-warning-bg text-status-warning">CD</Badge>}
+                                                            {(m.high_risk || m.is_high_risk) && <Badge variant="outline" className="text-[9px] border-status-critical/30 bg-status-critical-bg text-status-critical">High Risk</Badge>}
                                                         </div>
                                                         <p className="text-xs text-muted-foreground">
                                                             {[m.dosage, m.frequency, m.route].filter(Boolean).join(' · ')}
@@ -476,7 +476,7 @@ export default function ClientMedical({
                                     <CardHeader className="pb-2">
                                         <CardTitle className="flex items-center justify-between text-sm">
                                             <span className="flex items-center gap-2">
-                                                <Thermometer className="h-4 w-4 text-blue-500" />
+                                                <Thermometer className="h-4 w-4 text-status-info" />
                                                 Conditions
                                             </span>
                                             <Button variant="ghost" size="sm" className="text-xs" onClick={() => setFocusSection('conditions')}>Manage</Button>
@@ -489,7 +489,7 @@ export default function ClientMedical({
                                                     <div key={c.id} className="flex items-center justify-between rounded-lg border p-2.5">
                                                         <span className="text-sm font-medium">{c.label}</span>
                                                         {c.severity && (
-                                                            <Badge variant="outline" className={`text-[9px] ${c.severity === 'high' ? 'border-red-200 bg-red-50 text-red-700' : c.severity === 'medium' ? 'border-amber-200 bg-amber-50 text-amber-700' : ''}`}>
+                                                            <Badge variant="outline" className={`text-[9px] ${c.severity === 'high' ? 'border-status-critical/30 bg-status-critical-bg text-status-critical' : c.severity === 'medium' ? 'border-status-warning/30 bg-status-warning-bg text-status-warning' : ''}`}>
                                                                 {c.severity}
                                                             </Badge>
                                                         )}
@@ -506,7 +506,7 @@ export default function ClientMedical({
                                     <CardHeader className="pb-2">
                                         <CardTitle className="flex items-center justify-between text-sm">
                                             <span className="flex items-center gap-2">
-                                                <Phone className="h-4 w-4 text-emerald-500" />
+                                                <Phone className="h-4 w-4 text-status-success" />
                                                 Emergency Contacts
                                             </span>
                                             <Button variant="ghost" size="sm" className="text-xs" onClick={() => setFocusSection('emergency_contacts')}>Manage</Button>
@@ -539,7 +539,7 @@ export default function ClientMedical({
                                 <CardHeader className="pb-2">
                                     <CardTitle className="flex items-center justify-between text-sm">
                                         <span className="flex items-center gap-2">
-                                            <FileHeart className="h-4 w-4 text-rose-500" />
+                                            <FileHeart className="h-4 w-4 text-status-critical" />
                                             Medical History
                                         </span>
                                         <Button variant="ghost" size="sm" className="text-xs" onClick={() => setFocusSection('profile')}>Edit</Button>
@@ -576,7 +576,7 @@ export default function ClientMedical({
                     <Card className={cn(focusSection !== 'profile' && 'hidden')}>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
                                     <FileHeart className="h-4 w-4" />
                                 </div>
                                 Medical Profile
@@ -593,10 +593,10 @@ export default function ClientMedical({
                                 <div className="space-y-4">
                                     {/* GP Info */}
                                     {(profile?.gp_name || profile?.gp_practice || profile?.gp_phone) && (
-                                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                                        <div className="rounded-xl border border-status-success/30 bg-status-success-bg p-4">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Stethoscope className="h-4 w-4 text-emerald-600" />
-                                                <span className="text-sm font-semibold text-emerald-800">GP / Primary Care</span>
+                                                <Stethoscope className="h-4 w-4 text-status-success" />
+                                                <span className="text-sm font-semibold text-status-success">GP / Primary Care</span>
                                             </div>
                                             <div className="grid gap-2 sm:grid-cols-3 text-sm">
                                                 {profile.gp_name && <div><span className="text-xs text-muted-foreground">Doctor</span><p className="font-medium">{profile.gp_name}</p></div>}
@@ -615,7 +615,7 @@ export default function ClientMedical({
                                             <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Disabilities</p><p className="text-sm leading-relaxed">{profile.disabilities}</p></div>
                                         )}
                                         {profile?.allergies && (
-                                            <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-rose-600">Allergies</p><p className="text-sm font-medium text-rose-700">{profile.allergies}</p></div>
+                                            <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-status-critical">Allergies</p><p className="text-sm font-medium text-status-critical">{profile.allergies}</p></div>
                                         )}
                                         {profile?.blood_type && (
                                             <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Blood Type</p><p className="text-sm font-medium">{profile.blood_type}</p></div>
@@ -641,10 +641,10 @@ export default function ClientMedical({
                                 <div className="space-y-3">
                             {/* GP Information highlight card */}
                             {(profile?.gp_name || profile?.gp_practice || profile?.gp_phone) && (
-                                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                                <div className="mb-4 rounded-xl border border-status-success/30 bg-status-success-bg p-4">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <Stethoscope className="h-4 w-4 text-emerald-600" />
-                                        <span className="text-sm font-semibold text-emerald-800">GP / Primary Care</span>
+                                        <Stethoscope className="h-4 w-4 text-status-success" />
+                                        <span className="text-sm font-semibold text-status-success">GP / Primary Care</span>
                                     </div>
                                     <div className="grid gap-2 sm:grid-cols-3 text-sm">
                                         {profile.gp_name && <div><span className="text-xs text-muted-foreground">Doctor</span><p className="font-medium">{profile.gp_name}</p></div>}
@@ -1106,12 +1106,12 @@ export default function ClientMedical({
                                                     <Pill className="h-4 w-4 text-primary" />
                                                     <span className="text-sm font-semibold">{m.name}</span>
                                                     {m.controlled_drug && (
-                                                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                                        <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning">
                                                             Controlled
                                                         </span>
                                                     )}
                                                     {m.is_prn && (
-                                                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                                                        <span className="rounded-full bg-status-info-bg px-2 py-0.5 text-[10px] font-medium text-status-info">
                                                             PRN
                                                         </span>
                                                     )}
@@ -1125,7 +1125,7 @@ export default function ClientMedical({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                        className="text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
                                                         onClick={() =>
                                                             medForm.delete(
                                                                 `/operations/clients/${client.id}/medical/medications/${m.id}`,
@@ -1150,7 +1150,7 @@ export default function ClientMedical({
                                                 </div>
                                             )}
                                             {isOverdue && (
-                                                <div className="mt-2 flex items-center gap-1 text-xs text-red-600">
+                                                <div className="mt-2 flex items-center gap-1 text-xs text-status-critical">
                                                     <AlertTriangle className="h-3 w-3" />
                                                     Review overdue (end date: {new Date(m.end_date).toLocaleDateString()})
                                                 </div>
@@ -1171,7 +1171,7 @@ export default function ClientMedical({
                     <Card className={cn(focusSection !== 'conditions' && 'hidden')}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                                     <Thermometer className="h-4 w-4" />
                                 </div>
                                 Conditions
@@ -1184,9 +1184,9 @@ export default function ClientMedical({
                                 </Button>
                             )}
                             {can_edit && showAddCondition && (
-                                <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/30 p-4">
+                                <div className="rounded-xl border border-dashed border-status-warning/30 bg-status-warning-bg p-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-status-warning">
                                             <Plus className="h-4 w-4" />
                                             Add condition
                                         </div>
@@ -1233,7 +1233,7 @@ export default function ClientMedical({
                                     </div>
                                     <div className="mt-3">
                                         <Button
-                                            className="bg-amber-600 hover:bg-amber-700"
+                                            className="bg-status-warning hover:bg-status-warning"
                                             onClick={() =>
                                                 conditionForm.post(
                                                     `/operations/clients/${client.id}/medical/conditions`,
@@ -1266,14 +1266,14 @@ export default function ClientMedical({
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex items-center gap-2">
-                                                <Thermometer className="h-4 w-4 text-amber-500" />
+                                                <Thermometer className="h-4 w-4 text-status-warning" />
                                                 <span className="text-sm font-semibold">{c.label}</span>
                                                 {c.severity && (
                                                     <span className={cn(
                                                         'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                                                        c.severity === 'severe' ? 'bg-red-100 text-red-700' :
-                                                        c.severity === 'moderate' ? 'bg-amber-100 text-amber-700' :
-                                                        'bg-green-100 text-green-700',
+                                                        c.severity === 'severe' ? 'bg-status-critical-bg text-status-critical' :
+                                                        c.severity === 'moderate' ? 'bg-status-warning-bg text-status-warning' :
+                                                        'bg-status-success-bg text-status-success',
                                                     )}>
                                                         {c.severity}
                                                     </span>
@@ -1283,7 +1283,7 @@ export default function ClientMedical({
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                    className="text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
                                                     onClick={() =>
                                                         conditionForm.delete(
                                                             `/operations/clients/${client.id}/medical/conditions/${c.id}`,
@@ -1317,7 +1317,7 @@ export default function ClientMedical({
                     <Card className={cn(focusSection !== 'emergency_contacts' && 'hidden')}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-info-bg text-status-info">
                                     <Phone className="h-4 w-4" />
                                 </div>
                                 Emergency Contacts
@@ -1330,9 +1330,9 @@ export default function ClientMedical({
                                 </Button>
                             )}
                             {can_edit && showAddContact && (
-                                <div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/30 p-4">
+                                <div className="rounded-xl border border-dashed border-status-info/30 bg-status-info-bg p-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-blue-800">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-status-info">
                                             <Plus className="h-4 w-4" />
                                             Add emergency contact
                                         </div>
@@ -1404,7 +1404,7 @@ export default function ClientMedical({
                                     </div>
                                     <div className="mt-3">
                                         <Button
-                                            className="bg-blue-600 hover:bg-blue-700"
+                                            className="bg-status-info hover:bg-status-info"
                                             onClick={() =>
                                                 contactForm.post(
                                                     `/operations/clients/${client.id}/medical/emergency-contacts`,
@@ -1440,7 +1440,7 @@ export default function ClientMedical({
                                             className="rounded-lg border p-4"
                                         >
                                             <div className="flex items-start gap-3">
-                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-info-bg text-sm font-bold text-status-info">
                                                     {initials}
                                                 </div>
                                                 <div className="min-w-0 flex-1">
@@ -1452,7 +1452,7 @@ export default function ClientMedical({
                                                             </span>
                                                         )}
                                                         {ec.authorised_for_health_info && (
-                                                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                                                            <span className="rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success">
                                                                 <Shield className="mr-0.5 inline h-3 w-3" />
                                                                 Health info authorised
                                                             </span>
@@ -1484,7 +1484,7 @@ export default function ClientMedical({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                        className="shrink-0 text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
                                                         onClick={() =>
                                                             contactForm.delete(
                                                                 `/operations/clients/${client.id}/medical/emergency-contacts/${ec.id}`,
@@ -1516,7 +1516,7 @@ export default function ClientMedical({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
                                     <Syringe className="h-4 w-4" />
                                 </div>
                                 Medication Administration (MAR)
@@ -1534,9 +1534,9 @@ export default function ClientMedical({
                                 </div>
                             )}
                             {can_record && medications.length > 0 && showAdminForm && (
-                                <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/30 p-4">
+                                <div className="rounded-xl border border-dashed border-status-success/30 bg-status-success-bg p-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-status-success">
                                             <Plus className="h-4 w-4" />
                                             Record administration
                                         </div>
@@ -1623,7 +1623,7 @@ export default function ClientMedical({
                                                     }
                                                 />
                                                 {administrationForm.errors.reason && (
-                                                    <div className="mt-1 text-xs text-red-600">
+                                                    <div className="mt-1 text-xs text-status-critical">
                                                         {administrationForm.errors.reason}
                                                     </div>
                                                 )}
@@ -1658,7 +1658,7 @@ export default function ClientMedical({
                                                         </SelectContent>
                                                     </Select>
                                                     {administrationForm.errors.witnessed_by && (
-                                                        <div className="mt-1 text-xs text-red-600">
+                                                        <div className="mt-1 text-xs text-status-critical">
                                                             {administrationForm.errors.witnessed_by}
                                                         </div>
                                                     )}
@@ -1721,7 +1721,7 @@ export default function ClientMedical({
                                     </div>
                                     <div className="mt-3">
                                         <Button
-                                            className="bg-emerald-600 hover:bg-emerald-700"
+                                            className="bg-status-success hover:bg-status-success"
                                             onClick={() => {
                                                 administrationForm.clearErrors();
                                                 if (!administrationForm.data.medication_id) return;
@@ -1835,9 +1835,9 @@ export default function ClientMedical({
                                             </div>
                                             <span className={cn(
                                                 'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                                                a.status === 'given' ? 'bg-emerald-100 text-emerald-700' :
-                                                a.status === 'refused' ? 'bg-red-100 text-red-700' :
-                                                a.status === 'missed' ? 'bg-amber-100 text-amber-700' :
+                                                a.status === 'given' ? 'bg-status-success-bg text-status-success' :
+                                                a.status === 'refused' ? 'bg-status-critical-bg text-status-critical' :
+                                                a.status === 'missed' ? 'bg-status-warning-bg text-status-warning' :
                                                 'bg-muted text-foreground',
                                             )}>
                                                 {a.status}
@@ -1951,7 +1951,7 @@ export default function ClientMedical({
                                                         placeholder="e.g. stock count, discrepancy investigation"
                                                     />
                                                     {stockForm.errors.reason && (
-                                                        <div className="mt-1 text-xs text-red-600">
+                                                        <div className="mt-1 text-xs text-status-critical">
                                                             {stockForm.errors.reason}
                                                         </div>
                                                     )}
@@ -1982,7 +1982,7 @@ export default function ClientMedical({
                                                         </SelectContent>
                                                     </Select>
                                                     {stockForm.errors.witnessed_by && (
-                                                        <div className="mt-1 text-xs text-red-600">
+                                                        <div className="mt-1 text-xs text-status-critical">
                                                             {stockForm.errors.witnessed_by}
                                                         </div>
                                                     )}
@@ -2130,7 +2130,7 @@ export default function ClientMedical({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
                                     <Shield className="h-4 w-4" />
                                 </div>
                                 Controlled Drug Register
@@ -2143,7 +2143,7 @@ export default function ClientMedical({
                                         <div className="text-sm font-medium">
                                             {e.medication?.name || 'Medication'}
                                         </div>
-                                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-700">
+                                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">
                                             {e.entry_type}
                                             {e.recorded_at
                                                 ? ` \u2022 ${new Date(e.recorded_at).toLocaleString()}`
@@ -2185,7 +2185,7 @@ export default function ClientMedical({
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                                     <AlertTriangle className="h-4 w-4" />
                                 </div>
                                 Controlled Drug Discrepancies
@@ -2195,7 +2195,7 @@ export default function ClientMedical({
                             {controlled_discrepancies.map((d: any) => (
                                 <div key={d.id} className={cn(
                                     'rounded-lg border p-3',
-                                    d.status === 'open' ? 'border-l-4 border-l-amber-400 bg-amber-50/30' : 'border-l-4 border-l-slate-200',
+                                    d.status === 'open' ? 'border-l-4 border-l-amber-400 bg-status-warning-bg' : 'border-l-4 border-l-slate-200',
                                 )}>
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="text-sm font-medium">
@@ -2203,7 +2203,7 @@ export default function ClientMedical({
                                         </div>
                                         <span className={cn(
                                             'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                                            d.status === 'open' ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground',
+                                            d.status === 'open' ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground',
                                         )}>
                                             {d.status}
                                             {d.reported_at

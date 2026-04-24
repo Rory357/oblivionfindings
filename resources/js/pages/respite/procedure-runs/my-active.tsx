@@ -11,8 +11,8 @@ type Props = {
 
 const statusColors: Record<string, string> = {
     pending: 'bg-muted text-foreground',
-    in_progress: 'bg-blue-100 text-blue-800',
-    escalated: 'bg-orange-100 text-orange-800',
+    in_progress: 'bg-status-info-bg text-status-info',
+    escalated: 'bg-status-warning-bg text-status-warning',
 };
 
 export default function MyActiveProcedureRuns({ runs }: Props) {
@@ -42,7 +42,7 @@ export default function MyActiveProcedureRuns({ runs }: Props) {
                                                 Progress: {r.current_step || 0}/{r.total_steps || 0} steps
                                             </div>
                                             {r.sla_deadline && (
-                                                <div className={`mt-1 text-xs ${r.sla_breached ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                                                <div className={`mt-1 text-xs ${r.sla_breached ? 'text-status-critical font-medium' : 'text-muted-foreground'}`}>
                                                     SLA Deadline: {formatDateTime(r.sla_deadline)}
                                                     {r.sla_breached && ' (BREACHED)'}
                                                 </div>

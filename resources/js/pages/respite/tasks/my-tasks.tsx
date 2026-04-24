@@ -11,16 +11,16 @@ type Props = {
 
 const priorityColors: Record<string, string> = {
     low: 'bg-muted text-foreground',
-    medium: 'bg-blue-100 text-blue-800',
-    high: 'bg-orange-100 text-orange-800',
-    urgent: 'bg-red-100 text-red-800',
+    medium: 'bg-status-info-bg text-status-info',
+    high: 'bg-status-warning-bg text-status-warning',
+    urgent: 'bg-status-critical-bg text-status-critical',
 };
 
 const statusColors: Record<string, string> = {
     pending: 'bg-muted text-foreground',
-    assigned: 'bg-blue-100 text-blue-800',
+    assigned: 'bg-status-info-bg text-status-info',
     in_progress: 'bg-primary/10 text-primary',
-    submitted_for_approval: 'bg-amber-100 text-amber-800',
+    submitted_for_approval: 'bg-status-warning-bg text-status-warning',
 };
 
 const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };

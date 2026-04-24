@@ -119,15 +119,15 @@ function severityTone(severity: string): {
 } {
     const s = severity.toLowerCase();
     if (s === 'critical') {
-        return { dot: 'bg-red-500', label: 'Critical' };
+        return { dot: 'bg-status-critical', label: 'Critical' };
     }
     if (s === 'high') {
-        return { dot: 'bg-amber-500', label: 'High' };
+        return { dot: 'bg-status-warning', label: 'High' };
     }
     if (s === 'medium') {
-        return { dot: 'bg-sky-500', label: 'Medium' };
+        return { dot: 'bg-status-info', label: 'Medium' };
     }
-    return { dot: 'bg-slate-400', label: 'Low' };
+    return { dot: 'bg-muted', label: 'Low' };
 }
 
 function ageFromDob(dob: string | null): number | null {
@@ -228,8 +228,8 @@ export default function ClientCare({
                             {hasActiveShift ? (
                                 <>
                                     <span aria-hidden>·</span>
-                                    <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                    <span className="inline-flex items-center gap-1 text-status-success dark:text-status-success">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
                                         On shift
                                     </span>
                                 </>
@@ -247,9 +247,9 @@ export default function ClientCare({
                     onClick={() => setPrnOpen(true)}
                     disabled={prnDisabled}
                     aria-label={`Give as-needed med to ${fullName}`}
-                    className="frontline-focus group flex w-full items-center gap-3 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-800/60 dark:bg-amber-950/20"
+                    className="frontline-focus group flex w-full items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-left transition-shadow hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-status-warning/60 dark:bg-status-warning"
                 >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-600 text-white">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-warning text-white">
                         <Zap className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -271,13 +271,13 @@ export default function ClientCare({
                     this client, saying so up-front prevents surprises when a
                     PRN gets recorded outside a shift. */}
                 {!hasActiveShift && prnCount > 0 && can.record_prn && (
-                    <div className="flex items-start gap-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-sm dark:border-sky-900 dark:bg-sky-950/20">
-                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-700 dark:text-sky-300" />
+                    <div className="flex items-start gap-3 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30 dark:bg-status-info">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-info dark:text-status-info" />
                         <div className="min-w-0">
-                            <p className="font-medium text-sky-900 dark:text-sky-100">
+                            <p className="font-medium text-status-info dark:text-status-info">
                                 You&rsquo;re not on shift for this client right now
                             </p>
-                            <p className="mt-0.5 text-xs text-sky-800 dark:text-sky-200">
+                            <p className="mt-0.5 text-xs text-status-info dark:text-status-info">
                                 You can still give an as-needed med from here. It will save
                                 without a shift link, so note why if the context matters.
                             </p>
@@ -314,7 +314,7 @@ export default function ClientCare({
                                             key={c.id}
                                             className="flex items-start gap-2"
                                         >
-                                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
                                             <div className="min-w-0">
                                                 <span className="font-medium">{c.label}</span>
                                                 {c.severity && (

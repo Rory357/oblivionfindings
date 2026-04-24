@@ -143,7 +143,7 @@ export default function GovernanceNav() {
             className={cn(
               'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
               isActive
-                ? 'bg-blue-50 text-blue-700'
+                ? 'bg-status-info-bg text-status-info'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             )}
           >

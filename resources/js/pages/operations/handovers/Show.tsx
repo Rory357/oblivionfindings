@@ -76,7 +76,7 @@ function statusBadge(status: string) {
             );
         case 'submitted':
             return (
-                <Badge variant="outline" className="gap-1 border-amber-500 text-amber-700">
+                <Badge variant="outline" className="gap-1 border-status-warning/30 text-status-warning">
                     <Clock className="h-3 w-3" />
                     Submitted
                 </Badge>

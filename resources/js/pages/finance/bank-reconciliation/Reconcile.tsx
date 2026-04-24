@@ -71,8 +71,8 @@ interface Props {
 }
 
 const confidenceColors: Record<string, string> = {
-    high: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30',
-    medium: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
+    high: 'bg-status-success-bg text-status-success border-status-success/30',
+    medium: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     low: 'bg-muted text-muted-foreground border-border',
 };
 
@@ -215,7 +215,7 @@ export default function Reconcile({
                         </p>
                     </div>
                     {isCompleted && (
-                        <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30 text-sm px-3 py-1">
+                        <Badge className="bg-status-success-bg text-status-success border-status-success/30 text-sm px-3 py-1">
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Completed {reconciliation.completed_at}
                             {reconciliation.completed_by_name && ` by ${reconciliation.completed_by_name}`}
@@ -249,10 +249,10 @@ export default function Reconcile({
                             </p>
                         </CardContent>
                     </Card>
-                    <Card className={isBalanced ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}>
+                    <Card className={isBalanced ? 'border-status-success/30 bg-status-success' : 'border-status-warning/30 bg-status-warning'}>
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Difference</p>
-                            <p className={`text-lg font-semibold font-mono tabular-nums mt-1 ${isBalanced ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            <p className={`text-lg font-semibold font-mono tabular-nums mt-1 ${isBalanced ? 'text-status-success' : 'text-status-warning'}`}>
                                 {formatCurrency(difference)}
                             </p>
                         </CardContent>
@@ -291,7 +291,7 @@ export default function Reconcile({
                         <Button
                             onClick={handleComplete}
                             disabled={!isBalanced || processing}
-                            className={isBalanced ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
+                            className={isBalanced ? 'bg-status-success hover:bg-status-success text-white' : ''}
                         >
                             <CheckCircle className="h-4 w-4 mr-2" />
                             Complete Reconciliation
@@ -301,10 +301,10 @@ export default function Reconcile({
 
                 {/* Suggested Matches */}
                 {!isCompleted && suggestedMatches.length > 0 && (
-                    <Card className="border-blue-500/30 bg-blue-500/5">
+                    <Card className="border-status-info/30 bg-status-info">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Sparkles className="h-4 w-4 text-blue-600" />
+                                <Sparkles className="h-4 w-4 text-status-info" />
                                 Suggested Matches ({suggestedMatches.length})
                             </CardTitle>
                         </CardHeader>
@@ -327,7 +327,7 @@ export default function Reconcile({
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-medium truncate">{txn.description}</span>
-                                                    <span className={`font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    <span className={`font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                         {formatCurrency(txn.amount)}
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">{txn.transaction_date}</span>
@@ -395,9 +395,9 @@ export default function Reconcile({
                                                     key={txn.id}
                                                     className={`cursor-pointer transition-colors ${
                                                         isSelected
-                                                            ? 'bg-blue-500/10 hover:bg-blue-500/10'
+                                                            ? 'bg-status-info hover:bg-status-info'
                                                             : hasSuggestion
-                                                              ? 'bg-blue-500/5 hover:bg-blue-500/10'
+                                                              ? 'bg-status-info hover:bg-status-info'
                                                               : 'hover:bg-muted/50'
                                                     } ${isCompleted ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
@@ -415,7 +415,7 @@ export default function Reconcile({
                                                     <TableCell className="whitespace-nowrap text-sm">
                                                         {txn.transaction_date}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                         {formatCurrency(txn.amount)}
                                                     </TableCell>
                                                     <TableCell className="text-sm truncate max-w-[200px]">
@@ -465,7 +465,7 @@ export default function Reconcile({
                                                     key={line.id}
                                                     className={`cursor-pointer transition-colors ${
                                                         isSelected
-                                                            ? 'bg-blue-500/10 hover:bg-blue-500/10'
+                                                            ? 'bg-status-info hover:bg-status-info'
                                                             : 'hover:bg-muted/50'
                                                     } ${isCompleted ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
@@ -476,7 +476,7 @@ export default function Reconcile({
                                                     <TableCell className="whitespace-nowrap text-sm">
                                                         {line.journal_date}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                         {formatCurrency(amount)}
                                                     </TableCell>
                                                     <TableCell className="text-sm truncate max-w-[200px]">
@@ -500,7 +500,7 @@ export default function Reconcile({
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                <CheckCircle className="h-4 w-4 text-status-success" />
                                 Matched Items ({matchedLines.length})
                             </CardTitle>
                         </CardHeader>
@@ -529,7 +529,7 @@ export default function Reconcile({
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${(line.bank_transaction?.amount ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            <TableCell className={`text-right font-mono tabular-nums ${(line.bank_transaction?.amount ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
                                                 {line.bank_transaction ? formatCurrency(line.bank_transaction.amount) : '-'}
                                             </TableCell>
                                             <TableCell>

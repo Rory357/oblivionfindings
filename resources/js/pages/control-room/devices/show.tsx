@@ -110,24 +110,24 @@ function formatDateTime(isoString: string | null): string {
 }
 
 const statusBadgeColors: Record<string, string> = {
-    online: 'bg-green-100 text-green-800 border-green-200',
-    offline: 'bg-red-100 text-red-800 border-red-200',
-    maintenance: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    online: 'bg-status-success-bg text-status-success border-status-success/30',
+    offline: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    maintenance: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     retired: 'bg-muted text-foreground border-border',
 };
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-black',
-    low: 'bg-green-500 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-black',
+    low: 'bg-status-success text-white',
 };
 
 const alertStatusColors: Record<string, string> = {
-    open: 'bg-red-100 text-red-800',
-    ack: 'bg-yellow-100 text-yellow-800',
-    triaging: 'bg-blue-100 text-blue-800',
-    resolved: 'bg-green-100 text-green-800',
+    open: 'bg-status-critical-bg text-status-critical',
+    ack: 'bg-status-warning-bg text-status-warning',
+    triaging: 'bg-status-info-bg text-status-info',
+    resolved: 'bg-status-success-bg text-status-success',
     closed: 'bg-muted text-foreground',
 };
 
@@ -238,7 +238,7 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                     {device.status}
                                 </Badge>
                                 {device.is_stale && (
-                                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                                    <Badge variant="outline" className="bg-status-warning-bg text-status-warning border-status-warning/30">
                                         Stale
                                     </Badge>
                                 )}
@@ -315,8 +315,8 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                                 <span
                                                     className={`inline-block h-2 w-2 rounded-full ${
                                                         device.signal_source.status === 'active'
-                                                            ? 'bg-green-500'
-                                                            : 'bg-gray-400'
+                                                            ? 'bg-status-success'
+                                                            : 'bg-muted'
                                                     }`}
                                                 />
                                                 {device.signal_source.name}

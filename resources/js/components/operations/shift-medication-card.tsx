@@ -702,8 +702,8 @@ export default function ShiftMedicationCard({
                                                     className={`flex items-center gap-2 text-xs ${
                                                         scanStatus ===
                                                         'verified'
-                                                            ? 'text-green-700'
-                                                            : 'text-red-600'
+                                                            ? 'text-status-success'
+                                                            : 'text-status-critical'
                                                     }`}
                                                 >
                                                     {scanStatus ===

@@ -99,14 +99,14 @@ const statusColor = (status: string) => {
         case 'active':
         case 'open':
         case 'in_progress':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'recovering':
         case 'pending':
-            return 'bg-blue-100 text-blue-800';
+            return 'bg-status-info-bg text-status-info';
         case 'returned_to_work':
         case 'completed':
         case 'approved':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'closed':
         case 'ended':
             return 'bg-muted text-foreground';
@@ -118,13 +118,13 @@ const statusColor = (status: string) => {
 const severityColor = (severity: string) => {
     switch (severity) {
         case 'minor':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'moderate':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'serious':
-            return 'bg-orange-100 text-orange-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'critical':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         default:
             return 'bg-muted text-foreground';
     }
@@ -412,7 +412,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                                                         <Badge
                                                             className={
                                                                 g.completed
-                                                                    ? 'bg-green-100 text-green-800'
+                                                                    ? 'bg-status-success-bg text-status-success'
                                                                     : 'bg-muted text-foreground'
                                                             }
                                                         >

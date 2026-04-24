@@ -81,15 +81,15 @@ interface EvidencePackPanelProps {
 function typeIcon(type: string) {
     switch (type) {
         case 'photo':
-            return <Camera className="h-4 w-4 text-blue-500" />;
+            return <Camera className="h-4 w-4 text-status-info" />;
         case 'document':
-            return <FileText className="h-4 w-4 text-amber-500" />;
+            return <FileText className="h-4 w-4 text-status-warning" />;
         case 'cctv_bookmark':
             return <Video className="h-4 w-4 text-primary" />;
         case 'note':
-            return <StickyNote className="h-4 w-4 text-green-500" />;
+            return <StickyNote className="h-4 w-4 text-status-success" />;
         case 'audio':
-            return <Mic className="h-4 w-4 text-rose-500" />;
+            return <Mic className="h-4 w-4 text-status-critical" />;
         case 'door_log':
             return <FileCode className="h-4 w-4 text-muted-foreground" />;
         default:

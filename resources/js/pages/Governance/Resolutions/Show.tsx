@@ -191,9 +191,9 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold text-foreground">{resolution.title}</h1>
               <Badge className={cn(
-                resolution.status === 'open' && 'bg-green-100 text-green-800',
+                resolution.status === 'open' && 'bg-status-success-bg text-status-success',
                 resolution.status === 'closed' && 'bg-primary/10 text-primary',
-                resolution.status === 'implemented' && 'bg-green-100 text-green-800',
+                resolution.status === 'implemented' && 'bg-status-success-bg text-status-success',
                 resolution.status === 'archived' && 'bg-muted text-foreground',
                 resolution.status === 'draft' && 'bg-muted text-foreground',
               )}>
@@ -201,7 +201,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               </Badge>
               {resolution.outcome && (
                 <Badge className={cn(
-                  resolution.outcome === 'carried' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  resolution.outcome === 'carried' ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'
                 )}>
                   {resolution.outcome}
                 </Badge>
@@ -219,9 +219,9 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               <p className="text-foreground whitespace-pre-wrap">{resolution.context}</p>
               
               {resolution.recommendation && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="font-medium text-blue-900">Management Recommendation:</p>
-                  <p className="text-blue-800">{resolution.recommendation}</p>
+                <div className="mt-4 p-4 bg-status-info-bg rounded-lg border border-status-info/30">
+                  <p className="font-medium text-status-info">Management Recommendation:</p>
+                  <p className="text-status-info">{resolution.recommendation}</p>
                 </div>
               )}
             </CardContent>
@@ -248,7 +248,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
 
           {/* Voting Section */}
           {isOpen && can_vote && !my_vote && (
-            <Card className="mb-6 border-blue-200">
+            <Card className="mb-6 border-status-info/30">
               <CardHeader>
                 <CardTitle>Cast Your Vote</CardTitle>
                 <CardDescription>
@@ -262,14 +262,14 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                   <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
                     <RadioGroupItem value="for" />
                     <span className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <CheckCircle className="w-5 h-5 text-status-success" />
                       For
                     </span>
                   </label>
                   <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
                     <RadioGroupItem value="against" />
                     <span className="flex items-center gap-2">
-                      <XCircle className="w-5 h-5 text-red-500" />
+                      <XCircle className="w-5 h-5 text-status-critical" />
                       Against
                     </span>
                   </label>
@@ -323,8 +323,8 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               <CardContent>
                 <div className="flex items-center gap-2">
                   <Badge className={cn(
-                    my_vote.vote === 'for' && 'bg-green-100 text-green-800',
-                    my_vote.vote === 'against' && 'bg-red-100 text-red-800',
+                    my_vote.vote === 'for' && 'bg-status-success-bg text-status-success',
+                    my_vote.vote === 'against' && 'bg-status-critical-bg text-status-critical',
                     my_vote.vote === 'abstain' && 'bg-muted text-foreground',
                   )}>
                     {my_vote.vote.toUpperCase()}
@@ -333,7 +333,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                     Voted {new Date(my_vote.voted_at).toLocaleString()}
                   </span>
                   {my_vote.conflict_declared && (
-                    <Badge variant="outline" className="text-orange-600">
+                    <Badge variant="outline" className="text-status-warning">
                       <AlertTriangle className="w-3 h-3 mr-1" />
                       Conflict Declared
                     </Badge>
@@ -351,13 +351,13 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <p className="text-3xl font-bold text-green-600">{results.summary.for}</p>
-                    <p className="text-sm text-green-800">For ({results.percentages.for}%)</p>
+                  <div className="text-center p-4 bg-status-success-bg rounded-lg">
+                    <p className="text-3xl font-bold text-status-success">{results.summary.for}</p>
+                    <p className="text-sm text-status-success">For ({results.percentages.for}%)</p>
                   </div>
-                  <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <p className="text-3xl font-bold text-red-600">{results.summary.against}</p>
-                    <p className="text-sm text-red-800">Against ({results.percentages.against}%)</p>
+                  <div className="text-center p-4 bg-status-critical-bg rounded-lg">
+                    <p className="text-3xl font-bold text-status-critical">{results.summary.against}</p>
+                    <p className="text-sm text-status-critical">Against ({results.percentages.against}%)</p>
                   </div>
                   <div className="text-center p-4 bg-muted rounded-lg">
                     <p className="text-3xl font-bold text-muted-foreground">{results.summary.abstain}</p>
@@ -371,8 +371,8 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                     <div key={`${resolveMemberName(vote.board_member)}-${vote.voted_at}-${index}`} className="flex items-center justify-between p-2 border rounded">
                       <span>{resolveMemberName(vote.board_member)}</span>
                       <Badge className={cn(
-                        vote.vote === 'for' && 'bg-green-100 text-green-800',
-                        vote.vote === 'against' && 'bg-red-100 text-red-800',
+                        vote.vote === 'for' && 'bg-status-success-bg text-status-success',
+                        vote.vote === 'against' && 'bg-status-critical-bg text-status-critical',
                         vote.vote === 'abstain' && 'bg-muted text-foreground',
                       )}>
                         {vote.vote}
@@ -385,7 +385,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                   <div className="mt-4">
                     <h4 className="font-medium mb-2">Conflict Declarations</h4>
                     {results.conflicts.map((conflict, i) => (
-                      <p key={i} className="text-sm text-orange-600">
+                      <p key={i} className="text-sm text-status-warning">
                         {resolveMemberName(conflict.board_member)} - {conflict.type}
                       </p>
                     ))}

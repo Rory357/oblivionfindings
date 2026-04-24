@@ -18,11 +18,11 @@ type Props = {
 
 const statusColors: Record<string, string> = {
     pending: 'bg-muted text-foreground',
-    in_progress: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
+    in_progress: 'bg-status-info-bg text-status-info',
+    completed: 'bg-status-success-bg text-status-success',
+    failed: 'bg-status-critical-bg text-status-critical',
     cancelled: 'bg-muted text-muted-foreground',
-    escalated: 'bg-orange-100 text-orange-800',
+    escalated: 'bg-status-warning-bg text-status-warning',
 };
 
 export default function ProcedureRunShow({ run, staff }: Props) {
@@ -59,14 +59,14 @@ export default function ProcedureRunShow({ run, staff }: Props) {
                         </div>
                         <div>Progress: {run.current_step || 0}/{run.total_steps || 0} steps</div>
                         {run.sla_deadline && (
-                            <div className={run.sla_breached ? 'text-red-600 font-medium' : ''}>
+                            <div className={run.sla_breached ? 'text-status-critical font-medium' : ''}>
                                 SLA Deadline: {formatDateTime(run.sla_deadline)}
                                 {run.sla_breached && ' (BREACHED)'}
                             </div>
                         )}
                         <div>Initiated by: {run.initiated_by?.name || 'Unknown'}</div>
                         {run.escalated_to && <div>Escalated to: {run.escalated_to?.name}</div>}
-                        {run.failure_reason && <div className="text-red-600">Failure reason: {run.failure_reason}</div>}
+                        {run.failure_reason && <div className="text-status-critical">Failure reason: {run.failure_reason}</div>}
                         {run.cancellation_reason && <div>Cancellation reason: {run.cancellation_reason}</div>}
                     </CardContent>
                 </Card>
@@ -81,7 +81,7 @@ export default function ProcedureRunShow({ run, staff }: Props) {
                                 {run.step_states.map((step: any, idx: number) => (
                                     <li key={idx} className="flex items-center gap-2 text-sm">
                                         {step.completed ? (
-                                            <span className="text-green-600">&#10003;</span>
+                                            <span className="text-status-success">&#10003;</span>
                                         ) : (
                                             <span className="text-muted-foreground">&#9675;</span>
                                         )}

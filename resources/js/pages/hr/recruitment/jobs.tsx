@@ -292,11 +292,11 @@ export default function RecruitmentJobs({
                 />
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <KpiCard label="Open Requisitions" value={summary.open_requisitions} icon={BriefcaseBusiness} color="bg-blue-500/10 text-blue-500" />
-                    <KpiCard label="Active Candidates" value={summary.active_candidates} icon={UserCheck} color="bg-emerald-500/10 text-emerald-500" />
-                    <KpiCard label="Stale Candidates" value={summary.stale_candidates} icon={AlertTriangle} color="bg-amber-500/10 text-amber-500" />
+                    <KpiCard label="Open Requisitions" value={summary.open_requisitions} icon={BriefcaseBusiness} color="bg-status-info-bg text-status-info" />
+                    <KpiCard label="Active Candidates" value={summary.active_candidates} icon={UserCheck} color="bg-status-success-bg text-status-success" />
+                    <KpiCard label="Stale Candidates" value={summary.stale_candidates} icon={AlertTriangle} color="bg-status-warning-bg text-status-warning" />
                     <KpiCard label="Offers In Flight" value={summary.offers_in_flight} icon={Clock3} color="bg-primary/10 text-primary" />
-                    <KpiCard label="Total Hired" value={summary.hired_candidates} icon={CheckCircle2} color="bg-green-500/10 text-green-500" />
+                    <KpiCard label="Total Hired" value={summary.hired_candidates} icon={CheckCircle2} color="bg-status-success-bg text-status-success" />
                 </div>
 
                 {/* Filters */}
@@ -372,9 +372,9 @@ export default function RecruitmentJobs({
                                         {total > 0 && (
                                             <div className="mb-3">
                                                 <div className="flex h-2 rounded-full overflow-hidden bg-muted/30">
-                                                    {activePct > 0 && <div className="bg-blue-500 transition-all" style={{ width: `${activePct}%` }} />}
-                                                    {stalePct > 0 && <div className="bg-amber-500 transition-all" style={{ width: `${stalePct}%` }} />}
-                                                    {hiredPct > 0 && <div className="bg-green-500 transition-all" style={{ width: `${hiredPct}%` }} />}
+                                                    {activePct > 0 && <div className="bg-status-info transition-all" style={{ width: `${activePct}%` }} />}
+                                                    {stalePct > 0 && <div className="bg-status-warning transition-all" style={{ width: `${stalePct}%` }} />}
+                                                    {hiredPct > 0 && <div className="bg-status-success transition-all" style={{ width: `${hiredPct}%` }} />}
                                                 </div>
                                                 <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
                                                     <span>{job.metrics.active_candidates} active</span>
@@ -462,9 +462,9 @@ export default function RecruitmentJobs({
                                             <td className="px-4 py-3 text-muted-foreground text-xs">{job.site?.name || '-'}</td>
                                             <td className="px-4 py-3 text-muted-foreground text-xs">{job.hiring_manager?.name || 'Unassigned'}</td>
                                             <td className="px-4 py-3 text-xs">
-                                                <span className="text-blue-400">{job.metrics.active_candidates} active</span>
+                                                <span className="text-status-info">{job.metrics.active_candidates} active</span>
                                                 <span className="text-muted-foreground"> / </span>
-                                                <span className="text-green-400">{job.metrics.hired_candidates} hired</span>
+                                                <span className="text-status-success">{job.metrics.hired_candidates} hired</span>
                                                 <span className="text-muted-foreground"> ({job.metrics.conversion_rate}%)</span>
                                             </td>
                                             <td className="px-4 py-3 text-right">
@@ -498,9 +498,9 @@ export default function RecruitmentJobs({
                                         </div>
                                         <div className="grid grid-cols-4 gap-2 text-center">
                                             <div><p className="text-lg font-bold">{entry.open_jobs}</p><p className="text-[10px] text-muted-foreground">Jobs</p></div>
-                                            <div><p className="text-lg font-bold text-blue-400">{entry.active_candidates}</p><p className="text-[10px] text-muted-foreground">Active</p></div>
-                                            <div><p className="text-lg font-bold text-amber-400">{entry.stale_candidates}</p><p className="text-[10px] text-muted-foreground">Stale</p></div>
-                                            <div><p className="text-lg font-bold text-green-400">{entry.hired_candidates}</p><p className="text-[10px] text-muted-foreground">Hired</p></div>
+                                            <div><p className="text-lg font-bold text-status-info">{entry.active_candidates}</p><p className="text-[10px] text-muted-foreground">Active</p></div>
+                                            <div><p className="text-lg font-bold text-status-warning">{entry.stale_candidates}</p><p className="text-[10px] text-muted-foreground">Stale</p></div>
+                                            <div><p className="text-lg font-bold text-status-success">{entry.hired_candidates}</p><p className="text-[10px] text-muted-foreground">Hired</p></div>
                                         </div>
                                     </div>
                                 ))}

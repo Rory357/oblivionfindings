@@ -13,19 +13,19 @@ type Props = {
 };
 
 const statusColors: Record<string, string> = {
-    pending_review: 'bg-amber-100 text-amber-800',
-    active: 'bg-green-100 text-green-800',
-    modified: 'bg-blue-100 text-blue-800',
+    pending_review: 'bg-status-warning-bg text-status-warning',
+    active: 'bg-status-success-bg text-status-success',
+    modified: 'bg-status-info-bg text-status-info',
     suspended: 'bg-muted text-muted-foreground',
     completed: 'bg-muted text-foreground',
 };
 
 const typeColors: Record<string, string> = {
     behaviour: 'bg-primary/10 text-primary',
-    safety: 'bg-red-100 text-red-800',
-    medical: 'bg-blue-100 text-blue-800',
-    mobility: 'bg-orange-100 text-orange-800',
-    communication: 'bg-teal-100 text-teal-800',
+    safety: 'bg-status-critical-bg text-status-critical',
+    medical: 'bg-status-info-bg text-status-info',
+    mobility: 'bg-status-warning-bg text-status-warning',
+    communication: 'bg-status-info-bg text-status-info',
 };
 
 export default function RiskPlanActivationsForStay({ stay, activations, planTypes }: Props) {

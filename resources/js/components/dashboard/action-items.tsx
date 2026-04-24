@@ -29,7 +29,7 @@ export function ActionItems({ items }: ActionItemsProps) {
                         className="flex items-center gap-3 px-1 py-3 transition-colors hover:bg-muted/50 rounded-lg"
                     >
                         {done ? (
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
                         ) : (
                             <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                         )}

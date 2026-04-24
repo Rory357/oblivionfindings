@@ -24,10 +24,10 @@ type Props = {
 };
 
 const reviewStatusColors: Record<string, string> = {
-    scheduled: 'bg-blue-100 text-blue-700',
-    overdue: 'bg-red-100 text-red-700',
-    in_progress: 'bg-amber-100 text-amber-700',
-    completed: 'bg-green-100 text-green-700',
+    scheduled: 'bg-status-info-bg text-status-info',
+    overdue: 'bg-status-critical-bg text-status-critical',
+    in_progress: 'bg-status-warning-bg text-status-warning',
+    completed: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
 };
 
@@ -73,7 +73,7 @@ function ScheduleReviewDialog({ clients }: { clients: Props['clients'] }) {
                                 ))}
                             </SelectContent>
                         </Select>
-                        {form.errors.client_id && <p className="text-sm text-red-600">{form.errors.client_id}</p>}
+                        {form.errors.client_id && <p className="text-sm text-status-critical">{form.errors.client_id}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -89,13 +89,13 @@ function ScheduleReviewDialog({ clients }: { clients: Props['clients'] }) {
                                 <SelectItem value="incident">Incident</SelectItem>
                             </SelectContent>
                         </Select>
-                        {form.errors.review_type && <p className="text-sm text-red-600">{form.errors.review_type}</p>}
+                        {form.errors.review_type && <p className="text-sm text-status-critical">{form.errors.review_type}</p>}
                     </div>
 
                     <div className="space-y-2">
                         <Label>Scheduled Date</Label>
                         <Input type="date" value={form.data.scheduled_date} onChange={(e) => form.setData('scheduled_date', e.target.value)} />
-                        {form.errors.scheduled_date && <p className="text-sm text-red-600">{form.errors.scheduled_date}</p>}
+                        {form.errors.scheduled_date && <p className="text-sm text-status-critical">{form.errors.scheduled_date}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -163,9 +163,9 @@ function CompleteReviewDialog({ review }: { review: any }) {
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div className="space-y-2">
-                        <Label>Clinical Summary <span className="text-red-500">*</span></Label>
+                        <Label>Clinical Summary <span className="text-status-critical">*</span></Label>
                         <Textarea value={form.data.clinical_summary} onChange={(e) => form.setData('clinical_summary', e.target.value)} placeholder="Summary of findings..." rows={4} required />
-                        {form.errors.clinical_summary && <p className="text-sm text-red-600">{form.errors.clinical_summary}</p>}
+                        {form.errors.clinical_summary && <p className="text-sm text-status-critical">{form.errors.clinical_summary}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -244,13 +244,13 @@ function EditReviewDialog({ review, clients, open, onOpenChange }: { review: any
                                 <SelectItem value="incident">Incident</SelectItem>
                             </SelectContent>
                         </Select>
-                        {form.errors.review_type && <p className="text-sm text-red-600">{form.errors.review_type}</p>}
+                        {form.errors.review_type && <p className="text-sm text-status-critical">{form.errors.review_type}</p>}
                     </div>
 
                     <div className="space-y-2">
                         <Label>Scheduled Date</Label>
                         <Input type="date" value={form.data.scheduled_date} onChange={(e) => form.setData('scheduled_date', e.target.value)} />
-                        {form.errors.scheduled_date && <p className="text-sm text-red-600">{form.errors.scheduled_date}</p>}
+                        {form.errors.scheduled_date && <p className="text-sm text-status-critical">{form.errors.scheduled_date}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -318,19 +318,19 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
                 <div className="mb-6 grid gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-700 dark:bg-red-900/40"><AlertTriangle className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical dark:bg-status-critical"><AlertTriangle className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{overdueReviews.length}</p><p className="text-xs text-muted-foreground">Overdue Reviews</p></div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40"><Calendar className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:bg-status-warning"><Calendar className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{upcomingReviews.length}</p><p className="text-xs text-muted-foreground">Upcoming (30 Days)</p></div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 text-green-700 dark:bg-green-900/40"><CheckCircle className="h-5 w-5" /></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-success-bg text-status-success dark:bg-status-success"><CheckCircle className="h-5 w-5" /></div>
                             <div><p className="text-2xl font-bold">{reviews.data.filter((r: any) => r.status === 'completed').length}</p><p className="text-xs text-muted-foreground">Completed (Visible)</p></div>
                         </CardContent>
                     </Card>
@@ -338,9 +338,9 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
 
                 {/* Overdue Alert */}
                 {overdueReviews.length > 0 && (
-                    <Card className="mb-6 border-red-200 dark:border-red-800">
+                    <Card className="mb-6 border-status-critical/30 dark:border-status-critical/30">
                         <CardHeader className="pb-3">
-                            <CardTitle className="flex items-center gap-2 text-base text-red-700 dark:text-red-400">
+                            <CardTitle className="flex items-center gap-2 text-base text-status-critical dark:text-status-critical">
                                 <AlertTriangle className="h-4 w-4" /> Overdue Reviews
                             </CardTitle>
                         </CardHeader>
@@ -350,9 +350,9 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
                                     <div key={r.id} className="flex items-center justify-between p-3">
                                         <span className="font-medium">{r.client?.last_name}, {r.client?.first_name}</span>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm">Due: <span className="text-red-600">{r.scheduled_date ? new Date(r.scheduled_date).toLocaleDateString('en-NZ') : '—'}</span></span>
+                                            <span className="text-sm">Due: <span className="text-status-critical">{r.scheduled_date ? new Date(r.scheduled_date).toLocaleDateString('en-NZ') : '—'}</span></span>
                                             <CompleteReviewDialog review={r} />
-                                            <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteReview(r.id)}>
+                                            <Button size="sm" variant="ghost" className="text-status-critical hover:text-status-critical" onClick={() => deleteReview(r.id)}>
                                                 <Trash2 className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>
@@ -413,7 +413,7 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
                                         <td className="p-3 text-xs">{r.reviewer_name ?? r.reviewer?.name ?? '—'}</td>
                                         <td className="p-3"><Badge className={`text-xs ${reviewStatusColors[r.status] ?? ''}`}>{r.status}</Badge></td>
                                         <td className="p-3 text-xs">{r.next_review_date ? new Date(r.next_review_date).toLocaleDateString('en-NZ') : '—'}</td>
-                                        <td className="p-3">{r.whanau_involved ? <CheckCircle className="h-4 w-4 text-green-600" /> : <span className="text-muted-foreground">—</span>}</td>
+                                        <td className="p-3">{r.whanau_involved ? <CheckCircle className="h-4 w-4 text-status-success" /> : <span className="text-muted-foreground">—</span>}</td>
                                         <td className="p-3">
                                             <div className="flex items-center gap-1">
                                                 {r.status !== 'completed' && r.status !== 'cancelled' && (
@@ -425,7 +425,7 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
                                                     <CompleteReviewDialog review={r} />
                                                 )}
                                                 {r.status !== 'completed' && (
-                                                    <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteReview(r.id)}>
+                                                    <Button size="icon" variant="ghost" className="text-status-critical hover:text-status-critical" onClick={() => deleteReview(r.id)}>
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 )}

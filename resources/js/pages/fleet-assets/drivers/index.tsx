@@ -82,9 +82,9 @@ function getLicenceExpiryDays(dateStr: string | null): number | null {
 function getLicenceRowClass(driver: Driver): string {
     const days = getLicenceExpiryDays(driver.eligibility?.licence_expires_at ?? null);
     if (days === null) return '';
-    if (days < 0) return 'bg-red-500/10 hover:bg-red-500/15';
-    if (days <= 30) return 'bg-orange-500/10 hover:bg-orange-500/15';
-    if (days <= 60) return 'bg-yellow-500/10 hover:bg-yellow-500/15';
+    if (days < 0) return 'bg-status-critical hover:bg-status-critical';
+    if (days <= 30) return 'bg-status-warning hover:bg-status-warning';
+    if (days <= 60) return 'bg-status-warning hover:bg-status-warning';
     return '';
 }
 
@@ -168,17 +168,17 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
 
                 {/* Expired license warning banner */}
                 {(expiredCount > 0 || expiringSoonCount > 0) && (
-                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+                    <div className="rounded-lg border border-status-critical/30 bg-status-critical p-4">
                         <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-red-500" />
+                            <AlertTriangle className="h-5 w-5 text-status-critical" />
                             <div className="space-y-0.5">
                                 {expiredCount > 0 && (
-                                    <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                                    <p className="text-sm font-medium text-status-critical dark:text-status-critical">
                                         {expiredCount} driver{expiredCount !== 1 ? 's have' : ' has'} expired licences
                                     </p>
                                 )}
                                 {expiringSoonCount > 0 && (
-                                    <p className="text-sm text-orange-600 dark:text-orange-400">
+                                    <p className="text-sm text-status-warning dark:text-status-warning">
                                         {expiringSoonCount} driver{expiringSoonCount !== 1 ? 's have' : ' has'} licences expiring within 60 days
                                     </p>
                                 )}
@@ -210,7 +210,7 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-amber-600">
+                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-status-warning">
                                     <Clock className="h-4 w-4" /> Pending
                                 </CardTitle>
                             </CardHeader>
@@ -220,7 +220,7 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-red-600">
+                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-status-critical">
                                     <XCircle className="h-4 w-4" /> Suspended
                                 </CardTitle>
                             </CardHeader>
@@ -230,7 +230,7 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                         </Card>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-red-600">
+                                <CardTitle className="flex items-center gap-1 text-sm font-medium text-status-critical">
                                     <AlertTriangle className="h-4 w-4" /> Expired
                                 </CardTitle>
                             </CardHeader>
@@ -319,10 +319,10 @@ export default function DriversIndex({ drivers: rawDrivers, filters: rawFilters 
                                                         <Badge variant="destructive" className="text-[10px]">Expired</Badge>
                                                     )}
                                                     {expiryDays !== null && expiryDays >= 0 && expiryDays <= 30 && (
-                                                        <Badge className="bg-orange-500 text-white text-[10px]">{expiryDays}d left</Badge>
+                                                        <Badge className="bg-status-warning text-white text-[10px]">{expiryDays}d left</Badge>
                                                     )}
                                                     {expiryDays !== null && expiryDays > 30 && expiryDays <= 60 && (
-                                                        <Badge className="bg-yellow-500 text-white text-[10px]">{expiryDays}d left</Badge>
+                                                        <Badge className="bg-status-warning text-white text-[10px]">{expiryDays}d left</Badge>
                                                     )}
                                                 </div>
                                             </td>

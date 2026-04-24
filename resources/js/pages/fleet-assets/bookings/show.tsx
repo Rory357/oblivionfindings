@@ -60,11 +60,11 @@ type Props = {
 };
 
 const statusBannerColors: Record<string, string> = {
-    pending: 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200',
-    approved: 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200',
+    pending: 'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
+    approved: 'bg-status-info-bg border-status-info/30 text-status-info dark:bg-status-info-bg dark:border-status-info/30 dark:text-status-info',
     checked_out: 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
     returned: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
-    rejected: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
+    rejected: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
     cancelled: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',
 };
 
@@ -200,9 +200,9 @@ export default function BookingShow({ booking, can }: Props) {
                                     </div>
                                 )}
                                 {b.rejection_reason && (
-                                    <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/30">
-                                        <dt className="text-xs text-red-600 dark:text-red-400">Rejection Reason</dt>
-                                        <dd className="mt-1 font-medium text-red-800 dark:text-red-300">{b.rejection_reason}</dd>
+                                    <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3 dark:border-status-critical/30 dark:bg-status-critical">
+                                        <dt className="text-xs text-status-critical dark:text-status-critical">Rejection Reason</dt>
+                                        <dd className="mt-1 font-medium text-status-critical dark:text-status-critical">{b.rejection_reason}</dd>
                                     </div>
                                 )}
                             </dl>
@@ -292,7 +292,7 @@ export default function BookingShow({ booking, can }: Props) {
                 <div className="space-y-4">
                     {/* Pending: Approve / Reject */}
                     {canManage && b.status === 'pending' && (
-                        <Card className="border-2 border-amber-200 dark:border-amber-800">
+                        <Card className="border-2 border-status-warning/30 dark:border-status-warning/30">
                             <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <h3 className="font-semibold">Awaiting Approval</h3>
@@ -323,12 +323,12 @@ export default function BookingShow({ booking, can }: Props) {
 
                     {/* Approved: Checkout */}
                     {canManage && b.status === 'approved' && (
-                        <Card className="border-2 border-blue-200 dark:border-blue-800">
+                        <Card className="border-2 border-status-info/30 dark:border-status-info/30">
                             <CardHeader>
                                 <CardTitle className="text-base">Checkout Vehicle</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400">
+                                <div className="flex items-center gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                     <ClipboardCheck className="h-4 w-4 shrink-0" />
                                     <span>Complete a pre-trip inspection before checkout.</span>
                                     <Link
@@ -369,7 +369,7 @@ export default function BookingShow({ booking, can }: Props) {
                                 <CardTitle className="text-base">Return Vehicle</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400">
+                                <div className="flex items-center gap-2 rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning">
                                     <ClipboardCheck className="h-4 w-4 shrink-0" />
                                     <span>Complete a post-trip inspection before returning the vehicle.</span>
                                     <Link

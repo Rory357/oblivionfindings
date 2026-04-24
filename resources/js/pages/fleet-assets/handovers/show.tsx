@@ -51,9 +51,9 @@ type Props = {
 };
 
 const statusBannerColors: Record<string, string> = {
-    pending_acceptance: 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200',
+    pending_acceptance: 'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
     accepted: 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
-    disputed: 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200',
+    disputed: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
 };
 
 function statusBadge(status: string) {
@@ -71,12 +71,12 @@ function statusBadge(status: string) {
 
 function conditionLabel(condition: string) {
     const labels: Record<string, { text: string; color: string }> = {
-        good: { text: 'Good', color: 'text-green-600' },
-        clean: { text: 'Clean', color: 'text-green-600' },
-        minor_damage: { text: 'Minor Damage', color: 'text-amber-600' },
-        acceptable: { text: 'Acceptable', color: 'text-amber-600' },
-        significant_damage: { text: 'Significant Damage', color: 'text-red-600' },
-        needs_cleaning: { text: 'Needs Cleaning', color: 'text-red-600' },
+        good: { text: 'Good', color: 'text-status-success' },
+        clean: { text: 'Clean', color: 'text-status-success' },
+        minor_damage: { text: 'Minor Damage', color: 'text-status-warning' },
+        acceptable: { text: 'Acceptable', color: 'text-status-warning' },
+        significant_damage: { text: 'Significant Damage', color: 'text-status-critical' },
+        needs_cleaning: { text: 'Needs Cleaning', color: 'text-status-critical' },
     };
     const info = labels[condition] ?? { text: condition.replace(/_/g, ' '), color: '' };
     return <span className={cn('font-medium', info.color)}>{info.text}</span>;
@@ -188,7 +188,7 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
                                     </div>
                                     {h.accepted_at && (
                                         <div className="rounded-md bg-muted/40 p-3 text-center">
-                                            <CheckCircle className="mx-auto h-4 w-4 text-green-600" />
+                                            <CheckCircle className="mx-auto h-4 w-4 text-status-success" />
                                             <div className="mt-1 text-xs text-muted-foreground">Accepted At</div>
                                             <div className="mt-1 text-sm font-medium">{formatDateTime(h.accepted_at)}</div>
                                         </div>
@@ -217,9 +217,9 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
                                         <div className="relative h-16 w-8 rounded-md border-2 overflow-hidden">
                                             <div
                                                 className={cn('absolute bottom-0 w-full transition-all', {
-                                                    'bg-green-500': fuelPct > 50,
-                                                    'bg-amber-500': fuelPct > 0 && fuelPct <= 50,
-                                                    'bg-red-500': fuelPct === 0,
+                                                    'bg-status-success': fuelPct > 50,
+                                                    'bg-status-warning': fuelPct > 0 && fuelPct <= 50,
+                                                    'bg-status-critical': fuelPct === 0,
                                                 })}
                                                 style={{ height: `${fuelPct}%` }}
                                             />
@@ -251,14 +251,14 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                        <AlertTriangle className="h-4 w-4 text-status-warning" />
                                         Damage Notes
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-2">
                                         {(h.damage_notes ?? []).map((note, i) => (
-                                            <div key={i} className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+                                            <div key={i} className="rounded-md border border-status-warning/30 bg-status-warning-bg p-3 dark:border-status-warning/30 dark:bg-status-warning">
                                                 <div className="text-sm font-medium">{note.area}</div>
                                                 <div className="text-sm text-muted-foreground">{note.description}</div>
                                             </div>
@@ -298,12 +298,12 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
                                     ].map((item) => (
                                         <div key={item.label} className={cn(
                                             'flex items-center gap-3 rounded-lg border p-3 transition-colors',
-                                            item.value ? 'border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20' : 'border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20'
+                                            item.value ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success' : 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
                                         )}>
                                             {item.value ? (
-                                                <Check className="h-5 w-5 text-green-600" />
+                                                <Check className="h-5 w-5 text-status-success" />
                                             ) : (
-                                                <XCircle className="h-5 w-5 text-red-600" />
+                                                <XCircle className="h-5 w-5 text-status-critical" />
                                             )}
                                             <span className="text-sm font-medium">{item.label}</span>
                                         </div>
@@ -314,7 +314,7 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
 
                         {/* Accept / Dispute Actions */}
                         {canAcceptOrDispute && (
-                            <Card className="border-2 border-amber-200 dark:border-amber-800">
+                            <Card className="border-2 border-status-warning/30 dark:border-status-warning/30">
                                 <CardHeader>
                                     <CardTitle className="text-base">Accept or Dispute</CardTitle>
                                 </CardHeader>

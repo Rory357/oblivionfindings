@@ -90,23 +90,23 @@ const TYPE_TONE: Record<
 > = {
     alert: {
         ring: 'border-border',
-        iconBg: 'bg-amber-100 dark:bg-amber-500/15',
-        iconFg: 'text-amber-700 dark:text-amber-300',
+        iconBg: 'bg-status-warning-bg dark:bg-status-warning',
+        iconFg: 'text-status-warning dark:text-status-warning',
     },
     incident: {
         ring: 'border-border',
-        iconBg: 'bg-red-100 dark:bg-red-500/15',
-        iconFg: 'text-red-700 dark:text-red-300',
+        iconBg: 'bg-status-critical-bg dark:bg-status-critical',
+        iconFg: 'text-status-critical dark:text-status-critical',
     },
     followup: {
         ring: 'border-border',
-        iconBg: 'bg-sky-100 dark:bg-sky-500/15',
-        iconFg: 'text-sky-700 dark:text-sky-300',
+        iconBg: 'bg-status-info-bg dark:bg-status-info',
+        iconFg: 'text-status-info dark:text-status-info',
     },
     note_followup: {
         ring: 'border-border',
-        iconBg: 'bg-sky-100 dark:bg-sky-500/15',
-        iconFg: 'text-sky-700 dark:text-sky-300',
+        iconBg: 'bg-status-info-bg dark:bg-status-info',
+        iconFg: 'text-status-info dark:text-status-info',
     },
     shift: {
         ring: 'border-border',
@@ -157,7 +157,7 @@ function resolveUrgency(
         return {
             label: 'Breached',
             className:
-                'border-red-300 bg-red-100 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200',
+                'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical',
         };
     }
 
@@ -167,7 +167,7 @@ function resolveUrgency(
             return {
                 label: 'Due now',
                 className:
-                    'border-red-300 bg-red-100 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200',
+                    'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical',
             };
         }
         const mins = Math.floor(diffMs / 60000);
@@ -175,7 +175,7 @@ function resolveUrgency(
             return {
                 label: `Due in ${mins}m`,
                 className:
-                    'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100',
+                    'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
             };
         }
     }
@@ -184,7 +184,7 @@ function resolveUrgency(
         return {
             label: 'At risk',
             className:
-                'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100',
+                'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
         };
     }
 
@@ -192,7 +192,7 @@ function resolveUrgency(
         return {
             label: 'Critical',
             className:
-                'border-red-300 bg-red-100 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200',
+                'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical',
         };
     }
 
@@ -200,7 +200,7 @@ function resolveUrgency(
         return {
             label: 'High',
             className:
-                'border-orange-300 bg-orange-100 text-orange-900 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-100',
+                'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
         };
     }
 

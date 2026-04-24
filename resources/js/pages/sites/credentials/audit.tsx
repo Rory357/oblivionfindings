@@ -78,7 +78,7 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="outline">{log.action}</Badge>
-                                                <span className="text-sm text-slate-300">{log.user?.name ?? 'Unknown User'}</span>
+                                                <span className="text-sm text-muted-foreground">{log.user?.name ?? 'Unknown User'}</span>
                                             </div>
                                             <div className="mt-1 text-xs text-muted-foreground">
                                                 {new Date(log.created_at).toLocaleString()}

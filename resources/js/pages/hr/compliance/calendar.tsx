@@ -29,10 +29,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const typeColors: Record<string, string> = {
-    compliance: 'bg-blue-100 text-blue-800 border-blue-200',
+    compliance: 'bg-status-info-bg text-status-info border-status-info/30',
     vetting: 'bg-primary/10 text-primary border-primary',
-    driver: 'bg-amber-100 text-amber-800 border-amber-200',
-    training: 'bg-green-100 text-green-800 border-green-200',
+    driver: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    training: 'bg-status-success-bg text-status-success border-status-success/30',
 };
 
 export default function ComplianceCalendar({ events, filters }: Props) {

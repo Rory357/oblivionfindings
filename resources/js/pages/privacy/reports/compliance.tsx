@@ -87,14 +87,14 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <FileText className="h-5 w-5 text-blue-500" />
+                            <FileText className="h-5 w-5 text-status-info" />
                             Data Subject Requests
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             <StatCard label="Total DSRs" value={dsrStats.total} />
-                            <StatCard label="Completed" value={dsrStats.completed} color="text-green-600" />
+                            <StatCard label="Completed" value={dsrStats.completed} color="text-status-success" />
                             <StatCard label="Avg Response (days)" value={dsrStats.average_response_days} />
                             <StatCard label="Types" value={Object.keys(dsrStats.by_type).length} />
                         </div>
@@ -115,15 +115,15 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <AlertTriangle className="h-5 w-5 text-red-500" />
+                            <AlertTriangle className="h-5 w-5 text-status-critical" />
                             Breach Statistics
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             <StatCard label="Total Breaches" value={breachStats.total} />
-                            <StatCard label="Resolved" value={breachStats.resolved} color="text-green-600" />
-                            <StatCard label="ICO Notifications" value={breachStats.ico_notifications} color="text-red-600" />
+                            <StatCard label="Resolved" value={breachStats.resolved} color="text-status-success" />
+                            <StatCard label="ICO Notifications" value={breachStats.ico_notifications} color="text-status-critical" />
                         </div>
                     </CardContent>
                 </Card>
@@ -139,8 +139,8 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                     <CardContent>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             <StatCard label="Total DPIAs" value={dpiaStats.total} />
-                            <StatCard label="Approved" value={dpiaStats.approved} color="text-green-600" />
-                            <StatCard label="High Risk" value={dpiaStats.high_risk} color="text-red-600" />
+                            <StatCard label="Approved" value={dpiaStats.approved} color="text-status-success" />
+                            <StatCard label="High Risk" value={dpiaStats.high_risk} color="text-status-critical" />
                         </div>
                     </CardContent>
                 </Card>
@@ -149,14 +149,14 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Lock className="h-5 w-5 text-amber-500" />
+                            <Lock className="h-5 w-5 text-status-warning" />
                             Retention Policies
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <StatCard label="Total Policies" value={retentionStats.total_policies} />
-                            <StatCard label="Active Policies" value={retentionStats.active_policies} color="text-green-600" />
+                            <StatCard label="Active Policies" value={retentionStats.active_policies} color="text-status-success" />
                         </div>
                     </CardContent>
                 </Card>
@@ -172,7 +172,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <StatCard label="Total Holds" value={legalHoldStats.total} />
-                            <StatCard label="Active Holds" value={legalHoldStats.active} color="text-orange-600" />
+                            <StatCard label="Active Holds" value={legalHoldStats.active} color="text-status-warning" />
                         </div>
                     </CardContent>
                 </Card>

@@ -57,19 +57,19 @@ const NOTE_TYPES = [
         key: 'note',
         label: 'Note',
         emoji: '📝',
-        color: 'bg-blue-100 text-blue-700 border-blue-200',
+        color: 'bg-status-info-bg text-status-info border-status-info/30',
     },
     {
         key: 'todo',
         label: 'To-Do',
         emoji: '✅',
-        color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+        color: 'bg-status-success-bg text-status-success border-status-success/30',
     },
     {
         key: 'request',
         label: 'Request',
         emoji: '🙏',
-        color: 'bg-amber-100 text-amber-700 border-amber-200',
+        color: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     },
     {
         key: 'reminder',
@@ -81,15 +81,15 @@ const NOTE_TYPES = [
 
 const PRIORITIES = [
     { key: 'low', label: 'Low', color: 'bg-muted text-muted-foreground' },
-    { key: 'normal', label: 'Normal', color: 'bg-blue-100 text-blue-700' },
-    { key: 'high', label: 'High', color: 'bg-orange-100 text-orange-700' },
-    { key: 'urgent', label: 'Urgent', color: 'bg-red-100 text-red-700' },
+    { key: 'normal', label: 'Normal', color: 'bg-status-info-bg text-status-info' },
+    { key: 'high', label: 'High', color: 'bg-status-warning-bg text-status-warning' },
+    { key: 'urgent', label: 'Urgent', color: 'bg-status-critical-bg text-status-critical' },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-    open: 'bg-blue-100 text-blue-700',
-    in_progress: 'bg-amber-100 text-amber-700',
-    completed: 'bg-emerald-100 text-emerald-700',
+    open: 'bg-status-info-bg text-status-info',
+    in_progress: 'bg-status-warning-bg text-status-warning',
+    completed: 'bg-status-success-bg text-status-success',
     cancelled: 'bg-muted text-muted-foreground',
 };
 
@@ -177,27 +177,27 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
 
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center dark:from-blue-950/20">
-                        <div className="text-xl font-bold text-blue-700">
+                    <div className="rounded-xl border bg-status-info-bg p-3 text-center dark:from-blue-950/20">
+                        <div className="text-xl font-bold text-status-info">
                             {stats.open}
                         </div>
-                        <div className="text-[10px] tracking-wider text-blue-500 uppercase">
+                        <div className="text-[10px] tracking-wider text-status-info uppercase">
                             Open
                         </div>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center dark:from-emerald-950/20">
-                        <div className="text-xl font-bold text-emerald-700">
+                    <div className="rounded-xl border bg-status-success-bg p-3 text-center dark:from-emerald-950/20">
+                        <div className="text-xl font-bold text-status-success">
                             {stats.completed}
                         </div>
-                        <div className="text-[10px] tracking-wider text-emerald-500 uppercase">
+                        <div className="text-[10px] tracking-wider text-status-success uppercase">
                             Completed
                         </div>
                     </div>
                     <div
-                        className={`rounded-xl border p-3 text-center ${stats.overdue > 0 ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20' : ''}`}
+                        className={`rounded-xl border p-3 text-center ${stats.overdue > 0 ? 'bg-status-critical-bg dark:from-red-950/20' : ''}`}
                     >
                         <div
-                            className={`text-xl font-bold ${stats.overdue > 0 ? 'text-red-700' : 'text-muted-foreground'}`}
+                            className={`text-xl font-bold ${stats.overdue > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
                         >
                             {stats.overdue}
                         </div>
@@ -411,7 +411,7 @@ function NoteCard({
 
     return (
         <Card
-            className={`overflow-hidden transition-all hover:shadow-sm ${note.is_overdue ? 'border-red-300 bg-red-50/20' : note.status === 'completed' ? 'opacity-70' : ''}`}
+            className={`overflow-hidden transition-all hover:shadow-sm ${note.is_overdue ? 'border-status-critical/30 bg-status-critical-bg' : note.status === 'completed' ? 'opacity-70' : ''}`}
         >
             <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -438,7 +438,7 @@ function NoteCard({
                                 {note.status.replace('_', ' ')}
                             </Badge>
                             {note.is_overdue && (
-                                <Badge className="gap-0.5 border-0 bg-red-100 text-[9px] text-red-700">
+                                <Badge className="gap-0.5 border-0 bg-status-critical-bg text-[9px] text-status-critical">
                                     <AlertTriangle className="h-2.5 w-2.5" />
                                     Overdue
                                 </Badge>
@@ -500,14 +500,14 @@ function NoteCard({
 
                         {/* Staff Response */}
                         {note.staff_response && (
-                            <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-blue-50/50 p-2 dark:bg-blue-950/10">
+                            <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-status-info-bg p-2 dark:bg-status-info">
                                 <p className="text-xs">
                                     <span className="font-medium">
                                         {note.staff_responded_by_name}
                                     </span>
                                     <Badge
                                         variant="outline"
-                                        className="ml-1 border-blue-200 bg-blue-50 text-[9px] text-blue-700"
+                                        className="ml-1 border-status-info/30 bg-status-info-bg text-[9px] text-status-info"
                                     >
                                         Staff
                                     </Badge>
@@ -528,7 +528,7 @@ function NoteCard({
                         {/* Completed info */}
                         {note.status === 'completed' &&
                             note.completed_by_name && (
-                                <p className="mt-1 flex items-center gap-1 text-xs text-emerald-600">
+                                <p className="mt-1 flex items-center gap-1 text-xs text-status-success">
                                     <CheckCircle2 className="h-3 w-3" />
                                     Completed by {note.completed_by_name}
                                     {note.completed_at &&
@@ -549,7 +549,7 @@ function NoteCard({
                         ['open', 'in_progress'].includes(note.status) && (
                             <button
                                 onClick={() => onDelete(note.id)}
-                                className="shrink-0 text-muted-foreground/50 transition-colors hover:text-red-500"
+                                className="shrink-0 text-muted-foreground/50 transition-colors hover:text-status-critical"
                             >
                                 <Trash2 className="h-4 w-4" />
                             </button>

@@ -228,7 +228,7 @@ export default function EditSite() {
                                 })}
                             </div>
                             <input type="hidden" name="type" value={data.type} />
-                            {errors.type && <div className="mt-2 text-sm text-red-400">{errors.type}</div>}
+                            {errors.type && <div className="mt-2 text-sm text-status-critical">{errors.type}</div>}
                         </CardContent>
                     </Card>
 
@@ -246,7 +246,7 @@ export default function EditSite() {
                                     onChange={(e) => setData('name', e.target.value)}
                                     className="mt-1"
                                 />
-                                {errors.name && <div className="mt-1 text-sm text-red-400">{errors.name}</div>}
+                                {errors.name && <div className="mt-1 text-sm text-status-critical">{errors.name}</div>}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -450,7 +450,7 @@ export default function EditSite() {
                     {/* Risk Flags */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-amber-400">
+                            <CardTitle className="flex items-center gap-2 text-status-warning">
                                 <AlertTriangle className="w-5 h-5" />
                                 Risk Assessment
                             </CardTitle>
@@ -648,7 +648,7 @@ export default function EditSite() {
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-red-400 hover:text-red-300 flex-shrink-0"
+                                                className="text-status-critical hover:text-status-critical flex-shrink-0"
                                                 onClick={() => handleDeleteDocument(doc.id)}
                                             >
                                                 <Trash2 className="w-4 h-4" />

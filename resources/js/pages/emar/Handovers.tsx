@@ -185,12 +185,12 @@ function statusBadge(status: string) {
     switch (status) {
         case 'acknowledged':
             return (
-                <Badge className="bg-emerald-100 text-emerald-700">
+                <Badge className="bg-status-success-bg text-status-success">
                     {label}
                 </Badge>
             );
         case 'submitted':
-            return <Badge className="bg-blue-100 text-blue-700">{label}</Badge>;
+            return <Badge className="bg-status-info-bg text-status-info">{label}</Badge>;
         case 'draft':
             return <Badge variant="secondary">{label}</Badge>;
         default:
@@ -393,7 +393,7 @@ function HandoverDialog({
                                     </SelectContent>
                                 </Select>
                                 {form.errors.shift_id ? (
-                                    <div className="text-xs text-red-600">
+                                    <div className="text-xs text-status-critical">
                                         {form.errors.shift_id}
                                     </div>
                                 ) : null}
@@ -440,7 +440,7 @@ function HandoverDialog({
                             </SelectContent>
                         </Select>
                         {form.errors.incoming_shift_id ? (
-                            <div className="text-xs text-red-600">
+                            <div className="text-xs text-status-critical">
                                 {form.errors.incoming_shift_id}
                             </div>
                         ) : null}
@@ -463,7 +463,7 @@ function HandoverDialog({
                                 placeholder="Settled, anxious, sleepy, escalating..."
                             />
                             {form.errors.client_mood ? (
-                                <div className="text-xs text-red-600">
+                                <div className="text-xs text-status-critical">
                                     {form.errors.client_mood}
                                 </div>
                             ) : null}
@@ -493,7 +493,7 @@ function HandoverDialog({
                             className="min-h-[130px]"
                         />
                         {form.errors.handover_notes ? (
-                            <div className="text-xs text-red-600">
+                            <div className="text-xs text-status-critical">
                                 {form.errors.handover_notes}
                             </div>
                         ) : null}
@@ -691,7 +691,7 @@ export default function Handovers({ handovers, shifts }: Props) {
                 <div className="grid gap-4 md:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <ArrowRightLeft className="h-8 w-8 text-sky-600" />
+                            <ArrowRightLeft className="h-8 w-8 text-status-info" />
                             <div>
                                 <div className="text-sm text-muted-foreground">
                                     This Page
@@ -704,7 +704,7 @@ export default function Handovers({ handovers, shifts }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <FilePenLine className="h-8 w-8 text-amber-600" />
+                            <FilePenLine className="h-8 w-8 text-status-warning" />
                             <div>
                                 <div className="text-sm text-muted-foreground">
                                     Drafts
@@ -717,7 +717,7 @@ export default function Handovers({ handovers, shifts }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <Clock3 className="h-8 w-8 text-blue-600" />
+                            <Clock3 className="h-8 w-8 text-status-info" />
                             <div>
                                 <div className="text-sm text-muted-foreground">
                                     Submitted
@@ -730,7 +730,7 @@ export default function Handovers({ handovers, shifts }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                            <CheckCircle2 className="h-8 w-8 text-status-success" />
                             <div>
                                 <div className="text-sm text-muted-foreground">
                                     Acknowledged

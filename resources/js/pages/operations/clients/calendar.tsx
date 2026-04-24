@@ -36,12 +36,12 @@ const views: { key: ViewKey; label: string }[] = [
 ];
 
 const categories = [
-    { dot: 'bg-blue-500', label: 'Shifts', icon: CalendarDays, bg: 'bg-blue-50 dark:bg-blue-950/40' },
-    { dot: 'bg-green-500', label: 'Family Visits', icon: Users, bg: 'bg-green-50 dark:bg-green-950/40' },
-    { dot: 'bg-amber-500', label: 'GP Visits', icon: Stethoscope, bg: 'bg-amber-50 dark:bg-amber-950/40' },
+    { dot: 'bg-status-info', label: 'Shifts', icon: CalendarDays, bg: 'bg-status-info-bg dark:bg-status-info' },
+    { dot: 'bg-status-success', label: 'Family Visits', icon: Users, bg: 'bg-status-success-bg dark:bg-status-success' },
+    { dot: 'bg-status-warning', label: 'GP Visits', icon: Stethoscope, bg: 'bg-status-warning-bg dark:bg-status-warning' },
     { dot: 'bg-primary', label: 'Specialist', icon: Heart, bg: 'bg-primary/10 dark:bg-primary/40' },
-    { dot: 'bg-pink-500', label: 'Therapy', icon: Heart, bg: 'bg-pink-50 dark:bg-pink-950/40' },
-    { dot: 'bg-cyan-500', label: 'Activities', icon: Calendar, bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
+    { dot: 'bg-status-critical', label: 'Therapy', icon: Heart, bg: 'bg-status-critical-bg dark:bg-pink-950/40' },
+    { dot: 'bg-status-info', label: 'Activities', icon: Calendar, bg: 'bg-status-info-bg dark:bg-status-info' },
 ];
 
 const apptTypes = [
@@ -243,7 +243,7 @@ export default function ClientCalendar({ client, pending_visit_count }: Props) {
                                 <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sm" asChild>
                                     <Link href={`/operations/clients/${client.id}/visit-requests`}>
                                         <Users className="h-4 w-4" />Visit Requests
-                                        {pending_visit_count > 0 && <span className="ml-auto rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">{pending_visit_count}</span>}
+                                        {pending_visit_count > 0 && <span className="ml-auto rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">{pending_visit_count}</span>}
                                     </Link>
                                 </Button>
                                 <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-sm" asChild>

@@ -286,7 +286,7 @@ const Features: React.FC = () => {
 
                             {/* Control Room Dashboard Preview - No camera feeds, only alerts/detections */}
                             <div className="relative">
-                                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-purple-500/20 blur-2xl" />
+                                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-primary/20 blur-2xl" />
                                 <div className="relative rounded-2xl border border-border bg-background p-4 shadow-2xl">
                                     <div className="mb-4 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
@@ -299,7 +299,7 @@ const Features: React.FC = () => {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                                            <span className="h-2 w-2 animate-pulse rounded-full bg-status-success" />
                                             <span className="text-xs text-muted-foreground">
                                                 Monitoring Active
                                             </span>
@@ -316,8 +316,8 @@ const Features: React.FC = () => {
                                                 <span className="text-muted-foreground">
                                                     Main Entrance
                                                 </span>
-                                                <span className="flex items-center gap-1 text-emerald-500">
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                <span className="flex items-center gap-1 text-status-success">
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
                                                     Clear
                                                 </span>
                                             </div>
@@ -325,8 +325,8 @@ const Features: React.FC = () => {
                                                 <span className="text-muted-foreground">
                                                     Lounge
                                                 </span>
-                                                <span className="flex items-center gap-1 text-emerald-500">
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                <span className="flex items-center gap-1 text-status-success">
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
                                                     Clear
                                                 </span>
                                             </div>
@@ -334,8 +334,8 @@ const Features: React.FC = () => {
                                                 <span className="text-muted-foreground">
                                                     Kitchen
                                                 </span>
-                                                <span className="flex items-center gap-1 text-amber-500">
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                                <span className="flex items-center gap-1 text-status-warning">
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-status-warning" />
                                                     Activity
                                                 </span>
                                             </div>
@@ -343,8 +343,8 @@ const Features: React.FC = () => {
                                                 <span className="text-muted-foreground">
                                                     Garden
                                                 </span>
-                                                <span className="flex items-center gap-1 text-emerald-500">
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                <span className="flex items-center gap-1 text-status-success">
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
                                                     Clear
                                                 </span>
                                             </div>
@@ -352,14 +352,14 @@ const Features: React.FC = () => {
                                     </div>
 
                                     {/* Alert Panel */}
-                                    <div className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+                                    <div className="mb-3 rounded-lg border border-status-warning/20 bg-status-warning p-3">
                                         <div className="flex items-start gap-3">
                                             <AlertTriangle
                                                 size={16}
-                                                className="mt-0.5 text-amber-500"
+                                                className="mt-0.5 text-status-warning"
                                             />
                                             <div>
-                                                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                                                <p className="text-xs font-medium text-status-warning dark:text-status-warning">
                                                     Activity Detected
                                                 </p>
                                                 <p className="text-[10px] text-muted-foreground">
@@ -440,7 +440,7 @@ const Features: React.FC = () => {
                                         >
                                             <CheckCircle2
                                                 size={18}
-                                                className="mt-0.5 shrink-0 text-emerald-500"
+                                                className="mt-0.5 shrink-0 text-status-success"
                                             />
                                             <span className="text-sm text-muted-foreground">
                                                 {item}
@@ -584,7 +584,7 @@ const Features: React.FC = () => {
                                     >
                                         <CheckCircle2
                                             size={18}
-                                            className="text-emerald-500"
+                                            className="text-status-success"
                                         />
                                         <span className="text-sm text-muted-foreground">
                                             {item}

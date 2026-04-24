@@ -321,7 +321,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="font-medium">{vendor.company_name}</span>
                                                         {vendor.is_preferred && (
-                                                            <Badge variant="outline" className="border-yellow-500/30 text-yellow-400">
+                                                            <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                                                 <Star className="w-3 h-3 mr-1" />
                                                                 Preferred
                                                             </Badge>
@@ -341,7 +341,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                                                             </a>
                                                         )}
                                                         {vendor.after_hours_phone && (
-                                                            <a href={`tel:${vendor.after_hours_phone}`} className="flex items-center gap-1 text-amber-400 hover:text-amber-300">
+                                                            <a href={`tel:${vendor.after_hours_phone}`} className="flex items-center gap-1 text-status-warning hover:text-status-warning">
                                                                 <Phone className="w-4 h-4" />
                                                                 After-hours: {vendor.after_hours_phone}
                                                             </a>
@@ -359,7 +359,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                                                         </div>
                                                     )}
                                                     {vendor.notes && (
-                                                        <div className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap border-t border-slate-700/50 pt-2">
+                                                        <div className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap border-t border-border/50 pt-2">
                                                             {vendor.notes}
                                                         </div>
                                                     )}
@@ -370,7 +370,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                                                     </Button>
                                                     <AlertDialog>
                                                         <AlertDialogTrigger asChild>
-                                                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                                                            <Button variant="ghost" size="sm" className="text-status-critical hover:text-status-critical">
                                                                 <Trash2 className="w-4 h-4" />
                                                             </Button>
                                                         </AlertDialogTrigger>
@@ -384,7 +384,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                                 <AlertDialogAction
-                                                                    className="bg-red-600 hover:bg-red-700"
+                                                                    className="bg-status-critical hover:bg-status-critical"
                                                                     onClick={() => router.delete(`/sites/${site.id}/vendors/${vendor.id}`)}
                                                                 >
                                                                     Delete

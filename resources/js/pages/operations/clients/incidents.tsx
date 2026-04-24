@@ -47,17 +47,17 @@ type Props = {
 };
 
 const severityConfig: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-    low: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-l-emerald-500' },
-    medium: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500', border: 'border-l-amber-500' },
-    high: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500', border: 'border-l-red-500' },
-    critical: { bg: 'bg-red-100', text: 'text-red-800', dot: 'bg-red-600', border: 'border-l-red-600' },
+    low: { bg: 'bg-status-success-bg', text: 'text-status-success', dot: 'bg-status-success', border: 'border-l-emerald-500' },
+    medium: { bg: 'bg-status-warning-bg', text: 'text-status-warning', dot: 'bg-status-warning', border: 'border-l-amber-500' },
+    high: { bg: 'bg-status-critical-bg', text: 'text-status-critical', dot: 'bg-status-critical', border: 'border-l-red-500' },
+    critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical', dot: 'bg-status-critical', border: 'border-l-red-600' },
 };
 
 const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
     draft: { bg: 'bg-muted', text: 'text-foreground', icon: FileEdit },
-    submitted: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
+    submitted: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Clock },
     reviewed: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2 },
-    closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
+    closed: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2 },
 };
 
 const typeIcons: Record<string, typeof AlertTriangle> = {
@@ -128,8 +128,8 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
-                            <ShieldAlert className="h-5 w-5 text-red-600" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-critical-bg">
+                            <ShieldAlert className="h-5 w-5 text-status-critical" />
                         </div>
                         <div>
                             <h1 className="text-lg font-semibold">Incidents for {name}</h1>
@@ -162,11 +162,11 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                         <div className="text-xs text-muted-foreground">Drafts</div>
                     </div>
                     <div className="rounded-lg border bg-white p-3">
-                        <div className={`text-2xl font-bold ${highCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{highCount}</div>
+                        <div className={`text-2xl font-bold ${highCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}>{highCount}</div>
                         <div className="text-xs text-muted-foreground">High severity</div>
                     </div>
                     <div className="rounded-lg border bg-white p-3">
-                        <div className="text-2xl font-bold text-blue-600">{awaitingReview}</div>
+                        <div className="text-2xl font-bold text-status-info">{awaitingReview}</div>
                         <div className="text-xs text-muted-foreground">Awaiting review</div>
                     </div>
                 </div>
@@ -347,7 +347,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-semibold capitalize">{i.type?.replace(/_/g, ' ')}</span>
-                                                <span className="text-slate-300">|</span>
+                                                <span className="text-muted-foreground">|</span>
                                                 <Badge className={`${sev.bg} ${sev.text} border-0 text-[10px] font-medium`}>
                                                     {i.severity}
                                                 </Badge>
@@ -356,7 +356,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                                                     {i.status}
                                                 </Badge>
                                                 {i.is_notifiable && (
-                                                    <Badge className="bg-red-100 text-red-700 border-0 text-[10px]">WorkSafe</Badge>
+                                                    <Badge className="bg-status-critical-bg text-status-critical border-0 text-[10px]">WorkSafe</Badge>
                                                 )}
                                                 {i.requires_followup && (
                                                     <Badge className="bg-primary/10 text-primary border-0 text-[10px]">Follow-up</Badge>
@@ -418,7 +418,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
 
                     {!incidents.length && (
                         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-                            <ShieldAlert className="h-10 w-10 text-slate-300" />
+                            <ShieldAlert className="h-10 w-10 text-muted-foreground" />
                             <div className="mt-2 text-sm font-medium text-muted-foreground">No incidents recorded</div>
                             <div className="text-xs text-muted-foreground">
                                 {can.create ? 'Create your first incident above' : 'No incidents have been logged for this client'}

@@ -141,35 +141,35 @@ interface Props {
 // --- Helpers ---
 
 const categoryConfig: Record<string, { color: string; icon: typeof AlertTriangle }> = {
-    emergency: { color: 'bg-red-100 text-red-800 border-red-200', icon: AlertTriangle },
-    safety: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Shield },
-    compliance: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: CheckCircle },
+    emergency: { color: 'bg-status-critical-bg text-status-critical border-status-critical/30', icon: AlertTriangle },
+    safety: { color: 'bg-status-warning-bg text-status-warning border-status-warning/30', icon: Shield },
+    compliance: { color: 'bg-status-info-bg text-status-info border-status-info/30', icon: CheckCircle },
     maintenance: { color: 'bg-muted text-foreground border-border', icon: Wrench },
     investigation: { color: 'bg-primary/10 text-primary border-primary', icon: SearchIcon },
 };
 
 const stepTypeColors: Record<string, string> = {
-    task: 'bg-blue-100 text-blue-800',
+    task: 'bg-status-info-bg text-status-info',
     decision: 'bg-primary/10 text-primary',
-    notification: 'bg-yellow-100 text-yellow-800',
-    escalation: 'bg-red-100 text-red-800',
-    evidence: 'bg-green-100 text-green-800',
-    approval: 'bg-orange-100 text-orange-800',
+    notification: 'bg-status-warning-bg text-status-warning',
+    escalation: 'bg-status-critical-bg text-status-critical',
+    evidence: 'bg-status-success-bg text-status-success',
+    approval: 'bg-status-warning-bg text-status-warning',
 };
 
 const runStatusColors: Record<string, string> = {
     pending: 'bg-muted text-foreground',
-    in_progress: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
+    in_progress: 'bg-status-info-bg text-status-info',
+    completed: 'bg-status-success-bg text-status-success',
+    failed: 'bg-status-critical-bg text-status-critical',
     cancelled: 'bg-muted text-muted-foreground',
 };
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-600 text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-yellow-500 text-black',
-    low: 'bg-green-500 text-white',
+    critical: 'bg-status-critical text-white',
+    high: 'bg-status-warning text-white',
+    medium: 'bg-status-warning text-black',
+    low: 'bg-status-success text-white',
 };
 
 function formatDate(isoString: string | null): string {
@@ -592,10 +592,10 @@ export default function PlaybookShow({ playbook, recentRuns, categories, stepTyp
                                             </div>
                                             <div className="flex items-center gap-2 pt-1">
                                                 {playbook.auto_attach && (
-                                                    <Badge variant="outline" className="bg-green-50 text-green-700 text-xs">Auto-attach</Badge>
+                                                    <Badge variant="outline" className="bg-status-success-bg text-status-success text-xs">Auto-attach</Badge>
                                                 )}
                                                 {playbook.requires_approval && (
-                                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 text-xs">Requires Approval</Badge>
+                                                    <Badge variant="outline" className="bg-status-warning-bg text-status-warning text-xs">Requires Approval</Badge>
                                                 )}
                                             </div>
                                         </div>
@@ -630,7 +630,7 @@ export default function PlaybookShow({ playbook, recentRuns, categories, stepTyp
                                             {playbook.escalation_after_minutes && (
                                                 <div className="flex items-center justify-between border-t pt-2">
                                                     <span className="text-sm text-muted-foreground">Escalate after</span>
-                                                    <span className="font-mono text-sm font-medium text-red-600">
+                                                    <span className="font-mono text-sm font-medium text-status-critical">
                                                         {playbook.escalation_after_minutes} min
                                                     </span>
                                                 </div>
@@ -691,13 +691,13 @@ export default function PlaybookShow({ playbook, recentRuns, categories, stepTyp
                                                                 {stepTypes[step.type] ?? step.type}
                                                             </Badge>
                                                             {step.is_required && (
-                                                                <span className="flex items-center gap-0.5 text-xs text-orange-600" title="Required">
+                                                                <span className="flex items-center gap-0.5 text-xs text-status-warning" title="Required">
                                                                     <Star className="h-3 w-3" />
                                                                     Required
                                                                 </span>
                                                             )}
                                                             {step.is_blocking && (
-                                                                <span className="flex items-center gap-0.5 text-xs text-red-600" title="Blocking">
+                                                                <span className="flex items-center gap-0.5 text-xs text-status-critical" title="Blocking">
                                                                     <Lock className="h-3 w-3" />
                                                                     Blocking
                                                                 </span>

@@ -237,7 +237,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={Building2}
-                                iconBg="bg-emerald-100 text-emerald-600"
+                                iconBg="bg-status-success-bg text-status-success"
                                 title="Funding Source"
                                 description="Who is funding this agreement and their reference details."
                             />
@@ -321,7 +321,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={DollarSign}
-                                iconBg="bg-amber-100 text-amber-600"
+                                iconBg="bg-status-warning-bg text-status-warning"
                                 title="Budget & Rates"
                                 description="Allocated funding and service rates in NZD."
                             />
@@ -430,7 +430,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={UserCheck}
-                                iconBg="bg-teal-100 text-teal-600"
+                                iconBg="bg-status-info-bg text-status-info"
                                 title="NASC Details"
                                 description="Needs Assessment and Service Coordination information."
                             />
@@ -490,7 +490,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={FileText}
-                                iconBg="bg-blue-100 text-blue-600"
+                                iconBg="bg-status-info-bg text-status-info"
                                 title="Terms & Notes"
                                 description="Agreement terms, conditions, and any additional notes."
                             />
@@ -512,7 +512,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={Upload}
-                                iconBg="bg-cyan-100 text-cyan-600"
+                                iconBg="bg-status-info-bg text-status-info"
                                 title="Documents"
                                 description="Upload signed agreement, addendums, or supporting documents."
                             />
@@ -556,7 +556,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                className="h-6 px-2 text-xs text-red-500 hover:text-red-700"
+                                                className="h-6 px-2 text-xs text-status-critical hover:text-status-critical"
                                                 onClick={(e) => { e.stopPropagation(); removeFile(index); }}
                                             >
                                                 Remove

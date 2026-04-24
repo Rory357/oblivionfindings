@@ -98,45 +98,45 @@ const CATEGORY_COLOURS: Record<string, { bg: string; text: string; border: strin
         icon: 'text-primary',
     },
     Community: {
-        bg: 'bg-blue-500/10',
-        text: 'text-blue-400',
+        bg: 'bg-status-info',
+        text: 'text-status-info',
         border: 'border-l-blue-500',
-        badge: 'bg-blue-500/20 text-blue-300',
-        icon: 'text-blue-400',
+        badge: 'bg-status-info-bg text-status-info',
+        icon: 'text-status-info',
     },
     'Day Services': {
-        bg: 'bg-emerald-500/10',
-        text: 'text-emerald-400',
+        bg: 'bg-status-success',
+        text: 'text-status-success',
         border: 'border-l-emerald-500',
-        badge: 'bg-emerald-500/20 text-emerald-300',
-        icon: 'text-emerald-400',
+        badge: 'bg-status-success-bg text-status-success',
+        icon: 'text-status-success',
     },
     Respite: {
-        bg: 'bg-amber-500/10',
-        text: 'text-amber-400',
+        bg: 'bg-status-warning',
+        text: 'text-status-warning',
         border: 'border-l-amber-500',
-        badge: 'bg-amber-500/20 text-amber-300',
-        icon: 'text-amber-400',
+        badge: 'bg-status-warning-bg text-status-warning',
+        icon: 'text-status-warning',
     },
     Specialist: {
-        bg: 'bg-rose-500/10',
-        text: 'text-rose-400',
+        bg: 'bg-status-critical',
+        text: 'text-status-critical',
         border: 'border-l-rose-500',
-        badge: 'bg-rose-500/20 text-rose-300',
-        icon: 'text-rose-400',
+        badge: 'bg-status-critical-bg text-status-critical',
+        icon: 'text-status-critical',
     },
     'Children & Youth': {
-        bg: 'bg-teal-500/10',
-        text: 'text-teal-400',
+        bg: 'bg-status-info',
+        text: 'text-status-info',
         border: 'border-l-teal-500',
-        badge: 'bg-teal-500/20 text-teal-300',
-        icon: 'text-teal-400',
+        badge: 'bg-status-info-bg text-status-info',
+        icon: 'text-status-info',
     },
     'Flexible / Other': {
-        bg: 'bg-slate-500/10',
+        bg: 'bg-muted-foreground/80/10',
         text: 'text-muted-foreground',
         border: 'border-l-slate-500',
-        badge: 'bg-slate-500/20 text-slate-300',
+        badge: 'bg-muted-foreground/80/20 text-muted-foreground',
         icon: 'text-muted-foreground',
     },
 };
@@ -299,12 +299,12 @@ export default function ServiceContextsPage(props: Props) {
                             </div>
                             <div className="mt-2 text-2xl font-bold text-primary">{totalContexts}</div>
                         </div>
-                        <div className="rounded-xl border bg-emerald-500/5 p-4">
+                        <div className="rounded-xl border bg-status-success p-4">
                             <div className="flex items-center gap-2">
-                                <div className="h-2 w-2 rounded-full bg-emerald-400" />
+                                <div className="h-2 w-2 rounded-full bg-status-success" />
                                 <span className="text-xs font-medium text-muted-foreground">Active</span>
                             </div>
-                            <div className="mt-2 text-2xl font-bold text-emerald-400">{activeContexts}</div>
+                            <div className="mt-2 text-2xl font-bold text-status-success">{activeContexts}</div>
                         </div>
                         <div className="rounded-xl border p-4">
                             <div className="flex items-center gap-2">
@@ -315,7 +315,7 @@ export default function ServiceContextsPage(props: Props) {
                                 {CATEGORY_ORDER.filter((cat) => categoryStats[cat]).map((cat) => (
                                     <span
                                         key={cat}
-                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${CATEGORY_COLOURS[cat]?.badge ?? 'bg-slate-500/20 text-slate-300'}`}
+                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${CATEGORY_COLOURS[cat]?.badge ?? 'bg-muted-foreground/80/20 text-muted-foreground'}`}
                                     >
                                         {cat}: {categoryStats[cat]}
                                     </span>
@@ -325,12 +325,12 @@ export default function ServiceContextsPage(props: Props) {
                                 )}
                             </div>
                         </div>
-                        <div className="rounded-xl border bg-blue-500/5 p-4">
+                        <div className="rounded-xl border bg-status-info p-4">
                             <div className="flex items-center gap-2">
-                                <Building2 className="h-4 w-4 text-blue-400" />
+                                <Building2 className="h-4 w-4 text-status-info" />
                                 <span className="text-xs font-medium text-muted-foreground">Linked to Sites</span>
                             </div>
-                            <div className="mt-2 text-2xl font-bold text-blue-400">{linkedToSites}</div>
+                            <div className="mt-2 text-2xl font-bold text-status-info">{linkedToSites}</div>
                         </div>
                     </div>
 
@@ -377,7 +377,7 @@ export default function ServiceContextsPage(props: Props) {
                                         })}
                                 </select>
                                 {defaultForm.errors.default_id && (
-                                    <div className="text-xs text-red-400">{defaultForm.errors.default_id}</div>
+                                    <div className="text-xs text-status-critical">{defaultForm.errors.default_id}</div>
                                 )}
                             </div>
                             <div className="flex gap-2">
@@ -461,7 +461,7 @@ export default function ServiceContextsPage(props: Props) {
                                                 </SelectContent>
                                             </Select>
                                             {createForm.errors.type && (
-                                                <div className="text-xs text-red-400">{createForm.errors.type}</div>
+                                                <div className="text-xs text-status-critical">{createForm.errors.type}</div>
                                             )}
                                         </div>
                                         <div className="space-y-2">
@@ -472,14 +472,14 @@ export default function ServiceContextsPage(props: Props) {
                                                 placeholder="e.g. Residential -- Albany House"
                                             />
                                             {createForm.errors.name && (
-                                                <div className="text-xs text-red-400">{createForm.errors.name}</div>
+                                                <div className="text-xs text-status-critical">{createForm.errors.name}</div>
                                             )}
                                         </div>
                                     </div>
 
                                     {/* Type description hint */}
                                     {selectedCreateType && (
-                                        <div className={`rounded-lg p-3 text-xs ${CATEGORY_COLOURS[selectedCreateType.category]?.bg ?? 'bg-slate-500/10'} ${CATEGORY_COLOURS[selectedCreateType.category]?.text ?? 'text-muted-foreground'}`}>
+                                        <div className={`rounded-lg p-3 text-xs ${CATEGORY_COLOURS[selectedCreateType.category]?.bg ?? 'bg-muted-foreground/80/10'} ${CATEGORY_COLOURS[selectedCreateType.category]?.text ?? 'text-muted-foreground'}`}>
                                             <span className="font-medium">{selectedCreateType.label}:</span>{' '}
                                             {selectedCreateType.description}
                                         </div>
@@ -507,7 +507,7 @@ export default function ServiceContextsPage(props: Props) {
                                                 ))}
                                             </select>
                                             {createForm.errors.site_id && (
-                                                <div className="text-xs text-red-400">{createForm.errors.site_id}</div>
+                                                <div className="text-xs text-status-critical">{createForm.errors.site_id}</div>
                                             )}
                                         </div>
                                         <div className="space-y-2">
@@ -550,7 +550,7 @@ export default function ServiceContextsPage(props: Props) {
                                             rows={3}
                                         />
                                         {createForm.errors.description && (
-                                            <div className="text-xs text-red-400">{createForm.errors.description}</div>
+                                            <div className="text-xs text-status-critical">{createForm.errors.description}</div>
                                         )}
                                     </div>
 
@@ -720,11 +720,11 @@ function ContextCard({
                             {category}
                         </Badge>
                         {c.is_active ? (
-                            <Badge variant="secondary" className="border-0 bg-emerald-500/20 text-[10px] text-emerald-300">
+                            <Badge variant="secondary" className="border-0 bg-status-success-bg text-[10px] text-status-success">
                                 Active
                             </Badge>
                         ) : (
-                            <Badge variant="secondary" className="border-0 bg-slate-500/20 text-[10px] text-muted-foreground">
+                            <Badge variant="secondary" className="border-0 bg-muted-foreground/80/20 text-[10px] text-muted-foreground">
                                 Inactive
                             </Badge>
                         )}
@@ -940,7 +940,7 @@ function ContextCard({
                     <Button
                         size="icon"
                         variant="ghost"
-                        className="h-7 w-7 text-muted-foreground hover:text-amber-400"
+                        className="h-7 w-7 text-muted-foreground hover:text-status-warning"
                         onClick={() => {
                             // Toggle active/inactive as archive action
                             editForm.setData({

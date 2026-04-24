@@ -243,7 +243,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                                             </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                                                    <Button variant="ghost" size="sm" className="text-status-critical hover:text-status-critical">
                                                         <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                 </AlertDialogTrigger>
@@ -257,7 +257,7 @@ export default function SiteChecklists({ site, assignments, templates }: Props) 
                                                     <AlertDialogFooter>
                                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                         <AlertDialogAction
-                                                            className="bg-red-600 hover:bg-red-700"
+                                                            className="bg-status-critical hover:bg-status-critical"
                                                             onClick={() => removeAssignment(assignment.id)}
                                                         >
                                                             Remove

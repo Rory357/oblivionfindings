@@ -88,8 +88,8 @@ const SECTION_COLORS: Record<string, string> = {
 };
 
 function ResultIcon({ result }: { result: string }) {
-    if (result === 'pass') return <CheckCircle className="h-5 w-5 text-green-600" />;
-    if (result === 'fail') return <XCircle className="h-5 w-5 text-red-600" />;
+    if (result === 'pass') return <CheckCircle className="h-5 w-5 text-status-success" />;
+    if (result === 'fail') return <XCircle className="h-5 w-5 text-status-critical" />;
     return <MinusCircle className="h-5 w-5 text-muted-foreground" />;
 }
 
@@ -141,14 +141,14 @@ export default function InspectionShow({ inspection }: Props) {
                     'rounded-lg border px-5 py-4',
                     insp.passed
                         ? 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70'
-                        : 'bg-red-50 border-red-200 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200'
+                        : 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical'
                 )}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             {insp.passed ? (
                                 <CheckCircle className="h-6 w-6 text-primary dark:text-primary" />
                             ) : (
-                                <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                                <XCircle className="h-6 w-6 text-status-critical dark:text-status-critical" />
                             )}
                             <div>
                                 <span className="text-lg font-bold">{insp.passed ? 'Inspection Passed' : 'Inspection Failed'}</span>
@@ -220,12 +220,12 @@ export default function InspectionShow({ inspection }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-3 gap-3">
-                                <div className="rounded-lg bg-green-50 p-3 text-center dark:bg-green-950/20">
-                                    <div className="text-2xl font-bold text-green-600">{counts.pass}</div>
+                                <div className="rounded-lg bg-status-success-bg p-3 text-center dark:bg-status-success">
+                                    <div className="text-2xl font-bold text-status-success">{counts.pass}</div>
                                     <div className="mt-1 text-xs text-muted-foreground">Passed</div>
                                 </div>
-                                <div className="rounded-lg bg-red-50 p-3 text-center dark:bg-red-950/20">
-                                    <div className="text-2xl font-bold text-red-600">{counts.fail}</div>
+                                <div className="rounded-lg bg-status-critical-bg p-3 text-center dark:bg-status-critical">
+                                    <div className="text-2xl font-bold text-status-critical">{counts.fail}</div>
                                     <div className="mt-1 text-xs text-muted-foreground">Failed</div>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3 text-center dark:bg-muted/20">
@@ -255,9 +255,9 @@ export default function InspectionShow({ inspection }: Props) {
                                         className={cn(
                                             'flex items-center gap-3 rounded-lg border p-3 transition-colors',
                                             item.result === 'fail'
-                                                ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                                ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical'
                                                 : item.result === 'pass'
-                                                ? 'border-green-100 bg-green-50/30 dark:border-green-900/50 dark:bg-green-950/10'
+                                                ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/50 dark:bg-status-success'
                                                 : ''
                                         )}
                                     >

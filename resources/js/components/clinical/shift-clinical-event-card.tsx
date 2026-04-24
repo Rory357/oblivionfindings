@@ -25,7 +25,7 @@ export default function ShiftClinicalEventCard({ shiftId }: Props) {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
-                        <Activity className="h-4 w-4 text-rose-600" />
+                        <Activity className="h-4 w-4 text-status-critical" />
                         Clinical Event
                     </CardTitle>
                 </CardHeader>

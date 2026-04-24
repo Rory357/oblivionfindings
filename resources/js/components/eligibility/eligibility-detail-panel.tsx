@@ -62,10 +62,10 @@ export function EligibilityDetailPanel({
     const hasIssues = blocks.length > 0 || warnings.length > 0;
 
     const borderClass = status === 'blocked'
-        ? 'border-red-200 dark:border-red-800'
+        ? 'border-status-critical/30 dark:border-status-critical/30'
         : status === 'warnings'
-            ? 'border-yellow-200 dark:border-yellow-800'
-            : 'border-green-200 dark:border-green-800';
+            ? 'border-status-warning/30 dark:border-status-warning/30'
+            : 'border-status-success/30 dark:border-status-success/30';
 
     return (
         <Card className={cn(borderClass, className)}>
@@ -81,12 +81,12 @@ export function EligibilityDetailPanel({
                 {/* Hard blocks */}
                 {blocks.length > 0 && (
                     <div className="space-y-1.5">
-                        <p className="text-xs font-medium uppercase tracking-wider text-red-700 dark:text-red-400">
+                        <p className="text-xs font-medium uppercase tracking-wider text-status-critical dark:text-status-critical">
                             Hard blocks
                         </p>
                         <ul className="space-y-1">
                             {blocks.map((reason, i) => (
-                                <li key={i} className="flex items-start gap-2 text-sm text-red-700 dark:text-red-400">
+                                <li key={i} className="flex items-start gap-2 text-sm text-status-critical dark:text-status-critical">
                                     <XCircle className="mt-0.5 size-3.5 shrink-0" />
                                     <span>{reason}</span>
                                 </li>
@@ -98,12 +98,12 @@ export function EligibilityDetailPanel({
                 {/* Warnings */}
                 {warnings.length > 0 && (
                     <div className="space-y-1.5">
-                        <p className="text-xs font-medium uppercase tracking-wider text-yellow-700 dark:text-yellow-400">
+                        <p className="text-xs font-medium uppercase tracking-wider text-status-warning dark:text-status-warning">
                             Warnings
                         </p>
                         <ul className="space-y-1">
                             {warnings.map((reason, i) => (
-                                <li key={i} className="flex items-start gap-2 text-sm text-yellow-700 dark:text-yellow-400">
+                                <li key={i} className="flex items-start gap-2 text-sm text-status-warning dark:text-status-warning">
                                     <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
                                     <span>{reason}</span>
                                 </li>
@@ -121,7 +121,7 @@ export function EligibilityDetailPanel({
                         <ul className="space-y-0.5">
                             {passedChecks.map((check, i) => (
                                 <li key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <CheckCircle2 className="size-3 shrink-0 text-green-500" />
+                                    <CheckCircle2 className="size-3 shrink-0 text-status-success" />
                                     <span>{ruleLabel(check.rule)}</span>
                                 </li>
                             ))}
@@ -131,7 +131,7 @@ export function EligibilityDetailPanel({
 
                 {/* Clean pass message */}
                 {!hasIssues && passedChecks.length === 0 && (
-                    <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                    <div className="flex items-center gap-2 text-sm text-status-success dark:text-status-success">
                         <CheckCircle2 className="size-4" />
                         <span>All eligibility checks passed.</span>
                     </div>

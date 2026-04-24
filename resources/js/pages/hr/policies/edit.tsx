@@ -150,7 +150,7 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                         </Button>
                     </Link>
                     <div className="flex items-center gap-3">
-                        <FileText className="h-6 w-6 text-blue-500" />
+                        <FileText className="h-6 w-6 text-status-info" />
                         <div>
                             <h1 className="text-2xl font-bold">Edit Policy</h1>
                             <p className="text-muted-foreground">Update policy details</p>
@@ -170,9 +170,9 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                     id="title"
                                     value={data.title}
                                     onChange={(e) => setData('title', e.target.value)}
-                                    className={errors.title ? 'border-red-500' : ''}
+                                    className={errors.title ? 'border-status-critical/30' : ''}
                                 />
-                                {errors.title && <p className="text-sm text-red-500">{errors.title}</p>}
+                                {errors.title && <p className="text-sm text-status-critical">{errors.title}</p>}
                             </div>
 
                             <div className="space-y-3">
@@ -190,7 +190,7 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
 
                                 {!showCustomCategory ? (
                                     <Select value={data.category} onValueChange={(value) => setData('category', value)}>
-                                        <SelectTrigger className={errors.category ? 'border-red-500' : ''}>
+                                        <SelectTrigger className={errors.category ? 'border-status-critical/30' : ''}>
                                             <SelectValue placeholder="Select a category" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -204,7 +204,7 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                         placeholder="Enter custom category"
                                         value={data.custom_category}
                                         onChange={(e) => setData('custom_category', e.target.value)}
-                                        className={errors.category ? 'border-red-500' : ''}
+                                        className={errors.category ? 'border-status-critical/30' : ''}
                                     />
                                 )}
                             </div>
@@ -299,13 +299,13 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                         </Button>
                                         {versionData.document ? (
                                             <div className="flex items-center gap-2 text-sm">
-                                                <FileCheck className="h-4 w-4 text-green-500" />
+                                                <FileCheck className="h-4 w-4 text-status-success" />
                                                 <span>{versionData.document.name}</span>
                                                 <span className="text-muted-foreground">({formatFileSize(versionData.document.size)})</span>
                                             </div>
                                         ) : <span className="text-sm text-muted-foreground">No file selected</span>}
                                     </div>
-                                    {versionErrors.document && <p className="text-sm text-red-500">{versionErrors.document}</p>}
+                                    {versionErrors.document && <p className="text-sm text-status-critical">{versionErrors.document}</p>}
                                 </div>
 
                                 <div className="space-y-2">
@@ -340,13 +340,13 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
 
                         <div className="space-y-2">
                             {policy.versions.map((version) => (
-                                <div key={version.id} className={`flex items-center justify-between rounded-lg border p-3 ${version.is_current ? 'border-blue-500 bg-blue-50/50' : ''}`}>
+                                <div key={version.id} className={`flex items-center justify-between rounded-lg border p-3 ${version.is_current ? 'border-status-info/30 bg-status-info-bg' : ''}`}>
                                     <div className="flex items-center gap-3">
                                         <FileText className="h-5 w-5 text-muted-foreground" />
                                         <div>
                                             <div className="font-medium">
                                                 Version {version.version_number}
-                                                {version.is_current && <span className="ml-2 text-xs text-blue-600">(Current)</span>}
+                                                {version.is_current && <span className="ml-2 text-xs text-status-info">(Current)</span>}
                                             </div>
                                             {version.document_path && (
                                                 <div className="text-xs text-muted-foreground">{version.document_path.split('/').pop()}</div>
@@ -358,7 +358,7 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className="text-red-500 hover:text-red-600"
+                                            className="text-status-critical hover:text-status-critical"
                                             onClick={() => handleDeleteVersion(version.id)}
                                         >
                                             <Trash2 className="h-4 w-4" />
@@ -371,9 +371,9 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
                 </Card>
 
                 {/* Delete Policy */}
-                <Card className="border-red-200">
+                <Card className="border-status-critical/30">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-red-600">
+                        <CardTitle className="flex items-center gap-2 text-status-critical">
                             <AlertTriangle className="h-5 w-5" />
                             Danger Zone
                         </CardTitle>

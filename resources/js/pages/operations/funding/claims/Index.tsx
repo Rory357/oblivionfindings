@@ -176,7 +176,7 @@ export default function FundingClaimsIndex({
                                 <p className="text-sm text-muted-foreground">
                                     {claim.items_count ?? 0} items
                                 </p>
-                                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                                <p className="text-sm font-semibold text-status-success dark:text-status-success">
                                     {nzd.format(claim.total_amount ?? 0)}
                                 </p>
                                 <div className="flex justify-end">

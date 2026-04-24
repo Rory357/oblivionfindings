@@ -159,12 +159,12 @@ export default function TransportPreCheck({
                 />
 
                 {pre_check_completed && (
-                    <div className="rounded-lg border-2 border-green-300 bg-green-50 p-4 dark:border-green-700 dark:bg-green-950/30">
+                    <div className="rounded-lg border-2 border-status-success/30 bg-status-success-bg p-4 dark:border-status-success/30 dark:bg-status-success">
                         <div className="flex items-center gap-3">
-                            <CheckCircle className="h-6 w-6 text-green-600" />
+                            <CheckCircle className="h-6 w-6 text-status-success" />
                             <div>
-                                <p className="font-semibold text-green-800 dark:text-green-300">Pre-Check Completed</p>
-                                <p className="text-sm text-green-700 dark:text-green-400">
+                                <p className="font-semibold text-status-success dark:text-status-success">Pre-Check Completed</p>
+                                <p className="text-sm text-status-success dark:text-status-success">
                                     All safety checks have been completed for this transport.
                                 </p>
                             </div>
@@ -209,8 +209,8 @@ export default function TransportPreCheck({
                                         key={item.key}
                                         className={cn(
                                             'border-2 transition-colors',
-                                            checked === true && 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/20',
-                                            checked === false && 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950/20',
+                                            checked === true && 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success',
+                                            checked === false && 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical',
                                             checked === null && 'border-border',
                                         )}
                                     >
@@ -219,14 +219,14 @@ export default function TransportPreCheck({
                                                 <div className="flex items-center gap-3">
                                                     <div className={cn(
                                                         'flex h-10 w-10 items-center justify-center rounded-full',
-                                                        checked === true && 'bg-green-100 dark:bg-green-900/30',
-                                                        checked === false && 'bg-red-100 dark:bg-red-900/30',
+                                                        checked === true && 'bg-status-success-bg dark:bg-status-success',
+                                                        checked === false && 'bg-status-critical-bg dark:bg-status-critical',
                                                         checked === null && 'bg-muted',
                                                     )}>
                                                         <Icon className={cn(
                                                             'h-5 w-5',
-                                                            checked === true && 'text-green-600',
-                                                            checked === false && 'text-red-600',
+                                                            checked === true && 'text-status-success',
+                                                            checked === false && 'text-status-critical',
                                                             checked === null && 'text-muted-foreground',
                                                         )} />
                                                     </div>
@@ -242,7 +242,7 @@ export default function TransportPreCheck({
                                                         onClick={() => toggleCheck(item.key, true)}
                                                         className={cn(
                                                             'h-14 w-14 p-0',
-                                                            checked === true && 'bg-green-600 hover:bg-green-700',
+                                                            checked === true && 'bg-status-success hover:bg-status-success',
                                                         )}
                                                     >
                                                         <CheckCircle className="h-6 w-6" />

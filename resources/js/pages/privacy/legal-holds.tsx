@@ -34,9 +34,9 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'active':
-                return 'bg-red-100 text-red-800 border-red-200';
+                return 'bg-status-critical-bg text-status-critical border-status-critical/30';
             case 'released':
-                return 'bg-green-100 text-green-800 border-green-200';
+                return 'bg-status-success-bg text-status-success border-status-success/30';
             default:
                 return 'bg-muted text-foreground border-border';
         }

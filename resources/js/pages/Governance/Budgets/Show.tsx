@@ -143,10 +143,10 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
   const getStatusColor = (status: string) => {
     return {
       drafting: 'bg-muted text-foreground',
-      proposed: 'bg-yellow-100 text-yellow-800',
-      under_review: 'bg-blue-100 text-blue-800',
-      approved: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800',
+      proposed: 'bg-status-warning-bg text-status-warning',
+      under_review: 'bg-status-info-bg text-status-info',
+      approved: 'bg-status-success-bg text-status-success',
+      rejected: 'bg-status-critical-bg text-status-critical',
     }[status] || 'bg-muted text-foreground';
   };
 
@@ -289,7 +289,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Link */}
         <div className="mb-4">
-          <Link href={budgetsIndex.url()} className="text-sm text-blue-600 hover:underline">
+          <Link href={budgetsIndex.url()} className="text-sm text-status-info hover:underline">
             &larr; Back to Budgets
           </Link>
         </div>
@@ -298,7 +298,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
         <div className="flex items-start justify-between mb-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <Wallet className="w-8 h-8 text-green-500" />
+              <Wallet className="w-8 h-8 text-status-success" />
               <div>
                 <h1 className="text-2xl font-bold text-foreground">{budget.title || `FY${budget.fiscal_year} Budget`}</h1>
                 <p className="text-muted-foreground">Fiscal Year {budget.fiscal_year}</p>
@@ -350,7 +350,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
               budget.approval_resolution.outcome === 'carried' ? (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button className="bg-green-600 hover:bg-green-700">
+                    <Button className="bg-status-success hover:bg-status-success">
                       <CheckCircle className="w-4 h-4 mr-1" />
                       Approve Budget
                     </Button>
@@ -365,7 +365,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={approveBudget} className="bg-green-600 hover:bg-green-700">
+                      <AlertDialogAction onClick={approveBudget} className="bg-status-success hover:bg-status-success">
                         Confirm Approval
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -401,7 +401,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                   <p className="text-sm text-muted-foreground">Actual Spend</p>
                   <p className="text-2xl font-bold text-foreground">{formatCurrency(totals.actual)}</p>
                 </div>
-                <Wallet className="w-8 h-8 text-blue-400" />
+                <Wallet className="w-8 h-8 text-status-info" />
               </div>
             </CardContent>
           </Card>
@@ -412,7 +412,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                   <p className="text-sm text-muted-foreground">Remaining</p>
                   <p className={cn(
                     'text-2xl font-bold',
-                    totals.remaining >= 0 ? 'text-green-600' : 'text-red-600',
+                    totals.remaining >= 0 ? 'text-status-success' : 'text-status-critical',
                   )}>{formatCurrency(totals.remaining)}</p>
                 </div>
                 <BarChart3 className="w-8 h-8 text-muted-foreground" />
@@ -431,8 +431,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
             </CardContent>
           </Card>
           <Card className={cn(
-            totals.variance > 0 && 'border-red-200',
-            totals.variance < 0 && 'border-green-200',
+            totals.variance > 0 && 'border-status-critical/30',
+            totals.variance < 0 && 'border-status-success/30',
           )}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -440,15 +440,15 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                   <p className="text-sm text-muted-foreground">Variance</p>
                   <p className={cn(
                     'text-2xl font-bold',
-                    totals.variance > 0 ? 'text-red-600' : totals.variance < 0 ? 'text-green-600' : 'text-foreground',
+                    totals.variance > 0 ? 'text-status-critical' : totals.variance < 0 ? 'text-status-success' : 'text-foreground',
                   )}>
                     {totals.variance > 0 ? '+' : ''}{formatCurrency(totals.variance)}
                   </p>
                 </div>
                 {totals.variance > 0 ? (
-                  <TrendingUp className="w-8 h-8 text-red-400" />
+                  <TrendingUp className="w-8 h-8 text-status-critical" />
                 ) : (
-                  <TrendingDown className="w-8 h-8 text-green-400" />
+                  <TrendingDown className="w-8 h-8 text-status-success" />
                 )}
               </div>
             </CardContent>
@@ -457,13 +457,13 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
 
         {/* Approval / Resolution Banner */}
         {budget.status === 'approved' && budget.approval_resolution && (
-          <Card className="mb-6 border-green-200 bg-green-50">
+          <Card className="mb-6 border-status-success/30 bg-status-success-bg">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-green-600" />
+                <CheckCircle className="w-6 h-6 text-status-success" />
                 <div>
-                  <p className="font-medium text-green-800">Board Approved</p>
-                  <p className="text-sm text-green-600">
+                  <p className="font-medium text-status-success">Board Approved</p>
+                  <p className="text-sm text-status-success">
                     Resolution {budget.approval_resolution.resolution_reference}
                     {budget.approved_by_board_at && ` on ${new Date(budget.approved_by_board_at).toLocaleDateString('en-NZ')}`}
                   </p>
@@ -473,14 +473,14 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
           </Card>
         )}
         {budget.status === 'proposed' && budget.approval_resolution && (
-          <Card className="mb-6 border-yellow-200 bg-yellow-50">
+          <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Clock className="w-6 h-6 text-yellow-600" />
+                  <Clock className="w-6 h-6 text-status-warning" />
                   <div>
-                    <p className="font-medium text-yellow-800">Pending Board Vote</p>
-                    <p className="text-sm text-yellow-600">
+                    <p className="font-medium text-status-warning">Pending Board Vote</p>
+                    <p className="text-sm text-status-warning">
                       Resolution {budget.approval_resolution.resolution_reference} — {budget.approval_resolution.outcome ? `Outcome: ${budget.approval_resolution.outcome}` : 'Voting not yet completed'}
                     </p>
                   </div>
@@ -563,7 +563,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                             placeholder="e.g., Staff salaries"
                             required
                           />
-                          {lineItemForm.errors.description && <p className="text-sm text-red-500 mt-1">{lineItemForm.errors.description}</p>}
+                          {lineItemForm.errors.description && <p className="text-sm text-status-critical mt-1">{lineItemForm.errors.description}</p>}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -612,7 +612,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
               <CardContent>
                 {(budget.line_items || []).length === 0 ? (
                   <div className="text-center py-12">
-                    <DollarSign className="mx-auto h-12 w-12 text-gray-300" />
+                    <DollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-2 text-sm font-semibold text-foreground">No line items</h3>
                     <p className="mt-1 text-sm text-muted-foreground">Get started by adding budget line items to track allocations and spending.</p>
                     {canEdit && (
@@ -660,16 +660,16 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                               <td className="text-right py-2">{formatCurrency(Number(item.actual_amount))}</td>
                               <td className={cn(
                                 'text-right py-2 font-medium',
-                                Number(item.variance_amount) > 0 && 'text-red-600',
-                                Number(item.variance_amount) < 0 && 'text-green-600',
+                                Number(item.variance_amount) > 0 && 'text-status-critical',
+                                Number(item.variance_amount) < 0 && 'text-status-success',
                               )}>
                                 {Number(item.variance_amount) > 0 ? '+' : ''}{formatCurrency(Number(item.variance_amount || 0))}
                               </td>
                               <td className={cn(
                                 'text-right py-2',
                                 Math.abs(variancePct) > 10 && 'font-medium',
-                                variancePct > 10 && 'text-red-600',
-                                variancePct < -10 && 'text-green-600',
+                                variancePct > 10 && 'text-status-critical',
+                                variancePct < -10 && 'text-status-success',
                               )}>
                                 {variancePct > 0 ? '+' : ''}{variancePct.toFixed(1)}%
                                 {Math.abs(variancePct) > 10 && (
@@ -688,7 +688,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                                     </Button>
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
+                                        <Button variant="ghost" size="sm" className="text-status-critical hover:text-status-critical">
                                           <Trash2 className="w-3 h-3" />
                                         </Button>
                                       </AlertDialogTrigger>
@@ -703,7 +703,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                                           <AlertDialogAction
                                             onClick={() => deleteLineItem(item.id)}
-                                            className="bg-red-600 hover:bg-red-700"
+                                            className="bg-status-critical hover:bg-status-critical"
                                           >
                                             Delete
                                           </AlertDialogAction>
@@ -725,8 +725,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                           <td className="text-right py-2">{formatCurrency(totals.actual)}</td>
                           <td className={cn(
                             'text-right py-2',
-                            totals.variance > 0 && 'text-red-600',
-                            totals.variance < 0 && 'text-green-600',
+                            totals.variance > 0 && 'text-status-critical',
+                            totals.variance < 0 && 'text-status-success',
                           )}>
                             {totals.variance > 0 ? '+' : ''}{formatCurrency(totals.variance)}
                           </td>
@@ -804,7 +804,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                             onChange={e => adjustmentForm.setData('amount', e.target.value)}
                             required
                           />
-                          {adjustmentForm.errors.amount && <p className="text-sm text-red-500 mt-1">{adjustmentForm.errors.amount}</p>}
+                          {adjustmentForm.errors.amount && <p className="text-sm text-status-critical mt-1">{adjustmentForm.errors.amount}</p>}
                         </div>
                         <div>
                           <Label>Reason</Label>
@@ -815,7 +815,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                             required
                             placeholder="Explain why this adjustment is needed..."
                           />
-                          {adjustmentForm.errors.reason && <p className="text-sm text-red-500 mt-1">{adjustmentForm.errors.reason}</p>}
+                          {adjustmentForm.errors.reason && <p className="text-sm text-status-critical mt-1">{adjustmentForm.errors.reason}</p>}
                         </div>
                         <p className="text-xs text-muted-foreground">
                           Adjustments exceeding 5% of total budget will require board resolution.
@@ -840,7 +840,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                       <div className="mb-4">
                         <h4 className="text-sm font-semibold text-foreground mb-2">Pending Approvals</h4>
                         {pendingAdjustments.map((adj) => (
-                          <div key={adj.id} className="p-4 border rounded-lg border-yellow-200 bg-yellow-50 mb-2">
+                          <div key={adj.id} className="p-4 border rounded-lg border-status-warning/30 bg-status-warning-bg mb-2">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
@@ -862,7 +862,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="text-green-600 border-green-300 hover:bg-green-50"
+                                  className="text-status-success border-status-success/30 hover:bg-status-success-bg"
                                   onClick={() => approveAdjustment(adj.id)}
                                 >
                                   Approve
@@ -892,8 +892,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                                 )}
                               </div>
                               <Badge className={cn(
-                                adj.status === 'approved' && 'bg-green-100 text-green-800',
-                                adj.status === 'rejected' && 'bg-red-100 text-red-800',
+                                adj.status === 'approved' && 'bg-status-success-bg text-status-success',
+                                adj.status === 'rejected' && 'bg-status-critical-bg text-status-critical',
                               )}>
                                 {adj.status}
                               </Badge>
@@ -926,8 +926,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                           <p className="text-lg font-semibold">{formatCurrency(categoryTotals.budget)}</p>
                           <p className={cn(
                             'text-sm font-medium',
-                            categoryTotals.variance > 0 && 'text-red-600',
-                            categoryTotals.variance < 0 && 'text-green-600',
+                            categoryTotals.variance > 0 && 'text-status-critical',
+                            categoryTotals.variance < 0 && 'text-status-success',
                           )}>
                             Variance: {categoryTotals.variance > 0 ? '+' : ''}{formatCurrency(categoryTotals.variance)}
                           </p>
@@ -957,8 +957,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                                 <td className="text-right py-2">{formatCurrency(Number(item.actual_amount))}</td>
                                 <td className={cn(
                                   'text-right py-2 font-medium',
-                                  Number(item.variance_amount) > 0 && 'text-red-600',
-                                  Number(item.variance_amount) < 0 && 'text-green-600',
+                                  Number(item.variance_amount) > 0 && 'text-status-critical',
+                                  Number(item.variance_amount) < 0 && 'text-status-success',
                                 )}>
                                   {Number(item.variance_amount) > 0 ? '+' : ''}{formatCurrency(Number(item.variance_amount || 0))}
                                 </td>

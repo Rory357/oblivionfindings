@@ -99,7 +99,7 @@ export default function EmailSettings() {
             <Badge
                 dusk={dusk}
                 variant="outline"
-                className="border-emerald-200 bg-emerald-50 text-emerald-700"
+                className="border-status-success/30 bg-status-success-bg text-status-success"
             >
                 <CheckCircle className="mr-1 h-3 w-3" />
                 Connected
@@ -108,7 +108,7 @@ export default function EmailSettings() {
             <Badge
                 dusk={dusk}
                 variant="outline"
-                className="border-amber-200 bg-amber-50 text-amber-700"
+                className="border-status-warning/30 bg-status-warning-bg text-status-warning"
             >
                 <XCircle className="mr-1 h-3 w-3" />
                 Not connected
@@ -124,19 +124,19 @@ export default function EmailSettings() {
                     <Card>
                         <CardContent className="space-y-2 py-4">
                             {flash?.success && (
-                                <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+                                <div className="flex items-center gap-2 text-sm font-medium text-status-success">
                                     <CheckCircle className="h-4 w-4" />
                                     {flash.success}
                                 </div>
                             )}
                             {flash?.warning && (
-                                <div className="flex items-center gap-2 text-sm font-medium text-amber-700">
+                                <div className="flex items-center gap-2 text-sm font-medium text-status-warning">
                                     <XCircle className="h-4 w-4" />
                                     {flash.warning}
                                 </div>
                             )}
                             {flash?.error && (
-                                <div className="flex items-center gap-2 text-sm font-medium text-red-700">
+                                <div className="flex items-center gap-2 text-sm font-medium text-status-critical">
                                     <XCircle className="h-4 w-4" />
                                     {flash.error}
                                 </div>

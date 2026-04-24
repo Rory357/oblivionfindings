@@ -220,7 +220,7 @@ export default function JobBoardIndex({
                                             </p>
                                         )}
                                         {job.replacement ? (
-                                            <p className="mt-1 text-xs text-amber-700">
+                                            <p className="mt-1 text-xs text-status-warning">
                                                 Replacement request:{' '}
                                                 {job.replacement.reason}
                                             </p>
@@ -299,12 +299,12 @@ export default function JobBoardIndex({
                                             ) : null}
                                         </div>
                                         {job.eligibility && !job.eligibility.is_eligible && job.eligibility.blocked_reasons.length > 0 ? (
-                                            <div className="text-xs text-red-600 dark:text-red-400">
+                                            <div className="text-xs text-status-critical dark:text-status-critical">
                                                 {job.eligibility.blocked_reasons[0]}
                                             </div>
                                         ) : null}
                                         {job.eligibility?.first_warning ? (
-                                            <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                                            <div className="text-xs text-status-warning dark:text-status-warning">
                                                 {job.eligibility.first_warning}
                                             </div>
                                         ) : null}

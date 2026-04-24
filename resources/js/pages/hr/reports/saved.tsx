@@ -48,11 +48,11 @@ const breadcrumbs = [
 ];
 
 const typeColors: Record<string, string> = {
-    employee: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
-    leave: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
-    compliance: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+    employee: 'border-status-info/30 text-status-info bg-status-info',
+    leave: 'border-status-warning/30 text-status-warning bg-status-warning',
+    compliance: 'border-status-success/30 text-status-success bg-status-success',
     time: 'border-primary/30 text-primary bg-primary/10',
-    training: 'border-orange-500/30 text-orange-400 bg-orange-500/10',
+    training: 'border-status-warning/30 text-status-warning bg-status-warning',
 };
 
 export default function SavedReports({ reports, sources }: Props) {
@@ -200,7 +200,7 @@ export default function SavedReports({ reports, sources }: Props) {
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => handleDelete(report.id)}
-                                                    className="text-red-400 hover:text-red-300"
+                                                    className="text-status-critical hover:text-status-critical"
                                                 >
                                                     <Trash2 className="h-3 w-3" />
                                                 </Button>

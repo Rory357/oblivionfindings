@@ -147,7 +147,7 @@ export default function MileageIndex({ claims = { data: [], links: [], current_p
                                         <Badge variant={STATUS_VARIANTS[claim.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">
                                             {claim.status}
                                         </Badge>
-                                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                                        <span className="text-sm font-semibold text-status-success dark:text-status-success">
                                             {nzd.format(claim.amount)}
                                         </span>
                                     </div>

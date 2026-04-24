@@ -114,8 +114,8 @@ export default function Documents({ client, documents }: Props) {
 
     const fileIcon = (mime: string) => {
         if (mime.startsWith('image/')) return <FileImage className="h-5 w-5 text-primary" />;
-        if (mime.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
-        return <File className="h-5 w-5 text-blue-500" />;
+        if (mime.includes('pdf')) return <FileText className="h-5 w-5 text-status-critical" />;
+        return <File className="h-5 w-5 text-status-info" />;
     };
 
     return (
@@ -197,7 +197,7 @@ export default function Documents({ client, documents }: Props) {
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-red-500"
+                                            className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-status-critical"
                                             onClick={() => {
                                                 form.setData('file', null);
                                                 if (fileInputRef.current) fileInputRef.current.value = '';
@@ -208,7 +208,7 @@ export default function Documents({ client, documents }: Props) {
                                     </div>
                                 )}
                                 {form.errors.file && (
-                                    <p className="text-xs text-red-500">{form.errors.file}</p>
+                                    <p className="text-xs text-status-critical">{form.errors.file}</p>
                                 )}
 
                                 <div>
@@ -220,7 +220,7 @@ export default function Documents({ client, documents }: Props) {
                                         placeholder="e.g. GP Letter - April 2026"
                                     />
                                     {form.errors.title && (
-                                        <p className="mt-1 text-xs text-red-500">{form.errors.title}</p>
+                                        <p className="mt-1 text-xs text-status-critical">{form.errors.title}</p>
                                     )}
                                 </div>
                                 <div>

@@ -116,7 +116,7 @@ export default function HealthSummaryCard({
         <Card>
             <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm">
-                    <Activity className="h-4 w-4 text-emerald-600" />
+                    <Activity className="h-4 w-4 text-status-success" />
                     Health Summary
                 </CardTitle>
             </CardHeader>
@@ -183,7 +183,7 @@ export default function HealthSummaryCard({
                 {/* Recent events */}
                 {events.count > 0 && (
                     <div className="flex items-center gap-2 border-t pt-2 text-xs">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                        <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
                         <span className="text-muted-foreground">
                             {events.count} event{events.count !== 1 ? 's' : ''}{' '}
                             (30d)

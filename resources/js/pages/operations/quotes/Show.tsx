@@ -77,7 +77,7 @@ export default function QuoteShow({ quote }: Props) {
                 <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={STATUS_COLORS[quote.status] as any ?? 'outline'} className="capitalize">{quote.status}</Badge>
                     {quote.valid_until && (
-                        <span className={`flex items-center gap-1 text-xs ${new Date(quote.valid_until) < new Date() ? 'font-medium text-amber-600' : 'text-muted-foreground'}`}>
+                        <span className={`flex items-center gap-1 text-xs ${new Date(quote.valid_until) < new Date() ? 'font-medium text-status-warning' : 'text-muted-foreground'}`}>
                             <CalendarDays className="h-3 w-3" /> Valid until: {formatDate(quote.valid_until)}
                         </span>
                     )}

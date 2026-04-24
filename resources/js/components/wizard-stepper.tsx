@@ -22,7 +22,7 @@ export default function WizardStepper({ steps, current }: Props) {
                             <span
                                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                                     isComplete
-                                        ? 'bg-emerald-500 text-white'
+                                        ? 'bg-status-success text-white'
                                         : isCurrent
                                           ? 'bg-primary text-primary-foreground'
                                           : 'bg-muted text-muted-foreground'
@@ -42,7 +42,7 @@ export default function WizardStepper({ steps, current }: Props) {
                         {index < steps.length - 1 && (
                             <span
                                 className={`h-0.5 flex-1 rounded-full ${
-                                    isComplete ? 'bg-emerald-500' : 'bg-muted'
+                                    isComplete ? 'bg-status-success' : 'bg-muted'
                                 }`}
                             />
                         )}

@@ -138,12 +138,12 @@ const KUDOS_ICONS: Record<string, typeof Star> = {
 };
 
 const KUDOS_COLORS: Record<string, string> = {
-    teamwork: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
-    innovation: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+    teamwork: 'bg-status-info-bg text-status-info border-status-info/30',
+    innovation: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     leadership: 'bg-primary/10 text-primary border-primary/30',
-    customer_focus: 'bg-pink-500/10 text-pink-600 border-pink-500/30',
-    going_above: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
-    other: 'bg-slate-500/10 text-muted-foreground border-slate-500/30',
+    customer_focus: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    going_above: 'bg-status-success-bg text-status-success border-status-success/30',
+    other: 'bg-muted-foreground/80/10 text-muted-foreground border-border/30',
 };
 
 const GOAL_STATUS: Record<string, { label: string; color: string }> = {
@@ -266,12 +266,12 @@ export default function DirectoryShow({
                                         </Badge>
                                     )}
                                     {employee.is_first_aider && (
-                                        <Badge className="bg-emerald-500/20 text-emerald-200 border-emerald-400/30 text-xs">
+                                        <Badge className="bg-status-success-bg text-status-success border-status-success/30 text-xs">
                                             <Heart className="mr-1 h-3 w-3" /> First Aider
                                         </Badge>
                                     )}
                                     {employee.is_fire_warden && (
-                                        <Badge className="bg-orange-500/20 text-orange-200 border-orange-400/30 text-xs">
+                                        <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30 text-xs">
                                             <Flame className="mr-1 h-3 w-3" /> Fire Warden
                                         </Badge>
                                     )}
@@ -336,13 +336,13 @@ export default function DirectoryShow({
                                     <span className="text-[10px] text-white/60">Years</span>
                                 </div>
                                 <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
-                                    <Award className="h-5 w-5 text-amber-300 mb-1" />
+                                    <Award className="h-5 w-5 text-status-warning mb-1" />
                                     <span className="text-2xl font-bold text-white">{kudosCount}</span>
                                     <span className="text-[10px] text-white/60">Kudos</span>
                                 </div>
                                 {complianceRate != null && (
                                     <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
-                                        <Shield className="h-5 w-5 text-emerald-300 mb-1" />
+                                        <Shield className="h-5 w-5 text-status-success mb-1" />
                                         <span className="text-2xl font-bold text-white">{complianceRate}%</span>
                                         <span className="text-[10px] text-white/60">Compliant</span>
                                     </div>
@@ -355,21 +355,21 @@ export default function DirectoryShow({
                 {/* Mobile stat cards (hidden on lg) */}
                 <div className="grid gap-3 grid-cols-3 lg:hidden">
                     <Card className="overflow-hidden">
-                        <div className="h-1 bg-blue-500" />
+                        <div className="h-1 bg-status-info" />
                         <CardContent className="p-3 text-center">
                             <p className="text-xl font-bold">{tenure ? `${tenure.years}.${tenure.months}` : '\u2014'}</p>
                             <p className="text-[10px] text-muted-foreground">Years</p>
                         </CardContent>
                     </Card>
                     <Card className="overflow-hidden">
-                        <div className="h-1 bg-amber-500" />
+                        <div className="h-1 bg-status-warning" />
                         <CardContent className="p-3 text-center">
                             <p className="text-xl font-bold">{kudosCount}</p>
                             <p className="text-[10px] text-muted-foreground">Kudos (30d)</p>
                         </CardContent>
                     </Card>
                     <Card className="overflow-hidden">
-                        <div className="h-1 bg-emerald-500" />
+                        <div className="h-1 bg-status-success" />
                         <CardContent className="p-3 text-center">
                             <p className="text-xl font-bold">{complianceRate != null ? `${complianceRate}%` : '\u2014'}</p>
                             <p className="text-[10px] text-muted-foreground">Compliance</p>
@@ -389,8 +389,8 @@ export default function DirectoryShow({
                                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                     {employee.email && (
                                         <a href={`mailto:${employee.email}`} className="flex items-center gap-3 rounded-lg p-3 bg-muted/30 hover:bg-muted/60 transition-colors">
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
-                                                <Mail className="h-4 w-4 text-blue-600" />
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
+                                                <Mail className="h-4 w-4 text-status-info" />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-[10px] text-muted-foreground">Email</p>
@@ -400,8 +400,8 @@ export default function DirectoryShow({
                                     )}
                                     {employee.phone && (
                                         <a href={`tel:${employee.phone}`} className="flex items-center gap-3 rounded-lg p-3 bg-muted/30 hover:bg-muted/60 transition-colors">
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
-                                                <Phone className="h-4 w-4 text-emerald-600" />
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-success">
+                                                <Phone className="h-4 w-4 text-status-success" />
                                             </div>
                                             <div>
                                                 <p className="text-[10px] text-muted-foreground">Phone</p>
@@ -421,8 +421,8 @@ export default function DirectoryShow({
                                         </div>
                                     )}
                                     <div className="flex items-center gap-3 rounded-lg p-3 bg-muted/30">
-                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
-                                            <Calendar className="h-4 w-4 text-amber-600" />
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-warning">
+                                            <Calendar className="h-4 w-4 text-status-warning" />
                                         </div>
                                         <div>
                                             <p className="text-[10px] text-muted-foreground">Start Date</p>
@@ -430,8 +430,8 @@ export default function DirectoryShow({
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3 rounded-lg p-3 bg-muted/30">
-                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/10">
-                                            <Briefcase className="h-4 w-4 text-cyan-600" />
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
+                                            <Briefcase className="h-4 w-4 text-status-info" />
                                         </div>
                                         <div>
                                             <p className="text-[10px] text-muted-foreground">Employment</p>
@@ -440,8 +440,8 @@ export default function DirectoryShow({
                                     </div>
                                     {employee.department && (
                                         <div className="flex items-center gap-3 rounded-lg p-3 bg-muted/30">
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-pink-500/10">
-                                                <Users className="h-4 w-4 text-pink-600" />
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical">
+                                                <Users className="h-4 w-4 text-status-critical" />
                                             </div>
                                             <div>
                                                 <p className="text-[10px] text-muted-foreground">Department</p>
@@ -451,8 +451,8 @@ export default function DirectoryShow({
                                     )}
                                     {employee.cellphone && employee.cellphone !== employee.phone && (
                                         <a href={`tel:${employee.cellphone}`} className="flex items-center gap-3 rounded-lg p-3 bg-muted/30 hover:bg-muted/60 transition-colors">
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500/10">
-                                                <Phone className="h-4 w-4 text-teal-600" />
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
+                                                <Phone className="h-4 w-4 text-status-info" />
                                             </div>
                                             <div>
                                                 <p className="text-[10px] text-muted-foreground">Mobile</p>
@@ -489,7 +489,7 @@ export default function DirectoryShow({
                             <CardHeader className="pb-2">
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="flex items-center gap-2 text-sm">
-                                        <Sparkles className="h-4 w-4 text-amber-500" />
+                                        <Sparkles className="h-4 w-4 text-status-warning" />
                                         Recognition
                                         {kudosReceived.length > 0 && (
                                             <Badge variant="secondary" className="ml-1">{kudosReceived.length}</Badge>
@@ -566,25 +566,25 @@ export default function DirectoryShow({
                                         <div className="flex-1 space-y-2">
                                             {complianceSummary.compliant > 0 && (
                                                 <div className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Compliant</span>
+                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-status-success" />Compliant</span>
                                                     <span className="font-medium">{complianceSummary.compliant}</span>
                                                 </div>
                                             )}
                                             {complianceSummary.expiring_soon > 0 && (
                                                 <div className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />Expiring Soon</span>
-                                                    <span className="font-medium text-amber-600">{complianceSummary.expiring_soon}</span>
+                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-status-warning" />Expiring Soon</span>
+                                                    <span className="font-medium text-status-warning">{complianceSummary.expiring_soon}</span>
                                                 </div>
                                             )}
                                             {complianceSummary.expired > 0 && (
                                                 <div className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-red-500" />Expired</span>
-                                                    <span className="font-medium text-red-600">{complianceSummary.expired}</span>
+                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-status-critical" />Expired</span>
+                                                    <span className="font-medium text-status-critical">{complianceSummary.expired}</span>
                                                 </div>
                                             )}
                                             {complianceSummary.not_started > 0 && (
                                                 <div className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" />Not Started</span>
+                                                    <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-muted" />Not Started</span>
                                                     <span className="font-medium">{complianceSummary.not_started}</span>
                                                 </div>
                                             )}
@@ -755,7 +755,7 @@ export default function DirectoryShow({
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-2">
-                                <Sparkles className="h-5 w-5 text-amber-500" />
+                                <Sparkles className="h-5 w-5 text-status-warning" />
                                 Send Kudos to {employee.name.split(' ')[0]}
                             </DialogTitle>
                         </DialogHeader>
@@ -783,7 +783,7 @@ export default function DirectoryShow({
                             </div>
                             <div>
                                 <Label htmlFor="kudos-msg" className="text-xs font-medium">
-                                    Message <span className="text-red-500">*</span>
+                                    Message <span className="text-status-critical">*</span>
                                 </Label>
                                 <Textarea
                                     id="kudos-msg"
@@ -802,7 +802,7 @@ export default function DirectoryShow({
                             <Button
                                 onClick={sendKudos}
                                 disabled={!kudosMessage.trim() || kudosSending}
-                                className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600"
+                                className="gap-2 bg-gradient-to-r from-status-warning to-status-warning text-white hover:from-status-warning hover:to-status-warning"
                             >
                                 <Sparkles className="h-4 w-4" />
                                 {kudosSending ? 'Sending...' : 'Send Kudos'}

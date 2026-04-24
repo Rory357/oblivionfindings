@@ -27,7 +27,7 @@ const VISIBILITY_BADGE: Record<string, { label: string; className: string }> = {
     },
     include_family: {
         label: 'Family Visible',
-        className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+        className: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     },
     private: {
         label: 'Private',
@@ -36,10 +36,10 @@ const VISIBILITY_BADGE: Record<string, { label: string; className: string }> = {
 };
 
 function moodColor(rating: number): string {
-    if (rating <= 3) return 'bg-red-500';
-    if (rating <= 6) return 'bg-amber-500';
-    if (rating <= 8) return 'bg-blue-500';
-    return 'bg-emerald-500';
+    if (rating <= 3) return 'bg-status-critical';
+    if (rating <= 6) return 'bg-status-warning';
+    if (rating <= 8) return 'bg-status-info';
+    return 'bg-status-success';
 }
 
 function relativeTime(dateStr: string): string {
@@ -77,7 +77,7 @@ export function ProgressNoteEntry({ note, compact = false }: ProgressNoteEntryPr
 
     if (compact) {
         return (
-            <div className={`flex items-center gap-2 py-1.5 px-2 rounded-md text-xs ${note.is_flagged ? 'bg-red-50 dark:bg-red-950/20 border-l-2 border-l-red-500' : ''}`}>
+            <div className={`flex items-center gap-2 py-1.5 px-2 rounded-md text-xs ${note.is_flagged ? 'bg-status-critical-bg dark:bg-status-critical border-l-2 border-l-red-500' : ''}`}>
                 {note.author && (
                     <div className="h-5 w-5 shrink-0 rounded-full bg-primary/10 dark:bg-primary/40 flex items-center justify-center">
                         <span className="text-[8px] font-semibold text-primary dark:text-primary/70">
@@ -127,9 +127,9 @@ export function ProgressNoteEntry({ note, compact = false }: ProgressNoteEntryPr
                         )}
                         {note.is_flagged && (
                             <div className="relative group">
-                                <Flag className="h-3.5 w-3.5 text-red-500" />
+                                <Flag className="h-3.5 w-3.5 text-status-critical" />
                                 {note.flagged_reason && (
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 rounded bg-slate-900 dark:bg-muted px-2 py-1 text-[10px] text-white dark:text-foreground whitespace-nowrap shadow-lg">
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10 rounded bg-muted dark:bg-muted px-2 py-1 text-[10px] text-white dark:text-foreground whitespace-nowrap shadow-lg">
                                         {note.flagged_reason}
                                     </div>
                                 )}

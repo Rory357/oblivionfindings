@@ -359,7 +359,7 @@ function ManagerDashboard({ props }: { props: Props }) {
                         <CardContent>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                                 <div>
-                                    <p className="text-2xl font-bold text-emerald-600">{props.emarWidgets.adminRate}%</p>
+                                    <p className="text-2xl font-bold text-status-success">{props.emarWidgets.adminRate}%</p>
                                     <p className="text-[10px] text-muted-foreground">Admin Rate</p>
                                 </div>
                                 <div>
@@ -367,7 +367,7 @@ function ManagerDashboard({ props }: { props: Props }) {
                                     <p className="text-[10px] text-muted-foreground">Pending</p>
                                 </div>
                                 <div>
-                                    <p className={`text-2xl font-bold ${props.emarWidgets.activeAlerts > 0 ? 'text-amber-600' : ''}`}>{props.emarWidgets.activeAlerts}</p>
+                                    <p className={`text-2xl font-bold ${props.emarWidgets.activeAlerts > 0 ? 'text-status-warning' : ''}`}>{props.emarWidgets.activeAlerts}</p>
                                     <p className="text-[10px] text-muted-foreground">Alerts</p>
                                 </div>
                             </div>

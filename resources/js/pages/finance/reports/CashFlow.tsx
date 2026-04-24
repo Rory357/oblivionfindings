@@ -67,7 +67,7 @@ function CashFlowSection({
                 <TableRow key={`${title}-${idx}`}>
                     <TableCell className="pl-8">{entry.account_name}</TableCell>
                     <TableCell
-                        className={`text-right ${entry.amount < 0 ? 'text-red-600 dark:text-red-400' : ''}`}
+                        className={`text-right ${entry.amount < 0 ? 'text-status-critical dark:text-status-critical' : ''}`}
                     >
                         {formatCurrency(entry.amount)}
                     </TableCell>
@@ -83,7 +83,7 @@ function CashFlowSection({
             <TableRow className="border-t font-semibold">
                 <TableCell>Net {title}</TableCell>
                 <TableCell
-                    className={`text-right ${total < 0 ? 'text-red-600 dark:text-red-400' : ''}`}
+                    className={`text-right ${total < 0 ? 'text-status-critical dark:text-status-critical' : ''}`}
                 >
                     {formatCurrency(total)}
                 </TableCell>
@@ -146,15 +146,15 @@ export default function CashFlow({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.total_operating >= 0
-                                        ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                                        : 'bg-red-100 dark:bg-red-900/30'
+                                        ? 'bg-status-success-bg dark:bg-status-success'
+                                        : 'bg-status-critical-bg dark:bg-status-critical'
                                 }`}
                             >
                                 <ArrowUpCircle
                                     className={`h-5 w-5 ${
                                         report.total_operating >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 />
                             </div>
@@ -163,8 +163,8 @@ export default function CashFlow({ report, filters }: Props) {
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.total_operating >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
                                     {formatCurrency(report.total_operating)}
@@ -177,15 +177,15 @@ export default function CashFlow({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.total_investing >= 0
-                                        ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                                        : 'bg-red-100 dark:bg-red-900/30'
+                                        ? 'bg-status-success-bg dark:bg-status-success'
+                                        : 'bg-status-critical-bg dark:bg-status-critical'
                                 }`}
                             >
                                 <ArrowDownCircle
                                     className={`h-5 w-5 ${
                                         report.total_investing >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 />
                             </div>
@@ -194,8 +194,8 @@ export default function CashFlow({ report, filters }: Props) {
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.total_investing >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
                                     {formatCurrency(report.total_investing)}
@@ -208,15 +208,15 @@ export default function CashFlow({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.total_financing >= 0
-                                        ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                                        : 'bg-red-100 dark:bg-red-900/30'
+                                        ? 'bg-status-success-bg dark:bg-status-success'
+                                        : 'bg-status-critical-bg dark:bg-status-critical'
                                 }`}
                             >
                                 <TrendingUp
                                     className={`h-5 w-5 ${
                                         report.total_financing >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 />
                             </div>
@@ -225,8 +225,8 @@ export default function CashFlow({ report, filters }: Props) {
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.total_financing >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
                                     {formatCurrency(report.total_financing)}
@@ -239,15 +239,15 @@ export default function CashFlow({ report, filters }: Props) {
                             <div
                                 className={`rounded-full p-3 ${
                                     report.net_cash_change >= 0
-                                        ? 'bg-emerald-100 dark:bg-emerald-900/30'
-                                        : 'bg-red-100 dark:bg-red-900/30'
+                                        ? 'bg-status-success-bg dark:bg-status-success'
+                                        : 'bg-status-critical-bg dark:bg-status-critical'
                                 }`}
                             >
                                 <Wallet
                                     className={`h-5 w-5 ${
                                         report.net_cash_change >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 />
                             </div>
@@ -256,8 +256,8 @@ export default function CashFlow({ report, filters }: Props) {
                                 <p
                                     className={`text-2xl font-bold ${
                                         report.net_cash_change >= 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-red-600 dark:text-red-400'
+                                            ? 'text-status-success dark:text-status-success'
+                                            : 'text-status-critical dark:text-status-critical'
                                     }`}
                                 >
                                     {formatCurrency(report.net_cash_change)}
@@ -391,8 +391,8 @@ export default function CashFlow({ report, filters }: Props) {
                                     <TableCell
                                         className={`text-right ${
                                             report.net_cash_change >= 0
-                                                ? 'text-emerald-600 dark:text-emerald-400'
-                                                : 'text-red-600 dark:text-red-400'
+                                                ? 'text-status-success dark:text-status-success'
+                                                : 'text-status-critical dark:text-status-critical'
                                         }`}
                                     >
                                         {formatCurrency(report.net_cash_change)}

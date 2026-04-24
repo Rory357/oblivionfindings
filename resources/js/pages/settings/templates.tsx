@@ -64,8 +64,8 @@ const CATEGORIES = ['All', 'Operations', 'HR', 'Incidents', 'System'] as const;
 
 const CATEGORY_CONFIG: Record<string, { colour: string; bg: string; icon: typeof Briefcase }> = {
     operations: { colour: 'text-primary dark:text-primary', bg: 'bg-primary/10 dark:bg-primary/40', icon: Briefcase },
-    hr: { colour: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/40', icon: Users },
-    incidents: { colour: 'text-red-700 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/40', icon: AlertTriangle },
+    hr: { colour: 'text-status-info dark:text-status-info', bg: 'bg-status-info-bg dark:bg-status-info', icon: Users },
+    incidents: { colour: 'text-status-critical dark:text-status-critical', bg: 'bg-status-critical-bg dark:bg-status-critical', icon: AlertTriangle },
     system: { colour: 'text-foreground dark:text-muted-foreground', bg: 'bg-muted dark:bg-muted/60', icon: Shield },
 };
 
@@ -139,9 +139,9 @@ function smsSegments(length: number): number {
 }
 
 function charCountColour(length: number): string {
-    if (length <= 160) return 'text-emerald-600 dark:text-emerald-400';
-    if (length <= 320) return 'text-amber-600 dark:text-amber-400';
-    return 'text-red-600 dark:text-red-400';
+    if (length <= 160) return 'text-status-success dark:text-status-success';
+    if (length <= 320) return 'text-status-warning dark:text-status-warning';
+    return 'text-status-critical dark:text-status-critical';
 }
 
 function renderWithSampleData(text: string, orgName: string): string {
@@ -277,7 +277,7 @@ function TemplateCard({
                                 {template.category}
                             </Badge>
                             {template.is_active ? (
-                                <Badge className="bg-emerald-100 text-[10px] text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                <Badge className="bg-status-success-bg text-[10px] text-status-success dark:bg-status-success-bg dark:text-status-success">
                                     Active
                                 </Badge>
                             ) : (
@@ -366,9 +366,9 @@ function TemplateCard({
 function PhoneMockup({ message }: { message: string }) {
     return (
         <div className="mx-auto w-64">
-            <div className="rounded-[2rem] border-4 border-slate-800 bg-muted p-4 dark:border-slate-600 dark:bg-muted">
+            <div className="rounded-[2rem] border-4 border-slate-800 bg-muted p-4 dark:border-border dark:bg-muted">
                 {/* Notch */}
-                <div className="mx-auto mb-3 h-5 w-20 rounded-full bg-slate-800 dark:bg-slate-600" />
+                <div className="mx-auto mb-3 h-5 w-20 rounded-full bg-muted dark:bg-muted-foreground/80" />
                 {/* Screen */}
                 <div className="min-h-[200px] rounded-xl bg-white p-3 dark:bg-muted">
                     <p className="mb-2 text-center text-[10px] text-muted-foreground">Today 09:00</p>
@@ -377,7 +377,7 @@ function PhoneMockup({ message }: { message: string }) {
                     </div>
                 </div>
                 {/* Home bar */}
-                <div className="mx-auto mt-3 h-1 w-16 rounded-full bg-slate-800 dark:bg-slate-600" />
+                <div className="mx-auto mt-3 h-1 w-16 rounded-full bg-muted dark:bg-muted-foreground/80" />
             </div>
         </div>
     );
@@ -613,7 +613,7 @@ function TemplateSettings() {
                 <Button onClick={handleSave} className="bg-primary hover:bg-primary">
                     {saved ? 'Saved!' : 'Save Settings'}
                 </Button>
-                {saved && <span className="text-sm text-emerald-600">Settings saved successfully</span>}
+                {saved && <span className="text-sm text-status-success">Settings saved successfully</span>}
             </div>
         </div>
     );
@@ -742,10 +742,10 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
                 setPreviewHtml(data.html ?? '');
                 setPreviewSubject(data.subject ?? '');
             } else {
-                setPreviewHtml('<p class="text-red-500">Failed to load preview.</p>');
+                setPreviewHtml('<p class="text-status-critical">Failed to load preview.</p>');
             }
         } catch {
-            setPreviewHtml('<p class="text-red-500">Network error loading preview.</p>');
+            setPreviewHtml('<p class="text-status-critical">Network error loading preview.</p>');
         } finally {
             setPreviewLoading(false);
         }
@@ -789,7 +789,7 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
             {/* Flash toast */}
             {flash && (
                 <div className="fixed right-4 top-4 z-50 animate-in fade-in slide-in-from-top-2">
-                    <div className="rounded-lg border bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg dark:bg-emerald-900/40 dark:text-emerald-300">
+                    <div className="rounded-lg border bg-status-success-bg px-4 py-3 text-sm font-medium text-status-success shadow-lg dark:bg-status-success-bg dark:text-status-success">
                         {flash}
                     </div>
                 </div>
@@ -814,8 +814,8 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
                 {/* Stats */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <StatCard label="Total Templates" value={templates.length} colour="bg-primary" icon={Hash} />
-                    <StatCard label="Email Templates" value={emailTemplates.length} colour="bg-blue-600" icon={Mail} />
-                    <StatCard label="SMS Templates" value={smsTemplates.length} colour="bg-emerald-600" icon={Smartphone} />
+                    <StatCard label="Email Templates" value={emailTemplates.length} colour="bg-status-info" icon={Mail} />
+                    <StatCard label="SMS Templates" value={smsTemplates.length} colour="bg-status-success" icon={Smartphone} />
                 </div>
 
                 {/* Tabs */}
@@ -992,7 +992,7 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
                     </DialogHeader>
 
                     {/* Info banner */}
-                    <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                    <div className="rounded-md border border-status-info/30 bg-status-info-bg px-4 py-2.5 text-xs text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                         <strong>Note:</strong> This preview is rendered using your actual account data and merge fields.
                     </div>
 

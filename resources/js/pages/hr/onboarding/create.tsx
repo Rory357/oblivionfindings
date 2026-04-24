@@ -92,7 +92,7 @@ export default function CreateOnboarding({ employees }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.employee_profile_id && (
-                                        <p className="text-sm text-red-500">{errors.employee_profile_id}</p>
+                                        <p className="text-sm text-status-critical">{errors.employee_profile_id}</p>
                                     )}
                                 </div>
 

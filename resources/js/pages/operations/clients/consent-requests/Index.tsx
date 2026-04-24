@@ -29,9 +29,9 @@ type Props = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-800',
-    approved: 'bg-emerald-100 text-emerald-800',
-    declined: 'bg-red-100 text-red-800',
+    pending: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-success-bg text-status-success',
+    declined: 'bg-status-critical-bg text-status-critical',
     cancelled: 'bg-muted text-muted-foreground',
     expired: 'bg-muted text-muted-foreground',
 };
@@ -95,7 +95,7 @@ export default function ConsentRequestsIndex({ client, requests = [], stats }: P
                                                 </Link>
                                                 <Badge className={STATUS_STYLES[r.status] ?? 'bg-muted'}>{r.status}</Badge>
                                                 {r.is_expired && r.status === 'pending' && (
-                                                    <Badge className="bg-red-100 text-red-700">overdue</Badge>
+                                                    <Badge className="bg-status-critical-bg text-status-critical">overdue</Badge>
                                                 )}
                                             </div>
                                             <div className="mt-1 text-sm text-muted-foreground">
@@ -143,9 +143,9 @@ function StatCard({
 }) {
     const toneClass: Record<string, string> = {
         slate: 'text-muted-foreground',
-        amber: 'text-amber-600',
-        emerald: 'text-emerald-600',
-        red: 'text-red-600',
+        amber: 'text-status-warning',
+        emerald: 'text-status-success',
+        red: 'text-status-critical',
     };
     return (
         <Card>

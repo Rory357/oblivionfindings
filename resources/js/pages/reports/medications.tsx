@@ -226,7 +226,7 @@ export default function MedicationsReport(props: Props) {
                                         <div className="text-sm font-medium">
                                             {d.client?.first_name} {d.client?.last_name} — {d.medication?.name}
                                         </div>
-                                        <div className={`text-xs ${d.status === 'open' ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                        <div className={`text-xs ${d.status === 'open' ? 'text-status-warning' : 'text-muted-foreground'}`}>
                                             {d.status}
                                         </div>
                                     </div>

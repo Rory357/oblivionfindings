@@ -36,7 +36,7 @@ const reviewTypeLabels: Record<string, { label: string; desc: string }> = {
     self: { label: 'Self Assessment', desc: 'Self-reflection on own performance' },
 };
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-rose-500', 'bg-primary'];
+const AVATAR_COLORS = ['bg-status-info', 'bg-primary', 'bg-status-success', 'bg-status-warning', 'bg-status-critical', 'bg-status-info', 'bg-status-critical', 'bg-primary'];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 function slugify(text: string) { return text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 100); }
@@ -123,7 +123,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                 <form onSubmit={submit} className="mx-auto max-w-3xl space-y-6">
                     {/* Step 1: Template Selection */}
                     <Card className="overflow-hidden">
-                        <CardHeader className="border-b bg-gradient-to-r from-indigo-50 to-transparent pb-3">
+                        <CardHeader className="border-b bg-gradient-to-r from-primary/10 to-transparent pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-base">
                                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">1</div>
@@ -156,7 +156,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                             </div>
                             {templates.length === 0 && (
                                 <div className="py-6 text-center">
-                                    <FileText className="mx-auto mb-2 h-8 w-8 text-slate-200" />
+                                    <FileText className="mx-auto mb-2 h-8 w-8 text-foreground" />
                                     <p className="text-sm text-muted-foreground">No templates yet. The default questions will be used.</p>
                                 </div>
                             )}
@@ -165,7 +165,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
 
                     {/* Step 2: Employee & Type */}
                     <Card className="overflow-hidden">
-                        <CardHeader className="border-b bg-gradient-to-r from-violet-50 to-transparent pb-3">
+                        <CardHeader className="border-b bg-gradient-to-r from-primary/10 to-transparent pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">2</div>
                                 Select Employee & Review Type
@@ -179,7 +179,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                                         <SelectTrigger><SelectValue placeholder="Select an employee" /></SelectTrigger>
                                         <SelectContent>{employees.map(emp => <SelectItem key={emp.id} value={String(emp.id)}>{emp.name}</SelectItem>)}</SelectContent>
                                     </Select>
-                                    {form.errors.subject_user_id && <p className="text-xs text-red-600">{form.errors.subject_user_id}</p>}
+                                    {form.errors.subject_user_id && <p className="text-xs text-status-critical">{form.errors.subject_user_id}</p>}
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label>Review Type *</Label>
@@ -187,7 +187,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                                         <SelectTrigger><SelectValue placeholder="Select review type" /></SelectTrigger>
                                         <SelectContent>{reviewTypes.map(type => <SelectItem key={type} value={type}>{reviewTypeLabels[type]?.label || type}</SelectItem>)}</SelectContent>
                                     </Select>
-                                    {form.errors.review_type && <p className="text-xs text-red-600">{form.errors.review_type}</p>}
+                                    {form.errors.review_type && <p className="text-xs text-status-critical">{form.errors.review_type}</p>}
                                     {form.data.review_type && reviewTypeLabels[form.data.review_type] && (
                                         <p className="text-[11px] text-muted-foreground">{reviewTypeLabels[form.data.review_type].desc}</p>
                                     )}
@@ -198,20 +198,20 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
 
                     {/* Step 3: Select Reviewers */}
                     <Card className="overflow-hidden">
-                        <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-transparent pb-3">
+                        <CardHeader className="border-b bg-gradient-to-r from-status-info-bg to-transparent pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">3</div>
+                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-status-info text-[11px] font-bold text-white">3</div>
                                     {isSelfAssessment ? 'Reviewer' : 'Select Reviewers'}
                                 </CardTitle>
-                                {!isSelfAssessment && form.data.reviewer_user_ids.length > 0 && <Badge className="bg-blue-100 text-blue-700 border-0">{form.data.reviewer_user_ids.length} selected</Badge>}
+                                {!isSelfAssessment && form.data.reviewer_user_ids.length > 0 && <Badge className="bg-status-info-bg text-status-info border-0">{form.data.reviewer_user_ids.length} selected</Badge>}
                             </div>
                         </CardHeader>
                         <CardContent className="pt-4">
-                            {form.errors.reviewer_user_ids && <p className="mb-3 text-xs text-red-600">{form.errors.reviewer_user_ids}</p>}
+                            {form.errors.reviewer_user_ids && <p className="mb-3 text-xs text-status-critical">{form.errors.reviewer_user_ids}</p>}
                             {isSelfAssessment ? (
                                 /* Self-assessment: auto-assigned to subject */
-                                <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                                <div className="flex items-center gap-3 rounded-xl border border-status-info/30 bg-status-info-bg p-4">
                                     {selectedSubject ? (
                                         <>
                                             <div className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColor(parseInt(form.data.subject_user_id) || 0)}`}>
@@ -221,7 +221,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                                                 <p className="text-sm font-semibold">{selectedSubject.name}</p>
                                                 <p className="text-[11px] text-muted-foreground">Self-assessment — the employee will review their own performance</p>
                                             </div>
-                                            <CheckCircle2 className="ml-auto h-5 w-5 text-blue-500" />
+                                            <CheckCircle2 className="ml-auto h-5 w-5 text-status-info" />
                                         </>
                                     ) : (
                                         <p className="text-sm text-muted-foreground">Select an employee above — they will be assigned as their own reviewer</p>
@@ -229,7 +229,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                                 </div>
                             ) : !form.data.subject_user_id ? (
                                 <div className="flex flex-col items-center gap-2 py-8">
-                                    <User className="h-8 w-8 text-slate-200" />
+                                    <User className="h-8 w-8 text-foreground" />
                                     <p className="text-sm text-muted-foreground">Select an employee first to see available reviewers</p>
                                 </div>
                             ) : (
@@ -244,7 +244,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                                             return (
                                                 <label
                                                     key={emp.id}
-                                                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition-all ${selected ? 'border-blue-300 bg-blue-50/50 shadow-sm' : 'hover:bg-muted/50'}`}
+                                                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 transition-all ${selected ? 'border-status-info/30 bg-status-info-bg shadow-sm' : 'hover:bg-muted/50'}`}
                                                     onClick={() => toggleReviewer(String(emp.id))}
                                                 >
                                                     <Checkbox
@@ -256,7 +256,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                                                         {getInitials(emp.name)}
                                                     </div>
                                                     <span className="text-sm font-medium">{emp.name}</span>
-                                                    {selected && <CheckCircle2 className="ml-auto h-4 w-4 text-blue-500" />}
+                                                    {selected && <CheckCircle2 className="ml-auto h-4 w-4 text-status-info" />}
                                                 </label>
                                             );
                                         })}
@@ -268,9 +268,9 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
 
                     {/* Step 4: Questions Preview */}
                     <Card className="overflow-hidden">
-                        <CardHeader className="border-b bg-gradient-to-r from-emerald-50 to-transparent pb-3">
+                        <CardHeader className="border-b bg-gradient-to-r from-status-success-bg to-transparent pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white">4</div>
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-status-success text-[11px] font-bold text-white">4</div>
                                 Review Questions
                                 {selectedTemplate && <Badge variant="outline" className="text-[9px]">{selectedTemplate.name}</Badge>}
                             </CardTitle>
@@ -280,7 +280,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                             <div className="space-y-2">
                                 {displayQuestions.map((q, i) => (
                                     <div key={q.key || i} className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
-                                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">{i + 1}</div>
+                                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-status-success-bg text-[10px] font-bold text-status-success">{i + 1}</div>
                                         <div>
                                             <p className="text-sm font-medium capitalize">{q.key.replace(/_/g, ' ')}</p>
                                             <p className="text-xs text-muted-foreground">{q.question}</p>
@@ -292,7 +292,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                     </Card>
 
                     {/* Summary & Submit */}
-                    <div className="flex items-center justify-between rounded-xl border bg-gradient-to-r from-violet-50 to-purple-50 p-4">
+                    <div className="flex items-center justify-between rounded-xl border bg-primary/10 p-4">
                         <div className="text-sm">
                             {selectedSubject ? (
                                 <p>Requesting feedback for <strong>{selectedSubject.name}</strong> from <strong>{form.data.reviewer_user_ids.length}</strong> reviewer{form.data.reviewer_user_ids.length !== 1 ? 's' : ''} using <strong>{selectedTemplate?.name || 'default questions'}</strong></p>
@@ -341,7 +341,7 @@ export default function FeedbackRequest({ employees, reviewTypes, templates, def
                                             <Input value={q.key} onChange={e => updateQuestion(i, 'key', e.target.value)} placeholder="Key (auto-generated)" className="text-xs text-muted-foreground h-7" />
                                         </div>
                                         {newTemplate.questions.length > 1 && (
-                                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 shrink-0" onClick={() => removeQuestion(i)}>
+                                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-status-critical shrink-0" onClick={() => removeQuestion(i)}>
                                                 <Trash2 className="h-3 w-3" />
                                             </Button>
                                         )}

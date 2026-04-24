@@ -107,8 +107,8 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                 <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-blue-500/10 p-2">
-                                <Users className="h-5 w-5 text-blue-500" />
+                            <div className="rounded-lg bg-status-info p-2">
+                                <Users className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{trends.overall.total_interviews}</p>
@@ -118,8 +118,8 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-yellow-500/10 p-2">
-                                <Star className="h-5 w-5 text-yellow-500" />
+                            <div className="rounded-lg bg-status-warning p-2">
+                                <Star className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{trends.overall.avg_satisfaction || '-'}</p>
@@ -129,8 +129,8 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-emerald-500/10 p-2">
-                                <ThumbsUp className="h-5 w-5 text-emerald-500" />
+                            <div className="rounded-lg bg-status-success p-2">
+                                <ThumbsUp className="h-5 w-5 text-status-success" />
                             </div>
                             <div>
                                 <p className="text-2xl font-bold">{recommendPct}%</p>
@@ -209,7 +209,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                                 </div>
                                                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                                                     <div
-                                                        className="h-full rounded-full bg-yellow-400 transition-all"
+                                                        className="h-full rounded-full bg-status-warning transition-all"
                                                         style={{ width: `${pct}%` }}
                                                     />
                                                 </div>
@@ -235,11 +235,11 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                         <div className="flex-1">
                                             <div className="mb-1 flex justify-between text-sm">
                                                 <span>Yes</span>
-                                                <span className="text-emerald-500">{trends.recommend_stats.would_recommend}</span>
+                                                <span className="text-status-success">{trends.recommend_stats.would_recommend}</span>
                                             </div>
                                             <div className="h-3 overflow-hidden rounded-full bg-muted">
                                                 <div
-                                                    className="h-full rounded-full bg-emerald-400"
+                                                    className="h-full rounded-full bg-status-success"
                                                     style={{
                                                         width: `${(trends.recommend_stats.would_recommend / trends.recommend_stats.total) * 100}%`,
                                                     }}
@@ -251,11 +251,11 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                                         <div className="flex-1">
                                             <div className="mb-1 flex justify-between text-sm">
                                                 <span>No</span>
-                                                <span className="text-red-500">{trends.recommend_stats.would_not_recommend}</span>
+                                                <span className="text-status-critical">{trends.recommend_stats.would_not_recommend}</span>
                                             </div>
                                             <div className="h-3 overflow-hidden rounded-full bg-muted">
                                                 <div
-                                                    className="h-full rounded-full bg-red-400"
+                                                    className="h-full rounded-full bg-status-critical"
                                                     style={{
                                                         width: `${(trends.recommend_stats.would_not_recommend / trends.recommend_stats.total) * 100}%`,
                                                     }}

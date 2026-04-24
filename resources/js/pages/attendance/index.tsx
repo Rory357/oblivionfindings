@@ -162,15 +162,15 @@ export default function AttendanceIndex({
 
                 {/* Clock action card */}
                 {canClock ? (
-                    <Card className={openSession ? 'border-emerald-500/20' : 'border-primary/20'}>
+                    <Card className={openSession ? 'border-status-success/20' : 'border-primary/20'}>
                         <CardContent className="p-5">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <div className="flex items-center gap-3">
                                         {openSession ? (
                                             <span className="relative flex h-3 w-3">
-                                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                                                <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-75" />
+                                                <span className="relative inline-flex h-3 w-3 rounded-full bg-status-success" />
                                             </span>
                                         ) : null}
                                         <span className="text-lg font-semibold">

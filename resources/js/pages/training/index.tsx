@@ -40,15 +40,15 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
         switch (status) {
             case 'completed':
             case 'passed':
-                return 'bg-green-100 text-green-800 border-green-200';
+                return 'bg-status-success-bg text-status-success border-status-success/30';
             case 'in_progress':
-                return 'bg-blue-100 text-blue-800 border-blue-200';
+                return 'bg-status-info-bg text-status-info border-status-info/30';
             case 'enrolled':
-                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'expired':
-                return 'bg-red-100 text-red-800 border-red-200';
+                return 'bg-status-critical-bg text-status-critical border-status-critical/30';
             case 'failed':
-                return 'bg-orange-100 text-orange-800 border-orange-200';
+                return 'bg-status-warning-bg text-status-warning border-status-warning/30';
             case 'exempted':
                 return 'bg-primary/10 text-primary border-primary';
             default:
@@ -99,7 +99,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                    <CheckCircle2 className="h-5 w-5 text-status-success" />
                                     <div className="text-2xl font-bold">{stats.valid}</div>
                                 </div>
                             </CardContent>
@@ -110,7 +110,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5 text-orange-500" />
+                                    <Clock className="h-5 w-5 text-status-warning" />
                                     <div className="text-2xl font-bold">{stats.expiring_soon}</div>
                                 </div>
                             </CardContent>
@@ -121,7 +121,7 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-red-500" />
+                                    <AlertTriangle className="h-5 w-5 text-status-critical" />
                                     <div className="text-2xl font-bold">{stats.expired}</div>
                                 </div>
                             </CardContent>
@@ -220,19 +220,19 @@ export default function TrainingIndex({ filters, trainingRecords, staff = [], co
                                                     {record.status.replace(/_/g, ' ')}
                                                 </Badge>
                                                 {record.is_expiring_soon && (
-                                                    <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
+                                                    <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                                         <Clock className="mr-1 h-3 w-3" />
                                                         Expiring Soon
                                                     </Badge>
                                                 )}
                                                 {record.is_expired && (
-                                                    <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
+                                                    <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                                         <AlertTriangle className="mr-1 h-3 w-3" />
                                                         Expired
                                                     </Badge>
                                                 )}
                                                 {record.assessment_passed && (
-                                                    <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                                                    <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
                                                         Passed ({record.assessment_score}%)
                                                     </Badge>
                                                 )}

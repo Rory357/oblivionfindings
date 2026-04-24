@@ -123,20 +123,20 @@ function relativeTime(dateStr?: string | null): string {
 
 function statusBadge(user: UserItem) {
     if (!user.approved_at) {
-        return <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">Pending</Badge>;
+        return <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">Pending</Badge>;
     }
     if (user.staff_profile?.status === 'suspended') {
-        return <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">Suspended</Badge>;
+        return <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">Suspended</Badge>;
     }
-    return <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">Active</Badge>;
+    return <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">Active</Badge>;
 }
 
 function userTypeBadge(type: string) {
     const map: Record<string, { label: string; className: string }> = {
         staff: { label: 'Staff', className: 'border-primary bg-primary/10 text-primary' },
-        client: { label: 'Client', className: 'border-blue-300 bg-blue-50 text-blue-700' },
-        next_of_kin: { label: 'Whanau', className: 'border-cyan-300 bg-cyan-50 text-cyan-700' },
-        board: { label: 'Board', className: 'border-amber-300 bg-amber-50 text-amber-700' },
+        client: { label: 'Client', className: 'border-status-info/30 bg-status-info-bg text-status-info' },
+        next_of_kin: { label: 'Whanau', className: 'border-status-info/30 bg-status-info-bg text-status-info' },
+        board: { label: 'Board', className: 'border-status-warning/30 bg-status-warning-bg text-status-warning' },
         user: { label: 'User', className: 'border-border bg-muted text-foreground' },
     };
     const info = map[type] ?? map.user;
@@ -412,7 +412,7 @@ export default function UsersIndex({
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-red-200 text-red-600 hover:bg-red-50"
+                                    className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
                                     onClick={() => {
                                         selectedIds.forEach((id) => handleSuspend(id));
                                         setSelectedIds([]);
@@ -533,7 +533,7 @@ export default function UsersIndex({
                                                 </TableCell>
                                                 <TableCell>
                                                     {user.two_factor_confirmed_at ? (
-                                                        <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                                        <ShieldCheck className="h-4 w-4 text-status-success" />
                                                     ) : (
                                                         <ShieldAlert className="h-4 w-4 text-muted-foreground/30" />
                                                     )}
@@ -571,7 +571,7 @@ export default function UsersIndex({
                                                                     {user.is_active ? (
                                                                         <DropdownMenuItem
                                                                             dusk={`user-suspend-${user.id}`}
-                                                                            className="text-red-600 focus:text-red-600"
+                                                                            className="text-status-critical focus:text-status-critical"
                                                                             onClick={() => handleSuspend(user.id)}
                                                                         >
                                                                             <UserMinus className="mr-2 h-4 w-4" />
@@ -580,7 +580,7 @@ export default function UsersIndex({
                                                                     ) : (
                                                                         <DropdownMenuItem
                                                                             dusk={`user-approve-${user.id}`}
-                                                                            className="text-emerald-600 focus:text-emerald-600"
+                                                                            className="text-status-success focus:text-status-success"
                                                                             onClick={() => handleApprove(user.id)}
                                                                         >
                                                                             <CheckCircle className="mr-2 h-4 w-4" />

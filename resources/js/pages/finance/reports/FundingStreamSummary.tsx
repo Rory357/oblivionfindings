@@ -125,7 +125,7 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Total Revenue</p>
-                                    <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(data.totals.revenue)}</p>
+                                    <p className="text-2xl font-bold tabular-nums text-status-success dark:text-status-success">{formatCurrency(data.totals.revenue)}</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <TrendingUp className="h-5 w-5 text-muted-foreground" />
@@ -138,7 +138,7 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Total Expenses</p>
-                                    <p className="text-2xl font-bold tabular-nums text-red-600 dark:text-red-400">{formatCurrency(data.totals.expenses)}</p>
+                                    <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{formatCurrency(data.totals.expenses)}</p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <TrendingDown className="h-5 w-5 text-muted-foreground" />
@@ -151,7 +151,7 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Overall Margin</p>
-                                    <p className={`text-2xl font-bold tabular-nums ${overallMarginPct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    <p className={`text-2xl font-bold tabular-nums ${overallMarginPct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                         {formatPct(overallMarginPct)}
                                     </p>
                                     <p className="text-xs text-muted-foreground">{formatCurrency(data.totals.net_margin)} net</p>
@@ -220,10 +220,10 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                                                 <TableCell className="text-right font-mono tabular-nums">
                                                     {formatCurrency(stream.expenses)}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono tabular-nums font-semibold ${stream.net_margin >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                                                <TableCell className={`text-right font-mono tabular-nums font-semibold ${stream.net_margin >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                                     {formatCurrency(stream.net_margin)}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono tabular-nums ${stream.margin_pct >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                                                <TableCell className={`text-right font-mono tabular-nums ${stream.margin_pct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                                     {formatPct(stream.margin_pct)}
                                                 </TableCell>
                                             </TableRow>
@@ -236,10 +236,10 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                                             <TableCell className="text-right font-mono tabular-nums">
                                                 {formatCurrency(data.totals.expenses)}
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${data.totals.net_margin >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                                            <TableCell className={`text-right font-mono tabular-nums ${data.totals.net_margin >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                                 {formatCurrency(data.totals.net_margin)}
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${overallMarginPct >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                                            <TableCell className={`text-right font-mono tabular-nums ${overallMarginPct >= 0 ? 'text-status-success dark:text-status-success' : 'text-status-critical dark:text-status-critical'}`}>
                                                 {formatPct(overallMarginPct)}
                                             </TableCell>
                                         </TableRow>

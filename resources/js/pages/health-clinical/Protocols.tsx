@@ -200,15 +200,15 @@ export default function Protocols({
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
+                    <div className="rounded-xl border bg-status-success-bg p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-success">
                             Active
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-emerald-700">
+                        <p className="mt-1 text-2xl font-bold text-status-success">
                             {stats.active_protocols}
                         </p>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-gray-50 p-4">
+                    <div className="rounded-xl border bg-primary/10 p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                             Inactive
                         </p>
@@ -216,23 +216,23 @@ export default function Protocols({
                             {stats.inactive_protocols}
                         </p>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-cyan-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">
+                    <div className="rounded-xl border bg-status-info-bg p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-info">
                             Due Schedules
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-blue-700">
+                        <p className="mt-1 text-2xl font-bold text-status-info">
                             {stats.schedules_due}
                         </p>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-rose-50 to-orange-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-500">
+                    <div className="rounded-xl border bg-primary/10 p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-critical">
                             Overdue
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-rose-700">
+                        <p className="mt-1 text-2xl font-bold text-status-critical">
                             {stats.schedules_overdue}
                         </p>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-fuchsia-50 p-4">
+                    <div className="rounded-xl border bg-primary/10 p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
                             Compliance (30d)
                         </p>
@@ -394,7 +394,7 @@ export default function Protocols({
                                                     {protocol.client ? (
                                                         <Link
                                                             href={`/operations/clients/${protocol.client.id}`}
-                                                            className="font-medium text-blue-600 hover:underline"
+                                                            className="font-medium text-status-info hover:underline"
                                                         >
                                                             {protocol.client.first_name} {protocol.client.last_name}
                                                         </Link>
@@ -420,7 +420,7 @@ export default function Protocols({
                                                 <td className="px-4 py-3">
                                                     <Badge
                                                         className={protocol.is_active
-                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                            ? 'bg-status-success-bg text-status-success'
                                                             : 'bg-muted text-foreground'}
                                                     >
                                                         {protocol.is_active ? 'Active' : 'Inactive'}

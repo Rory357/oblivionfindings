@@ -79,24 +79,24 @@ const formatNZD = (amount: number | string) =>
 
 function confidenceBadge(score: number) {
     if (score >= 80) {
-        return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">{score}%</Badge>;
+        return <Badge className="bg-status-success-bg text-status-success border-status-success/30">{score}%</Badge>;
     }
     if (score >= 50) {
-        return <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30">{score}%</Badge>;
+        return <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">{score}%</Badge>;
     }
-    return <Badge className="bg-red-500/10 text-red-700 border-red-500/30">{score}%</Badge>;
+    return <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">{score}%</Badge>;
 }
 
 function statusBadge(status: string) {
     switch (status) {
         case 'confirmed':
-            return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">Confirmed</Badge>;
+            return <Badge className="bg-status-success-bg text-status-success border-status-success/30">Confirmed</Badge>;
         case 'auto_confirmed':
-            return <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30">Auto-confirmed</Badge>;
+            return <Badge className="bg-status-info-bg text-status-info border-status-info/30">Auto-confirmed</Badge>;
         case 'rejected':
-            return <Badge className="bg-red-500/10 text-red-700 border-red-500/30">Rejected</Badge>;
+            return <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">Rejected</Badge>;
         case 'suggested':
-            return <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30">Suggested</Badge>;
+            return <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">Suggested</Badge>;
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
@@ -174,8 +174,8 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-amber-500/10 p-2">
-                                        <Lightbulb className="h-5 w-5 text-amber-600" />
+                                    <div className="rounded-lg bg-status-warning p-2">
+                                        <Lightbulb className="h-5 w-5 text-status-warning" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Suggested (this page)</p>
@@ -187,8 +187,8 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-emerald-500/10 p-2">
-                                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                    <div className="rounded-lg bg-status-success p-2">
+                                        <CheckCircle2 className="h-5 w-5 text-status-success" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Confirmed (this page)</p>
@@ -200,8 +200,8 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                         <Card>
                             <CardContent className="pt-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-red-500/10 p-2">
-                                        <ThumbsDown className="h-5 w-5 text-red-600" />
+                                    <div className="rounded-lg bg-status-critical p-2">
+                                        <ThumbsDown className="h-5 w-5 text-status-critical" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Rejected (this page)</p>
@@ -356,7 +356,7 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+                                                            className="text-status-success hover:text-status-success hover:bg-status-success"
                                                             onClick={() => handleConfirm(match.id)}
                                                         >
                                                             <CheckCircle2 className="w-4 h-4 mr-1" />

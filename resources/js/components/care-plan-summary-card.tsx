@@ -29,17 +29,17 @@ const STATUS_BORDER: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-    active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    active: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     draft: 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground',
-    review: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    review: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     archived: 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground',
 };
 
 const PLAN_TYPE_BADGE: Record<string, string> = {
-    standard: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    emergency: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    standard: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    emergency: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     interim: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary/70',
-    review: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    review: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
 };
 
 function formatDate(date: string | null | undefined): string {
@@ -133,7 +133,7 @@ export function CarePlanSummaryCard({ plan, showClient = false, compact = false 
                                 {plan.plan_type.replace(/_/g, ' ')}
                             </Badge>
                             {isReviewOverdue && (
-                                <Badge className="border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 text-[10px]">
+                                <Badge className="border-0 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning text-[10px]">
                                     <AlertTriangle className="h-3 w-3 mr-0.5" />
                                     Review overdue
                                 </Badge>
@@ -150,7 +150,7 @@ export function CarePlanSummaryCard({ plan, showClient = false, compact = false 
                         {/* Goals summary */}
                         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                <CheckCircle2 className="h-3 w-3 text-status-success" />
                                 {goalsAchieved}/{goalsCount} goals completed
                             </span>
                         </div>
@@ -165,7 +165,7 @@ export function CarePlanSummaryCard({ plan, showClient = false, compact = false 
                                     </span>
                                 )}
                                 {plan.next_review_at && (
-                                    <span className={`flex items-center gap-1 ${isReviewOverdue ? 'text-amber-600 dark:text-amber-400 font-medium' : ''}`}>
+                                    <span className={`flex items-center gap-1 ${isReviewOverdue ? 'text-status-warning dark:text-status-warning font-medium' : ''}`}>
                                         <Calendar className="h-3 w-3" />
                                         Review: {formatDate(plan.next_review_at)}
                                         {reviewDays !== null && !isReviewOverdue && (

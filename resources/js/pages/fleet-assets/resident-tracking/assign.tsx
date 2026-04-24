@@ -271,7 +271,7 @@ export default function ResidentTrackingAssign({ clients, available_trackers, as
                                                         variant="secondary"
                                                         className={`text-[10px] ${
                                                             tracker.status === 'online'
-                                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                ? 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success'
                                                                 : ''
                                                         }`}
                                                     >

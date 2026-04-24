@@ -51,31 +51,31 @@ const RESTRICTIVE_PRACTICE_TYPES = [
 
 function restraintTypeBadge(type: string) {
     switch (type) {
-        case 'physical': return 'bg-red-100 text-red-800 border-red-200';
+        case 'physical': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         case 'chemical': return 'bg-primary/10 text-primary border-primary';
-        case 'mechanical': return 'bg-orange-100 text-orange-800 border-orange-200';
-        case 'seclusion': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        case 'environmental': return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'mechanical': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'seclusion': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'environmental': return 'bg-status-info-bg text-status-info border-status-info/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
 
 function severityBadge(s: string) {
     switch (s) {
-        case 'critical': return 'bg-red-100 text-red-800 border-red-200';
-        case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
-        case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        case 'low': return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'critical': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
+        case 'high': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'medium': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+        case 'low': return 'bg-status-info-bg text-status-info border-status-info/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
 
 function statusBadgeColor(s: string) {
     switch (s) {
-        case 'active': return 'bg-green-100 text-green-800 border-green-200';
+        case 'active': return 'bg-status-success-bg text-status-success border-status-success/30';
         case 'draft': return 'bg-muted text-foreground border-border';
-        case 'expired': return 'bg-red-100 text-red-800 border-red-200';
-        case 'under_review': return 'bg-amber-100 text-amber-800 border-amber-200';
+        case 'expired': return 'bg-status-critical-bg text-status-critical border-status-critical/30';
+        case 'under_review': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         default: return 'bg-muted text-foreground border-border';
     }
 }
@@ -210,7 +210,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {eventForm.errors.client_id && <p className="mt-1 text-xs text-red-600">{eventForm.errors.client_id}</p>}
+                                                {eventForm.errors.client_id && <p className="mt-1 text-xs text-status-critical">{eventForm.errors.client_id}</p>}
                                             </div>
                                             <div>
                                                 <Label>Behaviour Support Plan (optional)</Label>
@@ -240,12 +240,12 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {eventForm.errors.site_id && <p className="mt-1 text-xs text-red-600">{eventForm.errors.site_id}</p>}
+                                                {eventForm.errors.site_id && <p className="mt-1 text-xs text-status-critical">{eventForm.errors.site_id}</p>}
                                             </div>
                                             <div>
                                                 <Label>Started At</Label>
                                                 <Input type="datetime-local" value={eventForm.data.started_at} onChange={(e) => eventForm.setData('started_at', e.target.value)} />
-                                                {eventForm.errors.started_at && <p className="mt-1 text-xs text-red-600">{eventForm.errors.started_at}</p>}
+                                                {eventForm.errors.started_at && <p className="mt-1 text-xs text-status-critical">{eventForm.errors.started_at}</p>}
                                             </div>
                                             <div>
                                                 <Label>Ended At</Label>
@@ -264,7 +264,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {eventForm.errors.restraint_type && <p className="mt-1 text-xs text-red-600">{eventForm.errors.restraint_type}</p>}
+                                                {eventForm.errors.restraint_type && <p className="mt-1 text-xs text-status-critical">{eventForm.errors.restraint_type}</p>}
                                             </div>
                                             <div>
                                                 <Label>Severity</Label>
@@ -383,14 +383,14 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                                         </td>
                                                         <td className="py-2 text-center">
                                                             {ev.within_support_plan ? (
-                                                                <Check className="mx-auto h-4 w-4 text-green-600" />
+                                                                <Check className="mx-auto h-4 w-4 text-status-success" />
                                                             ) : (
-                                                                <X className="mx-auto h-4 w-4 text-red-500" />
+                                                                <X className="mx-auto h-4 w-4 text-status-critical" />
                                                             )}
                                                         </td>
                                                         <td className="py-2 text-center">
                                                             {ev.reviewed_at ? (
-                                                                <Check className="mx-auto h-4 w-4 text-green-600" />
+                                                                <Check className="mx-auto h-4 w-4 text-status-success" />
                                                             ) : (
                                                                 <X className="mx-auto h-4 w-4 text-muted-foreground" />
                                                             )}
@@ -460,12 +460,12 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {planForm.errors.client_id && <p className="mt-1 text-xs text-red-600">{planForm.errors.client_id}</p>}
+                                                {planForm.errors.client_id && <p className="mt-1 text-xs text-status-critical">{planForm.errors.client_id}</p>}
                                             </div>
                                             <div>
                                                 <Label>Title</Label>
                                                 <Input value={planForm.data.title} onChange={(e) => planForm.setData('title', e.target.value)} placeholder="Plan title" />
-                                                {planForm.errors.title && <p className="mt-1 text-xs text-red-600">{planForm.errors.title}</p>}
+                                                {planForm.errors.title && <p className="mt-1 text-xs text-status-critical">{planForm.errors.title}</p>}
                                             </div>
                                         </div>
 
@@ -544,7 +544,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                                         </div>
                                         <div className="text-xs text-muted-foreground">
                                             <span className="font-medium">Review:</span>{' '}
-                                            <span className={isOverdueReview(plan.review_date) ? 'font-semibold text-red-600' : ''}>
+                                            <span className={isOverdueReview(plan.review_date) ? 'font-semibold text-status-critical' : ''}>
                                                 {formatDate(plan.review_date)}
                                             </span>
                                         </div>
@@ -576,7 +576,7 @@ export default function RestraintsIndex({ events, plans, stats, clients, staff, 
                             <div>
                                 <Label>Review Notes</Label>
                                 <Textarea value={reviewForm.data.review_notes} onChange={(e) => reviewForm.setData('review_notes', e.target.value)} rows={3} />
-                                {reviewForm.errors.review_notes && <p className="mt-1 text-xs text-red-600">{reviewForm.errors.review_notes}</p>}
+                                {reviewForm.errors.review_notes && <p className="mt-1 text-xs text-status-critical">{reviewForm.errors.review_notes}</p>}
                             </div>
                             <div>
                                 <Label>Lessons Learned</Label>

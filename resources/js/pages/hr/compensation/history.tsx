@@ -53,15 +53,15 @@ const formatCurrency = (value: string | null) => {
 const getChangeTypeColor = (type: string) => {
     switch (type) {
         case 'initial':
-            return 'bg-blue-100 text-blue-800 border-blue-200';
+            return 'bg-status-info-bg text-status-info border-status-info/30';
         case 'promotion':
-            return 'bg-green-100 text-green-800 border-green-200';
+            return 'bg-status-success-bg text-status-success border-status-success/30';
         case 'review':
             return 'bg-primary/10 text-primary border-primary';
         case 'adjustment':
-            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         case 'correction':
-            return 'bg-red-100 text-red-800 border-red-200';
+            return 'bg-status-critical-bg text-status-critical border-status-critical/30';
         default:
             return 'bg-muted text-foreground border-border';
     }
@@ -132,7 +132,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
 
                                 return (
                                     <div key={entry.id} className="relative flex gap-4 border-l-2 border-border pb-4 pl-6 last:border-transparent last:pb-0">
-                                        <div className="absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-white bg-slate-300" />
+                                        <div className="absolute -left-2 top-0 h-4 w-4 rounded-full border-2 border-white bg-muted" />
 
                                         <div className="flex-1 space-y-1">
                                             <div className="flex items-center gap-2">
@@ -141,7 +141,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                                                     {entry.change_type.replace(/_/g, ' ')}
                                                 </Badge>
                                                 {pctVal !== null && (
-                                                    <span className={`flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                                    <span className={`flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-status-success' : isNegative ? 'text-status-critical' : 'text-muted-foreground'}`}>
                                                         {isPositive ? <TrendingUp className="h-3 w-3" /> : isNegative ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
                                                         {isPositive ? '+' : ''}{pctVal}%
                                                     </span>

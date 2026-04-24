@@ -219,29 +219,29 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
 
   const getStatusColor = (status: string) => {
     return {
-      scheduled: 'bg-blue-100 text-blue-800',
-      agenda_draft: 'bg-yellow-100 text-yellow-800',
-      agenda_final: 'bg-green-100 text-green-800',
+      scheduled: 'bg-status-info-bg text-status-info',
+      agenda_draft: 'bg-status-warning-bg text-status-warning',
+      agenda_final: 'bg-status-success-bg text-status-success',
       in_progress: 'bg-primary/10 text-primary',
-      minutes_draft: 'bg-orange-100 text-orange-800',
-      minutes_approved: 'bg-green-100 text-green-800',
+      minutes_draft: 'bg-status-warning-bg text-status-warning',
+      minutes_approved: 'bg-status-success-bg text-status-success',
       archived: 'bg-muted text-foreground',
     }[status] || 'bg-muted text-foreground';
   };
 
   const getChecklistStatusColor = (status: 'done' | 'in_progress' | 'todo' | 'blocked') => {
     return {
-      done: 'bg-green-100 text-green-800 border-green-200',
-      in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
-      todo: 'bg-amber-100 text-amber-800 border-amber-200',
-      blocked: 'bg-red-100 text-red-800 border-red-200',
+      done: 'bg-status-success-bg text-status-success border-status-success/30',
+      in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
+      todo: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+      blocked: 'bg-status-critical-bg text-status-critical border-status-critical/30',
     }[status];
   };
 
   const getItemTypeIcon = (type: string) => {
     switch (type) {
       case 'decision': return <Vote className="w-4 h-4 text-primary" />;
-      case 'consent': return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'consent': return <CheckCircle className="w-4 h-4 text-status-success" />;
       default: return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
   };
@@ -400,7 +400,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
             </div>
           </div>
           {packMessage && (
-            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+            <div className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2 text-sm text-status-info">
               {packMessage}
             </div>
           )}
@@ -414,22 +414,22 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
               <div className="mb-3 flex flex-wrap gap-2">
                 <Badge variant="outline">{workflowChecklist.counts.done} complete</Badge>
                 {workflowChecklist.counts.remaining > 0 && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                  <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">
                     {workflowChecklist.counts.remaining} remaining
                   </Badge>
                 )}
                 {workflowChecklist.counts.blocked > 0 && (
-                  <Badge className="bg-red-100 text-red-800 border-red-200">
+                  <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">
                     {workflowChecklist.counts.blocked} blocked
                   </Badge>
                 )}
               </div>
 
               {workflowChecklist.next_step && (
-                <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-blue-700">Next Step</p>
-                  <p className="font-semibold text-blue-900">{workflowChecklist.next_step.label}</p>
-                  <p className="text-sm text-blue-800">{workflowChecklist.next_step.detail}</p>
+                <div className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-status-info">Next Step</p>
+                  <p className="font-semibold text-status-info">{workflowChecklist.next_step.label}</p>
+                  <p className="text-sm text-status-info">{workflowChecklist.next_step.detail}</p>
                 </div>
               )}
 
@@ -443,7 +443,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                       </div>
                       <p className="text-sm text-muted-foreground">{item.detail}</p>
                       {item.blocked_by && (
-                        <p className="text-xs text-red-700">Blocked by: {item.blocked_by}</p>
+                        <p className="text-xs text-status-critical">Blocked by: {item.blocked_by}</p>
                       )}
                     </div>
                     <div>
@@ -528,7 +528,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                               onChange={e => agendaForm.setData('title', e.target.value)}
                               required
                             />
-                            {agendaForm.errors.title && <p className="text-sm text-red-500 mt-1">{agendaForm.errors.title}</p>}
+                            {agendaForm.errors.title && <p className="text-sm text-status-critical mt-1">{agendaForm.errors.title}</p>}
                           </div>
                           <div>
                             <Label htmlFor="agenda-description">Description</Label>
@@ -648,7 +648,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-red-500 hover:text-red-700"
+                                className="text-status-critical hover:text-status-critical"
                               >
                                 Remove
                               </Button>
@@ -664,7 +664,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => removeAgendaItem(item.id)}
-                                  className="bg-red-600 hover:bg-red-700"
+                                  className="bg-status-critical hover:bg-status-critical"
                                 >
                                   Remove
                                 </AlertDialogAction>
@@ -757,10 +757,10 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                         <span className="font-medium">{attendance.board_member.user.name}</span>
                         <div className="flex items-center gap-2">
                           <Badge className={cn(
-                            attendance.status === 'present' && 'bg-green-100 text-green-800',
-                            attendance.status === 'apology' && 'bg-yellow-100 text-yellow-800',
-                            attendance.status === 'no_show' && 'bg-red-100 text-red-800',
-                            attendance.status === 'late' && 'bg-blue-100 text-blue-800',
+                            attendance.status === 'present' && 'bg-status-success-bg text-status-success',
+                            attendance.status === 'apology' && 'bg-status-warning-bg text-status-warning',
+                            attendance.status === 'no_show' && 'bg-status-critical-bg text-status-critical',
+                            attendance.status === 'late' && 'bg-status-info-bg text-status-info',
                           )}>
                             {attendance.status.replace('_', ' ')}
                           </Badge>
@@ -819,7 +819,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                                           type="button"
                                           variant="ghost"
                                           size="sm"
-                                          className="text-red-500 hover:text-red-700 shrink-0"
+                                          className="text-status-critical hover:text-status-critical shrink-0"
                                           onClick={() => removeMinutesBlock(idx)}
                                         >
                                           Remove
@@ -891,8 +891,8 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                       <div className="flex items-center gap-2 mb-4">
                         <span className="text-sm text-muted-foreground">Status:</span>
                         <Badge className={cn(
-                          meeting.minutes.status === 'draft' && 'bg-yellow-100 text-yellow-800',
-                          meeting.minutes.status === 'approved' && 'bg-green-100 text-green-800',
+                          meeting.minutes.status === 'draft' && 'bg-status-warning-bg text-status-warning',
+                          meeting.minutes.status === 'approved' && 'bg-status-success-bg text-status-success',
                         )}>
                           {meeting.minutes.status}
                         </Badge>

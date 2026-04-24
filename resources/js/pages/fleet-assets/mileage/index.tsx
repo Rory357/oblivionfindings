@@ -94,13 +94,13 @@ const _PURPOSE_LABELS: Record<string, string> = {
 function statusBadge(status: string) {
     switch (status) {
         case 'pending':
-            return <Badge className="bg-amber-500 text-white">Pending</Badge>;
+            return <Badge className="bg-status-warning text-white">Pending</Badge>;
         case 'approved':
             return <Badge className="bg-primary text-white">Approved</Badge>;
         case 'rejected':
-            return <Badge className="bg-red-500 text-white">Rejected</Badge>;
+            return <Badge className="bg-status-critical text-white">Rejected</Badge>;
         case 'paid':
-            return <Badge className="bg-green-600 text-white">Paid</Badge>;
+            return <Badge className="bg-status-success text-white">Paid</Badge>;
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
@@ -363,7 +363,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                                             size="sm"
                                                                             variant="outline"
                                                                             onClick={() => handleReject(trip.id)}
-                                                                            className="text-xs h-7 text-red-600 hover:text-red-700"
+                                                                            className="text-xs h-7 text-status-critical hover:text-status-critical"
                                                                         >
                                                                             <X className="mr-1 h-3 w-3" />
                                                                             Reject
@@ -375,7 +375,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                                         size="sm"
                                                                         variant="outline"
                                                                         onClick={() => handleMarkPaid(trip.id)}
-                                                                        className="text-xs h-7 text-green-600 hover:text-green-700"
+                                                                        className="text-xs h-7 text-status-success hover:text-status-success"
                                                                     >
                                                                         <CheckCircle className="mr-1 h-3 w-3" />
                                                                         Mark Paid

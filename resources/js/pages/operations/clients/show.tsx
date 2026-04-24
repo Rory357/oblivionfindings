@@ -826,9 +826,9 @@ export default function ClientShow({
                                 <Badge
                                     className={
                                         client.status === 'active'
-                                            ? 'border-emerald-300/30 bg-emerald-400/20 text-emerald-100'
+                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
                                             : client.status === 'onboarding'
-                                              ? 'border-amber-300/30 bg-amber-400/20 text-amber-100'
+                                              ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
                                               : 'border-white/20 bg-white/10 text-white/90'
                                     }
                                 >
@@ -855,11 +855,11 @@ export default function ClientShow({
                                         <Badge
                                             className={
                                                 client.risk_level === 'critical'
-                                                    ? 'border-red-300/30 bg-red-400/20 text-red-100'
+                                                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
                                                     : client.risk_level ===
                                                         'high'
-                                                      ? 'border-orange-300/30 bg-orange-400/20 text-orange-100'
-                                                      : 'border-yellow-300/30 bg-yellow-400/20 text-yellow-100'
+                                                      ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
+                                                      : 'border-status-warning/30 bg-status-warning-bg text-status-warning'
                                             }
                                         >
                                             <ShieldAlert className="mr-1 h-3 w-3" />
@@ -867,7 +867,7 @@ export default function ClientShow({
                                         </Badge>
                                     )}
                                 {client.safeguarding_flag && (
-                                    <Badge className="border-red-300/30 bg-red-400/20 text-red-100">
+                                    <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                         <Shield className="mr-1 h-3 w-3" />
                                         Safeguarding
                                     </Badge>
@@ -915,7 +915,7 @@ export default function ClientShow({
                                         <Users className="mr-1.5 h-3.5 w-3.5" />
                                         Visits
                                         {pendingVisitCount > 0 ? (
-                                                <span className="ml-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                                                <span className="ml-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
                                                     {pendingVisitCount}
                                                 </span>
                                         ) : null}
@@ -1157,13 +1157,13 @@ export default function ClientShow({
                             <>
                                 {/* Safeguarding Alert */}
                                 {client.safeguarding_flag && (
-                                    <div className="mb-4 flex items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50 p-4">
-                                        <ShieldAlert className="h-6 w-6 text-red-600" />
+                                    <div className="mb-4 flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
+                                        <ShieldAlert className="h-6 w-6 text-status-critical" />
                                         <div>
-                                            <p className="text-sm font-bold text-red-800">
+                                            <p className="text-sm font-bold text-status-critical">
                                                 Safeguarding Alert
                                             </p>
-                                            <p className="text-xs text-red-700">
+                                            <p className="text-xs text-status-critical">
                                                 Active safeguarding concern.
                                                 Follow protocols.
                                             </p>
@@ -1174,7 +1174,7 @@ export default function ClientShow({
                                 {/* Row 1: Quick Stats */}
                                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                                     {/* Care Plan Status */}
-                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                                    <div className="rounded-xl border bg-primary/10 p-4">
                                         <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
                                             Care Plan
                                         </p>
@@ -1183,7 +1183,7 @@ export default function ClientShow({
                                         </p>
                                         {reviewDays !== null && (
                                             <p
-                                                className={`mt-0.5 text-xs ${reviewDays < 0 ? 'font-semibold text-red-600' : 'text-primary'}`}
+                                                className={`mt-0.5 text-xs ${reviewDays < 0 ? 'font-semibold text-status-critical' : 'text-primary'}`}
                                             >
                                                 Review:{' '}
                                                 {reviewDays < 0
@@ -1194,7 +1194,7 @@ export default function ClientShow({
                                     </div>
 
                                     {/* Goals */}
-                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                                    <div className="rounded-xl border bg-primary/10 p-4">
                                         <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
                                             Goals
                                         </p>
@@ -1212,7 +1212,7 @@ export default function ClientShow({
                                     </div>
 
                                     {/* Shifts */}
-                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                                    <div className="rounded-xl border bg-primary/10 p-4">
                                         <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
                                             Shifts
                                         </p>
@@ -1275,7 +1275,7 @@ export default function ClientShow({
                                     </div>
 
                                     {/* Risk Level — clickable dropdown */}
-                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                                    <div className="rounded-xl border bg-primary/10 p-4">
                                         <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
                                             Risk Level
                                         </p>
@@ -1296,16 +1296,16 @@ export default function ClientShow({
                                                     className={`h-8 w-full border-0 text-sm font-bold shadow-none ${
                                                         client.risk_level ===
                                                         'critical'
-                                                            ? 'bg-red-100 text-red-700'
+                                                            ? 'bg-status-critical-bg text-status-critical'
                                                             : client.risk_level ===
                                                                 'high'
-                                                              ? 'bg-red-100 text-red-700'
+                                                              ? 'bg-status-critical-bg text-status-critical'
                                                               : client.risk_level ===
                                                                   'medium'
-                                                                ? 'bg-amber-100 text-amber-700'
+                                                                ? 'bg-status-warning-bg text-status-warning'
                                                                 : client.risk_level ===
                                                                     'low'
-                                                                  ? 'bg-emerald-100 text-emerald-700'
+                                                                  ? 'bg-status-success-bg text-status-success'
                                                                   : 'bg-muted text-muted-foreground'
                                                     } rounded-full px-3`}
                                                 >
@@ -1335,7 +1335,7 @@ export default function ClientShow({
                                 </div>
 
                                 {client.site && siteCoverageSummary ? (
-                                    <Card className="mt-4 overflow-hidden border-primary/70 bg-gradient-to-br from-white via-indigo-50/80 to-cyan-50/70">
+                                    <Card className="mt-4 overflow-hidden border-primary/70 bg-gradient-to-br from-white via-primary/10/80 to-status-info-bg/70">
                                         <CardHeader className="pb-3">
                                             <div className="flex flex-wrap items-start justify-between gap-3">
                                                 <div>
@@ -1363,7 +1363,7 @@ export default function ClientShow({
                                                             siteCoverageSummary.under_covered_windows >
                                                             0
                                                                 ? ''
-                                                                : 'bg-emerald-100 text-emerald-800'
+                                                                : 'bg-status-success-bg text-status-success'
                                                         }
                                                     >
                                                         {siteCoverageSummary.under_covered_windows >
@@ -1516,7 +1516,7 @@ export default function ClientShow({
 
                                                 {siteCoverageSummary.alerts
                                                     .length === 0 ? (
-                                                    <div className="mt-4 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-800">
+                                                    <div className="mt-4 rounded-xl border border-dashed border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success">
                                                         No projected shortages
                                                         for this site right now.
                                                     </div>
@@ -1607,7 +1607,7 @@ export default function ClientShow({
                                 ) : null}
 
                                 {recurringShiftSeries.length > 0 && (
-                                    <Card className="mt-4 border-primary/70 bg-gradient-to-br from-violet-50/80 via-white to-fuchsia-50/70">
+                                    <Card className="mt-4 border-primary/70 bg-gradient-to-br from-primary/10/80 via-white to-primary/10/70">
                                         <CardHeader className="pb-3">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
@@ -1653,7 +1653,7 @@ export default function ClientShow({
                                                             </Badge>
                                                             {series.open_occurrences_count >
                                                             0 ? (
-                                                                <Badge className="bg-amber-100 text-amber-800">
+                                                                <Badge className="bg-status-warning-bg text-status-warning">
                                                                     {
                                                                         series.open_occurrences_count
                                                                     }{' '}
@@ -1662,7 +1662,7 @@ export default function ClientShow({
                                                             ) : null}
                                                             {series.active_replacements_count >
                                                             0 ? (
-                                                                <Badge className="bg-blue-100 text-blue-800">
+                                                                <Badge className="bg-status-info-bg text-status-info">
                                                                     {
                                                                         series.active_replacements_count
                                                                     }{' '}
@@ -1750,7 +1750,7 @@ export default function ClientShow({
                                         {/* About Me Card */}
                                         {hasAboutMe && (
                                             <Card className="overflow-hidden border-primary">
-                                                <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-5 py-3">
+                                                <div className="bg-primary px-5 py-3">
                                                     <h3 className="text-sm font-semibold text-white">
                                                         About{' '}
                                                         {client.first_name}
@@ -1814,12 +1814,12 @@ export default function ClientShow({
                                                     )}
                                                     <div className="grid gap-3 sm:grid-cols-2">
                                                         {aboutMe.likes && (
-                                                            <div className="rounded-lg bg-emerald-50 p-3">
-                                                                <p className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase">
+                                                            <div className="rounded-lg bg-status-success-bg p-3">
+                                                                <p className="text-[10px] font-bold tracking-wider text-status-success uppercase">
                                                                     Things I
                                                                     Like
                                                                 </p>
-                                                                <p className="mt-1 text-sm text-emerald-800">
+                                                                <p className="mt-1 text-sm text-status-success">
                                                                     {
                                                                         aboutMe.likes
                                                                     }
@@ -1827,12 +1827,12 @@ export default function ClientShow({
                                                             </div>
                                                         )}
                                                         {aboutMe.dislikes && (
-                                                            <div className="rounded-lg bg-red-50 p-3">
-                                                                <p className="text-[10px] font-bold tracking-wider text-red-500 uppercase">
+                                                            <div className="rounded-lg bg-status-critical-bg p-3">
+                                                                <p className="text-[10px] font-bold tracking-wider text-status-critical uppercase">
                                                                     Things I
                                                                     Don't Like
                                                                 </p>
-                                                                <p className="mt-1 text-sm text-red-800">
+                                                                <p className="mt-1 text-sm text-status-critical">
                                                                     {
                                                                         aboutMe.dislikes
                                                                     }
@@ -2214,7 +2214,7 @@ export default function ClientShow({
                                                         )}
                                                     </div>
                                                     {incidents.length > 0 && (
-                                                        <div className="mt-3 rounded-lg bg-amber-50 p-2 text-center text-xs text-amber-700">
+                                                        <div className="mt-3 rounded-lg bg-status-warning-bg p-2 text-center text-xs text-status-warning">
                                                             {incidents.length}{' '}
                                                             recent incident
                                                             {incidents.length !==
@@ -2829,7 +2829,7 @@ export default function ClientShow({
                                     >
                                         <div className="flex items-center gap-2">
                                             <div
-                                                className={`h-2 w-2 rounded-full ${item.complete ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                                className={`h-2 w-2 rounded-full ${item.complete ? 'bg-status-success' : 'bg-muted'}`}
                                             />
                                             <div>
                                                 <div className="text-sm font-medium">
@@ -2901,7 +2901,7 @@ export default function ClientShow({
                                                         )
                                                       ? {
                                                             label: 'Service',
-                                                            color: 'bg-blue-100 text-blue-700',
+                                                            color: 'bg-status-info-bg text-status-info',
                                                         }
                                                       : {
                                                             label: 'Admin',
@@ -2910,7 +2910,7 @@ export default function ClientShow({
                                             return (
                                                 <div
                                                     key={step.id}
-                                                    className={`flex items-center justify-between rounded-md border p-3 ${step.status === 'completed' ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-emerald-950/20' : step.due_date && new Date(step.due_date) < new Date() && step.status === 'pending' ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20' : ''}`}
+                                                    className={`flex items-center justify-between rounded-md border p-3 ${step.status === 'completed' ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30 dark:bg-status-success' : step.due_date && new Date(step.due_date) < new Date() && step.status === 'pending' ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30 dark:bg-status-critical' : ''}`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
@@ -2970,7 +2970,7 @@ export default function ClientShow({
                                                                                     step.due_date,
                                                                                 ) <
                                                                                 new Date()
-                                                                                    ? 'font-medium text-red-600'
+                                                                                    ? 'font-medium text-status-critical'
                                                                                     : ''
                                                                             }
                                                                         >
@@ -3099,9 +3099,9 @@ export default function ClientShow({
                             </Card>
                         )}
 
-                        <Card className="mt-4 border-orange-200 bg-orange-50/30">
+                        <Card className="mt-4 border-status-warning/30 bg-status-warning-bg">
                             <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning">
                                     <GraduationCap className="h-5 w-5" />
                                 </div>
                                 <div className="flex-1">
@@ -3128,13 +3128,13 @@ export default function ClientShow({
                         {/* Allergy Alert */}
                         {medical.profile?.allergies &&
                             medical.profile.allergies !== '-' && (
-                                <div className="flex items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50 p-4">
-                                    <ShieldAlert className="h-6 w-6 shrink-0 text-red-600" />
+                                <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
+                                    <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
                                     <div>
-                                        <p className="text-sm font-bold text-red-800">
+                                        <p className="text-sm font-bold text-status-critical">
                                             Allergies
                                         </p>
-                                        <p className="text-sm text-red-700">
+                                        <p className="text-sm text-status-critical">
                                             {medical.profile.allergies}
                                         </p>
                                     </div>
@@ -3143,7 +3143,7 @@ export default function ClientShow({
 
                         {/* Quick Stats */}
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                            <div className="rounded-xl border bg-primary/10 p-3 text-center">
                                 <div className="text-xl font-bold text-primary">
                                     {medical.medications?.length ?? 0}
                                 </div>
@@ -3151,23 +3151,23 @@ export default function ClientShow({
                                     Medications
                                 </div>
                             </div>
-                            <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-yellow-50 p-3 text-center">
-                                <div className="text-xl font-bold text-amber-700">
+                            <div className="rounded-xl border bg-status-warning-bg p-3 text-center">
+                                <div className="text-xl font-bold text-status-warning">
                                     {medical.conditions?.length ?? 0}
                                 </div>
-                                <div className="text-[10px] tracking-wider text-amber-500 uppercase">
+                                <div className="text-[10px] tracking-wider text-status-warning uppercase">
                                     Conditions
                                 </div>
                             </div>
-                            <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-cyan-50 p-3 text-center">
-                                <div className="text-xl font-bold text-blue-700">
+                            <div className="rounded-xl border bg-status-info-bg p-3 text-center">
+                                <div className="text-xl font-bold text-status-info">
                                     {medical.emergency_contacts?.length ?? 0}
                                 </div>
-                                <div className="text-[10px] tracking-wider text-blue-500 uppercase">
+                                <div className="text-[10px] tracking-wider text-status-info uppercase">
                                     Emergency Contacts
                                 </div>
                             </div>
-                            <div className="rounded-xl border bg-gradient-to-br from-cyan-50 to-teal-50 p-3 text-center">
+                            <div className="rounded-xl border bg-status-info-bg p-3 text-center">
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -3189,10 +3189,10 @@ export default function ClientShow({
                                 {/* GP Card */}
                                 {(medical.profile?.gp_name ||
                                     medical.profile?.gp_practice) && (
-                                    <Card className="border-emerald-200 bg-emerald-50/30">
+                                    <Card className="border-status-success/30 bg-status-success-bg">
                                         <CardContent className="p-4">
                                             <div className="mb-2 flex items-center gap-2">
-                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
                                                     <Heart className="h-4 w-4" />
                                                 </div>
                                                 <span className="text-sm font-semibold">
@@ -3250,7 +3250,7 @@ export default function ClientShow({
                                     <CardHeader>
                                         <CardTitle className="flex items-center justify-between text-base">
                                             <div className="flex items-center gap-2">
-                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
                                                     <FileText className="h-4 w-4" />
                                                 </div>
                                                 Medical Profile
@@ -3382,12 +3382,12 @@ export default function ClientShow({
                                                                         {m.name}
                                                                     </span>
                                                                     {m.is_controlled && (
-                                                                        <Badge className="border-0 bg-red-100 text-[9px] text-red-700">
+                                                                        <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">
                                                                             Controlled
                                                                         </Badge>
                                                                     )}
                                                                     {m.is_prn && (
-                                                                        <Badge className="border-0 bg-amber-100 text-[9px] text-amber-700">
+                                                                        <Badge className="border-0 bg-status-warning-bg text-[9px] text-status-warning">
                                                                             PRN
                                                                         </Badge>
                                                                     )}
@@ -3439,7 +3439,7 @@ export default function ClientShow({
                                     <CardHeader className="pb-2">
                                         <CardTitle className="flex items-center justify-between text-sm font-semibold">
                                             <div className="flex items-center gap-2">
-                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-100 text-amber-600">
+                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-warning-bg text-status-warning">
                                                     <ShieldAlert className="h-3.5 w-3.5" />
                                                 </div>
                                                 Conditions
@@ -3483,11 +3483,11 @@ export default function ClientShow({
                                                                         className={`border-0 text-[9px] ${
                                                                             c.severity ===
                                                                             'severe'
-                                                                                ? 'bg-red-100 text-red-700'
+                                                                                ? 'bg-status-critical-bg text-status-critical'
                                                                                 : c.severity ===
                                                                                     'moderate'
-                                                                                  ? 'bg-amber-100 text-amber-700'
-                                                                                  : 'bg-emerald-100 text-emerald-700'
+                                                                                  ? 'bg-status-warning-bg text-status-warning'
+                                                                                  : 'bg-status-success-bg text-status-success'
                                                                         }`}
                                                                     >
                                                                         {
@@ -3514,7 +3514,7 @@ export default function ClientShow({
                                     <CardHeader className="pb-2">
                                         <CardTitle className="flex items-center justify-between text-sm font-semibold">
                                             <div className="flex items-center gap-2">
-                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-100 text-blue-600">
+                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-status-info-bg text-status-info">
                                                     <Heart className="h-3.5 w-3.5" />
                                                 </div>
                                                 Emergency Contacts
@@ -3549,7 +3549,7 @@ export default function ClientShow({
                                                             key={e.id}
                                                             className="flex items-start gap-2.5 rounded-lg border p-2.5"
                                                         >
-                                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+                                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-info-bg text-xs font-bold text-status-info">
                                                                 {(
                                                                     e.name ??
                                                                     '?'
@@ -3622,19 +3622,19 @@ export default function ClientShow({
                             <div className="space-y-4">
                                 {/* Allergy Banner */}
                                 {hasAllergies && (
-                                    <div className="flex items-center gap-3 rounded-xl border-2 border-red-300 bg-gradient-to-r from-red-50 to-rose-50 p-4">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                    <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
                                             <AlertTriangle className="h-5 w-5" />
                                         </div>
                                         <div className="flex-1">
-                                            <p className="text-sm font-semibold text-red-800">
+                                            <p className="text-sm font-semibold text-status-critical">
                                                 Allergies
                                             </p>
                                             <div className="mt-1 flex flex-wrap gap-1.5">
                                                 {allergies.map((a: string) => (
                                                     <Badge
                                                         key={a}
-                                                        className="border-0 bg-red-200/60 text-xs font-semibold text-red-800"
+                                                        className="border-0 bg-status-critical-bg text-xs font-semibold text-status-critical"
                                                     >
                                                         {a}
                                                     </Badge>
@@ -3647,12 +3647,12 @@ export default function ClientShow({
                                 {/* Alerts Banner */}
                                 {emarSummary &&
                                     emarSummary.pending_alerts_count > 0 && (
-                                        <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
-                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                        <div className="flex items-center gap-3 rounded-xl border-2 border-status-warning/30 bg-status-warning-bg p-4">
+                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                                                 <AlertTriangle className="h-5 w-5" />
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-sm font-semibold text-amber-800">
+                                                <p className="text-sm font-semibold text-status-warning">
                                                     {
                                                         emarSummary.pending_alerts_count
                                                     }{' '}
@@ -3662,14 +3662,14 @@ export default function ClientShow({
                                                         ? 's'
                                                         : ''}
                                                 </p>
-                                                <p className="text-xs text-amber-700">
+                                                <p className="text-xs text-status-warning">
                                                     Review alerts in the full
                                                     eMAR dashboard.
                                                 </p>
                                             </div>
                                             <Button
                                                 size="sm"
-                                                className="bg-amber-600 text-white hover:bg-amber-700"
+                                                className="bg-status-warning text-white hover:bg-status-warning"
                                                 asChild
                                             >
                                                 <Link
@@ -3684,18 +3684,18 @@ export default function ClientShow({
                                 {/* Stats */}
                                 {emarSummary && (
                                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                        <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-4 text-center">
-                                            <div className="text-3xl font-bold text-blue-700">
+                                        <div className="rounded-xl border bg-status-info-bg p-4 text-center">
+                                            <div className="text-3xl font-bold text-status-info">
                                                 {
                                                     emarSummary.active_medications_count
                                                 }
                                             </div>
-                                            <div className="text-[10px] tracking-wider text-blue-500 uppercase">
+                                            <div className="text-[10px] tracking-wider text-status-info uppercase">
                                                 Active Medications
                                             </div>
                                         </div>
-                                        <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-4 text-center">
-                                            <div className="text-sm font-bold text-emerald-700">
+                                        <div className="rounded-xl border bg-status-success-bg p-4 text-center">
+                                            <div className="text-sm font-bold text-status-success">
                                                 {emarSummary.last_administration
                                                     ? new Date(
                                                           emarSummary.last_administration,
@@ -3710,15 +3710,15 @@ export default function ClientShow({
                                                       )
                                                     : '—'}
                                             </div>
-                                            <div className="text-[10px] tracking-wider text-emerald-500 uppercase">
+                                            <div className="text-[10px] tracking-wider text-status-success uppercase">
                                                 Last Administration
                                             </div>
                                         </div>
                                         <div
-                                            className={`rounded-xl border p-4 text-center ${controlledMeds.length > 0 ? 'bg-gradient-to-br from-rose-50 to-pink-50' : ''}`}
+                                            className={`rounded-xl border p-4 text-center ${controlledMeds.length > 0 ? 'bg-status-critical-bg' : ''}`}
                                         >
                                             <div
-                                                className={`text-3xl font-bold ${controlledMeds.length > 0 ? 'text-rose-700' : 'text-muted-foreground'}`}
+                                                className={`text-3xl font-bold ${controlledMeds.length > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
                                             >
                                                 {controlledMeds.length}
                                             </div>
@@ -3726,7 +3726,7 @@ export default function ClientShow({
                                                 Controlled Drugs
                                             </div>
                                         </div>
-                                        <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4 text-center">
+                                        <div className="rounded-xl border bg-primary/10 p-4 text-center">
                                             <div className="text-sm font-bold text-primary">
                                                 {emarSummary.next_review_date
                                                     ? new Date(
@@ -3751,7 +3751,7 @@ export default function ClientShow({
                                 {/* Action Buttons */}
                                 <div className="flex flex-wrap gap-2">
                                     <Button
-                                        className="gap-1.5 bg-blue-600 hover:bg-blue-700"
+                                        className="gap-1.5 bg-status-info hover:bg-status-info"
                                         asChild
                                     >
                                         <Link
@@ -3802,13 +3802,13 @@ export default function ClientShow({
                                 {/* Scheduled Medications */}
                                 {scheduledMeds.length > 0 && (
                                     <Card className="overflow-hidden">
-                                        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3">
+                                        <div className="bg-gradient-to-r from-status-info to-primary px-5 py-3">
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <h3 className="text-sm font-semibold text-white">
                                                         Scheduled Medications
                                                     </h3>
-                                                    <p className="text-xs text-blue-200">
+                                                    <p className="text-xs text-status-info">
                                                         {scheduledMeds.length}{' '}
                                                         medication
                                                         {scheduledMeds.length !==
@@ -3828,7 +3828,7 @@ export default function ClientShow({
                                                         className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/30"
                                                     >
                                                         <div
-                                                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${m.controlled_drug ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}
+                                                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${m.controlled_drug ? 'bg-status-critical-bg text-status-critical' : 'bg-status-info-bg text-status-info'}`}
                                                         >
                                                             <Pill className="h-5 w-5" />
                                                         </div>
@@ -3838,7 +3838,7 @@ export default function ClientShow({
                                                                     {m.name}
                                                                 </span>
                                                                 {m.controlled_drug && (
-                                                                    <Badge className="gap-0.5 border-0 bg-rose-100 text-[9px] text-rose-700">
+                                                                    <Badge className="gap-0.5 border-0 bg-status-critical-bg text-[9px] text-status-critical">
                                                                         <Shield className="h-2.5 w-2.5" />
                                                                         Controlled
                                                                     </Badge>
@@ -3865,7 +3865,7 @@ export default function ClientShow({
                                                                     </span>
                                                                 )}
                                                                 {m.frequency && (
-                                                                    <span className="text-blue-600">
+                                                                    <span className="text-status-info">
                                                                         {
                                                                             m.frequency
                                                                         }
@@ -3890,7 +3890,7 @@ export default function ClientShow({
                                 {/* PRN Medications */}
                                 {prnMeds.length > 0 && (
                                     <Card className="overflow-hidden">
-                                        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-3">
+                                        <div className="bg-primary px-5 py-3">
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <h3 className="text-sm font-semibold text-white">
@@ -3926,7 +3926,7 @@ export default function ClientShow({
                                                                     PRN
                                                                 </Badge>
                                                                 {m.controlled_drug && (
-                                                                    <Badge className="gap-0.5 border-0 bg-rose-100 text-[9px] text-rose-700">
+                                                                    <Badge className="gap-0.5 border-0 bg-status-critical-bg text-[9px] text-status-critical">
                                                                         <Shield className="h-2.5 w-2.5" />
                                                                         Controlled
                                                                     </Badge>
@@ -4029,8 +4029,8 @@ export default function ClientShow({
                                 {meds.length === 0 && (
                                     <Card className="border-dashed">
                                         <CardContent className="flex flex-col items-center justify-center py-16">
-                                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50">
-                                                <Pill className="h-8 w-8 text-blue-400" />
+                                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-status-info-bg">
+                                                <Pill className="h-8 w-8 text-status-info" />
                                             </div>
                                             <p className="font-medium">
                                                 No Medications
@@ -4137,15 +4137,15 @@ export default function ClientShow({
                             <div className="space-y-4">
                                 {/* Review Due Alert */}
                                 {reviewDue && activePlan && (
-                                    <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                    <div className="flex items-center gap-3 rounded-xl border-2 border-status-warning/30 bg-status-warning-bg p-4">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                                             <ShieldAlert className="h-5 w-5" />
                                         </div>
                                         <div className="flex-1">
-                                            <p className="text-sm font-semibold text-amber-800">
+                                            <p className="text-sm font-semibold text-status-warning">
                                                 Care Plan Review Overdue
                                             </p>
-                                            <p className="text-xs text-amber-700">
+                                            <p className="text-xs text-status-warning">
                                                 This plan is due for review.
                                                 Please update goals and
                                                 strategies.
@@ -4153,7 +4153,7 @@ export default function ClientShow({
                                         </div>
                                         <Button
                                             size="sm"
-                                            className="bg-amber-600 text-white hover:bg-amber-700"
+                                            className="bg-status-warning text-white hover:bg-status-warning"
                                             asChild
                                         >
                                             <Link
@@ -4169,7 +4169,7 @@ export default function ClientShow({
                                     <>
                                         {/* Quick Stats */}
                                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                            <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                            <div className="rounded-xl border bg-primary/10 p-3 text-center">
                                                 <div className="text-2xl font-bold text-primary">
                                                     {goalsPct}%
                                                 </div>
@@ -4177,26 +4177,26 @@ export default function ClientShow({
                                                     Overall Progress
                                                 </div>
                                             </div>
-                                            <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
-                                                <div className="text-2xl font-bold text-emerald-700">
+                                            <div className="rounded-xl border bg-status-success-bg p-3 text-center">
+                                                <div className="text-2xl font-bold text-status-success">
                                                     {goalsCompleted}/
                                                     {goals.length}
                                                 </div>
-                                                <div className="text-[10px] tracking-wider text-emerald-500 uppercase">
+                                                <div className="text-[10px] tracking-wider text-status-success uppercase">
                                                     Goals Completed
                                                 </div>
                                             </div>
-                                            <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 p-3 text-center">
-                                                <div className="text-2xl font-bold text-blue-700">
+                                            <div className="rounded-xl border bg-primary/10 p-3 text-center">
+                                                <div className="text-2xl font-bold text-status-info">
                                                     {goalsInProgress}
                                                 </div>
-                                                <div className="text-[10px] tracking-wider text-blue-500 uppercase">
+                                                <div className="text-[10px] tracking-wider text-status-info uppercase">
                                                     In Progress
                                                 </div>
                                             </div>
-                                            <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                            <div className="rounded-xl border bg-primary/10 p-3 text-center">
                                                 <div
-                                                    className={`text-2xl font-bold ${reviewDays !== null && reviewDays < 0 ? 'text-red-600' : 'text-primary'}`}
+                                                    className={`text-2xl font-bold ${reviewDays !== null && reviewDays < 0 ? 'text-status-critical' : 'text-primary'}`}
                                                 >
                                                     {reviewDays !== null
                                                         ? reviewDays < 0
@@ -4219,7 +4219,7 @@ export default function ClientShow({
                                             <div className="space-y-4 lg:col-span-2">
                                                 {/* Progress Stream Card */}
                                                 <Card className="overflow-hidden">
-                                                    <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-5 py-3">
+                                                    <div className="bg-primary px-5 py-3">
                                                         <div className="flex items-center justify-between">
                                                             <div>
                                                                 <h3 className="text-sm font-semibold text-white">
@@ -4288,7 +4288,7 @@ export default function ClientShow({
                                                                                         }
                                                                                     </span>
                                                                                     <span
-                                                                                        className={`text-xs font-bold tabular-nums ${g.status === 'completed' ? 'text-emerald-600' : 'text-primary'}`}
+                                                                                        className={`text-xs font-bold tabular-nums ${g.status === 'completed' ? 'text-status-success' : 'text-primary'}`}
                                                                                     >
                                                                                         {g.progress_percentage ??
                                                                                             0}
@@ -4298,7 +4298,7 @@ export default function ClientShow({
                                                                                 </div>
                                                                                 <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
                                                                                     <div
-                                                                                        className={`h-full rounded-full transition-all ${g.status === 'completed' ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-purple-500'}`}
+                                                                                        className={`h-full rounded-full transition-all ${g.status === 'completed' ? 'bg-gradient-to-r from-status-success to-status-success' : 'bg-primary'}`}
                                                                                         style={{
                                                                                             width: `${g.progress_percentage ?? 0}%`,
                                                                                         }}
@@ -4312,14 +4312,14 @@ export default function ClientShow({
                                                             <div className="mt-4 flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3">
                                                                 <div className="flex items-center gap-4">
                                                                     <span className="flex items-center gap-1.5 text-xs">
-                                                                        <span className="h-3 w-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500" />{' '}
+                                                                        <span className="h-3 w-3 rounded-full bg-gradient-to-r from-status-success to-status-success" />{' '}
                                                                         Completed:{' '}
                                                                         {
                                                                             goalsCompleted
                                                                         }
                                                                     </span>
                                                                     <span className="flex items-center gap-1.5 text-xs">
-                                                                        <span className="h-3 w-3 rounded-full bg-gradient-to-r from-violet-400 to-purple-500" />{' '}
+                                                                        <span className="h-3 w-3 rounded-full bg-primary" />{' '}
                                                                         In
                                                                         Progress:{' '}
                                                                         {
@@ -4327,7 +4327,7 @@ export default function ClientShow({
                                                                         }
                                                                     </span>
                                                                     <span className="flex items-center gap-1.5 text-xs">
-                                                                        <span className="h-3 w-3 rounded-full bg-slate-300" />{' '}
+                                                                        <span className="h-3 w-3 rounded-full bg-muted" />{' '}
                                                                         Not
                                                                         Started:{' '}
                                                                         {goals.length -
@@ -4353,7 +4353,7 @@ export default function ClientShow({
                                                 {/* About Me */}
                                                 {hasAboutMe && (
                                                     <Card className="overflow-hidden border-primary">
-                                                        <div className="bg-gradient-to-r from-rose-400 to-pink-500 px-5 py-2.5">
+                                                        <div className="bg-gradient-to-r from-status-critical to-status-critical px-5 py-2.5">
                                                             <h3 className="text-sm font-semibold text-white">
                                                                 About{' '}
                                                                 {
@@ -4377,8 +4377,8 @@ export default function ClientShow({
                                                             )}
                                                             <div className="grid gap-3 sm:grid-cols-2">
                                                                 {aboutMe.likes && (
-                                                                    <div className="rounded-lg bg-emerald-50 p-3">
-                                                                        <p className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase">
+                                                                    <div className="rounded-lg bg-status-success-bg p-3">
+                                                                        <p className="text-[10px] font-bold tracking-wider text-status-success uppercase">
                                                                             Things
                                                                             I
                                                                             Like
@@ -4391,8 +4391,8 @@ export default function ClientShow({
                                                                     </div>
                                                                 )}
                                                                 {aboutMe.dislikes && (
-                                                                    <div className="rounded-lg bg-red-50 p-3">
-                                                                        <p className="text-[10px] font-bold tracking-wider text-red-500 uppercase">
+                                                                    <div className="rounded-lg bg-status-critical-bg p-3">
+                                                                        <p className="text-[10px] font-bold tracking-wider text-status-critical uppercase">
                                                                             Things
                                                                             I
                                                                             Don
@@ -4443,7 +4443,7 @@ export default function ClientShow({
                                                             <span className="text-muted-foreground">
                                                                 Status
                                                             </span>
-                                                            <Badge className="border-0 bg-emerald-100 text-[10px] text-emerald-700">
+                                                            <Badge className="border-0 bg-status-success-bg text-[10px] text-status-success">
                                                                 Active
                                                             </Badge>
                                                         </div>
@@ -4483,7 +4483,7 @@ export default function ClientShow({
                                                                 <span
                                                                     className={
                                                                         reviewDue
-                                                                            ? 'font-semibold text-red-600'
+                                                                            ? 'font-semibold text-status-critical'
                                                                             : ''
                                                                     }
                                                                 >
@@ -4662,19 +4662,19 @@ export default function ClientShow({
                                 key: 'happy',
                                 emoji: '😊',
                                 label: 'Happy',
-                                color: 'bg-emerald-100 border-emerald-300 text-emerald-700',
+                                color: 'bg-status-success-bg border-status-success/30 text-status-success',
                             },
                             {
                                 key: 'calm',
                                 emoji: '😌',
                                 label: 'Calm',
-                                color: 'bg-sky-100 border-sky-300 text-sky-700',
+                                color: 'bg-status-info-bg border-status-info/30 text-status-info',
                             },
                             {
                                 key: 'excited',
                                 emoji: '🤩',
                                 label: 'Excited',
-                                color: 'bg-amber-100 border-amber-300 text-amber-700',
+                                color: 'bg-status-warning-bg border-status-warning/30 text-status-warning',
                             },
                             {
                                 key: 'tired',
@@ -4686,19 +4686,19 @@ export default function ClientShow({
                                 key: 'anxious',
                                 emoji: '😰',
                                 label: 'Anxious',
-                                color: 'bg-orange-100 border-orange-300 text-orange-700',
+                                color: 'bg-status-warning-bg border-status-warning/30 text-status-warning',
                             },
                             {
                                 key: 'sad',
                                 emoji: '😢',
                                 label: 'Sad',
-                                color: 'bg-blue-100 border-blue-300 text-blue-700',
+                                color: 'bg-status-info-bg border-status-info/30 text-status-info',
                             },
                             {
                                 key: 'frustrated',
                                 emoji: '😤',
                                 label: 'Frustrated',
-                                color: 'bg-red-100 border-red-300 text-red-700',
+                                color: 'bg-status-critical-bg border-status-critical/30 text-status-critical',
                             },
                             {
                                 key: 'confused',
@@ -4765,17 +4765,17 @@ export default function ClientShow({
                             },
                             observation: {
                                 border: 'border-l-blue-400',
-                                bg: 'bg-blue-50',
+                                bg: 'bg-status-info-bg',
                                 label: 'Observation',
                             },
                             handover: {
                                 border: 'border-l-cyan-400',
-                                bg: 'bg-cyan-50',
+                                bg: 'bg-status-info-bg',
                                 label: 'Handover',
                             },
                             incident: {
                                 border: 'border-l-red-400',
-                                bg: 'bg-red-50',
+                                bg: 'bg-status-critical-bg',
                                 label: 'Incident',
                             },
                         };
@@ -4792,7 +4792,7 @@ export default function ClientShow({
                             <div className="space-y-4">
                                 {/* Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
                                         <div className="text-xl font-bold text-primary">
                                             {notes.length}
                                         </div>
@@ -4800,29 +4800,29 @@ export default function ClientShow({
                                             Total Notes
                                         </div>
                                     </div>
-                                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
-                                        <div className="text-lg font-bold text-emerald-700">
+                                    <div className="rounded-xl border bg-status-success-bg p-3 text-center">
+                                        <div className="text-lg font-bold text-status-success">
                                             {topWeek
                                                 ? `${EMOTION_MAP[topWeek.key]?.emoji ?? ''} ${EMOTION_MAP[topWeek.key]?.label ?? topWeek.key}`
                                                 : '—'}
                                         </div>
-                                        <div className="text-[10px] tracking-wider text-emerald-500 uppercase">
+                                        <div className="text-[10px] tracking-wider text-status-success uppercase">
                                             This Week
                                         </div>
                                     </div>
-                                    <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
-                                        <div className="text-lg font-bold text-blue-700">
+                                    <div className="rounded-xl border bg-status-info-bg p-3 text-center">
+                                        <div className="text-lg font-bold text-status-info">
                                             {topMonth
                                                 ? `${EMOTION_MAP[topMonth.key]?.emoji ?? ''} ${EMOTION_MAP[topMonth.key]?.label ?? topMonth.key}`
                                                 : '—'}
                                         </div>
-                                        <div className="text-[10px] tracking-wider text-blue-500 uppercase">
+                                        <div className="text-[10px] tracking-wider text-status-info uppercase">
                                             This Month
                                         </div>
                                     </div>
                                     <div className="rounded-xl border p-3 text-center">
                                         <div
-                                            className={`text-xl font-bold ${flaggedCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}
+                                            className={`text-xl font-bold ${flaggedCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
                                         >
                                             {flaggedCount}
                                         </div>
@@ -4831,7 +4831,7 @@ export default function ClientShow({
                                         </div>
                                     </div>
                                     <div className="rounded-xl border p-3 text-center">
-                                        <div className="text-xl font-bold text-blue-600">
+                                        <div className="text-xl font-bold text-status-info">
                                             {familyCount}
                                         </div>
                                         <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
@@ -4919,7 +4919,7 @@ export default function ClientShow({
 
                                 {/* Add Note Form */}
                                 <Card className="overflow-hidden border-primary">
-                                    <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
+                                    <div className="bg-primary px-4 py-2.5">
                                         <h3 className="text-sm font-semibold text-white">
                                             Add Progress Note
                                         </h3>
@@ -5156,7 +5156,7 @@ export default function ClientShow({
                                             return (
                                                 <Card
                                                     key={note.id}
-                                                    className={`overflow-hidden border-l-4 ${note.is_flagged ? 'border-l-red-500 bg-red-50/30' : typeStyle.border}`}
+                                                    className={`overflow-hidden border-l-4 ${note.is_flagged ? 'border-l-red-500 bg-status-critical-bg' : typeStyle.border}`}
                                                 >
                                                     <CardContent className="p-4">
                                                         <div className="flex items-start justify-between gap-3">
@@ -5237,12 +5237,12 @@ export default function ClientShow({
                                                                             )}
                                                                         {note.visibility ===
                                                                             'include_family' && (
-                                                                            <Badge className="border-0 bg-blue-100 text-[9px] text-blue-700">
+                                                                            <Badge className="border-0 bg-status-info-bg text-[9px] text-status-info">
                                                                                 Family
                                                                             </Badge>
                                                                         )}
                                                                         {note.is_flagged && (
-                                                                            <Badge className="border-0 bg-red-100 text-[9px] text-red-700">
+                                                                            <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">
                                                                                 Flagged
                                                                             </Badge>
                                                                         )}
@@ -5341,7 +5341,7 @@ export default function ClientShow({
                             <div className="space-y-4">
                                 {/* Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
                                         <div className="text-xl font-bold text-primary">
                                             {agreements.length}
                                         </div>
@@ -5349,17 +5349,17 @@ export default function ClientShow({
                                             Total
                                         </div>
                                     </div>
-                                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
-                                        <div className="text-xl font-bold text-emerald-700">
+                                    <div className="rounded-xl border bg-status-success-bg p-3 text-center">
+                                        <div className="text-xl font-bold text-status-success">
                                             {activeAgs.length}
                                         </div>
-                                        <div className="text-[10px] tracking-wider text-emerald-500 uppercase">
+                                        <div className="text-[10px] tracking-wider text-status-success uppercase">
                                             Active
                                         </div>
                                     </div>
-                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                    <div className="rounded-xl border bg-primary/10 p-3 text-center">
                                         <div
-                                            className={`text-xl font-bold ${overallPct > 90 ? 'text-red-600' : overallPct > 70 ? 'text-amber-600' : 'text-primary'}`}
+                                            className={`text-xl font-bold ${overallPct > 90 ? 'text-status-critical' : overallPct > 70 ? 'text-status-warning' : 'text-primary'}`}
                                         >
                                             {overallPct}%
                                         </div>
@@ -5369,7 +5369,7 @@ export default function ClientShow({
                                     </div>
                                     <div className="rounded-xl border p-3 text-center">
                                         <div
-                                            className={`text-xl font-bold ${expiringSoon > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}
+                                            className={`text-xl font-bold ${expiringSoon > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
                                         >
                                             {expiringSoon}
                                         </div>
@@ -5401,7 +5401,7 @@ export default function ClientShow({
                                             </div>
                                             <div className="h-4 w-full overflow-hidden rounded-full bg-primary/20">
                                                 <div
-                                                    className={`h-full rounded-full transition-all ${overallPct > 90 ? 'bg-red-500' : overallPct > 70 ? 'bg-amber-500' : 'bg-primary'}`}
+                                                    className={`h-full rounded-full transition-all ${overallPct > 90 ? 'bg-status-critical' : overallPct > 70 ? 'bg-status-warning' : 'bg-primary'}`}
                                                     style={{
                                                         width: `${Math.min(overallPct, 100)}%`,
                                                     }}
@@ -5472,10 +5472,10 @@ export default function ClientShow({
                                                     : 0;
                                             const budgetColor =
                                                 budgetPct > 90
-                                                    ? 'bg-red-500'
+                                                    ? 'bg-status-critical'
                                                     : budgetPct > 70
-                                                      ? 'bg-amber-500'
-                                                      : 'bg-emerald-500';
+                                                      ? 'bg-status-warning'
+                                                      : 'bg-status-success';
                                             const isExpiring =
                                                 ag.ends_at &&
                                                 new Date(ag.ends_at).getTime() -
@@ -5496,7 +5496,7 @@ export default function ClientShow({
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="flex items-start gap-3">
                                                                 <div
-                                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-muted text-muted-foreground'}`}
+                                                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ag.status === 'active' ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground'}`}
                                                                 >
                                                                     <DollarSign className="h-5 w-5" />
                                                                 </div>
@@ -5508,7 +5508,7 @@ export default function ClientShow({
                                                                             }
                                                                         </span>
                                                                         <Badge
-                                                                            className={`border-0 text-[9px] capitalize ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-700' : ag.status === 'draft' ? 'bg-muted text-muted-foreground' : 'bg-amber-100 text-amber-700'}`}
+                                                                            className={`border-0 text-[9px] capitalize ${ag.status === 'active' ? 'bg-status-success-bg text-status-success' : ag.status === 'draft' ? 'bg-muted text-muted-foreground' : 'bg-status-warning-bg text-status-warning'}`}
                                                                         >
                                                                             {
                                                                                 ag.status
@@ -5525,13 +5525,13 @@ export default function ClientShow({
                                                                             </Badge>
                                                                         )}
                                                                         {isExpiring && (
-                                                                            <Badge className="animate-pulse border-0 bg-amber-100 text-[9px] text-amber-700">
+                                                                            <Badge className="animate-pulse border-0 bg-status-warning-bg text-[9px] text-status-warning">
                                                                                 Expiring
                                                                                 Soon
                                                                             </Badge>
                                                                         )}
                                                                         {isExpired && (
-                                                                            <Badge className="border-0 bg-red-100 text-[9px] text-red-700">
+                                                                            <Badge className="border-0 bg-status-critical-bg text-[9px] text-status-critical">
                                                                                 Expired
                                                                             </Badge>
                                                                         )}
@@ -5941,7 +5941,7 @@ export default function ClientShow({
                             ) : (
                                 <div className="relative ml-4">
                                     {/* Vertical line */}
-                                    <div className="absolute top-0 bottom-0 left-3 w-0.5 bg-gradient-to-b from-violet-300 via-violet-200 to-transparent" />
+                                    <div className="absolute top-0 bottom-0 left-3 w-0.5 bg-gradient-to-b from-primary via-primary/10 to-transparent" />
 
                                     <div className="space-y-0">
                                         {filteredEvents.map((e, idx) => {
@@ -5964,35 +5964,35 @@ export default function ClientShow({
                                                     icon: '🎯',
                                                 },
                                                 handover: {
-                                                    dot: 'bg-blue-500',
-                                                    bg: 'bg-blue-50',
+                                                    dot: 'bg-status-info',
+                                                    bg: 'bg-status-info-bg',
                                                     icon: '🤝',
                                                 },
                                                 incident: {
-                                                    dot: 'bg-red-500',
-                                                    bg: 'bg-red-50',
+                                                    dot: 'bg-status-critical',
+                                                    bg: 'bg-status-critical-bg',
                                                     icon: '⚠️',
                                                 },
                                                 shift: {
-                                                    dot: 'bg-emerald-500',
-                                                    bg: 'bg-emerald-50',
+                                                    dot: 'bg-status-success',
+                                                    bg: 'bg-status-success-bg',
                                                     icon: '📋',
                                                 },
                                                 medication: {
-                                                    dot: 'bg-cyan-500',
-                                                    bg: 'bg-cyan-50',
+                                                    dot: 'bg-status-info',
+                                                    bg: 'bg-status-info-bg',
                                                     icon: '💊',
                                                 },
                                                 assessment: {
-                                                    dot: 'bg-amber-500',
-                                                    bg: 'bg-amber-50',
+                                                    dot: 'bg-status-warning',
+                                                    bg: 'bg-status-warning-bg',
                                                     icon: '📊',
                                                 },
                                             };
                                             const style = TYPE_STYLES[
                                                 e.type
                                             ] ?? {
-                                                dot: 'bg-slate-400',
+                                                dot: 'bg-muted',
                                                 bg: 'bg-muted',
                                                 icon: '📌',
                                             };
@@ -6152,16 +6152,16 @@ export default function ClientShow({
                                                                                     string
                                                                                 > =
                                                                                     {
-                                                                                        happy: 'bg-emerald-100 text-emerald-700',
-                                                                                        calm: 'bg-sky-100 text-sky-700',
+                                                                                        happy: 'bg-status-success-bg text-status-success',
+                                                                                        calm: 'bg-status-info-bg text-status-info',
                                                                                         excited:
-                                                                                            'bg-amber-100 text-amber-700',
+                                                                                            'bg-status-warning-bg text-status-warning',
                                                                                         tired: 'bg-primary/10 text-primary',
                                                                                         anxious:
-                                                                                            'bg-orange-100 text-orange-700',
-                                                                                        sad: 'bg-blue-100 text-blue-700',
+                                                                                            'bg-status-warning-bg text-status-warning',
+                                                                                        sad: 'bg-status-info-bg text-status-info',
                                                                                         frustrated:
-                                                                                            'bg-red-100 text-red-700',
+                                                                                            'bg-status-critical-bg text-status-critical',
                                                                                         confused:
                                                                                             'bg-primary/10 text-primary',
                                                                                     };
@@ -6257,28 +6257,28 @@ export default function ClientShow({
                             string,
                             { color: string; bg: string }
                         > = {
-                            pdf: { color: 'text-red-600', bg: 'bg-red-100' },
-                            doc: { color: 'text-blue-600', bg: 'bg-blue-100' },
-                            docx: { color: 'text-blue-600', bg: 'bg-blue-100' },
+                            pdf: { color: 'text-status-critical', bg: 'bg-status-critical-bg' },
+                            doc: { color: 'text-status-info', bg: 'bg-status-info-bg' },
+                            docx: { color: 'text-status-info', bg: 'bg-status-info-bg' },
                             xls: {
-                                color: 'text-emerald-600',
-                                bg: 'bg-emerald-100',
+                                color: 'text-status-success',
+                                bg: 'bg-status-success-bg',
                             },
                             xlsx: {
-                                color: 'text-emerald-600',
-                                bg: 'bg-emerald-100',
+                                color: 'text-status-success',
+                                bg: 'bg-status-success-bg',
                             },
                             jpg: {
-                                color: 'text-amber-600',
-                                bg: 'bg-amber-100',
+                                color: 'text-status-warning',
+                                bg: 'bg-status-warning-bg',
                             },
                             jpeg: {
-                                color: 'text-amber-600',
-                                bg: 'bg-amber-100',
+                                color: 'text-status-warning',
+                                bg: 'bg-status-warning-bg',
                             },
                             png: {
-                                color: 'text-amber-600',
-                                bg: 'bg-amber-100',
+                                color: 'text-status-warning',
+                                bg: 'bg-status-warning-bg',
                             },
                         };
                         const getFileStyle = (name?: string) => {
@@ -6294,10 +6294,10 @@ export default function ClientShow({
                         };
                         const CAT_COLORS: Record<string, string> = {
                             care_plan: 'bg-primary/10 text-primary',
-                            assessment: 'bg-blue-100 text-blue-700',
-                            medical: 'bg-red-100 text-red-700',
-                            legal: 'bg-amber-100 text-amber-700',
-                            policy: 'bg-emerald-100 text-emerald-700',
+                            assessment: 'bg-status-info-bg text-status-info',
+                            medical: 'bg-status-critical-bg text-status-critical',
+                            legal: 'bg-status-warning-bg text-status-warning',
+                            policy: 'bg-status-success-bg text-status-success',
                             consent: 'bg-primary/10 text-primary',
                         };
 
@@ -6325,7 +6325,7 @@ export default function ClientShow({
                                                 new Date(d.expires_at) <
                                                     new Date(),
                                         ) && (
-                                            <Badge className="border-0 bg-red-100 text-[10px] text-red-700">
+                                            <Badge className="border-0 bg-status-critical-bg text-[10px] text-status-critical">
                                                 Has expired
                                             </Badge>
                                         )}
@@ -6364,7 +6364,7 @@ export default function ClientShow({
                                         ([folder, docs]) => (
                                             <div key={folder}>
                                                 <div className="mb-2 flex items-center gap-2">
-                                                    <FolderOpen className="h-4 w-4 text-amber-500" />
+                                                    <FolderOpen className="h-4 w-4 text-status-warning" />
                                                     <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                         {folder}
                                                     </span>
@@ -6400,7 +6400,7 @@ export default function ClientShow({
                                                                 <a
                                                                     key={d.id}
                                                                     href={`/operations/clients/${client.id}/documents/${d.id}/download`}
-                                                                    className={`group rounded-xl border bg-white p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md ${expired ? 'border-red-200' : expiring ? 'border-amber-200' : ''}`}
+                                                                    className={`group rounded-xl border bg-white p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md ${expired ? 'border-status-critical/30' : expiring ? 'border-status-warning/30' : ''}`}
                                                                 >
                                                                     <div
                                                                         className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl ${fi.bg}`}
@@ -6415,15 +6415,15 @@ export default function ClientShow({
                                                                     </p>
                                                                     <div className="mt-1.5 flex items-center justify-center gap-1">
                                                                         {d.portal_visible && (
-                                                                            <Globe className="h-3 w-3 text-blue-500" />
+                                                                            <Globe className="h-3 w-3 text-status-info" />
                                                                         )}
                                                                         {expired && (
-                                                                            <Badge className="h-4 border-0 bg-red-100 px-1 text-[8px] text-red-600">
+                                                                            <Badge className="h-4 border-0 bg-status-critical-bg px-1 text-[8px] text-status-critical">
                                                                                 Expired
                                                                             </Badge>
                                                                         )}
                                                                         {expiring && (
-                                                                            <Badge className="h-4 border-0 bg-amber-100 px-1 text-[8px] text-amber-600">
+                                                                            <Badge className="h-4 border-0 bg-status-warning-bg px-1 text-[8px] text-status-warning">
                                                                                 Expiring
                                                                             </Badge>
                                                                         )}
@@ -6488,17 +6488,17 @@ export default function ClientShow({
                             note: {
                                 emoji: '📝',
                                 label: 'Note',
-                                color: 'bg-blue-100 text-blue-700',
+                                color: 'bg-status-info-bg text-status-info',
                             },
                             todo: {
                                 emoji: '✅',
                                 label: 'To-Do',
-                                color: 'bg-emerald-100 text-emerald-700',
+                                color: 'bg-status-success-bg text-status-success',
                             },
                             request: {
                                 emoji: '🙏',
                                 label: 'Request',
-                                color: 'bg-amber-100 text-amber-700',
+                                color: 'bg-status-warning-bg text-status-warning',
                             },
                             reminder: {
                                 emoji: '⏰',
@@ -6508,14 +6508,14 @@ export default function ClientShow({
                         };
                         const PRIORITY_COLORS: Record<string, string> = {
                             low: 'bg-muted text-muted-foreground',
-                            normal: 'bg-blue-100 text-blue-700',
-                            high: 'bg-orange-100 text-orange-700',
-                            urgent: 'bg-red-100 text-red-700',
+                            normal: 'bg-status-info-bg text-status-info',
+                            high: 'bg-status-warning-bg text-status-warning',
+                            urgent: 'bg-status-critical-bg text-status-critical',
                         };
                         const STATUS_COLORS: Record<string, string> = {
-                            open: 'bg-blue-100 text-blue-700',
-                            in_progress: 'bg-amber-100 text-amber-700',
-                            completed: 'bg-emerald-100 text-emerald-700',
+                            open: 'bg-status-info-bg text-status-info',
+                            in_progress: 'bg-status-warning-bg text-status-warning',
+                            completed: 'bg-status-success-bg text-status-success',
                             cancelled: 'bg-muted text-muted-foreground',
                         };
 
@@ -6523,19 +6523,19 @@ export default function ClientShow({
                             <div className="space-y-4">
                                 {/* Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                    <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
-                                        <div className="text-xl font-bold text-blue-700">
+                                    <div className="rounded-xl border bg-status-info-bg p-3 text-center">
+                                        <div className="text-xl font-bold text-status-info">
                                             {openNotes.length}
                                         </div>
-                                        <div className="text-[10px] tracking-wider text-blue-500 uppercase">
+                                        <div className="text-[10px] tracking-wider text-status-info uppercase">
                                             Open
                                         </div>
                                     </div>
                                     <div
-                                        className={`rounded-xl border p-3 text-center ${urgentCount > 0 ? 'bg-gradient-to-br from-red-50 to-rose-50' : ''}`}
+                                        className={`rounded-xl border p-3 text-center ${urgentCount > 0 ? 'bg-status-critical-bg' : ''}`}
                                     >
                                         <div
-                                            className={`text-xl font-bold ${urgentCount > 0 ? 'text-red-700' : 'text-muted-foreground'}`}
+                                            className={`text-xl font-bold ${urgentCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
                                         >
                                             {urgentCount}
                                         </div>
@@ -6544,10 +6544,10 @@ export default function ClientShow({
                                         </div>
                                     </div>
                                     <div
-                                        className={`rounded-xl border p-3 text-center ${overdueCount > 0 ? 'bg-gradient-to-br from-orange-50 to-amber-50' : ''}`}
+                                        className={`rounded-xl border p-3 text-center ${overdueCount > 0 ? 'bg-status-warning-bg' : ''}`}
                                     >
                                         <div
-                                            className={`text-xl font-bold ${overdueCount > 0 ? 'text-orange-700' : 'text-muted-foreground'}`}
+                                            className={`text-xl font-bold ${overdueCount > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
                                         >
                                             {overdueCount}
                                         </div>
@@ -6555,11 +6555,11 @@ export default function ClientShow({
                                             Overdue
                                         </div>
                                     </div>
-                                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
-                                        <div className="text-xl font-bold text-emerald-700">
+                                    <div className="rounded-xl border bg-status-success-bg p-3 text-center">
+                                        <div className="text-xl font-bold text-status-success">
                                             {completedThisWeek}
                                         </div>
-                                        <div className="text-[10px] tracking-wider text-emerald-500 uppercase">
+                                        <div className="text-[10px] tracking-wider text-status-success uppercase">
                                             Done This Week
                                         </div>
                                     </div>
@@ -6590,7 +6590,7 @@ export default function ClientShow({
                                             return (
                                                 <Card
                                                     key={note.id}
-                                                    className={`overflow-hidden transition-all hover:shadow-sm ${note.is_overdue ? 'border-red-300 bg-red-50/20' : note.status === 'completed' ? 'opacity-60' : ''}`}
+                                                    className={`overflow-hidden transition-all hover:shadow-sm ${note.is_overdue ? 'border-status-critical/30 bg-status-critical-bg' : note.status === 'completed' ? 'opacity-60' : ''}`}
                                                 >
                                                     <CardContent className="p-4">
                                                         <div className="flex items-start justify-between gap-3">
@@ -6630,14 +6630,14 @@ export default function ClientShow({
                                                                         )}
                                                                     </Badge>
                                                                     {note.is_overdue && (
-                                                                        <Badge className="gap-0.5 border-0 bg-red-100 text-[9px] text-red-700">
+                                                                        <Badge className="gap-0.5 border-0 bg-status-critical-bg text-[9px] text-status-critical">
                                                                             <AlertTriangle className="h-2.5 w-2.5" />
                                                                             Overdue
                                                                         </Badge>
                                                                     )}
                                                                     <Badge
                                                                         variant="outline"
-                                                                        className="border-amber-200 bg-amber-50 text-[9px] text-amber-700"
+                                                                        className="border-status-warning/30 bg-status-warning-bg text-[9px] text-status-warning"
                                                                     >
                                                                         Family
                                                                     </Badge>
@@ -6726,7 +6726,7 @@ export default function ClientShow({
                                                                         </p>
                                                                     )}
                                                                 {note.staff_response && (
-                                                                    <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-blue-50/50 p-2">
+                                                                    <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-status-info-bg p-2">
                                                                         <p className="text-xs">
                                                                             <span className="font-medium">
                                                                                 {
@@ -6735,7 +6735,7 @@ export default function ClientShow({
                                                                             </span>{' '}
                                                                             <Badge
                                                                                 variant="outline"
-                                                                                className="ml-1 border-blue-200 bg-blue-50 text-[9px] text-blue-700"
+                                                                                className="ml-1 border-status-info/30 bg-status-info-bg text-[9px] text-status-info"
                                                                             >
                                                                                 Staff
                                                                             </Badge>
@@ -6750,7 +6750,7 @@ export default function ClientShow({
                                                                 {note.status ===
                                                                     'completed' &&
                                                                     note.completed_by_name && (
-                                                                        <p className="mt-1 text-xs text-emerald-600">
+                                                                        <p className="mt-1 text-xs text-status-success">
                                                                             <CheckCircle2 className="mr-1 inline h-3 w-3" />
                                                                             Completed
                                                                             by{' '}
@@ -6784,7 +6784,7 @@ export default function ClientShow({
                                                                     <Button
                                                                         size="sm"
                                                                         variant="outline"
-                                                                        className="h-7 gap-1 text-[10px] text-emerald-600"
+                                                                        className="h-7 gap-1 text-[10px] text-status-success"
                                                                         onClick={() =>
                                                                             router.post(
                                                                                 `/clients/${client.id}/family-notes/${note.id}/status`,
@@ -6805,7 +6805,7 @@ export default function ClientShow({
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline"
-                                                                            className="h-7 gap-1 text-[10px] text-amber-600"
+                                                                            className="h-7 gap-1 text-[10px] text-status-warning"
                                                                             onClick={() =>
                                                                                 router.post(
                                                                                     `/clients/${client.id}/family-notes/${note.id}/status`,
@@ -7163,10 +7163,10 @@ export default function ClientShow({
                         ).length;
 
                         const STATUS_COLORS: Record<string, string> = {
-                            given: 'bg-emerald-100 text-emerald-700',
-                            refused: 'bg-red-100 text-red-700',
+                            given: 'bg-status-success-bg text-status-success',
+                            refused: 'bg-status-critical-bg text-status-critical',
                             withdrawn: 'bg-muted text-muted-foreground',
-                            expired: 'bg-amber-100 text-amber-700',
+                            expired: 'bg-status-warning-bg text-status-warning',
                         };
 
                         return (
@@ -7182,7 +7182,7 @@ export default function ClientShow({
                                         </div>
                                     </div>
                                     <div className="rounded-lg border p-3 text-center">
-                                        <div className="text-lg font-bold text-emerald-600">
+                                        <div className="text-lg font-bold text-status-success">
                                             {activeCount}
                                         </div>
                                         <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
@@ -7191,7 +7191,7 @@ export default function ClientShow({
                                     </div>
                                     <div className="rounded-lg border p-3 text-center">
                                         <div
-                                            className={`text-lg font-bold ${expiringCount > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}
+                                            className={`text-lg font-bold ${expiringCount > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
                                         >
                                             {expiringCount}
                                         </div>
@@ -7201,7 +7201,7 @@ export default function ClientShow({
                                     </div>
                                     <div className="rounded-lg border p-3 text-center">
                                         <div
-                                            className={`text-lg font-bold ${expiredCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}
+                                            className={`text-lg font-bold ${expiredCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
                                         >
                                             {expiredCount}
                                         </div>
@@ -7280,9 +7280,9 @@ export default function ClientShow({
                                                                         <span
                                                                             className={
                                                                                 c.is_expired
-                                                                                    ? 'font-medium text-red-600'
+                                                                                    ? 'font-medium text-status-critical'
                                                                                     : c.is_expiring_soon
-                                                                                      ? 'font-medium text-amber-600'
+                                                                                      ? 'font-medium text-status-warning'
                                                                                       : ''
                                                                             }
                                                                         >
@@ -7361,12 +7361,12 @@ export default function ClientShow({
                                             <div className="flex items-center gap-2 text-sm font-medium">
                                                 {u.name}
                                                 {u.is_legal_guardian && (
-                                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning">
                                                         Legal Guardian
                                                     </span>
                                                 )}
                                                 {u.is_emergency_contact && (
-                                                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                                                    <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical">
                                                         Emergency
                                                     </span>
                                                 )}
@@ -7383,7 +7383,7 @@ export default function ClientShow({
                                         <div className="flex items-center gap-2">
                                             {u.status === 'active' ||
                                             u.is_active !== false ? (
-                                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                                                <span className="rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success">
                                                     Active
                                                 </span>
                                             ) : (
@@ -7429,9 +7429,9 @@ export default function ClientShow({
                         <div className="space-y-6">
                             {/* Stats */}
                             <div className="grid gap-3 sm:grid-cols-3">
-                                <Card className="border bg-blue-50/50 dark:bg-blue-950/20">
+                                <Card className="border bg-status-info-bg dark:bg-status-info">
                                     <CardContent className="p-4">
-                                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">{ts.transports_30d}</div>
+                                        <div className="text-2xl font-bold text-status-info dark:text-status-info">{ts.transports_30d}</div>
                                         <div className="text-xs text-muted-foreground">Transports (30d)</div>
                                     </CardContent>
                                 </Card>
@@ -7441,9 +7441,9 @@ export default function ClientShow({
                                         <div className="text-xs text-muted-foreground">Outings (30d)</div>
                                     </CardContent>
                                 </Card>
-                                <Card className={`border ${ts.incidents_30d > 0 ? 'bg-red-50/50 dark:bg-red-950/20' : 'bg-muted/30'}`}>
+                                <Card className={`border ${ts.incidents_30d > 0 ? 'bg-status-critical-bg dark:bg-status-critical' : 'bg-muted/30'}`}>
                                     <CardContent className="p-4">
-                                        <div className={`text-2xl font-bold ${ts.incidents_30d > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{ts.incidents_30d}</div>
+                                        <div className={`text-2xl font-bold ${ts.incidents_30d > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}>{ts.incidents_30d}</div>
                                         <div className="text-xs text-muted-foreground">Incidents (30d)</div>
                                     </CardContent>
                                 </Card>
@@ -7870,64 +7870,64 @@ const ASSESSMENT_TYPES: Record<
         label: 'InterRAI',
         icon: '\u{1F3E5}',
         border: 'border-l-blue-400',
-        bg: 'bg-blue-100',
-        gradient: 'from-blue-50 to-sky-50',
+        bg: 'bg-status-info-bg',
+        gradient: 'from-status-info-bg to-status-info-bg',
     },
     whodas: {
         label: 'WHODAS 2.0',
         icon: '\u{1F4CA}',
         border: 'border-l-violet-400',
         bg: 'bg-primary/10',
-        gradient: 'from-violet-50 to-purple-50',
+        gradient: 'from-primary/10 to-primary/10',
     },
     risk: {
         label: 'Risk Assessment',
         icon: '\u26A0\uFE0F',
         border: 'border-l-red-400',
-        bg: 'bg-red-100',
-        gradient: 'from-red-50 to-rose-50',
+        bg: 'bg-status-critical-bg',
+        gradient: 'from-status-critical-bg to-status-critical-bg',
     },
     medication_review: {
         label: 'Medication Review',
         icon: '\u{1F48A}',
         border: 'border-l-emerald-400',
-        bg: 'bg-emerald-100',
-        gradient: 'from-emerald-50 to-green-50',
+        bg: 'bg-status-success-bg',
+        gradient: 'from-status-success-bg to-status-success-bg',
     },
     honos: {
         label: 'HoNOS',
         icon: '\u{1F9E0}',
         border: 'border-l-amber-400',
-        bg: 'bg-amber-100',
-        gradient: 'from-amber-50 to-yellow-50',
+        bg: 'bg-status-warning-bg',
+        gradient: 'from-status-warning-bg to-status-warning-bg',
     },
     functional: {
         label: 'Functional Assessment',
         icon: '\u{1F3C3}',
         border: 'border-l-cyan-400',
-        bg: 'bg-cyan-100',
-        gradient: 'from-cyan-50 to-teal-50',
+        bg: 'bg-status-info-bg',
+        gradient: 'from-status-info-bg to-status-info-bg',
     },
     nasc: {
         label: 'Needs Assessment (NASC)',
         icon: '\u{1F4CB}',
         border: 'border-l-indigo-400',
         bg: 'bg-primary/10',
-        gradient: 'from-indigo-50 to-blue-50',
+        gradient: 'from-primary/10 to-status-info-bg',
     },
     behaviour_support: {
         label: 'Behaviour Support',
         icon: '\u{1F91D}',
         border: 'border-l-pink-400',
-        bg: 'bg-pink-100',
-        gradient: 'from-pink-50 to-rose-50',
+        bg: 'bg-status-critical-bg',
+        gradient: 'from-status-critical-bg to-status-critical-bg',
     },
     other: {
         label: 'Other',
         icon: '\u{1F4DD}',
         border: 'border-l-slate-400',
         bg: 'bg-muted',
-        gradient: 'from-slate-50 to-gray-50',
+        gradient: 'from-muted to-muted',
     },
 };
 
@@ -8060,7 +8060,7 @@ function AssessmentsTab({
         <div className="space-y-4">
             {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                <div className="rounded-xl border bg-primary/10 p-3 text-center">
                     <div className="text-2xl font-bold text-primary">
                         {assessments.length}
                     </div>
@@ -8068,29 +8068,29 @@ function AssessmentsTab({
                         Total Assessments
                     </div>
                 </div>
-                <div className="rounded-xl border bg-gradient-to-br from-red-50 to-rose-50 p-3 text-center">
+                <div className="rounded-xl border bg-status-critical-bg p-3 text-center">
                     <div
-                        className={`text-2xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}
+                        className={`text-2xl font-bold ${overdueCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
                     >
                         {overdueCount}
                     </div>
-                    <div className="text-[10px] tracking-wider text-red-500 uppercase">
+                    <div className="text-[10px] tracking-wider text-status-critical uppercase">
                         Overdue Reviews
                     </div>
                 </div>
-                <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
-                    <div className="text-2xl font-bold text-emerald-700">
+                <div className="rounded-xl border bg-status-success-bg p-3 text-center">
+                    <div className="text-2xl font-bold text-status-success">
                         {completedThisMonth}
                     </div>
-                    <div className="text-[10px] tracking-wider text-emerald-500 uppercase">
+                    <div className="text-[10px] tracking-wider text-status-success uppercase">
                         This Month
                     </div>
                 </div>
-                <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
-                    <div className="text-2xl font-bold text-blue-700">
+                <div className="rounded-xl border bg-status-info-bg p-3 text-center">
+                    <div className="text-2xl font-bold text-status-info">
                         {nextDueDays !== null ? `${nextDueDays}d` : '\u2014'}
                     </div>
-                    <div className="text-[10px] tracking-wider text-blue-500 uppercase">
+                    <div className="text-[10px] tracking-wider text-status-info uppercase">
                         Next Due
                     </div>
                 </div>
@@ -8098,16 +8098,16 @@ function AssessmentsTab({
 
             {/* Overdue Alert Banner */}
             {overdueCount > 0 && (
-                <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                <div className="flex items-center gap-3 rounded-xl border-2 border-status-warning/30 bg-status-warning-bg p-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                         <ShieldAlert className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                        <p className="text-sm font-semibold text-amber-800">
+                        <p className="text-sm font-semibold text-status-warning">
                             {overdueCount} Assessment Review
                             {overdueCount !== 1 ? 's' : ''} Overdue
                         </p>
-                        <p className="text-xs text-amber-700">
+                        <p className="text-xs text-status-warning">
                             These assessments are past their scheduled review
                             date.
                         </p>
@@ -8118,7 +8118,7 @@ function AssessmentsTab({
             {/* Form with Gradient Header */}
             {canEdit && showForm && (
                 <Card className="overflow-hidden border-primary">
-                    <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
+                    <div className="bg-primary px-4 py-2.5">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-white">
                                 {editingId
@@ -8298,7 +8298,7 @@ function AssessmentsTab({
                         return (
                             <Card
                                 key={a.id}
-                                className={`overflow-hidden border-l-4 ${typeStyle.border} ${isOverdue ? 'bg-red-50/30 dark:bg-red-950/20' : ''}`}
+                                className={`overflow-hidden border-l-4 ${typeStyle.border} ${isOverdue ? 'bg-status-critical-bg dark:bg-status-critical' : ''}`}
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-start justify-between gap-3">
@@ -8319,7 +8319,7 @@ function AssessmentsTab({
                                                         </Badge>
                                                     )}
                                                     {isOverdue && (
-                                                        <Badge className="border-0 bg-red-100 text-[9px] font-medium text-red-700">
+                                                        <Badge className="border-0 bg-status-critical-bg text-[9px] font-medium text-status-critical">
                                                             Review Overdue
                                                         </Badge>
                                                     )}
@@ -8337,7 +8337,7 @@ function AssessmentsTab({
                                                     )}
                                                     {a.next_review_at && (
                                                         <span
-                                                            className={`flex items-center gap-1 ${isOverdue ? 'font-medium text-red-600' : ''}`}
+                                                            className={`flex items-center gap-1 ${isOverdue ? 'font-medium text-status-critical' : ''}`}
                                                         >
                                                             <Clock className="h-3 w-3" />
                                                             Review:{' '}
@@ -8363,7 +8363,7 @@ function AssessmentsTab({
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
-                                                    className="text-red-500 hover:text-red-700"
+                                                    className="text-status-critical hover:text-status-critical"
                                                     onClick={() =>
                                                         setDeletingId(a.id)
                                                     }
@@ -8600,7 +8600,7 @@ function PhotoGalleryTab({
                                             {p.visibility.replace(/_/g, ' ')}
                                         </Badge>
                                         {p.status === 'pending_approval' && (
-                                            <Badge className="h-4 border-0 bg-amber-100 px-1 text-[8px] text-amber-600">
+                                            <Badge className="h-4 border-0 bg-status-warning-bg px-1 text-[8px] text-status-warning">
                                                 Pending
                                             </Badge>
                                         )}
@@ -8615,7 +8615,7 @@ function PhotoGalleryTab({
                                 {canEdit && (
                                     <button
                                         onClick={() => deletePhoto(p.id)}
-                                        className="absolute top-1 right-1 rounded-full bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-600"
+                                        className="absolute top-1 right-1 rounded-full bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-status-critical"
                                         title="Delete photo"
                                     >
                                         <svg
@@ -8660,7 +8660,7 @@ const ASSET_CATEGORIES: Record<
 > = {
     mobility_aid: {
         label: 'Mobility Aid',
-        color: 'bg-blue-100 text-blue-700',
+        color: 'bg-status-info-bg text-status-info',
         icon: '♿',
     },
     electronics: {
@@ -8670,22 +8670,22 @@ const ASSET_CATEGORIES: Record<
     },
     furniture: {
         label: 'Furniture',
-        color: 'bg-amber-100 text-amber-700',
+        color: 'bg-status-warning-bg text-status-warning',
         icon: '🪑',
     },
     clothing: {
         label: 'Clothing',
-        color: 'bg-pink-100 text-pink-700',
+        color: 'bg-status-critical-bg text-status-critical',
         icon: '👕',
     },
     medical_equipment: {
         label: 'Medical Equipment',
-        color: 'bg-red-100 text-red-700',
+        color: 'bg-status-critical-bg text-status-critical',
         icon: '🩺',
     },
     personal_care: {
         label: 'Personal Care',
-        color: 'bg-teal-100 text-teal-700',
+        color: 'bg-status-info-bg text-status-info',
         icon: '🧴',
     },
     entertainment: {
@@ -8695,17 +8695,17 @@ const ASSET_CATEGORIES: Record<
     },
     transport: {
         label: 'Transport',
-        color: 'bg-emerald-100 text-emerald-700',
+        color: 'bg-status-success-bg text-status-success',
         icon: '🚗',
     },
     other: { label: 'Other', color: 'bg-muted text-muted-foreground', icon: '📦' },
 };
 
 const CONDITION_COLORS: Record<string, string> = {
-    new: 'bg-emerald-100 text-emerald-700',
-    good: 'bg-blue-100 text-blue-700',
-    fair: 'bg-amber-100 text-amber-700',
-    poor: 'bg-red-100 text-red-700',
+    new: 'bg-status-success-bg text-status-success',
+    good: 'bg-status-info-bg text-status-info',
+    fair: 'bg-status-warning-bg text-status-warning',
+    poor: 'bg-status-critical-bg text-status-critical',
 };
 
 const STATUS_CONFIG: Record<
@@ -8714,28 +8714,28 @@ const STATUS_CONFIG: Record<
 > = {
     active: {
         label: 'Active',
-        color: 'bg-emerald-100 text-emerald-700',
-        dot: 'bg-emerald-500',
+        color: 'bg-status-success-bg text-status-success',
+        dot: 'bg-status-success',
     },
     in_repair: {
         label: 'In Repair',
-        color: 'bg-amber-100 text-amber-700',
-        dot: 'bg-amber-500',
+        color: 'bg-status-warning-bg text-status-warning',
+        dot: 'bg-status-warning',
     },
     lost: {
         label: 'Lost',
-        color: 'bg-red-100 text-red-700',
-        dot: 'bg-red-500',
+        color: 'bg-status-critical-bg text-status-critical',
+        dot: 'bg-status-critical',
     },
     damaged: {
         label: 'Damaged',
-        color: 'bg-orange-100 text-orange-700',
-        dot: 'bg-orange-500',
+        color: 'bg-status-warning-bg text-status-warning',
+        dot: 'bg-status-warning',
     },
     disposed: {
         label: 'Disposed',
         color: 'bg-muted text-muted-foreground',
-        dot: 'bg-slate-400',
+        dot: 'bg-muted',
     },
     returned: {
         label: 'Returned',
@@ -8745,13 +8745,13 @@ const STATUS_CONFIG: Record<
 };
 
 const OWNERSHIP_CONFIG: Record<string, { label: string; color: string }> = {
-    client: { label: 'Client Owned', color: 'bg-sky-100 text-sky-700' },
+    client: { label: 'Client Owned', color: 'bg-status-info-bg text-status-info' },
     provider: {
         label: 'Provider Owned',
         color: 'bg-primary/10 text-primary',
     },
-    funded: { label: 'Funded', color: 'bg-emerald-100 text-emerald-700' },
-    loaned: { label: 'On Loan', color: 'bg-amber-100 text-amber-700' },
+    funded: { label: 'Funded', color: 'bg-status-success-bg text-status-success' },
+    loaned: { label: 'On Loan', color: 'bg-status-warning-bg text-status-warning' },
 };
 
 function PersonalAssetsTab({
@@ -8982,7 +8982,7 @@ function PersonalAssetsTab({
         return (
             <Card
                 key={a.id}
-                className={`group relative overflow-hidden transition-all hover:shadow-md ${hasAlerts ? 'border-amber-300' : ''} ${a.status !== 'active' ? 'opacity-75' : ''}`}
+                className={`group relative overflow-hidden transition-all hover:shadow-md ${hasAlerts ? 'border-status-warning/30' : ''} ${a.status !== 'active' ? 'opacity-75' : ''}`}
             >
                 {/* Photo or category icon header */}
                 {a.photo_url ? (
@@ -9004,7 +9004,7 @@ function PersonalAssetsTab({
                         </div>
                         {a.portal_visible && (
                             <div className="absolute top-2 right-2">
-                                <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm">
+                                <span className="rounded-full bg-status-info px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm">
                                     Portal
                                 </span>
                             </div>
@@ -9027,7 +9027,7 @@ function PersonalAssetsTab({
                         </div>
                         {a.portal_visible && (
                             <div className="absolute top-2 right-2">
-                                <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm">
+                                <span className="rounded-full bg-status-info px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm">
                                     Portal
                                 </span>
                             </div>
@@ -9037,25 +9037,25 @@ function PersonalAssetsTab({
 
                 {/* Alert banner */}
                 {hasAlerts && (
-                    <div className="flex flex-wrap gap-1.5 border-b border-amber-200 bg-amber-50 px-3 py-1.5">
+                    <div className="flex flex-wrap gap-1.5 border-b border-status-warning/30 bg-status-warning-bg px-3 py-1.5">
                         {a.is_service_overdue && (
-                            <span className="text-[10px] font-medium text-amber-700">
+                            <span className="text-[10px] font-medium text-status-warning">
                                 Service overdue
                             </span>
                         )}
                         {a.is_warranty_expired && (
-                            <span className="text-[10px] font-medium text-red-700">
+                            <span className="text-[10px] font-medium text-status-critical">
                                 Warranty expired
                             </span>
                         )}
                         {a.is_warranty_expiring_soon &&
                             !a.is_warranty_expired && (
-                                <span className="text-[10px] font-medium text-amber-700">
+                                <span className="text-[10px] font-medium text-status-warning">
                                     Warranty expiring soon
                                 </span>
                             )}
                         {a.is_return_overdue && (
-                            <span className="text-[10px] font-medium text-red-700">
+                            <span className="text-[10px] font-medium text-status-critical">
                                 Return overdue
                             </span>
                         )}
@@ -9105,7 +9105,7 @@ function PersonalAssetsTab({
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                                    className="h-7 w-7 p-0 text-status-critical hover:text-status-critical"
                                     onClick={() => {
                                         if (
                                             confirm(
@@ -9172,7 +9172,7 @@ function PersonalAssetsTab({
                         )}
                         {a.next_service_due && (
                             <div
-                                className={`flex items-center gap-1.5 ${a.is_service_overdue ? 'font-medium text-amber-700' : ''}`}
+                                className={`flex items-center gap-1.5 ${a.is_service_overdue ? 'font-medium text-status-warning' : ''}`}
                             >
                                 <Clock className="h-3 w-3" />
                                 <span>
@@ -9186,7 +9186,7 @@ function PersonalAssetsTab({
                         )}
                         {a.warranty_expires_at && (
                             <div
-                                className={`flex items-center gap-1.5 ${a.is_warranty_expired ? 'font-medium text-red-600' : a.is_warranty_expiring_soon ? 'font-medium text-amber-700' : ''}`}
+                                className={`flex items-center gap-1.5 ${a.is_warranty_expired ? 'font-medium text-status-critical' : a.is_warranty_expiring_soon ? 'font-medium text-status-warning' : ''}`}
                             >
                                 <Shield className="h-3 w-3" />
                                 <span>
@@ -9202,7 +9202,7 @@ function PersonalAssetsTab({
                         )}
                         {a.return_required && a.return_by && (
                             <div
-                                className={`flex items-center gap-1.5 ${a.is_return_overdue ? 'font-medium text-red-600' : ''}`}
+                                className={`flex items-center gap-1.5 ${a.is_return_overdue ? 'font-medium text-status-critical' : ''}`}
                             >
                                 <AlertTriangle className="h-3 w-3" />
                                 <span>
@@ -9228,24 +9228,24 @@ function PersonalAssetsTab({
 
                     {/* Tracker info */}
                     {a.tracker && (
-                        <div className="space-y-1 rounded-lg border border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50 p-2">
+                        <div className="space-y-1 rounded-lg border border-status-info/30 bg-status-info-bg p-2">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
                                     <span className="text-xs">📡</span>
-                                    <span className="text-[11px] font-medium text-sky-800">
+                                    <span className="text-[11px] font-medium text-status-info">
                                         {a.tracker.name}
                                     </span>
                                 </div>
                                 <span
-                                    className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${a.tracker.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
+                                    className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${a.tracker.status === 'online' ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground'}`}
                                 >
                                     <span
-                                        className={`h-1.5 w-1.5 rounded-full ${a.tracker.status === 'online' ? 'bg-emerald-500' : 'bg-slate-400'}`}
+                                        className={`h-1.5 w-1.5 rounded-full ${a.tracker.status === 'online' ? 'bg-status-success' : 'bg-muted'}`}
                                     />
                                     {a.tracker.status}
                                 </span>
                             </div>
-                            <div className="flex flex-wrap gap-2 text-[10px] text-sky-700">
+                            <div className="flex flex-wrap gap-2 text-[10px] text-status-info">
                                 {a.tracker.battery != null && (
                                     <span>Battery: {a.tracker.battery}%</span>
                                 )}
@@ -9280,19 +9280,19 @@ function PersonalAssetsTab({
                         <div className="flex flex-wrap gap-1 pt-1 opacity-0 transition-opacity group-hover:opacity-100">
                             <button
                                 onClick={() => changeStatus(a.id, 'in_repair')}
-                                className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 transition-colors hover:bg-amber-100"
+                                className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning transition-colors hover:bg-status-warning-bg"
                             >
                                 In Repair
                             </button>
                             <button
                                 onClick={() => changeStatus(a.id, 'lost')}
-                                className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700 transition-colors hover:bg-red-100"
+                                className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-medium text-status-critical transition-colors hover:bg-status-critical-bg"
                             >
                                 Lost
                             </button>
                             <button
                                 onClick={() => changeStatus(a.id, 'damaged')}
-                                className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-700 transition-colors hover:bg-orange-100"
+                                className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning transition-colors hover:bg-status-warning-bg"
                             >
                                 Damaged
                             </button>
@@ -9302,7 +9302,7 @@ function PersonalAssetsTab({
                         <div className="flex flex-wrap gap-1 pt-1">
                             <button
                                 onClick={() => changeStatus(a.id, 'active')}
-                                className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                                className="rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success transition-colors hover:bg-status-success-bg"
                             >
                                 Repaired
                             </button>
@@ -9319,7 +9319,7 @@ function PersonalAssetsTab({
                             <div className="flex flex-wrap gap-1 pt-1">
                                 <button
                                     onClick={() => changeStatus(a.id, 'active')}
-                                    className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                                    className="rounded-full bg-status-success-bg px-2 py-0.5 text-[10px] font-medium text-status-success transition-colors hover:bg-status-success-bg"
                                 >
                                     Found / Restored
                                 </button>
@@ -9353,7 +9353,7 @@ function PersonalAssetsTab({
         <div className="space-y-4">
             {/* Gradient stat cards */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                <div className="rounded-xl border bg-primary/10 p-3 text-center">
                     <div className="text-xl font-bold text-primary">
                         {activeAssets.length}
                     </div>
@@ -9361,8 +9361,8 @@ function PersonalAssetsTab({
                         Active Items
                     </div>
                 </div>
-                <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-teal-50 p-3 text-center">
-                    <div className="text-xl font-bold text-emerald-700">
+                <div className="rounded-xl border bg-primary/10 p-3 text-center">
+                    <div className="text-xl font-bold text-status-success">
                         $
                         {totalValue > 0
                             ? totalValue.toLocaleString('en-NZ', {
@@ -9371,29 +9371,29 @@ function PersonalAssetsTab({
                               })
                             : '0'}
                     </div>
-                    <div className="text-[10px] tracking-wider text-emerald-500 uppercase">
+                    <div className="text-[10px] tracking-wider text-status-success uppercase">
                         Est. Value (NZD)
                     </div>
                 </div>
                 <div
-                    className={`rounded-xl border p-3 text-center ${needsAttention > 0 ? 'bg-gradient-to-br from-amber-50 to-orange-50' : 'bg-gradient-to-br from-slate-50 to-gray-50'}`}
+                    className={`rounded-xl border p-3 text-center ${needsAttention > 0 ? 'bg-status-warning-bg' : 'bg-primary/10'}`}
                 >
                     <div
-                        className={`text-xl font-bold ${needsAttention > 0 ? 'text-amber-700' : 'text-muted-foreground'}`}
+                        className={`text-xl font-bold ${needsAttention > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
                     >
                         {needsAttention}
                     </div>
                     <div
-                        className={`text-[10px] tracking-wider uppercase ${needsAttention > 0 ? 'text-amber-500' : 'text-muted-foreground'}`}
+                        className={`text-[10px] tracking-wider uppercase ${needsAttention > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
                     >
                         Needs Attention
                     </div>
                 </div>
-                <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
-                    <div className="text-xl font-bold text-blue-700">
+                <div className="rounded-xl border bg-status-info-bg p-3 text-center">
+                    <div className="text-xl font-bold text-status-info">
                         {categories.size}
                     </div>
-                    <div className="text-[10px] tracking-wider text-blue-500 uppercase">
+                    <div className="text-[10px] tracking-wider text-status-info uppercase">
                         Categories
                     </div>
                 </div>
@@ -9525,7 +9525,7 @@ function PersonalAssetsTab({
                                             placeholder="e.g. Wheelchair, PlayStation, TV"
                                         />
                                         {form.errors.name && (
-                                            <p className="mt-1 text-xs text-red-600">
+                                            <p className="mt-1 text-xs text-status-critical">
                                                 {form.errors.name}
                                             </p>
                                         )}
@@ -10019,7 +10019,7 @@ function PersonalAssetsTab({
             ) : filtered.length === 0 ? (
                 <Card className="border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-8">
-                        <Search className="mb-2 h-8 w-8 text-slate-300" />
+                        <Search className="mb-2 h-8 w-8 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
                             No assets match your filters
                         </p>
@@ -10128,28 +10128,28 @@ const CAL_STYLES = `
 
 const CAL_CATEGORIES = [
     {
-        dot: 'bg-blue-500',
+        dot: 'bg-status-info',
         label: 'Shifts',
         icon: CalendarDays,
-        bg: 'bg-blue-50 dark:bg-blue-950/40',
+        bg: 'bg-status-info-bg dark:bg-status-info',
     },
     {
-        dot: 'bg-green-500',
+        dot: 'bg-status-success',
         label: 'Family Visits',
         icon: Users,
-        bg: 'bg-green-50 dark:bg-green-950/40',
+        bg: 'bg-status-success-bg dark:bg-status-success',
     },
     {
-        dot: 'bg-pink-500',
+        dot: 'bg-status-critical',
         label: 'Medications',
         icon: Pill,
-        bg: 'bg-pink-50 dark:bg-pink-950/40',
+        bg: 'bg-status-critical-bg dark:bg-pink-950/40',
     },
     {
-        dot: 'bg-amber-500',
+        dot: 'bg-status-warning',
         label: 'GP Visits',
         icon: Stethoscope,
-        bg: 'bg-amber-50 dark:bg-amber-950/40',
+        bg: 'bg-status-warning-bg dark:bg-status-warning',
     },
     {
         dot: 'bg-primary',
@@ -10158,10 +10158,10 @@ const CAL_CATEGORIES = [
         bg: 'bg-primary/10 dark:bg-primary/40',
     },
     {
-        dot: 'bg-cyan-500',
+        dot: 'bg-status-info',
         label: 'Activities',
         icon: Calendar,
-        bg: 'bg-cyan-50 dark:bg-cyan-950/40',
+        bg: 'bg-status-info-bg dark:bg-status-info',
     },
     {
         dot: 'bg-primary/70',

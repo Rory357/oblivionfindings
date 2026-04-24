@@ -84,7 +84,7 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
                 </div>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={() => addToArray(arr, setArr)}>Add {label} Item</Button>
-            {(errors as any)[errorKey] && <div className="mt-1 text-xs text-red-500">{(errors as any)[errorKey]}</div>}
+            {(errors as any)[errorKey] && <div className="mt-1 text-xs text-status-critical">{(errors as any)[errorKey]}</div>}
         </div>
     );
 
@@ -124,7 +124,7 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.stay_id && <div className="mt-1 text-xs text-red-500">{errors.stay_id}</div>}
+                                    {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
                                 </div>
                                 <div>
                                     <Label>Plan Type *</Label>
@@ -136,14 +136,14 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.plan_type && <div className="mt-1 text-xs text-red-500">{errors.plan_type}</div>}
+                                    {errors.plan_type && <div className="mt-1 text-xs text-status-critical">{errors.plan_type}</div>}
                                 </div>
                             </div>
 
                             <div>
                                 <Label>Plan Name *</Label>
                                 <Input value={data.plan_name} onChange={(e) => setData('plan_name', e.target.value)} placeholder="Enter plan name" />
-                                {errors.plan_name && <div className="mt-1 text-xs text-red-500">{errors.plan_name}</div>}
+                                {errors.plan_name && <div className="mt-1 text-xs text-status-critical">{errors.plan_name}</div>}
                             </div>
                         </CardContent>
                     </Card>

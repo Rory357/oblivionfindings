@@ -52,10 +52,10 @@ const breadcrumbs = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    active: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Active' },
-    submitted: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Submitted' },
-    approved: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Approved' },
-    rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
+    active: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Active' },
+    submitted: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Submitted' },
+    approved: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
+    rejected: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Rejected' },
 };
 
 function formatEntryDate(dateStr: string): string {

@@ -31,10 +31,10 @@ type Props = {
 };
 
 const severityColors: Record<string, string> = {
-    low: 'bg-slate-500/20 text-muted-foreground',
-    medium: 'bg-yellow-500/20 text-yellow-400',
-    high: 'bg-orange-500/20 text-orange-400',
-    critical: 'bg-red-500/20 text-red-400',
+    low: 'bg-muted-foreground/80/20 text-muted-foreground',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function OverdueActions({ overdueActions, sites, filters }: Props) {
@@ -71,7 +71,7 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                         </Link>
                     </Button>
                     <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-red-400" />
+                        <AlertTriangle className="w-5 h-5 text-status-critical" />
                         Overdue Corrective Actions
                     </h1>
                     <p className="text-sm text-muted-foreground">
@@ -81,15 +81,15 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
 
                 {/* Summary */}
                 <div className="grid gap-4 sm:grid-cols-3">
-                    <Card className="bg-red-500/5 border-red-500/20">
+                    <Card className="bg-status-critical border-status-critical/20">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-red-400">{overdueActions.length}</div>
+                            <div className="text-2xl font-bold text-status-critical">{overdueActions.length}</div>
                             <div className="text-sm text-muted-foreground">Total Overdue</div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-orange-400">
+                            <div className="text-2xl font-bold text-status-warning">
                                 {overdueActions.filter(a => a.severity === 'critical' || a.severity === 'high').length}
                             </div>
                             <div className="text-sm text-muted-foreground">High/Critical</div>
@@ -202,7 +202,7 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                                                 {new Date(action.due_date).toLocaleDateString()}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="text-red-400">
+                                                <Badge variant="outline" className="text-status-critical">
                                                     {daysOverdue(action.due_date)} days
                                                 </Badge>
                                             </TableCell>

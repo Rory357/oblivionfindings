@@ -148,8 +148,8 @@ export default function MedicationScanVerificationPanel({
                         <div
                             className={`flex items-center gap-2 text-xs ${
                                 capture.status === 'verified'
-                                    ? 'text-green-700'
-                                    : 'text-red-600'
+                                    ? 'text-status-success'
+                                    : 'text-status-critical'
                             }`}
                         >
                             {capture.status === 'verified' ? (

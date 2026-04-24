@@ -129,7 +129,7 @@ export default function ClientFundsIndex({ funds = { data: [], links: [], curren
                         return (
                             <Card key={fund.id} className="transition-all hover:border-border hover:shadow-sm">
                                 <CardContent className="flex items-center gap-4 p-4">
-                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isLow ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}>
+                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isLow ? 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' : 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70'}`}>
                                         {isLow ? <AlertTriangle className="h-5 w-5" /> : <Wallet className="h-5 w-5" />}
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -150,7 +150,7 @@ export default function ClientFundsIndex({ funds = { data: [], links: [], curren
                                             {fund.client && (
                                                 <span>{fund.client.first_name} {fund.client.last_name}</span>
                                             )}
-                                            <span className={`font-semibold tabular-nums ${isLow ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                                            <span className={`font-semibold tabular-nums ${isLow ? 'text-status-critical dark:text-status-critical' : 'text-status-success dark:text-status-success'}`}>
                                                 {nzd.format(fund.balance)}
                                             </span>
                                             <span>{fund.transaction_count} transactions</span>

@@ -162,7 +162,7 @@ function SurveyCard({ survey }: { survey: Survey }) {
                             <Badge variant="outline" className="text-xs">Anonymous</Badge>
                         )}
                         {survey.has_responded && (
-                            <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 bg-emerald-500/10 text-xs">
+                            <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success text-xs">
                                 <CheckCircle2 className="h-3 w-3 mr-1" />
                                 Completed
                             </Badge>
@@ -189,7 +189,7 @@ function SurveyCard({ survey }: { survey: Survey }) {
                             <div key={question.id} className="space-y-2">
                                 <Label className="text-sm font-medium">
                                     {index + 1}. {question.question_text}
-                                    {question.is_required && <span className="text-red-500 ml-1">*</span>}
+                                    {question.is_required && <span className="text-status-critical ml-1">*</span>}
                                 </Label>
                                 <QuestionRenderer
                                     question={question}

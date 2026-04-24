@@ -69,7 +69,7 @@ export default function MyPolicies({ policies }: Props) {
                             <CardTitle className="text-sm font-medium text-muted-foreground">Attested</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-emerald-500">{attestedCount}</p>
+                            <p className="text-2xl font-bold text-status-success">{attestedCount}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -77,7 +77,7 @@ export default function MyPolicies({ policies }: Props) {
                             <CardTitle className="text-sm font-medium text-muted-foreground">Pending Attestation</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-yellow-500">{pendingCount}</p>
+                            <p className="text-2xl font-bold text-status-warning">{pendingCount}</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -123,12 +123,12 @@ export default function MyPolicies({ policies }: Props) {
                                         </td>
                                         <td className="px-4 py-3">
                                             {policy.is_attested ? (
-                                                <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                                                <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success">
                                                     <ShieldCheck className="mr-1 h-3 w-3" />
                                                     Attested
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 bg-yellow-500/10">
+                                                <Badge variant="outline" className="border-status-warning/30 text-status-warning bg-status-warning">
                                                     Pending
                                                 </Badge>
                                             )}

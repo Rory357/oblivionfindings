@@ -343,9 +343,9 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
 
                             {/* Pinned Messages Banner */}
                             {showPinned && pinnedMsgs.length > 0 && (
-                                <div className="border-b bg-amber-50/50 px-4 py-2 dark:bg-amber-950/10">
+                                <div className="border-b bg-status-warning-bg px-4 py-2 dark:bg-status-warning">
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600"><Pin className="inline h-3 w-3 mr-1" />Pinned Messages</span>
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-status-warning"><Pin className="inline h-3 w-3 mr-1" />Pinned Messages</span>
                                         <button onClick={() => setShowPinned(false)} className="text-muted-foreground hover:text-foreground"><X className="h-3 w-3" /></button>
                                     </div>
                                     {pinnedMsgs.map(pm => (
@@ -379,7 +379,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                                 {showAvatar && !isMe && (
                                                     <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">
                                                         {msg.sender?.name}
-                                                        {msg.sender_type !== 'family' && <Badge variant="outline" className="ml-1 text-[8px] border-blue-200 bg-blue-50 text-blue-700">Staff</Badge>}
+                                                        {msg.sender_type !== 'family' && <Badge variant="outline" className="ml-1 text-[8px] border-status-info/30 bg-status-info-bg text-status-info">Staff</Badge>}
                                                     </p>
                                                 )}
                                                 {/* Deleted message */}
@@ -421,7 +421,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                                     const quoteLine = parts ? parts[0].replace(/^> /, '') : null;
                                                     const mainText = parts ? parts.slice(1).join('\n\n') : msg.content;
                                                     return (
-                                                        <div className={`inline-block rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-amber-300' : ''}`}>
+                                                        <div className={`inline-block rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-status-warning' : ''}`}>
                                                             {msg.is_pinned && <Pin className="inline h-3 w-3 mr-1 opacity-60" />}
                                                             {quoteLine && (
                                                                 <div className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${isMe ? 'border-l-white/40 bg-white/10' : 'border-l-primary/40 bg-primary/5'}`}>
@@ -451,7 +451,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                                 <div className={`mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground/60 ${isMe ? 'justify-end' : ''}`}>
                                                     <span>{formatMessageTime(msg.created_at)}</span>
                                                     {isMe && isLastByMe && (
-                                                        msg.is_read ? <span title={`Read ${msg.read_at ? formatTime(msg.read_at) : ''}`}><CheckCheck className="h-3 w-3 text-blue-500" /></span> : <span title="Sent"><Check className="h-3 w-3" /></span>
+                                                        msg.is_read ? <span title={`Read ${msg.read_at ? formatTime(msg.read_at) : ''}`}><CheckCheck className="h-3 w-3 text-status-info" /></span> : <span title="Sent"><Check className="h-3 w-3" /></span>
                                                     )}
                                                 </div>
                                                 </>)}
@@ -465,7 +465,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                                             <div className="flex gap-1">{CHAT_REACTIONS.map(e => <button key={e} onClick={() => toggleReaction(msg.id, e)} className="rounded-lg p-1.5 text-base hover:bg-muted">{e}</button>)}</div>
                                                         </PopoverContent>
                                                     </Popover>
-                                                    <button onClick={() => togglePin(msg.id)} className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-muted hover:bg-accent'}`}>
+                                                    <button onClick={() => togglePin(msg.id)} className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${msg.is_pinned ? 'bg-status-warning-bg text-status-warning' : 'bg-muted hover:bg-accent'}`}>
                                                         <Pin className="h-3 w-3" />
                                                     </button>
                                                     <button onClick={() => replyTo(msg.id, msg.sender?.name ?? (isMe ? 'You' : '?'), msg.content)} className="h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors" title="Reply">
@@ -512,7 +512,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                         <Paperclip className="h-4 w-4" />
                                     </button>
                                     <button onClick={isRecording ? stopRecording : startRecording}
-                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${isRecording ? 'bg-status-critical text-white animate-pulse' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                                         title={isRecording ? 'Stop recording' : 'Voice note'}>
                                         {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                                     </button>
@@ -579,11 +579,11 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                     <span>{activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unpin' : 'Pin'}</span>
                                 </button>
                                 <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>
-                                    <Star className="h-4 w-4 text-amber-500" />
+                                    <Star className="h-4 w-4 text-status-warning" />
                                     <span>{activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unstar' : 'Star'}</span>
                                 </button>
                                 {ctxMenu.isOwn && (
-                                    <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => {
+                                    <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-status-critical transition-colors hover:bg-status-critical-bg dark:hover:bg-status-critical" onClick={() => {
                                         if (ctxMenu.messageId && confirm('Delete this message? It will show as "deleted" but data is kept for auditing.')) {
                                             router.delete(`/portal/clients/${client.id}/messages/archive/${ctxMenu.messageId}`, { preserveScroll: true });
                                         }
@@ -601,7 +601,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                 <Paperclip className="h-4 w-4 text-muted-foreground" /><span>Attach file</span>
                             </button>
                             <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { startRecording(); setCtxMenu(null); }}>
-                                <Mic className="h-4 w-4 text-red-500" /><span>Voice note</span>
+                                <Mic className="h-4 w-4 text-status-critical" /><span>Voice note</span>
                             </button>
                         </div>
                     )}
@@ -626,7 +626,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                             {uploadFile ? (
                                 <div className="flex items-center justify-center gap-3">
                                     {uploadType === 'photo' && uploadFile.type.startsWith('image/') ? <img src={URL.createObjectURL(uploadFile)} alt="Preview" className="h-16 w-16 rounded-lg object-cover" /> : <FileText className="h-10 w-10 text-primary" />}
-                                    <div className="text-left"><p className="text-sm font-medium">{uploadFile.name}</p><p className="text-xs text-muted-foreground">{(uploadFile.size / 1024).toFixed(0)} KB</p><button className="mt-1 text-xs text-red-500 hover:underline" onClick={() => setUploadFile(null)}>Remove</button></div>
+                                    <div className="text-left"><p className="text-sm font-medium">{uploadFile.name}</p><p className="text-xs text-muted-foreground">{(uploadFile.size / 1024).toFixed(0)} KB</p><button className="mt-1 text-xs text-status-critical hover:underline" onClick={() => setUploadFile(null)}>Remove</button></div>
                                 </div>
                             ) : (
                                 <>{uploadType === 'photo' ? <Camera className="mx-auto h-8 w-8 text-muted-foreground/40" /> : <FileText className="mx-auto h-8 w-8 text-muted-foreground/40" />}<p className="mt-2 text-sm text-muted-foreground">Drag & drop or click to browse</p><input type="file" className="absolute inset-0 cursor-pointer opacity-0" accept={uploadType === 'photo' ? 'image/*' : '.pdf,.doc,.docx,.xls,.xlsx,.txt,.rtf,.csv'} onChange={e => setUploadFile(e.target.files?.[0] ?? null)} /></>

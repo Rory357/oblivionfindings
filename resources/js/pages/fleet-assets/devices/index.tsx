@@ -219,8 +219,8 @@ export default function DevicesIndex({ devices, stats, pairing_options }: Props)
                 {/* Dark KPI Cards + ProgressRing */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     <FleetStatCard label="TOTAL DEVICES" value={totalDevices} icon={Rss} subtitle="All paired devices" />
-                    <FleetStatCard label="ONLINE" value={onlineCount} icon={Wifi} color="amber" valueClassName="text-green-400" subtitle="Currently reporting" />
-                    <FleetStatCard label="OFFLINE" value={offlineCount} icon={WifiOff} color="red" valueClassName="text-red-400" subtitle="Not responding" />
+                    <FleetStatCard label="ONLINE" value={onlineCount} icon={Wifi} color="amber" valueClassName="text-status-success" subtitle="Currently reporting" />
+                    <FleetStatCard label="OFFLINE" value={offlineCount} icon={WifiOff} color="red" valueClassName="text-status-critical" subtitle="Not responding" />
                     <FleetStatCard label="UNPAIRED" value={unpairedCount} icon={Unplug} subtitle="No asset linked" />
                     <Card className="border bg-primary/10 dark:bg-primary/20">
                         <CardContent className="flex items-center justify-center p-4">
@@ -268,7 +268,7 @@ export default function DevicesIndex({ devices, stats, pairing_options }: Props)
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
-                                                <span className={`h-2 w-2 rounded-full ${device.status === 'online' ? 'bg-green-500' : device.status === 'stale' ? 'bg-red-500' : 'bg-gray-400'}`} />
+                                                <span className={`h-2 w-2 rounded-full ${device.status === 'online' ? 'bg-status-success' : device.status === 'stale' ? 'bg-status-critical' : 'bg-muted'}`} />
                                                 <Badge variant={statusVariant(device.status)}>{device.status}</Badge>
                                             </div>
                                         </td>

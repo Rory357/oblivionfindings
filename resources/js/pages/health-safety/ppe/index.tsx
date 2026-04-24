@@ -122,15 +122,15 @@ const fmtDate = (v: string | null) =>
 const conditionColor = (c: string) => {
     switch (c) {
         case 'new':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'good':
-            return 'bg-blue-100 text-blue-800';
+            return 'bg-status-info-bg text-status-info';
         case 'fair':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'poor':
-            return 'bg-orange-100 text-orange-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'condemned':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         default:
             return 'bg-muted text-foreground';
     }
@@ -139,13 +139,13 @@ const conditionColor = (c: string) => {
 const statusColor = (s: string) => {
     switch (s) {
         case 'available':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'allocated':
-            return 'bg-blue-100 text-blue-800';
+            return 'bg-status-info-bg text-status-info';
         case 'in_repair':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'condemned':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         case 'retired':
             return 'bg-muted text-foreground';
         default:
@@ -156,23 +156,23 @@ const statusColor = (s: string) => {
 const categoryColor = (c: string) => {
     switch (c) {
         case 'head':
-            return 'bg-blue-100 text-blue-800';
+            return 'bg-status-info-bg text-status-info';
         case 'eye':
-            return 'bg-cyan-100 text-cyan-800';
+            return 'bg-status-info-bg text-status-info';
         case 'ear':
-            return 'bg-teal-100 text-teal-800';
+            return 'bg-status-info-bg text-status-info';
         case 'respiratory':
             return 'bg-primary/10 text-primary';
         case 'hand':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'foot':
-            return 'bg-orange-100 text-orange-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'body':
             return 'bg-primary/10 text-primary';
         case 'fall_protection':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         case 'high_visibility':
-            return 'bg-yellow-100 text-yellow-800';
+            return 'bg-status-warning-bg text-status-warning';
         default:
             return 'bg-muted text-foreground';
     }
@@ -463,7 +463,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                                             <span
                                                                 className={
                                                                     new Date(item.next_inspection_due) < new Date()
-                                                                        ? 'font-medium text-red-600'
+                                                                        ? 'font-medium text-status-critical'
                                                                         : ''
                                                                 }
                                                             >
@@ -631,21 +631,21 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                                     </td>
                                                     <td className="py-2.5 pr-4">
                                                         {a.fit_test_completed ? (
-                                                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                            <CheckCircle2 className="h-4 w-4 text-status-success" />
                                                         ) : (
-                                                            <XCircle className="h-4 w-4 text-red-400" />
+                                                            <XCircle className="h-4 w-4 text-status-critical" />
                                                         )}
                                                     </td>
                                                     <td className="py-2.5 pr-4">
                                                         {a.training_completed ? (
-                                                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                            <CheckCircle2 className="h-4 w-4 text-status-success" />
                                                         ) : (
-                                                            <XCircle className="h-4 w-4 text-red-400" />
+                                                            <XCircle className="h-4 w-4 text-status-critical" />
                                                         )}
                                                     </td>
                                                     <td className="py-2.5 pr-4">
                                                         {a.acknowledged ? (
-                                                            <Badge className="bg-green-100 text-green-800">Yes</Badge>
+                                                            <Badge className="bg-status-success-bg text-status-success">Yes</Badge>
                                                         ) : (
                                                             <Badge className="bg-muted text-muted-foreground">No</Badge>
                                                         )}
@@ -732,7 +732,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                     </SelectContent>
                                 </Select>
                                 {addItemForm.errors.ppe_type_id && (
-                                    <p className="mt-1 text-xs text-red-600">{addItemForm.errors.ppe_type_id}</p>
+                                    <p className="mt-1 text-xs text-status-critical">{addItemForm.errors.ppe_type_id}</p>
                                 )}
                             </div>
                             <div>
@@ -753,7 +753,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                     </SelectContent>
                                 </Select>
                                 {addItemForm.errors.site_id && (
-                                    <p className="mt-1 text-xs text-red-600">{addItemForm.errors.site_id}</p>
+                                    <p className="mt-1 text-xs text-status-critical">{addItemForm.errors.site_id}</p>
                                 )}
                             </div>
                         </div>
@@ -851,7 +851,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                     placeholder="e.g. Safety Glasses"
                                 />
                                 {addTypeForm.errors.name && (
-                                    <p className="mt-1 text-xs text-red-600">{addTypeForm.errors.name}</p>
+                                    <p className="mt-1 text-xs text-status-critical">{addTypeForm.errors.name}</p>
                                 )}
                             </div>
                             <div>
@@ -883,7 +883,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                     </SelectContent>
                                 </Select>
                                 {addTypeForm.errors.category && (
-                                    <p className="mt-1 text-xs text-red-600">{addTypeForm.errors.category}</p>
+                                    <p className="mt-1 text-xs text-status-critical">{addTypeForm.errors.category}</p>
                                 )}
                             </div>
                         </div>
@@ -986,7 +986,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                 </SelectContent>
                             </Select>
                             {allocateForm.errors.user_id && (
-                                <p className="mt-1 text-xs text-red-600">{allocateForm.errors.user_id}</p>
+                                <p className="mt-1 text-xs text-status-critical">{allocateForm.errors.user_id}</p>
                             )}
                         </div>
 
@@ -1093,7 +1093,7 @@ export default function PpeIndex({ types, inventory, allocations, stats, sites, 
                                 </SelectContent>
                             </Select>
                             {inspectForm.errors.result && (
-                                <p className="mt-1 text-xs text-red-600">{inspectForm.errors.result}</p>
+                                <p className="mt-1 text-xs text-status-critical">{inspectForm.errors.result}</p>
                             )}
                         </div>
 

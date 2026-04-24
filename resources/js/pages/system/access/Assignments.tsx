@@ -99,9 +99,9 @@ export default function UserAssignments({ users, roles }: Props) {
 
     const getRoleBadgeColor = (level: number): string => {
         if (level >= 90) return 'bg-primary/10 text-primary border-primary';
-        if (level >= 70) return 'bg-blue-100 text-blue-800 border-blue-200';
-        if (level >= 50) return 'bg-green-100 text-green-800 border-green-200';
-        if (level >= 30) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        if (level >= 70) return 'bg-status-info-bg text-status-info border-status-info/30';
+        if (level >= 50) return 'bg-status-success-bg text-status-success border-status-success/30';
+        if (level >= 30) return 'bg-status-warning-bg text-status-warning border-status-warning/30';
         return 'bg-muted text-foreground border-border';
     };
 

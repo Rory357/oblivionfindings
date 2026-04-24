@@ -149,7 +149,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
                                             <SelectItem value="receivable">Accounts Receivable (Client)</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    {errors.type && <p className="text-sm text-red-600 mt-1">{errors.type}</p>}
+                                    {errors.type && <p className="text-sm text-status-critical mt-1">{errors.type}</p>}
                                 </div>
 
                                 {data.type === 'payable' ? (
@@ -165,7 +165,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {errors.vendor_id && <p className="text-sm text-red-600 mt-1">{errors.vendor_id}</p>}
+                                        {errors.vendor_id && <p className="text-sm text-status-critical mt-1">{errors.vendor_id}</p>}
                                     </div>
                                 ) : (
                                     <div>
@@ -180,7 +180,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {errors.client_id && <p className="text-sm text-red-600 mt-1">{errors.client_id}</p>}
+                                        {errors.client_id && <p className="text-sm text-status-critical mt-1">{errors.client_id}</p>}
                                     </div>
                                 )}
 
@@ -192,7 +192,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
                                         value={data.credit_date}
                                         onChange={(e) => setData('credit_date', e.target.value)}
                                     />
-                                    {errors.credit_date && <p className="text-sm text-red-600 mt-1">{errors.credit_date}</p>}
+                                    {errors.credit_date && <p className="text-sm text-status-critical mt-1">{errors.credit_date}</p>}
                                 </div>
                             </div>
                             <div className="mt-4">
@@ -218,7 +218,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
                             </Button>
                         </CardHeader>
                         <CardContent>
-                            {errors.lines && <p className="text-sm text-red-600 mb-2">{errors.lines}</p>}
+                            {errors.lines && <p className="text-sm text-status-critical mb-2">{errors.lines}</p>}
                             <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
@@ -244,7 +244,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
                                                         className="min-w-[180px]"
                                                     />
                                                     {errors[`lines.${index}.description` as keyof typeof errors] && (
-                                                        <p className="text-xs text-red-600">{errors[`lines.${index}.description` as keyof typeof errors]}</p>
+                                                        <p className="text-xs text-status-critical">{errors[`lines.${index}.description` as keyof typeof errors]}</p>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
@@ -307,7 +307,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
                                                         onClick={() => removeLine(index)}
                                                         disabled={data.lines.length <= 1}
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                                        <Trash2 className="w-4 h-4 text-status-critical" />
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>

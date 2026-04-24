@@ -46,10 +46,10 @@ interface Props {
 }
 
 const severityColors = {
-  critical: 'border-red-300 bg-red-50 text-red-800',
-  warning: 'border-yellow-300 bg-yellow-50 text-yellow-800',
-  caution: 'border-orange-300 bg-orange-50 text-orange-800',
-  info: 'border-blue-300 bg-blue-50 text-blue-800',
+  critical: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+  warning: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+  caution: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+  info: 'border-status-info/30 bg-status-info-bg text-status-info',
 };
 
 const severityIcons = {
@@ -125,9 +125,9 @@ function TodaySummaryCard({ summary }: { summary: TodaysSummary }) {
   const { total_scheduled, completed, refused, missed, remaining, completion_percentage } = summary;
 
   return (
-    <Card className="border-blue-200 bg-blue-50">
+    <Card className="border-status-info/30 bg-status-info-bg">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium text-blue-800">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium text-status-info">
           <Calendar className="h-4 w-4" />
           {summary.title}
         </CardTitle>
@@ -140,24 +140,24 @@ function TodaySummaryCard({ summary }: { summary: TodaysSummary }) {
           </div>
           <div className="rounded bg-white p-2 text-center">
             <div className="text-xs text-muted-foreground">Completed</div>
-            <div className="text-lg font-bold text-green-600">{completed}</div>
+            <div className="text-lg font-bold text-status-success">{completed}</div>
           </div>
           <div className="rounded bg-white p-2 text-center">
             <div className="text-xs text-muted-foreground">Remaining</div>
-            <div className="text-lg font-bold text-orange-600">{remaining}</div>
+            <div className="text-lg font-bold text-status-warning">{remaining}</div>
           </div>
           <div className="rounded bg-white p-2 text-center">
             <div className="text-xs text-muted-foreground">Completion</div>
-            <div className="text-lg font-bold text-blue-600">{completion_percentage}%</div>
+            <div className="text-lg font-bold text-status-info">{completion_percentage}%</div>
           </div>
         </div>
         {(refused > 0 || missed > 0) && (
           <div className="flex gap-2 text-xs">
             {refused > 0 && (
-              <span className="text-orange-600">Refused: {refused}</span>
+              <span className="text-status-warning">Refused: {refused}</span>
             )}
             {missed > 0 && (
-              <span className="text-red-600">Missed: {missed}</span>
+              <span className="text-status-critical">Missed: {missed}</span>
             )}
           </div>
         )}

@@ -306,7 +306,7 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                             <Button onClick={submit} disabled={form.processing}>
                                 {mode === 'create' ? 'Create' : 'Save changes'}
                             </Button>
-                            {form.hasErrors ? <div className="mt-2 text-xs text-red-600">Please fix the errors above.</div> : null}
+                            {form.hasErrors ? <div className="mt-2 text-xs text-status-critical">Please fix the errors above.</div> : null}
                         </div>
                     </CardContent>
                 </Card>

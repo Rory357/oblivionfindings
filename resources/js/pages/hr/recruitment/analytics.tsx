@@ -85,9 +85,9 @@ export default function RecruitmentAnalytics({ timeToHire, sourceEffectiveness, 
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <KpiCard label="Total Candidates" value={totalCandidates} icon={Users} color="bg-blue-500/10 text-blue-500" />
-                    <KpiCard label="Avg Time to Hire" value={avgTimeToHire} icon={Clock} suffix=" days" color="bg-amber-500/10 text-amber-500" />
-                    <KpiCard label="Conversion Rate" value={conversionRate} icon={TrendingUp} suffix="%" color="bg-emerald-500/10 text-emerald-500" />
+                    <KpiCard label="Total Candidates" value={totalCandidates} icon={Users} color="bg-status-info-bg text-status-info" />
+                    <KpiCard label="Avg Time to Hire" value={avgTimeToHire} icon={Clock} suffix=" days" color="bg-status-warning-bg text-status-warning" />
+                    <KpiCard label="Conversion Rate" value={conversionRate} icon={TrendingUp} suffix="%" color="bg-status-success-bg text-status-success" />
                     <KpiCard label="Active Positions" value={activePositions} icon={Briefcase} color="bg-primary/10 text-primary" />
                 </div>
 
@@ -228,7 +228,7 @@ export default function RecruitmentAnalytics({ timeToHire, sourceEffectiveness, 
                                                 </div>
                                                 <span className="text-xs text-muted-foreground w-10 text-right">{entry.percentage}%</span>
                                                 {dropOff !== null && dropOff > 0 && (
-                                                    <span className="text-xs text-red-400 w-16 text-right">-{dropOff}%</span>
+                                                    <span className="text-xs text-status-critical w-16 text-right">-{dropOff}%</span>
                                                 )}
                                             </div>
                                         );
@@ -307,7 +307,7 @@ export default function RecruitmentAnalytics({ timeToHire, sourceEffectiveness, 
                                                         <td className="px-4 py-2">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="flex-1 bg-muted/30 rounded-full h-2 overflow-hidden max-w-[100px]">
-                                                                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${source.conversion_rate}%` }} />
+                                                                    <div className="bg-status-success h-full rounded-full" style={{ width: `${source.conversion_rate}%` }} />
                                                                 </div>
                                                                 <span className="text-xs text-muted-foreground">{source.conversion_rate}%</span>
                                                             </div>
@@ -360,7 +360,7 @@ export default function RecruitmentAnalytics({ timeToHire, sourceEffectiveness, 
                                                         <td className="px-4 py-2 font-medium">{pos.position_title}</td>
                                                         <td className="px-4 py-2 text-right"><Badge variant="secondary">{pos.applications}</Badge></td>
                                                         <td className="px-4 py-2 text-right">
-                                                            <span className={pos.days_open > 30 ? 'text-red-400 font-medium' : pos.days_open > 14 ? 'text-amber-400' : 'text-muted-foreground'}>
+                                                            <span className={pos.days_open > 30 ? 'text-status-critical font-medium' : pos.days_open > 14 ? 'text-status-warning' : 'text-muted-foreground'}>
                                                                 {pos.days_open}d
                                                             </span>
                                                         </td>

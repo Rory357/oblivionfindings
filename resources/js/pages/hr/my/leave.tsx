@@ -52,19 +52,19 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     pending: {
-        className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
+        className: 'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Pending',
     },
     approved: {
-        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        className: 'border-status-success/30 text-status-success bg-status-success',
         label: 'Approved',
     },
     declined: {
-        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        className: 'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Declined',
     },
     cancelled: {
-        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+        className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
         label: 'Cancelled',
     },
 };

@@ -1,8 +1,8 @@
 const statusConfig: Record<string, { color: string; label: string }> = {
-    online: { color: 'bg-emerald-500', label: 'Online' },
-    away: { color: 'bg-amber-500', label: 'Away' },
-    busy: { color: 'bg-red-500', label: 'Busy' },
-    offline: { color: 'bg-gray-300', label: 'Offline' },
+    online: { color: 'bg-status-success', label: 'Online' },
+    away: { color: 'bg-status-warning', label: 'Away' },
+    busy: { color: 'bg-status-critical', label: 'Busy' },
+    offline: { color: 'bg-muted', label: 'Offline' },
 };
 
 export function PresenceDot({ status, size = 'sm' }: { status: string; size?: 'sm' | 'md' | 'lg' }) {

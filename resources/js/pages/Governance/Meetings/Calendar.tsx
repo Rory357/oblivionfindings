@@ -130,12 +130,12 @@ export default function MeetingsCalendar({
 
   const getStatusColor = (status: string) => {
     return {
-      scheduled: 'bg-blue-100 text-blue-800 border-blue-200',
-      agenda_draft: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      agenda_final: 'bg-green-100 text-green-800 border-green-200',
+      scheduled: 'bg-status-info-bg text-status-info border-status-info/30',
+      agenda_draft: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+      agenda_final: 'bg-status-success-bg text-status-success border-status-success/30',
       in_progress: 'bg-primary/10 text-primary border-primary',
-      minutes_draft: 'bg-orange-100 text-orange-800 border-orange-200',
-      minutes_approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      minutes_draft: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+      minutes_approved: 'bg-status-success-bg text-status-success border-status-success/30',
       archived: 'bg-muted text-foreground border-border',
     }[status] || 'bg-muted text-foreground border-border';
   };
@@ -206,7 +206,7 @@ export default function MeetingsCalendar({
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-blue-600" />
+                  <CalendarDays className="h-5 w-5 text-status-info" />
                   Monthly Calendar
                 </CardTitle>
                 <CardDescription>Dates with meetings are highlighted and clickable.</CardDescription>
@@ -232,14 +232,14 @@ export default function MeetingsCalendar({
                         className={cn(
                           'min-h-[92px] rounded-lg border p-2 text-left transition-colors',
                           day.inMonth ? 'bg-white' : 'bg-muted text-muted-foreground',
-                          isActive && 'border-blue-500 ring-1 ring-blue-300',
-                          !isActive && day.isToday && 'border-blue-300',
-                          dayMeetings.length > 0 && 'border-blue-200',
-                          'hover:bg-blue-50'
+                          isActive && 'border-status-info/30 ring-1 ring-status-info',
+                          !isActive && day.isToday && 'border-status-info/30',
+                          dayMeetings.length > 0 && 'border-status-info/30',
+                          'hover:bg-status-info-bg'
                         )}
                       >
                         <div className="mb-1 flex items-center justify-between">
-                          <span className={cn('text-sm font-medium', day.isToday && 'text-blue-700')}>
+                          <span className={cn('text-sm font-medium', day.isToday && 'text-status-info')}>
                             {day.date.getDate()}
                           </span>
                           {dayMeetings.length > 0 && (
@@ -252,7 +252,7 @@ export default function MeetingsCalendar({
                           {dayMeetings.slice(0, 2).map((meeting) => (
                             <div
                               key={meeting.id}
-                              className="truncate rounded bg-blue-100 px-1.5 py-0.5 text-[11px] font-medium text-blue-800"
+                              className="truncate rounded bg-status-info-bg px-1.5 py-0.5 text-[11px] font-medium text-status-info"
                             >
                               {formatTime(meeting.scheduled_at)} {meeting.title}
                             </div>

@@ -81,10 +81,10 @@ type Props = {
 };
 
 const PURPOSE_TYPES = [
-    { value: 'community', label: 'Community', icon: MapPin, color: 'border-teal-500 bg-teal-50 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-700' },
-    { value: 'medical', label: 'Medical', icon: Stethoscope, color: 'border-red-500 bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700' },
-    { value: 'social', label: 'Social', icon: Users, color: 'border-green-500 bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700' },
-    { value: 'recreational', label: 'Recreational', icon: Sun, color: 'border-orange-500 bg-orange-50 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700' },
+    { value: 'community', label: 'Community', icon: MapPin, color: 'border-status-info/30 bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30' },
+    { value: 'medical', label: 'Medical', icon: Stethoscope, color: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30' },
+    { value: 'social', label: 'Social', icon: Users, color: 'border-status-success/30 bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success dark:border-status-success/30' },
+    { value: 'recreational', label: 'Recreational', icon: Sun, color: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30' },
     { value: 'shopping', label: 'Shopping', icon: ShoppingBag, color: 'border-primary bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary dark:border-primary' },
 ];
 
@@ -494,11 +494,11 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
 
                             {/* Medication alert */}
                             {hasMedicationAlert && (
-                                <div className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50/50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/20">
-                                    <Pill className="h-5 w-5 text-amber-600 shrink-0" />
+                                <div className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-4 py-3 dark:border-status-warning/30 dark:bg-status-warning">
+                                    <Pill className="h-5 w-5 text-status-warning shrink-0" />
                                     <div>
-                                        <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Medication Reminder</p>
-                                        <p className="text-xs text-amber-600 dark:text-amber-500">
+                                        <p className="text-sm font-medium text-status-warning dark:text-status-warning">Medication Reminder</p>
+                                        <p className="text-xs text-status-warning dark:text-status-warning">
                                             This outing is 2+ hours. Ensure all required medications are packed for selected residents.
                                         </p>
                                     </div>
@@ -624,7 +624,7 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
                                                                 type="button"
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                                                                className="h-7 w-7 p-0 text-status-critical hover:text-status-critical"
                                                                 onClick={() => removeStop(stop.id)}
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -728,9 +728,9 @@ export default function OutingCreate({ clients, vehicles, drivers, auth_user, ca
 
                                         {/* Vehicle compatibility warning */}
                                         {form.data.asset_id && !isVehicleCompatible(filteredVehicles.find((v) => String(v.id) === form.data.asset_id) ?? {} as VehicleOption) && (
-                                            <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50/50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/20">
-                                                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                                                <p className="text-xs text-amber-700 dark:text-amber-400">
+                                            <div className="flex items-center gap-2 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2 dark:border-status-warning/30 dark:bg-status-warning">
+                                                <AlertTriangle className="h-4 w-4 text-status-warning shrink-0" />
+                                                <p className="text-xs text-status-warning dark:text-status-warning">
                                                     This vehicle does not meet all accessibility needs of selected residents.
                                                 </p>
                                             </div>

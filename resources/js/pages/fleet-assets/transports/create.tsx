@@ -83,19 +83,19 @@ const TRANSPORT_TYPES = [
         value: 'medical',
         label: 'Medical',
         icon: Stethoscope,
-        color: 'border-red-500 bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700',
+        color: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical dark:border-status-critical/30',
     },
     {
         value: 'appointment',
         label: 'Appointment',
         icon: Calendar,
-        color: 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700',
+        color: 'border-status-info/30 bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
     },
     {
         value: 'social',
         label: 'Social',
         icon: Users,
-        color: 'border-green-500 bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700',
+        color: 'border-status-success/30 bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success dark:border-status-success/30',
     },
     {
         value: 'shopping',
@@ -107,25 +107,25 @@ const TRANSPORT_TYPES = [
         value: 'community',
         label: 'Community',
         icon: MapPin,
-        color: 'border-teal-500 bg-teal-50 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-700',
+        color: 'border-status-info/30 bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
     },
     {
         value: 'respite',
         label: 'Respite',
         icon: Sun,
-        color: 'border-orange-500 bg-orange-50 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700',
+        color: 'border-status-warning/30 bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning dark:border-status-warning/30',
     },
     {
         value: 'activity',
         label: 'Activity',
         icon: Activity,
-        color: 'border-cyan-500 bg-cyan-50 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-700',
+        color: 'border-status-info/30 bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info dark:border-status-info/30',
     },
     {
         value: 'other',
         label: 'Other',
         icon: Heart,
-        color: 'border-gray-500 bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground dark:border-border',
+        color: 'border-border bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground dark:border-border',
     },
 ];
 
@@ -600,11 +600,11 @@ export default function TransportCreate({
                                 )}
 
                                 {selectedShift && (
-                                    <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-sm dark:border-blue-900 dark:bg-blue-950/20">
-                                        <p className="font-medium text-blue-900 dark:text-blue-200">
+                                    <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30 dark:bg-status-info">
+                                        <p className="font-medium text-status-info dark:text-status-info">
                                             Linked shift #{selectedShift.id}
                                         </p>
-                                        <p className="mt-1 text-xs text-blue-800 dark:text-blue-300">
+                                        <p className="mt-1 text-xs text-status-info dark:text-status-info">
                                             {(
                                                 selectedShift.shift_type ??
                                                 'standard'
@@ -616,7 +616,7 @@ export default function TransportCreate({
                                                 ? ` · ${selectedShift.location}`
                                                 : ''}
                                         </p>
-                                        <p className="text-xs text-blue-700 dark:text-blue-400">
+                                        <p className="text-xs text-status-info dark:text-status-info">
                                             {selectedShift.client_name ??
                                                 'No resident'}
                                             {selectedShift.staff_name
@@ -898,7 +898,7 @@ export default function TransportCreate({
                                                 {isSelected &&
                                                     med.controlled_drug && (
                                                         <div className="mt-3 ml-7">
-                                                            <label className="text-xs font-medium text-red-700 dark:text-red-400">
+                                                            <label className="text-xs font-medium text-status-critical dark:text-status-critical">
                                                                 Witness Required
                                                                 for Controlled
                                                                 Drug *

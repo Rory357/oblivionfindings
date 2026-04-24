@@ -50,11 +50,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Draft' },
-    submitted: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Submitted' },
-    approved: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Approved' },
-    rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
-    paid: { className: 'border-blue-500/30 text-blue-400 bg-blue-500/10', label: 'Paid' },
+    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
+    submitted: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Submitted' },
+    approved: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
+    rejected: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Rejected' },
+    paid: { className: 'border-status-info/30 text-status-info bg-status-info', label: 'Paid' },
 };
 
 const categoryLabels: Record<string, string> = {
@@ -189,9 +189,9 @@ export default function ExpenseShow({ claim, can }: Props) {
 
                 {/* Rejection Reason */}
                 {claim.rejection_reason && (
-                    <Card className="border-red-500/30">
+                    <Card className="border-status-critical/30">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-red-400">Rejection Reason</CardTitle>
+                            <CardTitle className="text-sm text-status-critical">Rejection Reason</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p className="text-sm">{claim.rejection_reason}</p>
@@ -246,7 +246,7 @@ export default function ExpenseShow({ claim, can }: Props) {
                                         </TableCell>
                                         <TableCell>
                                             {item.receipt_path ? (
-                                                <Badge variant="outline" className="border-emerald-500/30 text-emerald-400">
+                                                <Badge variant="outline" className="border-status-success/30 text-status-success">
                                                     Attached
                                                 </Badge>
                                             ) : (

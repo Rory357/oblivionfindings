@@ -32,10 +32,10 @@ interface Props extends PageProps {
 }
 
 const statusStyles: Record<string, string> = {
-  complete: 'bg-green-100 text-green-800 border-green-200',
-  overdue: 'bg-red-100 text-red-800 border-red-200',
-  due_soon: 'bg-amber-100 text-amber-800 border-amber-200',
-  not_due: 'bg-sky-100 text-sky-800 border-sky-200',
+  complete: 'bg-status-success-bg text-status-success border-status-success/30',
+  overdue: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+  due_soon: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  not_due: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
 export default function ComplianceStatus({ auth, report }: Props) {
@@ -59,10 +59,10 @@ export default function ComplianceStatus({ auth, report }: Props) {
         <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {[
             { label: 'Total Obligations', value: report.summary.total, tone: 'text-foreground' },
-            { label: 'Complete', value: report.summary.complete, tone: 'text-green-700' },
-            { label: 'Overdue', value: report.summary.overdue, tone: 'text-red-700' },
-            { label: 'Due Soon', value: report.summary.due_soon, tone: 'text-amber-700' },
-            { label: 'Completion Rate', value: `${report.summary.completion_rate}%`, tone: 'text-sky-700' },
+            { label: 'Complete', value: report.summary.complete, tone: 'text-status-success' },
+            { label: 'Overdue', value: report.summary.overdue, tone: 'text-status-critical' },
+            { label: 'Due Soon', value: report.summary.due_soon, tone: 'text-status-warning' },
+            { label: 'Completion Rate', value: `${report.summary.completion_rate}%`, tone: 'text-status-info' },
           ].map((item) => (
             <Card key={item.label}>
               <CardContent className="pt-6">

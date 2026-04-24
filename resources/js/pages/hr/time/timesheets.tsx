@@ -76,10 +76,10 @@ const breadcrumbs = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10', label: 'Draft' },
-    submitted: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Submitted' },
-    approved: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Approved' },
-    rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
+    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10', label: 'Draft' },
+    submitted: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Submitted' },
+    approved: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Approved' },
+    rejected: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Rejected' },
 };
 
 function formatDate(dateStr: string): string {
@@ -260,7 +260,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"
-                                                                        className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                                                                        className="border-status-success/30 text-status-success hover:bg-status-success"
                                                                         disabled={processing === ts.id}
                                                                         onClick={() => setConfirmApproveId(ts.id)}
                                                                     >
@@ -270,7 +270,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"
-                                                                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                                                        className="border-status-critical/30 text-status-critical hover:bg-status-critical"
                                                                         disabled={processing === ts.id}
                                                                         onClick={() => setRejectId(ts.id)}
                                                                     >
@@ -280,7 +280,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                                 </>
                                                             )}
                                                             {ts.rejection_reason && ts.status === 'rejected' && (
-                                                                <span className="text-xs text-red-400" title={ts.rejection_reason}>
+                                                                <span className="text-xs text-status-critical" title={ts.rejection_reason}>
                                                                     Reason: {ts.rejection_reason.slice(0, 30)}...
                                                                 </span>
                                                             )}
@@ -320,7 +320,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
                                 onClick={() => confirmApproveId && handleApprove(confirmApproveId)}
-                                className="bg-emerald-600 hover:bg-emerald-700"
+                                className="bg-status-success hover:bg-status-success"
                             >
                                 Yes, Approve
                             </AlertDialogAction>

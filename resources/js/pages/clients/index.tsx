@@ -174,8 +174,8 @@ export default function ClientsIndex({ clients }) {
                                                 className={`rounded-full px-2 py-0.5 text-xs ${
                                                     client.onboarding.status ===
                                                     'complete'
-                                                        ? 'bg-emerald-50 text-emerald-700'
-                                                        : 'bg-amber-50 text-amber-700'
+                                                        ? 'bg-status-success-bg text-status-success'
+                                                        : 'bg-status-warning-bg text-status-warning'
                                                 }`}
                                             >
                                                 Onboarding:{' '}
@@ -201,7 +201,7 @@ export default function ClientsIndex({ clients }) {
                                                     {client.site.name}
                                                 </Link>
                                             ) : (
-                                                <span className="text-slate-300">
+                                                <span className="text-muted-foreground">
                                                     {client.site.name}
                                                 </span>
                                             )

@@ -71,12 +71,12 @@ const statusColor = (status: string) => {
     switch (status) {
         case 'completed':
         case 'resolved':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         case 'scheduled':
         case 'open':
-            return 'bg-blue-100 text-blue-800';
+            return 'bg-status-info-bg text-status-info';
         case 'in_progress':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'cancelled':
             return 'bg-muted text-foreground';
         default:
@@ -87,13 +87,13 @@ const statusColor = (status: string) => {
 const severityColor = (severity: string) => {
     switch (severity) {
         case 'critical':
-            return 'bg-red-100 text-red-800';
+            return 'bg-status-critical-bg text-status-critical';
         case 'high':
-            return 'bg-orange-100 text-orange-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'medium':
-            return 'bg-amber-100 text-amber-800';
+            return 'bg-status-warning-bg text-status-warning';
         case 'low':
-            return 'bg-green-100 text-green-800';
+            return 'bg-status-success-bg text-status-success';
         default:
             return 'bg-muted text-foreground';
     }
@@ -226,13 +226,13 @@ export default function DrillShow({ drill, staff }: Props) {
                         )}
                         {drill.status === 'completed' && (
                             <div className="mt-4 flex flex-wrap gap-3">
-                                <Badge className={drill.all_areas_checked ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                <Badge className={drill.all_areas_checked ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'}>
                                     All areas checked: {drill.all_areas_checked ? 'Yes' : 'No'}
                                 </Badge>
-                                <Badge className={drill.assembly_point_reached ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                <Badge className={drill.assembly_point_reached ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'}>
                                     Assembly point reached: {drill.assembly_point_reached ? 'Yes' : 'No'}
                                 </Badge>
-                                <Badge className={drill.roll_call_completed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                <Badge className={drill.roll_call_completed ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'}>
                                     Roll call completed: {drill.roll_call_completed ? 'Yes' : 'No'}
                                 </Badge>
                             </div>
@@ -373,7 +373,7 @@ export default function DrillShow({ drill, staff }: Props) {
                                             <td className="py-2 pr-4 font-medium">{p.user?.name ?? 'Unknown'}</td>
                                             <td className="py-2 pr-4 capitalize">{p.role ?? '-'}</td>
                                             <td className="py-2">
-                                                <Badge className={p.attended ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                                <Badge className={p.attended ? 'bg-status-success-bg text-status-success' : 'bg-status-critical-bg text-status-critical'}>
                                                     {p.attended ? 'Yes' : 'No'}
                                                 </Badge>
                                             </td>

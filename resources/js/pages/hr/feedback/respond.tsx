@@ -20,15 +20,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 const RATING_LABELS = ['', 'Poor', 'Below Average', 'Average', 'Good', 'Excellent'];
 
 const QUESTION_ICONS: Record<string, string> = {
-    communication: 'from-blue-500/10 to-blue-500/5',
-    teamwork: 'from-emerald-500/10 to-emerald-500/5',
-    leadership: 'from-violet-500/10 to-violet-500/5',
-    technical: 'from-amber-500/10 to-amber-500/5',
-    initiative: 'from-pink-500/10 to-pink-500/5',
-    overall: 'from-indigo-500/10 to-indigo-500/5',
+    communication: 'from-status-info/10 to-status-info/5',
+    teamwork: 'from-status-success/10 to-status-success/5',
+    leadership: 'from-primary/10 to-primary/5',
+    technical: 'from-status-warning/10 to-status-warning/5',
+    initiative: 'from-status-critical/10 to-status-critical/5',
+    overall: 'from-primary/10 to-primary/5',
 };
 
-const AVATAR_COLORS = ['bg-blue-500', 'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500'];
+const AVATAR_COLORS = ['bg-status-info', 'bg-primary', 'bg-status-success', 'bg-status-warning', 'bg-status-critical', 'bg-status-info'];
 function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
 
@@ -38,12 +38,12 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
             <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map((star) => (
                     <button key={star} type="button" onClick={() => onChange(star)} className="group/star focus:outline-none">
-                        <Star className={`h-7 w-7 transition-all ${star <= value ? 'fill-amber-400 text-amber-400 scale-110' : 'text-muted-foreground/20 hover:text-amber-300 group-hover/star:scale-110'}`} />
+                        <Star className={`h-7 w-7 transition-all ${star <= value ? 'fill-amber-400 text-status-warning scale-110' : 'text-muted-foreground/20 hover:text-status-warning group-hover/star:scale-110'}`} />
                     </button>
                 ))}
             </div>
             {value > 0 && (
-                <Badge variant="outline" className={`text-[10px] ${value >= 4 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : value >= 3 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+                <Badge variant="outline" className={`text-[10px] ${value >= 4 ? 'border-status-success/30 bg-status-success-bg text-status-success' : value >= 3 ? 'border-status-warning/30 bg-status-warning-bg text-status-warning' : 'border-status-critical/30 bg-status-critical-bg text-status-critical'}`}>
                     {RATING_LABELS[value]}
                 </Badge>
             )}
@@ -72,7 +72,7 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
             <div className="space-y-6 p-4 lg:p-6">
 
                 {/* Hero */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white shadow-lg">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-white shadow-lg">
                     <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
                     <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
                     <div className="relative flex items-center gap-4">
@@ -104,7 +104,7 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
 
                 <form onSubmit={submit} className="mx-auto max-w-3xl space-y-4">
                     {questionKeys.map((key, index) => {
-                        const gradient = QUESTION_ICONS[key] || 'from-slate-500/10 to-slate-500/5';
+                        const gradient = QUESTION_ICONS[key] || 'from-muted/10 to-muted/5';
                         return (
                             <Card key={key} className={`overflow-hidden bg-gradient-to-br ${gradient} transition-all hover:shadow-sm`}>
                                 <CardContent className="p-5">
@@ -119,7 +119,7 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                                     <div className="ml-10 space-y-3">
                                         <StarRating value={form.data.responses[index].rating} onChange={(v) => updateResponse(index, 'rating', v)} />
                                         {(form.errors as Record<string, string>)[`responses.${index}.rating`] && (
-                                            <p className="text-xs text-red-600">{(form.errors as Record<string, string>)[`responses.${index}.rating`]}</p>
+                                            <p className="text-xs text-status-critical">{(form.errors as Record<string, string>)[`responses.${index}.rating`]}</p>
                                         )}
                                         <Textarea
                                             value={form.data.responses[index].comment}
@@ -135,10 +135,10 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                     })}
 
                     {/* Submit */}
-                    <div className="flex items-center justify-between rounded-xl border bg-gradient-to-r from-violet-50 to-purple-50 p-4">
+                    <div className="flex items-center justify-between rounded-xl border bg-primary/10 p-4">
                         <div className="flex items-center gap-2 text-sm">
                             {answeredCount === questionKeys.length ? (
-                                <><CheckCircle2 className="h-4 w-4 text-emerald-500" /><span className="text-emerald-700 font-medium">All questions answered</span></>
+                                <><CheckCircle2 className="h-4 w-4 text-status-success" /><span className="text-status-success font-medium">All questions answered</span></>
                             ) : (
                                 <span className="text-muted-foreground">{answeredCount} of {questionKeys.length} questions rated</span>
                             )}

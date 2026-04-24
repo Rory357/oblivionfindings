@@ -60,16 +60,16 @@ const formatNZD = (amount: string | number) =>
 const statusBadge = (status: string) => {
     const map: Record<string, string> = {
         draft: 'bg-muted text-foreground',
-        posted: 'bg-green-100 text-green-800',
-        reversed: 'bg-red-100 text-red-800',
+        posted: 'bg-status-success-bg text-status-success',
+        reversed: 'bg-status-critical-bg text-status-critical',
     };
     return map[status] ?? 'bg-muted text-foreground';
 };
 
 const typeBadge = (type: string) => {
     const map: Record<string, string> = {
-        standard: 'bg-blue-100 text-blue-800',
-        adjustment: 'bg-yellow-100 text-yellow-800',
+        standard: 'bg-status-info-bg text-status-info',
+        adjustment: 'bg-status-warning-bg text-status-warning',
         opening: 'bg-primary/10 text-primary',
     };
     return map[type] ?? 'bg-muted text-foreground';

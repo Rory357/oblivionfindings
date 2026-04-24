@@ -12,7 +12,7 @@ type Props = { plan: Plan; can: { manage?: boolean } };
 
 const breadcrumbs = [{ title: 'HR', href: '/hr' }, { title: 'Succession', href: '/hr/succession' }, { title: 'Detail', href: '#' }];
 const readinessLabels: Record<string, string> = { ready_now: 'Ready Now', ready_1_year: '1 Year', ready_2_years: '2 Years', developing: 'Developing' };
-const readinessColors: Record<string, string> = { ready_now: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', ready_1_year: 'border-blue-500/30 text-blue-400 bg-blue-500/10', ready_2_years: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', developing: 'border-slate-500/30 text-muted-foreground' };
+const readinessColors: Record<string, string> = { ready_now: 'border-status-success/30 text-status-success bg-status-success', ready_1_year: 'border-status-info/30 text-status-info bg-status-info', ready_2_years: 'border-status-warning/30 text-status-warning bg-status-warning', developing: 'border-border/30 text-muted-foreground' };
 
 export default function SuccessionShow({ plan, can }: Props) {
     return (
@@ -40,7 +40,7 @@ export default function SuccessionShow({ plan, can }: Props) {
                                                 <p className="font-medium">{c.name}</p>
                                                 <Badge variant="outline" className={readinessColors[c.readiness]}>{readinessLabels[c.readiness] || c.readiness}</Badge>
                                             </div>
-                                            {c.overall_rating && <div className="flex gap-0.5">{[1,2,3,4,5].map(s => <Star key={s} className={`h-4 w-4 ${s <= c.overall_rating! ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'}`} />)}</div>}
+                                            {c.overall_rating && <div className="flex gap-0.5">{[1,2,3,4,5].map(s => <Star key={s} className={`h-4 w-4 ${s <= c.overall_rating! ? 'text-status-warning fill-yellow-400' : 'text-muted-foreground'}`} />)}</div>}
                                             {c.strengths && <div><p className="text-xs text-muted-foreground">Strengths</p><p className="text-sm">{c.strengths}</p></div>}
                                             {c.development_needs && <div><p className="text-xs text-muted-foreground">Development Needs</p><p className="text-sm">{c.development_needs}</p></div>}
                                         </CardContent>

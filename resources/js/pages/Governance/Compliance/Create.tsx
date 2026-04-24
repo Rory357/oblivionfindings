@@ -44,7 +44,7 @@ export default function CreateCompliance({ auth }: Props) {
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-6">
-            <Shield className="w-8 h-8 text-blue-500" />
+            <Shield className="w-8 h-8 text-status-info" />
             <h1 className="text-3xl font-bold text-foreground">New Compliance Obligation</h1>
           </div>
 
@@ -62,7 +62,7 @@ export default function CreateCompliance({ auth }: Props) {
                     onChange={(e) => setData('title', e.target.value)}
                     placeholder="e.g., Annual Audit Requirements"
                   />
-                  {errors.title && <p className="text-sm text-red-600 mt-1">{errors.title}</p>}
+                  {errors.title && <p className="text-sm text-status-critical mt-1">{errors.title}</p>}
                 </div>
 
                 <div>

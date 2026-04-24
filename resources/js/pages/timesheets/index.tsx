@@ -255,7 +255,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                         </div>
 
                         {bulkError ? (
-                            <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+                            <div className="flex items-center gap-2 rounded-lg border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                 <AlertCircle className="h-4 w-4 shrink-0" />
                                 {bulkError}
                             </div>
@@ -314,7 +314,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                                     {t.break_minutes ? ` · ${t.break_minutes}m break` : ''}
                                                 </div>
                                                 {t.is_residential_billable ? (
-                                                    <Badge variant="outline" className="mt-1 border-emerald-500/30 text-emerald-400 bg-emerald-500/10 text-[10px]">
+                                                    <Badge variant="outline" className="mt-1 border-status-success/30 text-status-success bg-status-success text-[10px]">
                                                         Residential billable
                                                     </Badge>
                                                 ) : null}
@@ -336,7 +336,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                                         <Button variant="ghost" size="sm" className="text-xs">View</Button>
                                                     </Link>
                                                     {canApprove && t.status === 'submitted' ? (
-                                                        <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 bg-yellow-500/10 text-[10px]">
+                                                        <Badge variant="outline" className="border-status-warning/30 text-status-warning bg-status-warning text-[10px]">
                                                             Needs approval
                                                         </Badge>
                                                     ) : null}

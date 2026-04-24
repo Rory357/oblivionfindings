@@ -41,10 +41,10 @@ function DonutChart({ percentage, size = 120 }: { percentage: number; size?: num
 
     const color =
         percentage >= 90
-            ? 'text-red-500'
+            ? 'text-status-critical'
             : percentage >= 70
-              ? 'text-amber-500'
-              : 'text-emerald-500';
+              ? 'text-status-warning'
+              : 'text-status-success';
 
     return (
         <div className="relative inline-flex items-center justify-center">
@@ -112,8 +112,8 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-500/10 p-2">
-                                    <Home className="w-5 h-5 text-blue-400" />
+                                <div className="rounded-lg bg-status-info p-2">
+                                    <Home className="w-5 h-5 text-status-info" />
                                 </div>
                                 <div>
                                     <div className="text-sm text-muted-foreground">Total Capacity</div>
@@ -125,8 +125,8 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-500/10 p-2">
-                                    <Users className="w-5 h-5 text-emerald-400" />
+                                <div className="rounded-lg bg-status-success p-2">
+                                    <Users className="w-5 h-5 text-status-success" />
                                 </div>
                                 <div>
                                     <div className="text-sm text-muted-foreground">Current Occupancy</div>
@@ -151,8 +151,8 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-amber-500/10 p-2">
-                                    <Clock className="w-5 h-5 text-amber-400" />
+                                <div className="rounded-lg bg-status-warning p-2">
+                                    <Clock className="w-5 h-5 text-status-warning" />
                                 </div>
                                 <div>
                                     <div className="text-sm text-muted-foreground">Waitlist</div>
@@ -218,12 +218,12 @@ export default function CapacityIndex({ site, rooms = [] }: Props) {
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {room.assigned_client ? (
-                                                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-300 bg-emerald-500/10">
+                                                    <Badge variant="outline" className="border-status-success/30 text-status-success bg-status-success">
                                                         Occupied
                                                     </Badge>
                                                 ) : (
                                                     <>
-                                                        <Badge variant="outline" className="border-slate-500/30 text-muted-foreground">
+                                                        <Badge variant="outline" className="border-border/30 text-muted-foreground">
                                                             Vacant
                                                         </Badge>
                                                         <Button variant="ghost" size="sm" className="text-xs" asChild>

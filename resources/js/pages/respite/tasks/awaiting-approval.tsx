@@ -14,9 +14,9 @@ type Props = {
 
 const priorityColors: Record<string, string> = {
     low: 'bg-muted text-foreground',
-    medium: 'bg-blue-100 text-blue-800',
-    high: 'bg-orange-100 text-orange-800',
-    urgent: 'bg-red-100 text-red-800',
+    medium: 'bg-status-info-bg text-status-info',
+    high: 'bg-status-warning-bg text-status-warning',
+    urgent: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function TasksAwaitingApproval({ tasks }: Props) {
@@ -43,7 +43,7 @@ export default function TasksAwaitingApproval({ tasks }: Props) {
                                             <div className="font-semibold">{t.title}</div>
                                             <div className="mt-2 flex flex-wrap gap-2">
                                                 <Badge className={priorityColors[t.priority] || ''}>{t.priority}</Badge>
-                                                <Badge className="bg-amber-100 text-amber-800">Awaiting Approval</Badge>
+                                                <Badge className="bg-status-warning-bg text-status-warning">Awaiting Approval</Badge>
                                             </div>
                                             {t.assigned_to && (
                                                 <div className="mt-2 text-xs text-muted-foreground">Submitted by: {t.assigned_to?.name}</div>

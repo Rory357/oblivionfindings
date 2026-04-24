@@ -120,7 +120,7 @@ export default function FundingClaimShow({ claim }: Props) {
                             <Badge variant="outline" className="h-5 px-2 text-[10px] capitalize">
                                 {claim.status}
                             </Badge>
-                            <p className="mt-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                            <p className="mt-2 text-sm font-semibold text-status-success dark:text-status-success">
                                 {nzd.format(claim.total_amount ?? 0)}
                             </p>
                         </CardContent>
@@ -192,7 +192,7 @@ export default function FundingClaimShow({ claim }: Props) {
                                 <p className="text-sm text-muted-foreground">
                                     {nzd.format(item.unit_price)}
                                 </p>
-                                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                                <p className="text-sm font-semibold text-status-success dark:text-status-success">
                                     {nzd.format(item.total_amount)}
                                 </p>
                             </div>

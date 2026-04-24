@@ -948,7 +948,7 @@ export default function RosteringIndex(props: Props) {
                                                                         const v = coverageMode === 'assigned' ? cell.assigned : cell.open;
                                                                         const bg = coverageMode === 'assigned'
                                                                             ? (v >= 3 ? 'bg-muted' : v === 2 ? 'bg-muted' : v === 1 ? 'bg-muted' : 'bg-transparent')
-                                                                            : (v >= 3 ? 'bg-amber-200' : v === 2 ? 'bg-amber-100' : v === 1 ? 'bg-amber-50' : 'bg-transparent');
+                                                                            : (v >= 3 ? 'bg-status-warning-bg' : v === 2 ? 'bg-status-warning-bg' : v === 1 ? 'bg-status-warning-bg' : 'bg-transparent');
                                                                         return (
                                                                             <div key={`${dk}-${h}`} className={`h-7 rounded border ${bg} flex items-center justify-center`}>
                                                                                 <span className="text-[10px] text-foreground">{v > 0 ? v : ''}</span>

@@ -173,22 +173,22 @@ const formatDateTime = (value?: string | null) => {
 
 const severityColor = (severity: string) => {
     const map: Record<string, string> = {
-        critical: 'bg-red-100 text-red-800 border-red-200',
-        high: 'bg-orange-100 text-orange-800 border-orange-200',
-        medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        low: 'bg-blue-100 text-blue-800 border-blue-200',
+        critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+        high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+        medium: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+        low: 'bg-status-info-bg text-status-info border-status-info/30',
     };
     return map[severity] ?? 'bg-muted text-foreground border-border';
 };
 
 const statusColor = (status: string) => {
     const map: Record<string, string> = {
-        closed: 'bg-green-100 text-green-800 border-green-200',
+        closed: 'bg-status-success-bg text-status-success border-status-success/30',
         investigating: 'bg-primary/10 text-primary border-primary',
-        triaged: 'bg-blue-100 text-blue-800 border-blue-200',
+        triaged: 'bg-status-info-bg text-status-info border-status-info/30',
         reported: 'bg-muted text-foreground border-border',
         action_plan: 'bg-primary/10 text-primary border-primary',
-        monitoring: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+        monitoring: 'bg-status-info-bg text-status-info border-status-info/30',
         referred_external: 'bg-primary/10 text-primary border-primary',
     };
     return map[status] ?? 'bg-muted text-foreground border-border';
@@ -196,35 +196,35 @@ const statusColor = (status: string) => {
 
 const riskColor = (level: string) => {
     const map: Record<string, string> = {
-        critical: 'bg-red-100 text-red-800 border-red-200',
-        high: 'bg-orange-100 text-orange-800 border-orange-200',
-        medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        low: 'bg-green-100 text-green-800 border-green-200',
+        critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+        high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+        medium: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+        low: 'bg-status-success-bg text-status-success border-status-success/30',
     };
     return map[level] ?? 'bg-muted text-foreground border-border';
 };
 
 const actionStatusColor = (status: string) => {
     const map: Record<string, string> = {
-        completed: 'bg-green-100 text-green-800 border-green-200',
-        in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
+        completed: 'bg-status-success-bg text-status-success border-status-success/30',
+        in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
         pending: 'bg-muted text-foreground border-border',
-        cancelled: 'bg-red-100 text-red-800 border-red-200',
-        overdue: 'bg-red-100 text-red-800 border-red-200',
+        cancelled: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+        overdue: 'bg-status-critical-bg text-status-critical border-status-critical/30',
     };
     return map[status] ?? 'bg-muted text-foreground border-border';
 };
 
 const investigationStatusColor = (status: string) => {
     const map: Record<string, string> = {
-        completed: 'bg-green-100 text-green-800 border-green-200',
-        in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
+        completed: 'bg-status-success-bg text-status-success border-status-success/30',
+        in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
         planned: 'bg-muted text-foreground border-border',
-        paused: 'bg-amber-100 text-amber-800 border-amber-200',
-        abandoned: 'bg-red-100 text-red-800 border-red-200',
+        paused: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+        abandoned: 'bg-status-critical-bg text-status-critical border-status-critical/30',
         pending: 'bg-muted text-foreground border-border',
-        cancelled: 'bg-red-100 text-red-800 border-red-200',
-        on_hold: 'bg-amber-100 text-amber-800 border-amber-200',
+        cancelled: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+        on_hold: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     };
     return map[status] ?? 'bg-muted text-foreground border-border';
 };
@@ -456,7 +456,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                     <div>
                         <h1 className="text-xl font-semibold flex items-center gap-2">
                             {concern.severity === 'critical' && (
-                                <AlertTriangle className="h-5 w-5 text-red-500" />
+                                <AlertTriangle className="h-5 w-5 text-status-critical" />
                             )}
                             {concern.reference_number}
                         </h1>
@@ -479,7 +479,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                             {concern.subject_informed === false && (
                                 <Badge
                                     variant="outline"
-                                    className="border-amber-200 bg-amber-50 text-amber-700"
+                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
                                 >
                                     Subject Not Informed
                                 </Badge>
@@ -565,7 +565,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     <span className="text-xs text-muted-foreground">
                                         Immediate Actions Taken
                                     </span>
-                                    <p className="mt-1 text-sm whitespace-pre-wrap rounded-md bg-amber-50 p-3 text-amber-900">
+                                    <p className="mt-1 text-sm whitespace-pre-wrap rounded-md bg-status-warning-bg p-3 text-status-warning">
                                         {concern.immediate_actions}
                                     </p>
                                 </div>
@@ -576,7 +576,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Users className="h-5 w-5 text-blue-500" />
+                                <Users className="h-5 w-5 text-status-info" />
                                 People Involved
                             </CardTitle>
                         </CardHeader>
@@ -610,9 +610,9 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
 
                 {/* Closure info if closed */}
                 {isClosed && (concern.closure_summary || concern.lessons_learned) && (
-                    <Card className="border-green-200 bg-green-50/50">
+                    <Card className="border-status-success/30 bg-status-success-bg">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base text-green-800">
+                            <CardTitle className="flex items-center gap-2 text-base text-status-success">
                                 <CheckCircle2 className="h-5 w-5" />
                                 Closure Summary
                             </CardTitle>
@@ -620,7 +620,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                         <CardContent className="space-y-3">
                             {concern.closure_summary && (
                                 <div>
-                                    <span className="text-xs text-green-700">Summary</span>
+                                    <span className="text-xs text-status-success">Summary</span>
                                     <p className="mt-1 text-sm whitespace-pre-wrap">
                                         {concern.closure_summary}
                                     </p>
@@ -628,14 +628,14 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                             )}
                             {concern.lessons_learned && (
                                 <div>
-                                    <span className="text-xs text-green-700">Lessons Learned</span>
+                                    <span className="text-xs text-status-success">Lessons Learned</span>
                                     <p className="mt-1 text-sm whitespace-pre-wrap">
                                         {concern.lessons_learned}
                                     </p>
                                 </div>
                             )}
                             {concern.closed_at && (
-                                <p className="text-xs text-green-600">
+                                <p className="text-xs text-status-success">
                                     Closed on {formatDateTime(concern.closed_at)} by{' '}
                                     {concern.closedBy?.name ?? 'Unknown'}
                                 </p>
@@ -650,7 +650,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <ShieldAlert className="h-5 w-5 text-red-500" />
+                            <ShieldAlert className="h-5 w-5 text-status-critical" />
                             Risk Assessments
                             <Badge variant="secondary" className="ml-1">
                                 {concern.riskAssessments?.length ?? 0}
@@ -958,12 +958,12 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {er.acknowledgment_received ? (
-                                                    <Badge className="bg-green-100 text-green-800 border-green-200">
+                                                    <Badge className="bg-status-success-bg text-status-success border-status-success/30">
                                                         <CheckCircle2 className="mr-1 h-3 w-3" />
                                                         Acknowledged
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="border-amber-200 text-amber-700">
+                                                    <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                                         Awaiting Acknowledgment
                                                     </Badge>
                                                 )}
@@ -1016,7 +1016,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <FileText className="h-5 w-5 text-amber-500" />
+                            <FileText className="h-5 w-5 text-status-warning" />
                             Action Plans
                             <Badge variant="secondary" className="ml-1">
                                 {concern.actionPlans?.length ?? 0}
@@ -1046,7 +1046,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     return (
                                         <div
                                             key={ap.id}
-                                            className={`rounded-lg border p-4 space-y-2 ${isOverdue ? 'border-red-200 bg-red-50/30' : ''}`}
+                                            className={`rounded-lg border p-4 space-y-2 ${isOverdue ? 'border-status-critical/30 bg-status-critical-bg' : ''}`}
                                         >
                                             <div className="flex flex-wrap items-start justify-between gap-2">
                                                 <div className="flex-1">
@@ -1073,7 +1073,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                                     {ap.assigned_to?.name ?? 'Unassigned'}
                                                 </MetaRow>
                                                 <MetaRow title="Due Date">
-                                                    <span className={isOverdue ? 'text-red-600 font-semibold' : ''}>
+                                                    <span className={isOverdue ? 'text-status-critical font-semibold' : ''}>
                                                         {formatDate(ap.due_date)}
                                                     </span>
                                                 </MetaRow>
@@ -1141,7 +1141,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                 </SelectContent>
                             </Select>
                             {assignForm.errors.assigned_to_user_id && (
-                                <p className="text-xs text-red-600 mt-1">
+                                <p className="text-xs text-status-critical mt-1">
                                     {assignForm.errors.assigned_to_user_id}
                                 </p>
                             )}
@@ -1219,7 +1219,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                 placeholder="Summarise the outcome and rationale for closure..."
                             />
                             {closeForm.errors.closure_summary && (
-                                <p className="text-xs text-red-600 mt-1">
+                                <p className="text-xs text-status-critical mt-1">
                                     {closeForm.errors.closure_summary}
                                 </p>
                             )}
@@ -1277,7 +1277,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     </SelectContent>
                                 </Select>
                                 {riskForm.errors.overall_risk_level && (
-                                    <p className="text-xs text-red-600 mt-1">
+                                    <p className="text-xs text-status-critical mt-1">
                                         {riskForm.errors.overall_risk_level}
                                     </p>
                                 )}
@@ -1489,7 +1489,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     </SelectContent>
                                 </Select>
                                 {investigationForm.errors.investigation_type && (
-                                    <p className="text-xs text-red-600 mt-1">
+                                    <p className="text-xs text-status-critical mt-1">
                                         {investigationForm.errors.investigation_type}
                                     </p>
                                 )}
@@ -1514,7 +1514,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     </SelectContent>
                                 </Select>
                                 {investigationForm.errors.lead_investigator_id && (
-                                    <p className="text-xs text-red-600 mt-1">
+                                    <p className="text-xs text-status-critical mt-1">
                                         {investigationForm.errors.lead_investigator_id}
                                     </p>
                                 )}
@@ -1614,7 +1614,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     </SelectContent>
                                 </Select>
                                 {externalForm.errors.authority_type && (
-                                    <p className="text-xs text-red-600 mt-1">
+                                    <p className="text-xs text-status-critical mt-1">
                                         {externalForm.errors.authority_type}
                                     </p>
                                 )}
@@ -1637,7 +1637,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     </SelectContent>
                                 </Select>
                                 {externalForm.errors.report_method && (
-                                    <p className="text-xs text-red-600 mt-1">
+                                    <p className="text-xs text-status-critical mt-1">
                                         {externalForm.errors.report_method}
                                     </p>
                                 )}
@@ -1717,7 +1717,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                 placeholder="Describe the action to be taken..."
                             />
                             {actionForm.errors.action_description && (
-                                <p className="text-xs text-red-600 mt-1">
+                                <p className="text-xs text-status-critical mt-1">
                                     {actionForm.errors.action_description}
                                 </p>
                             )}
@@ -1749,7 +1749,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                                     </SelectContent>
                                 </Select>
                                 {actionForm.errors.action_type && (
-                                    <p className="text-xs text-red-600 mt-1">
+                                    <p className="text-xs text-status-critical mt-1">
                                         {actionForm.errors.action_type}
                                     </p>
                                 )}

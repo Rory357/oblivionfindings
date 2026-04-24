@@ -46,19 +46,19 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     eligible: {
-        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        className: 'border-status-success/30 text-status-success bg-status-success',
         label: 'Eligible',
     },
     pending_review: {
-        className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
+        className: 'border-status-warning/30 text-status-warning bg-status-warning',
         label: 'Pending Review',
     },
     suspended: {
-        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        className: 'border-status-critical/30 text-status-critical bg-status-critical',
         label: 'Suspended',
     },
     expired: {
-        className: 'border-slate-500/30 text-muted-foreground bg-slate-500/10',
+        className: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
         label: 'Expired',
     },
 };
@@ -91,7 +91,7 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                             <CardTitle className="text-sm font-medium text-muted-foreground">Eligible</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-emerald-500">{summary.eligible}</p>
+                            <p className="text-2xl font-bold text-status-success">{summary.eligible}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -99,7 +99,7 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                             <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-yellow-500">{summary.pending}</p>
+                            <p className="text-2xl font-bold text-status-warning">{summary.pending}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -107,7 +107,7 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                             <CardTitle className="text-sm font-medium text-muted-foreground">Suspended</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-red-500">{summary.suspended}</p>
+                            <p className="text-2xl font-bold text-status-critical">{summary.suspended}</p>
                         </CardContent>
                     </Card>
                     <Card>

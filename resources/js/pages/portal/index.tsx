@@ -88,7 +88,7 @@ export default function PortalIndex({ clients }: Props) {
                                                 </Badge>
                                             )}
                                             {c.status?.toLowerCase() === 'active' && (
-                                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                <Badge className="bg-status-success-bg text-status-success hover:bg-status-success-bg dark:bg-status-success-bg dark:text-status-success">
                                                     Active
                                                 </Badge>
                                             )}

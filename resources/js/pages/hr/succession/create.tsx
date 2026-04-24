@@ -46,19 +46,19 @@ export default function SuccessionCreate({ positions, employees }: Props) {
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Role Title <span className="text-red-500">*</span></Label>
+                                    <Label>Role Title <span className="text-status-critical">*</span></Label>
                                     <Input value={data.role_title} onChange={e => setData('role_title', e.target.value)} placeholder="e.g. Head of Operations" />
-                                    {errors.role_title && <p className="text-sm text-red-500 mt-1">{errors.role_title}</p>}
+                                    {errors.role_title && <p className="text-sm text-status-critical mt-1">{errors.role_title}</p>}
                                 </div>
                                 <div>
                                     <Label>Department</Label>
                                     <Input value={data.department} onChange={e => setData('department', e.target.value)} />
-                                    {errors.department && <p className="text-sm text-red-500 mt-1">{errors.department}</p>}
+                                    {errors.department && <p className="text-sm text-status-critical mt-1">{errors.department}</p>}
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Risk Level <span className="text-red-500">*</span></Label>
+                                    <Label>Risk Level <span className="text-status-critical">*</span></Label>
                                     <Select value={data.risk_level} onValueChange={v => setData('risk_level', v)}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
@@ -68,7 +68,7 @@ export default function SuccessionCreate({ positions, employees }: Props) {
                                             <SelectItem value="critical">Critical</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    {errors.risk_level && <p className="text-sm text-red-500 mt-1">{errors.risk_level}</p>}
+                                    {errors.risk_level && <p className="text-sm text-status-critical mt-1">{errors.risk_level}</p>}
                                 </div>
                                 <div>
                                     <Label>Current Holder</Label>
@@ -78,7 +78,7 @@ export default function SuccessionCreate({ positions, employees }: Props) {
                                             {employees.map(e => <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
-                                    {errors.current_holder_user_id && <p className="text-sm text-red-500 mt-1">{errors.current_holder_user_id}</p>}
+                                    {errors.current_holder_user_id && <p className="text-sm text-status-critical mt-1">{errors.current_holder_user_id}</p>}
                                 </div>
                             </div>
                             {positions && positions.length > 0 && (
@@ -90,13 +90,13 @@ export default function SuccessionCreate({ positions, employees }: Props) {
                                             {positions.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.title}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
-                                    {errors.position_id && <p className="text-sm text-red-500 mt-1">{errors.position_id}</p>}
+                                    {errors.position_id && <p className="text-sm text-status-critical mt-1">{errors.position_id}</p>}
                                 </div>
                             )}
                             <div>
                                 <Label>Notes</Label>
                                 <Textarea rows={3} value={data.notes} onChange={e => setData('notes', e.target.value)} />
-                                {errors.notes && <p className="text-sm text-red-500 mt-1">{errors.notes}</p>}
+                                {errors.notes && <p className="text-sm text-status-critical mt-1">{errors.notes}</p>}
                             </div>
                             <div className="flex items-center gap-2">
                                 <Button type="submit" disabled={processing}>Create Plan</Button>

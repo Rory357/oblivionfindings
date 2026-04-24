@@ -60,7 +60,7 @@ export default function PettyCashCreate({ accounts, users }: Props) {
                                     onChange={(e) => setData('name', e.target.value)}
                                     placeholder="e.g. Office Petty Cash"
                                 />
-                                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                                {errors.name && <p className="mt-1 text-sm text-status-critical">{errors.name}</p>}
                             </div>
 
                             <div>
@@ -75,7 +75,7 @@ export default function PettyCashCreate({ accounts, users }: Props) {
                                     placeholder="200.00"
                                 />
                                 {errors.float_amount && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.float_amount}</p>
+                                    <p className="mt-1 text-sm text-status-critical">{errors.float_amount}</p>
                                 )}
                             </div>
 
@@ -97,7 +97,7 @@ export default function PettyCashCreate({ accounts, users }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {errors.gl_account_id && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.gl_account_id}</p>
+                                    <p className="mt-1 text-sm text-status-critical">{errors.gl_account_id}</p>
                                 )}
                             </div>
 
@@ -119,7 +119,7 @@ export default function PettyCashCreate({ accounts, users }: Props) {
                                     </SelectContent>
                                 </Select>
                                 {errors.custodian_user_id && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.custodian_user_id}</p>
+                                    <p className="mt-1 text-sm text-status-critical">{errors.custodian_user_id}</p>
                                 )}
                             </div>
 

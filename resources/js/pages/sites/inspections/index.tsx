@@ -60,10 +60,10 @@ const frequencyLabels: Record<string, string> = {
 };
 
 const resultColors: Record<string, string> = {
-    pass: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-    fail: 'border-red-500/30 text-red-400 bg-red-500/10',
-    partial: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
-    na: 'border-slate-500/30 text-muted-foreground',
+    pass: 'border-status-success/30 text-status-success bg-status-success',
+    fail: 'border-status-critical/30 text-status-critical bg-status-critical',
+    partial: 'border-status-warning/30 text-status-warning bg-status-warning',
+    na: 'border-border/30 text-muted-foreground',
 };
 
 export default function SiteInspections({ site, schedules, records }: Props) {
@@ -224,7 +224,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                                             )}
                                         </div>
                                         <div className="text-right">
-                                            <div className={`text-sm flex items-center gap-1 ${isOverdue(schedule.next_due_date) ? 'text-red-400' : 'text-slate-300'}`}>
+                                            <div className={`text-sm flex items-center gap-1 ${isOverdue(schedule.next_due_date) ? 'text-status-critical' : 'text-muted-foreground'}`}>
                                                 {isOverdue(schedule.next_due_date) ? <AlertCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                                                 Due: {new Date(schedule.next_due_date).toLocaleDateString()}
                                             </div>

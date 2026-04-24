@@ -262,15 +262,15 @@ function HomeKpi({
 }) {
     const ring =
         tone === 'danger'
-            ? 'border-red-300 bg-red-50/70 dark:border-red-800/60 dark:bg-red-950/20'
+            ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/60 dark:bg-status-critical'
             : tone === 'warn'
-                ? 'border-amber-300 bg-amber-50/70 dark:border-amber-800/60 dark:bg-amber-950/20'
+                ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/60 dark:bg-status-warning'
                 : 'border-border bg-card';
     const iconTone =
         tone === 'danger'
-            ? 'text-red-600 dark:text-red-400'
+            ? 'text-status-critical dark:text-status-critical'
             : tone === 'warn'
-                ? 'text-amber-600 dark:text-amber-400'
+                ? 'text-status-warning dark:text-status-warning'
                 : 'text-muted-foreground';
     return (
         <div
@@ -487,12 +487,12 @@ export default function MyDay({
     const clockBadge = isClockedIn ? (
         <span
             aria-hidden
-            className="block h-2 w-2 rounded-full bg-emerald-500"
+            className="block h-2 w-2 rounded-full bg-status-success"
         />
     ) : isAmbiguous ? (
         <span
             aria-hidden
-            className="block h-2 w-2 rounded-full bg-amber-500"
+            className="block h-2 w-2 rounded-full bg-status-warning"
         />
     ) : undefined;
 
@@ -543,7 +543,7 @@ export default function MyDay({
                     {stats.notifications_unread > 0 && (
                         <span
                             aria-hidden
-                            className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+                            className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-bold text-white"
                         >
                             {stats.notifications_unread}
                         </span>
@@ -610,11 +610,11 @@ export default function MyDay({
 
                 {/* ── Manager banner (only if a manager lands here directly) ─ */}
                 {is_manager && manager_data && (
-                    <Card className="border-blue-200 bg-blue-50/60 dark:border-blue-800 dark:bg-blue-950/20">
+                    <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30 dark:bg-status-info">
                         <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
                                 <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    <Users className="h-4 w-4 text-status-info dark:text-status-info" />
                                     <span className="font-semibold">
                                         {manager_data.staff_on_today}
                                     </span>
@@ -648,10 +648,10 @@ export default function MyDay({
                     <Link
                         href={active_round.url}
                         aria-label={`${active_round.status === 'in_progress' ? 'Resume' : 'Start'} ${active_round.name}`}
-                        className="frontline-focus group block rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 transition-shadow hover:shadow-sm dark:border-emerald-800/60 dark:bg-emerald-950/20"
+                        className="frontline-focus group block rounded-xl border border-status-success/30 bg-status-success-bg p-4 transition-shadow hover:shadow-sm dark:border-status-success/60 dark:bg-status-success"
                     >
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-success text-white">
                                 <Pill className="h-5 w-5" />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -860,7 +860,7 @@ export default function MyDay({
 
                         {sortedOpenItems.length === 0 ? (
                             <div className="flex flex-col items-center py-8 text-center">
-                                <CheckCircle2 className="h-8 w-8 text-green-500" />
+                                <CheckCircle2 className="h-8 w-8 text-status-success" />
                                 <p className="mt-2 text-sm text-muted-foreground">
                                     Nothing to action right now.
                                 </p>

@@ -184,9 +184,9 @@ function getInitials(name: string) {
 
 const BOARD_ROLE_COLOURS: Record<string, string> = {
     chair: 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70',
-    secretary: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-    treasurer: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
-    member: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+    secretary: 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    treasurer: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
+    member: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     observer: 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground',
 };
 
@@ -206,12 +206,12 @@ function OverrideToggle({
                 onClick={() => onChange('inherit')}
                 className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                     value === 'inherit'
-                        ? 'bg-muted text-foreground shadow-sm dark:bg-gray-700 dark:text-foreground'
+                        ? 'bg-muted text-foreground shadow-sm dark:bg-muted dark:text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
                 <span className="flex items-center gap-1.5">
-                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'inherit' ? 'bg-gray-500' : 'bg-gray-300'}`} />
+                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'inherit' ? 'bg-muted-foreground/80' : 'bg-muted'}`} />
                     Inherit
                 </span>
             </button>
@@ -220,12 +220,12 @@ function OverrideToggle({
                 onClick={() => onChange('allow')}
                 className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                     value === 'allow'
-                        ? 'bg-green-100 text-green-700 shadow-sm dark:bg-green-900 dark:text-green-200'
+                        ? 'bg-status-success-bg text-status-success shadow-sm dark:bg-status-success-bg dark:text-status-success'
                         : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
                 <span className="flex items-center gap-1.5">
-                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'allow' ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'allow' ? 'bg-status-success' : 'bg-muted'}`} />
                     Allow
                 </span>
             </button>
@@ -234,12 +234,12 @@ function OverrideToggle({
                 onClick={() => onChange('deny')}
                 className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                     value === 'deny'
-                        ? 'bg-red-100 text-red-700 shadow-sm dark:bg-red-900 dark:text-red-200'
+                        ? 'bg-status-critical-bg text-status-critical shadow-sm dark:bg-status-critical-bg dark:text-status-critical'
                         : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
                 <span className="flex items-center gap-1.5">
-                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'deny' ? 'bg-red-500' : 'bg-gray-300'}`} />
+                    <span className={`inline-block h-2 w-2 rounded-full ${value === 'deny' ? 'bg-status-critical' : 'bg-muted'}`} />
                     Deny
                 </span>
             </button>
@@ -629,8 +629,8 @@ function BoardGovernanceTab({
                 </Card>
                 <Card>
                     <CardContent className="flex items-center gap-3 py-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900">
-                            <Landmark className="h-5 w-5 text-emerald-600" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-bg dark:bg-status-success">
+                            <Landmark className="h-5 w-5 text-status-success" />
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{activeMembers.length}</div>
@@ -640,8 +640,8 @@ function BoardGovernanceTab({
                 </Card>
                 <Card>
                     <CardContent className="flex items-center gap-3 py-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900">
-                            <Calendar className="h-5 w-5 text-amber-600" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-warning-bg dark:bg-status-warning">
+                            <Calendar className="h-5 w-5 text-status-warning" />
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{expiringSoon.length}</div>
@@ -686,7 +686,7 @@ function BoardGovernanceTab({
                                     </SelectContent>
                                 </Select>
                                 {form.errors.user_id && (
-                                    <p className="mt-1 text-sm text-red-600">{form.errors.user_id}</p>
+                                    <p className="mt-1 text-sm text-status-critical">{form.errors.user_id}</p>
                                 )}
                             </div>
                             <div>
@@ -765,7 +765,7 @@ function BoardGovernanceTab({
                                                         {member.board_role}
                                                     </Badge>
                                                     {member.is_active ? (
-                                                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                        <Badge className="bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success">
                                                             Active
                                                         </Badge>
                                                     ) : (
@@ -790,7 +790,7 @@ function BoardGovernanceTab({
                                             <Button
                                                 size="sm"
                                                 variant="ghost"
-                                                className="text-red-600 hover:text-red-700"
+                                                className="text-status-critical hover:text-status-critical"
                                                 onClick={() => handleRemove(member.id)}
                                                 disabled={form.processing}
                                             >

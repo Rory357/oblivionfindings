@@ -108,7 +108,7 @@ function KpiCard({
                         <p className="text-sm font-medium text-muted-foreground">{title}</p>
                         <p className={`text-2xl font-bold ${className}`}>{value}</p>
                         {trend != null && (
-                            <div className={`mt-1 flex items-center gap-1 text-xs ${trend.positive ? 'text-green-600' : 'text-red-600'}`}>
+                            <div className={`mt-1 flex items-center gap-1 text-xs ${trend.positive ? 'text-status-success' : 'text-status-critical'}`}>
                                 {trend.positive ? (
                                     <ArrowUpRight className="h-3 w-3" />
                                 ) : (
@@ -210,21 +210,21 @@ export default function FinanceDashboard({
                         title="Revenue (Month)"
                         value={formatCurrency(totalRevenue)}
                         icon={TrendingUp}
-                        className="text-green-600"
+                        className="text-status-success"
                         trend={revenueTrend}
                     />
                     <KpiCard
                         title="Expenses (Month)"
                         value={formatCurrency(totalExpenses)}
                         icon={TrendingDown}
-                        className="text-red-600"
+                        className="text-status-critical"
                         trend={expenseTrend ? { ...expenseTrend, positive: !expenseTrend.positive } : null}
                     />
                     <KpiCard
                         title="Net Profit"
                         value={formatCurrency(netProfit)}
                         icon={DollarSign}
-                        className={netProfit >= 0 ? 'text-green-600' : 'text-red-600'}
+                        className={netProfit >= 0 ? 'text-status-success' : 'text-status-critical'}
                         trend={profitTrend}
                     />
                     <KpiCard
@@ -366,7 +366,7 @@ export default function FinanceDashboard({
                                                 <TableCell>
                                                     <Link
                                                         href={`/finance/bills/${bill.id}`}
-                                                        className="font-medium text-blue-600 hover:underline"
+                                                        className="font-medium text-status-info hover:underline"
                                                     >
                                                         {bill.bill_number}
                                                     </Link>
@@ -413,7 +413,7 @@ export default function FinanceDashboard({
                                                 <TableCell>
                                                     <Link
                                                         href={`/finance/journals/${journal.id}`}
-                                                        className="font-medium text-blue-600 hover:underline"
+                                                        className="font-medium text-status-info hover:underline"
                                                     >
                                                         {journal.journal_number}
                                                     </Link>

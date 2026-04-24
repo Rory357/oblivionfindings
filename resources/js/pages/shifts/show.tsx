@@ -320,17 +320,17 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                 {/* Workflow guidance banner */}
                 {guidance ? (
                     <div className={`flex items-center gap-3 rounded-xl border p-4 ${
-                        guidance.variant === 'warning' ? 'border-amber-500/30 bg-amber-500/10' :
-                        guidance.variant === 'success' ? 'border-emerald-500/30 bg-emerald-500/10' :
-                        'border-blue-500/30 bg-blue-500/10'
+                        guidance.variant === 'warning' ? 'border-status-warning/30 bg-status-warning' :
+                        guidance.variant === 'success' ? 'border-status-success/30 bg-status-success' :
+                        'border-status-info/30 bg-status-info'
                     }`}>
-                        {guidance.variant === 'warning' ? <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" /> :
-                         guidance.variant === 'success' ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" /> :
-                         <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />}
+                        {guidance.variant === 'warning' ? <AlertTriangle className="h-4 w-4 text-status-warning shrink-0" /> :
+                         guidance.variant === 'success' ? <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" /> :
+                         <ArrowRight className="h-4 w-4 text-status-info shrink-0" />}
                         <span className={`text-sm ${
-                            guidance.variant === 'warning' ? 'text-amber-800 dark:text-amber-300' :
-                            guidance.variant === 'success' ? 'text-emerald-800 dark:text-emerald-300' :
-                            'text-blue-800 dark:text-blue-300'
+                            guidance.variant === 'warning' ? 'text-status-warning dark:text-status-warning' :
+                            guidance.variant === 'success' ? 'text-status-success dark:text-status-success' :
+                            'text-status-info dark:text-status-info'
                         }`}>
                             {guidance.message}
                         </span>
@@ -413,9 +413,9 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
                                         <Badge variant="outline" className={
-                                            handoverSummary.status === 'acknowledged' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
-                                            handoverSummary.status === 'submitted' ? 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' :
-                                            'border-slate-500/30 text-muted-foreground bg-slate-500/10'
+                                            handoverSummary.status === 'acknowledged' ? 'border-status-success/30 text-status-success bg-status-success' :
+                                            handoverSummary.status === 'submitted' ? 'border-status-warning/30 text-status-warning bg-status-warning' :
+                                            'border-border/30 text-muted-foreground bg-muted-foreground/80/10'
                                         }>
                                             {handoverSummary.status.charAt(0).toUpperCase() + handoverSummary.status.slice(1)}
                                         </Badge>
@@ -492,12 +492,12 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                                                     placeholder="Why are tasks incomplete?"
                                                 />
                                                 {completeForm.errors.incomplete_tasks_reason ? (
-                                                    <div className="mt-1 text-xs text-red-600">{completeForm.errors.incomplete_tasks_reason}</div>
+                                                    <div className="mt-1 text-xs text-status-critical">{completeForm.errors.incomplete_tasks_reason}</div>
                                                 ) : null}
                                             </div>
                                         ) : null}
                                         {completeForm.errors.allow_incomplete_tasks ? (
-                                            <div className="text-xs text-red-600">{completeForm.errors.allow_incomplete_tasks}</div>
+                                            <div className="text-xs text-status-critical">{completeForm.errors.allow_incomplete_tasks}</div>
                                         ) : null}
                                     </div>
                                 ) : null}
@@ -514,7 +514,7 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                                             onChange={(e) => completeForm.setData('final_note_subject', e.target.value)}
                                         />
                                         {completeForm.errors.final_note_subject ? (
-                                            <div className="mt-1 text-xs text-red-600">{completeForm.errors.final_note_subject}</div>
+                                            <div className="mt-1 text-xs text-status-critical">{completeForm.errors.final_note_subject}</div>
                                         ) : null}
                                     </div>
                                 </div>
@@ -536,7 +536,7 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                                         placeholder="Summarise what happened during the shift, outcomes, any concerns, and handover items."
                                     />
                                     {completeForm.errors.final_note_body ? (
-                                        <div className="mt-1 text-xs text-red-600">{completeForm.errors.final_note_body}</div>
+                                        <div className="mt-1 text-xs text-status-critical">{completeForm.errors.final_note_body}</div>
                                     ) : null}
                                 </div>
                             </div>
@@ -819,7 +819,7 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                             Incidents
                             {(incidents || []).length > 0 ? (
-                                <Badge variant="outline" className="border-red-500/30 text-red-500 bg-red-500/10 text-[10px]">
+                                <Badge variant="outline" className="border-status-critical/30 text-status-critical bg-status-critical text-[10px]">
                                     {incidents.length}
                                 </Badge>
                             ) : null}
@@ -832,9 +832,9 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium">{i.type}</span>
                                         <Badge variant="outline" className={
-                                            i.severity === 'high' ? 'border-red-500/30 text-red-500 bg-red-500/10' :
-                                            i.severity === 'medium' ? 'border-amber-500/30 text-amber-400 bg-amber-500/10' :
-                                            'border-slate-500/30 text-muted-foreground bg-slate-500/10'
+                                            i.severity === 'high' ? 'border-status-critical/30 text-status-critical bg-status-critical' :
+                                            i.severity === 'medium' ? 'border-status-warning/30 text-status-warning bg-status-warning' :
+                                            'border-border/30 text-muted-foreground bg-muted-foreground/80/10'
                                         }>
                                             {i.severity}
                                         </Badge>

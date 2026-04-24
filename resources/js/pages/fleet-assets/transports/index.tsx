@@ -79,16 +79,16 @@ type Props = {
 };
 
 const TRANSPORT_TYPE_COLORS: Record<string, string> = {
-    medical: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    medical: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     appointment:
-        'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    social: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+        'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
+    social: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
     shopping:
         'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary',
     community:
-        'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
+        'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     respite:
-        'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+        'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
     other: 'bg-muted text-foreground dark:bg-muted/30 dark:text-muted-foreground',
 };
 

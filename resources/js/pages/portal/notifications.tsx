@@ -134,12 +134,12 @@ export default function Notifications({ notifications, filter, unreadCount }: Pr
                                     <CardContent className="flex items-start gap-3 p-4">
                                         <div
                                             className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                                                isUnread ? 'bg-blue-100 dark:bg-blue-950' : 'bg-muted'
+                                                isUnread ? 'bg-status-info-bg dark:bg-status-info' : 'bg-muted'
                                             }`}
                                         >
                                             <Bell
                                                 className={`h-4 w-4 ${
-                                                    isUnread ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'
+                                                    isUnread ? 'text-status-info dark:text-status-info' : 'text-muted-foreground'
                                                 }`}
                                             />
                                         </div>

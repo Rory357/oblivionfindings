@@ -33,10 +33,10 @@ type Props = {
 function pill(label: string, kind: 'ok' | 'warn' | 'bad') {
     const className =
         kind === 'ok'
-            ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+            ? 'bg-status-success-bg text-status-success border-status-success/30'
             : kind === 'warn'
-              ? 'bg-amber-100 text-amber-800 border-amber-200'
-              : 'bg-rose-100 text-rose-800 border-rose-200';
+              ? 'bg-status-warning-bg text-status-warning border-status-warning/30'
+              : 'bg-status-critical-bg text-status-critical border-status-critical/30';
     return (
         <Badge variant="outline" className={className}>
             {label}
@@ -87,29 +87,29 @@ export default function MedicationsIndex({ date, clients }: Props) {
                     <h2 className="mb-3 text-sm font-medium text-foreground">Client Medication Status</h2>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {clients.map((c) => (
-                            <Card key={c.id} className={`transition-shadow hover:shadow-md ${c.has_critical_alerts || (c.discrepancy_count ?? 0) > 0 ? 'border-red-300' : c.has_alerts ? 'border-amber-300' : ''}`}>
+                            <Card key={c.id} className={`transition-shadow hover:shadow-md ${c.has_critical_alerts || (c.discrepancy_count ?? 0) > 0 ? 'border-status-critical/30' : c.has_alerts ? 'border-status-warning/30' : ''}`}>
                                 <CardHeader className="pb-2">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="text-base">
-                                            <Link className="hover:text-blue-600 hover:underline" href={`/clients/${c.id}/mar`}>
+                                            <Link className="hover:text-status-info hover:underline" href={`/clients/${c.id}/mar`}>
                                                 {c.name}
                                             </Link>
                                         </CardTitle>
                                         {/* Alert indicators */}
                                         <div className="flex items-center gap-1">
                                             {(c.discrepancy_count ?? 0) > 0 && (
-                                                <div className="flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800" title="Controlled drug discrepancy">
+                                                <div className="flex items-center gap-1 rounded bg-status-critical-bg px-2 py-0.5 text-xs font-medium text-status-critical" title="Controlled drug discrepancy">
                                                     <XCircle className="h-3 w-3" />
                                                     {c.discrepancy_count ?? 0}
                                                 </div>
                                             )}
                                             {c.has_critical_alerts && (
-                                                <div className="flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800" title="Critical alert">
+                                                <div className="flex items-center gap-1 rounded bg-status-critical-bg px-2 py-0.5 text-xs font-medium text-status-critical" title="Critical alert">
                                                     <AlertCircle className="h-3 w-3" />
                                                 </div>
                                             )}
                                             {c.has_alerts && !c.has_critical_alerts && (
-                                                <div className="flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="Active alert">
+                                                <div className="flex items-center gap-1 rounded bg-status-warning-bg px-2 py-0.5 text-xs font-medium text-status-warning" title="Active alert">
                                                     <AlertTriangle className="h-3 w-3" />
                                                 </div>
                                             )}

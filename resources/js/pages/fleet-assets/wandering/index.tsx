@@ -298,7 +298,7 @@ export default function WanderingAlertsIndex({ alerts, stats, filters, can }: Pr
                                                                     variant="outline"
                                                                     size="sm"
                                                                     onClick={() => handleResolve(alert.id)}
-                                                                    className="text-green-600"
+                                                                    className="text-status-success"
                                                                 >
                                                                     <CheckCircle className="mr-1 h-3.5 w-3.5" />
                                                                     Resolve

@@ -65,9 +65,9 @@ type PageProps = {
 };
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30',
-    posted: 'bg-green-500/10 text-green-600 border-green-500/30',
-    eliminated: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+    pending: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    posted: 'bg-status-success-bg text-status-success border-status-success/30',
+    eliminated: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
 const formatCurrency = (amount: number) =>
@@ -235,8 +235,8 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-yellow-500/10">
-                                <Clock className="h-5 w-5 text-yellow-600" />
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-status-warning">
+                                <Clock className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Pending Transactions</p>

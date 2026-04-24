@@ -129,10 +129,10 @@ const LEAVE_COLORS: Record<string, string> = {
 };
 
 const PRIORITY_DOT: Record<string, string> = {
-    urgent: 'bg-red-500',
-    high: 'bg-amber-500',
-    normal: 'bg-blue-500',
-    low: 'bg-slate-400',
+    urgent: 'bg-status-critical',
+    high: 'bg-status-warning',
+    normal: 'bg-status-info',
+    low: 'bg-muted',
 };
 
 const QUICK_LINKS = [
@@ -253,7 +253,7 @@ export default function MyHrIndex({
                             </div>
 
                             <div className="flex flex-col items-center gap-1 rounded-lg bg-white/10 px-4 py-3">
-                                <Heart className="h-5 w-5 text-pink-300" />
+                                <Heart className="h-5 w-5 text-status-critical" />
                                 <span className="text-xl font-bold">{kudosReceived}</span>
                                 <span className="text-[10px] text-white/60">Kudos</span>
                             </div>
@@ -272,12 +272,12 @@ export default function MyHrIndex({
                                     <p className="text-sm font-medium text-muted-foreground">Pending Leave</p>
                                     <p className="mt-1 text-3xl font-bold tracking-tight">{pendingLeave}</p>
                                 </div>
-                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 transition-transform group-hover:scale-110">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-status-info-bg text-status-info dark:text-status-info transition-transform group-hover:scale-110">
                                     <CalendarDays className="h-6 w-6" />
                                 </div>
                             </div>
-                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/30">
-                                <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: pendingLeave > 0 ? '100%' : '0%' }} />
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-info-bg dark:bg-status-info">
+                                <div className="h-full rounded-full bg-status-info transition-all" style={{ width: pendingLeave > 0 ? '100%' : '0%' }} />
                             </div>
                         </div>
                     </Link>
@@ -292,12 +292,12 @@ export default function MyHrIndex({
                                         <p className="mt-0.5 text-xs text-muted-foreground">{formatNzd(pendingExpenses.total)} total</p>
                                     )}
                                 </div>
-                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 transition-transform group-hover:scale-110">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning dark:text-status-warning transition-transform group-hover:scale-110">
                                     <Receipt className="h-6 w-6" />
                                 </div>
                             </div>
-                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-amber-100 dark:bg-amber-900/30">
-                                <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: pendingExpenses.count > 0 ? '100%' : '0%' }} />
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-warning-bg dark:bg-status-warning">
+                                <div className="h-full rounded-full bg-status-warning transition-all" style={{ width: pendingExpenses.count > 0 ? '100%' : '0%' }} />
                             </div>
                         </div>
                     </Link>
@@ -326,12 +326,12 @@ export default function MyHrIndex({
                                     <p className="text-sm font-medium text-muted-foreground">Active Goals</p>
                                     <p className="mt-1 text-3xl font-bold tracking-tight">{activeGoals}</p>
                                 </div>
-                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-transform group-hover:scale-110">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-status-success-bg text-status-success dark:text-status-success transition-transform group-hover:scale-110">
                                     <Target className="h-6 w-6" />
                                 </div>
                             </div>
-                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-                                <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: activeGoals > 0 ? '100%' : '0%' }} />
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-status-success-bg dark:bg-status-success">
+                                <div className="h-full rounded-full bg-status-success transition-all" style={{ width: activeGoals > 0 ? '100%' : '0%' }} />
                             </div>
                         </div>
                     </Link>

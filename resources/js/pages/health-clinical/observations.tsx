@@ -173,7 +173,7 @@ export default function ObservationRegister({
 
                 {/* Hero Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                    <div className="rounded-xl border bg-primary/10 p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
                             Last 7 days
                         </p>
@@ -181,18 +181,18 @@ export default function ObservationRegister({
                             {stats.total_7d}
                         </p>
                     </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-cyan-50 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">
+                    <div className="rounded-xl border bg-status-info-bg p-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-info">
                             Last 30 days
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-blue-700">
+                        <p className="mt-1 text-2xl font-bold text-status-info">
                             {stats.total_30d}
                         </p>
                     </div>
                     {filter_options.observation_types.slice(0, 2).map((t) => (
                         <div
                             key={t.value}
-                            className="rounded-xl border bg-gradient-to-br from-slate-50 to-gray-50 p-4"
+                            className="rounded-xl border bg-primary/10 p-4"
                         >
                             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 {t.label} (30d)
@@ -359,13 +359,13 @@ export default function ObservationRegister({
                                         {observations.data.map((obs) => (
                                             <tr
                                                 key={obs.id}
-                                                className={`border-b transition-colors hover:bg-muted/20 ${obs.is_flagged ? 'bg-red-50/40' : ''}`}
+                                                className={`border-b transition-colors hover:bg-muted/20 ${obs.is_flagged ? 'bg-status-critical-bg' : ''}`}
                                             >
                                                 <td className="px-4 py-3">
                                                     {obs.client ? (
                                                         <Link
                                                             href={`/operations/clients/${obs.client.id}?tab=observations`}
-                                                            className="font-medium text-blue-600 hover:underline"
+                                                            className="font-medium text-status-info hover:underline"
                                                         >
                                                             {obs.client.first_name} {obs.client.last_name}
                                                         </Link>

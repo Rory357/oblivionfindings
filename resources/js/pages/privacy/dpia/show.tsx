@@ -86,12 +86,12 @@ export default function ShowDPIA({ dpia }: Props) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Activity className="h-5 w-5 text-green-500" />
+                            <Activity className="h-5 w-5 text-status-success" />
                             {dpia.assessment_name}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
                             <Badge variant="outline">{outcomeLabel}</Badge>
-                            <Badge className="border-red-200 bg-red-50 text-red-700">
+                            <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                 Risk: {riskLabels[dpia.overall_risk_level] ?? dpia.overall_risk_level}
                             </Badge>
                             {dpia.residual_risk_level && (

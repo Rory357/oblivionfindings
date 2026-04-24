@@ -52,7 +52,7 @@ export default function JobPostingShow({ posting, recentApplications, analytics,
                             <div className="mt-1.5 flex flex-wrap items-center gap-2">
                                 <Badge variant="outline" className={config.className}>{config.label}</Badge>
                                 <Badge variant="secondary">{employmentTypeLabels[posting.employment_type] || posting.employment_type}</Badge>
-                                {posting.is_remote && <Badge variant="outline" className="gap-1 border-blue-500/30 text-blue-400 bg-blue-500/10"><Wifi className="h-3 w-3" /> Remote</Badge>}
+                                {posting.is_remote && <Badge variant="outline" className="gap-1 border-status-info/30 text-status-info bg-status-info"><Wifi className="h-3 w-3" /> Remote</Badge>}
                                 {posting.is_internal && <Badge variant="outline" className="gap-1 border-primary/30 text-primary bg-primary/10"><Lock className="h-3 w-3" /> Internal</Badge>}
                             </div>
                         </div>
@@ -94,9 +94,9 @@ export default function JobPostingShow({ posting, recentApplications, analytics,
 
                 {/* Public URL */}
                 {publicUrl && posting.status === 'published' && (
-                    <div className="flex items-center gap-2 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
-                        <Globe className="h-4 w-4 text-emerald-500 shrink-0" />
-                        <code className="text-sm flex-1 truncate text-emerald-400">{publicUrl}</code>
+                    <div className="flex items-center gap-2 p-3 bg-status-success border border-status-success/20 rounded-lg">
+                        <Globe className="h-4 w-4 text-status-success shrink-0" />
+                        <code className="text-sm flex-1 truncate text-status-success">{publicUrl}</code>
                         <Button variant="ghost" size="sm" onClick={copyPublicLink}><Copy className="h-3.5 w-3.5" /></Button>
                         <Button variant="ghost" size="sm" asChild>
                             <a href={publicUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
@@ -109,7 +109,7 @@ export default function JobPostingShow({ posting, recentApplications, analytics,
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-blue-500/10 p-2"><Eye className="h-4 w-4 text-blue-500" /></div>
+                                <div className="rounded-lg bg-status-info p-2"><Eye className="h-4 w-4 text-status-info" /></div>
                                 <div>
                                     <p className="text-2xl font-bold">{analytics.views}</p>
                                     <p className="text-xs text-muted-foreground">Views</p>
@@ -131,7 +131,7 @@ export default function JobPostingShow({ posting, recentApplications, analytics,
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-emerald-500/10 p-2"><BarChart3 className="h-4 w-4 text-emerald-500" /></div>
+                                <div className="rounded-lg bg-status-success p-2"><BarChart3 className="h-4 w-4 text-status-success" /></div>
                                 <div>
                                     <p className="text-2xl font-bold">{analytics.conversion_rate}%</p>
                                     <p className="text-xs text-muted-foreground">Conversion</p>
@@ -142,7 +142,7 @@ export default function JobPostingShow({ posting, recentApplications, analytics,
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-amber-500/10 p-2"><Clock className="h-4 w-4 text-amber-500" /></div>
+                                <div className="rounded-lg bg-status-warning p-2"><Clock className="h-4 w-4 text-status-warning" /></div>
                                 <div>
                                     <p className="text-2xl font-bold">{analytics.days_published}</p>
                                     <p className="text-xs text-muted-foreground">Days Published</p>

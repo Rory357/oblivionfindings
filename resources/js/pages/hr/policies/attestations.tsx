@@ -62,7 +62,7 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <ShieldCheck className="h-5 w-5 text-amber-500" />
+                            <ShieldCheck className="h-5 w-5 text-status-warning" />
                             Policy Attestations
                         </h1>
                         <div className="mt-1 text-sm text-muted-foreground">
@@ -114,7 +114,7 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                                         <TableCell>
                                             <Link
                                                 href={`/hr/policies/${att.policy.id}`}
-                                                className="font-medium text-blue-600 hover:underline"
+                                                className="font-medium text-status-info hover:underline"
                                             >
                                                 {att.policy.title}
                                             </Link>

@@ -215,9 +215,9 @@ export default function BookingsIndex({
                 {/* Dark KPI Cards */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     <FleetStatCard label="TOTAL" value={totalCount} icon={ClipboardList} subtitle="All bookings" trend={bookingTrend} />
-                    <FleetStatCard label="PENDING" value={pendingCount} icon={Clock} color="amber" valueClassName="text-yellow-400" subtitle="Awaiting approval" />
-                    <FleetStatCard label="APPROVED" value={approvedCount} icon={CheckCircle} color="blue" valueClassName="text-blue-400" subtitle="Ready for use" />
-                    <FleetStatCard label="CHECKED OUT" value={checkedOutCount} icon={Car} color="amber" valueClassName="text-green-400" subtitle="Currently in use" />
+                    <FleetStatCard label="PENDING" value={pendingCount} icon={Clock} color="amber" valueClassName="text-status-warning" subtitle="Awaiting approval" />
+                    <FleetStatCard label="APPROVED" value={approvedCount} icon={CheckCircle} color="blue" valueClassName="text-status-info" subtitle="Ready for use" />
+                    <FleetStatCard label="CHECKED OUT" value={checkedOutCount} icon={Car} color="amber" valueClassName="text-status-success" subtitle="Currently in use" />
                 </div>
 
                 {/* View Toggle + Filters */}

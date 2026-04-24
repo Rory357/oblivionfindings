@@ -16,11 +16,11 @@ type Props = {
 
 const statusColors: Record<string, string> = {
     pending: 'bg-muted text-foreground',
-    in_progress: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
+    in_progress: 'bg-status-info-bg text-status-info',
+    completed: 'bg-status-success-bg text-status-success',
+    failed: 'bg-status-critical-bg text-status-critical',
     cancelled: 'bg-muted text-muted-foreground',
-    escalated: 'bg-orange-100 text-orange-800',
+    escalated: 'bg-status-warning-bg text-status-warning',
 };
 
 export default function ProcedureRunsIndex({ runs, templates, filters }: Props) {

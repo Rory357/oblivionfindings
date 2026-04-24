@@ -66,10 +66,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusColors: Record<string, string> = {
-    active: 'bg-green-100 text-green-800',
+    active: 'bg-status-success-bg text-status-success',
     opted_out: 'bg-muted text-foreground',
-    suspended: 'bg-yellow-100 text-yellow-800',
-    terminated: 'bg-red-100 text-red-800',
+    suspended: 'bg-status-warning-bg text-status-warning',
+    terminated: 'bg-status-critical-bg text-status-critical',
 };
 
 const typeLabels: Record<string, string> = {
@@ -103,7 +103,7 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
 
     const fieldError = (field: string) =>
         errors?.[field] ? (
-            <p className="mt-1 text-xs text-red-600">{errors[field]}</p>
+            <p className="mt-1 text-xs text-status-critical">{errors[field]}</p>
         ) : null;
 
     const onFilter = (next: Partial<typeof filters>) => {
@@ -249,7 +249,7 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                                     <TableRow>
                                         <TableCell colSpan={7} className="py-12 text-center">
                                             <div className="flex flex-col items-center gap-2">
-                                                <ShieldCheck className="h-10 w-10 text-slate-300" />
+                                                <ShieldCheck className="h-10 w-10 text-muted-foreground" />
                                                 <p className="text-sm font-medium text-muted-foreground">No enrollments found</p>
                                                 <p className="text-xs text-muted-foreground">
                                                     {filters.status || filters.plan_id

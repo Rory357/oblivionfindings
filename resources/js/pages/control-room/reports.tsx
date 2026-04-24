@@ -40,18 +40,18 @@ interface Props {
 }
 
 const severityColors: Record<string, string> = {
-    critical: 'bg-red-500',
-    high: 'bg-orange-500',
-    medium: 'bg-yellow-500',
-    low: 'bg-blue-500',
+    critical: 'bg-status-critical',
+    high: 'bg-status-warning',
+    medium: 'bg-status-warning',
+    low: 'bg-status-info',
 };
 
 const statusColors: Record<string, string> = {
-    open: 'bg-red-400',
-    ack: 'bg-yellow-400',
-    triaging: 'bg-blue-400',
-    resolved: 'bg-green-400',
-    closed: 'bg-gray-400',
+    open: 'bg-status-critical',
+    ack: 'bg-status-warning',
+    triaging: 'bg-status-info',
+    resolved: 'bg-status-success',
+    closed: 'bg-muted',
 };
 
 export default function ControlRoomReports({
@@ -287,7 +287,7 @@ export default function ControlRoomReports({
                                     >
                                         <div className="flex items-center gap-2">
                                             <div
-                                                className={`h-3 w-3 rounded-full ${statusColors[status] || 'bg-gray-400'}`}
+                                                className={`h-3 w-3 rounded-full ${statusColors[status] || 'bg-muted'}`}
                                             />
                                             <span className="text-sm capitalize">
                                                 {status}

@@ -80,10 +80,10 @@ function formatRelativeTime(isoString: string | null): string {
 }
 
 const statusDotColor: Record<string, string> = {
-    online: 'bg-green-500',
-    offline: 'bg-red-500',
-    maintenance: 'bg-yellow-500',
-    retired: 'bg-gray-400',
+    online: 'bg-status-success',
+    offline: 'bg-status-critical',
+    maintenance: 'bg-status-warning',
+    retired: 'bg-muted',
 };
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -99,14 +99,14 @@ const typeIcons: Record<string, React.ReactNode> = {
 };
 
 const typeBadgeColors: Record<string, string> = {
-    camera: 'bg-blue-100 text-blue-800 border-blue-200',
+    camera: 'bg-status-info-bg text-status-info border-status-info/30',
     door: 'bg-primary/10 text-primary border-primary',
-    sensor: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-    alarm_panel: 'bg-red-100 text-red-800 border-red-200',
-    bed_sensor: 'bg-pink-100 text-pink-800 border-pink-200',
-    personal_tracker: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    vehicle_tracker: 'bg-amber-100 text-amber-800 border-amber-200',
-    environmental: 'bg-teal-100 text-teal-800 border-teal-200',
+    sensor: 'bg-status-info-bg text-status-info border-status-info/30',
+    alarm_panel: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    bed_sensor: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    personal_tracker: 'bg-status-success-bg text-status-success border-status-success/30',
+    vehicle_tracker: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    environmental: 'bg-status-info-bg text-status-info border-status-info/30',
     network: 'bg-muted text-foreground border-border',
 };
 
@@ -120,16 +120,16 @@ function BatteryIndicator({ level }: { level: number | null }) {
         );
     }
 
-    let color = 'bg-green-500';
-    let textColor = 'text-green-700';
+    let color = 'bg-status-success';
+    let textColor = 'text-status-success';
     let Icon = Battery;
     if (level <= 20) {
-        color = 'bg-red-500';
-        textColor = 'text-red-700';
+        color = 'bg-status-critical';
+        textColor = 'text-status-critical';
         Icon = BatteryLow;
     } else if (level <= 50) {
-        color = 'bg-yellow-500';
-        textColor = 'text-yellow-700';
+        color = 'bg-status-warning';
+        textColor = 'text-status-warning';
         Icon = BatteryWarning;
     }
 
@@ -147,9 +147,9 @@ function BatteryIndicator({ level }: { level: number | null }) {
 function DeviceCard({ device }: { device: DeviceItem }) {
     let cardBg = '';
     if (device.status === 'offline') {
-        cardBg = 'bg-red-50/50 dark:bg-red-950/10 border-red-200/50';
+        cardBg = 'bg-status-critical-bg dark:bg-status-critical border-status-critical/50';
     } else if (device.is_stale) {
-        cardBg = 'bg-yellow-50/50 dark:bg-yellow-950/10 border-yellow-200/50';
+        cardBg = 'bg-status-warning-bg dark:bg-status-warning border-status-warning/50';
     }
 
     return (
@@ -158,7 +158,7 @@ function DeviceCard({ device }: { device: DeviceItem }) {
                 <CardContent className="pt-4 pb-4">
                     <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${statusDotColor[device.status] ?? 'bg-gray-400'}`} />
+                            <span className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${statusDotColor[device.status] ?? 'bg-muted'}`} />
                             <h3 className="font-medium text-sm truncate">
                                 {device.name || device.device_uid}
                             </h3>
@@ -189,9 +189,9 @@ function DeviceCard({ device }: { device: DeviceItem }) {
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                             {device.status === 'online' ? (
-                                <Wifi className="h-3 w-3 text-green-500" />
+                                <Wifi className="h-3 w-3 text-status-success" />
                             ) : (
-                                <WifiOff className="h-3 w-3 text-red-400" />
+                                <WifiOff className="h-3 w-3 text-status-critical" />
                             )}
                             {formatRelativeTime(device.last_seen_at)}
                         </span>
@@ -275,42 +275,42 @@ export default function DevicesIndex({ devices, stats, filters, sites }: Props) 
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-green-200/50">
+                    <Card className="border-status-success/50">
                         <CardContent className="pt-4 pb-3">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs font-medium text-green-600 uppercase tracking-wider">
+                                    <p className="text-xs font-medium text-status-success uppercase tracking-wider">
                                         Online
                                     </p>
-                                    <p className="text-2xl font-bold text-green-700">{stats.online}</p>
+                                    <p className="text-2xl font-bold text-status-success">{stats.online}</p>
                                 </div>
-                                <Wifi className="h-8 w-8 text-green-500/30" />
+                                <Wifi className="h-8 w-8 text-status-success" />
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-red-200/50">
+                    <Card className="border-status-critical/50">
                         <CardContent className="pt-4 pb-3">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs font-medium text-red-600 uppercase tracking-wider">
+                                    <p className="text-xs font-medium text-status-critical uppercase tracking-wider">
                                         Offline
                                     </p>
-                                    <p className="text-2xl font-bold text-red-700">{stats.offline}</p>
+                                    <p className="text-2xl font-bold text-status-critical">{stats.offline}</p>
                                 </div>
-                                <WifiOff className="h-8 w-8 text-red-500/30" />
+                                <WifiOff className="h-8 w-8 text-status-critical" />
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-yellow-200/50">
+                    <Card className="border-status-warning/50">
                         <CardContent className="pt-4 pb-3">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs font-medium text-yellow-600 uppercase tracking-wider">
+                                    <p className="text-xs font-medium text-status-warning uppercase tracking-wider">
                                         Low Battery
                                     </p>
-                                    <p className="text-2xl font-bold text-yellow-700">{stats.low_battery}</p>
+                                    <p className="text-2xl font-bold text-status-warning">{stats.low_battery}</p>
                                 </div>
-                                <BatteryLow className="h-8 w-8 text-yellow-500/30" />
+                                <BatteryLow className="h-8 w-8 text-status-warning" />
                             </div>
                         </CardContent>
                     </Card>

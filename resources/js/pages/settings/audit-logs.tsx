@@ -129,11 +129,11 @@ function absoluteTime(dateStr?: string | null): string {
 function eventBadgeColor(event?: string | null): string {
     switch (event) {
         case 'created':
-            return 'border-emerald-300 bg-emerald-50 text-emerald-700';
+            return 'border-status-success/30 bg-status-success-bg text-status-success';
         case 'updated':
-            return 'border-blue-300 bg-blue-50 text-blue-700';
+            return 'border-status-info/30 bg-status-info-bg text-status-info';
         case 'deleted':
-            return 'border-red-300 bg-red-50 text-red-700';
+            return 'border-status-critical/30 bg-status-critical-bg text-status-critical';
         case 'login':
             return 'border-primary bg-primary/10 text-primary';
         case 'logout':
@@ -148,13 +148,13 @@ function moduleBadgeColor(module?: string | null): string {
         case 'operations':
             return 'border-primary bg-primary/10 text-primary';
         case 'hr':
-            return 'border-cyan-300 bg-cyan-50 text-cyan-700';
+            return 'border-status-info/30 bg-status-info-bg text-status-info';
         case 'fleet':
-            return 'border-amber-300 bg-amber-50 text-amber-700';
+            return 'border-status-warning/30 bg-status-warning-bg text-status-warning';
         case 'settings':
             return 'border-primary bg-primary/10 text-primary';
         case 'finance':
-            return 'border-emerald-300 bg-emerald-50 text-emerald-700';
+            return 'border-status-success/30 bg-status-success-bg text-status-success';
         default:
             return 'border-border bg-muted text-foreground';
     }
@@ -175,12 +175,12 @@ function DiffViewer({ properties }: { properties: Record<string, any> }) {
                 <div key={key} className="flex gap-2">
                     <span className="shrink-0 font-semibold text-muted-foreground">{key}:</span>
                     {old[key] !== undefined && (
-                        <span className="text-red-600 line-through">
+                        <span className="text-status-critical line-through">
                             {JSON.stringify(old[key])}
                         </span>
                     )}
                     {attributes[key] !== undefined && (
-                        <span className="text-emerald-600">{JSON.stringify(attributes[key])}</span>
+                        <span className="text-status-success">{JSON.stringify(attributes[key])}</span>
                     )}
                 </div>
             ))}

@@ -44,11 +44,11 @@ const providerLabels: Record<string, string> = {
 };
 
 const typeColors: Record<string, string> = {
-    asset: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+    asset: 'bg-status-info-bg text-status-info border-status-info/30',
     liability: 'bg-primary/10 text-primary border-primary/30',
     equity: 'bg-primary/10 text-primary border-primary/30',
-    revenue: 'bg-green-500/10 text-green-600 border-green-500/30',
-    expense: 'bg-red-500/10 text-red-600 border-red-500/30',
+    revenue: 'bg-status-success-bg text-status-success border-status-success/30',
+    expense: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 export default function AccountMapping({ integration, localAccounts }: PageProps) {
@@ -188,7 +188,7 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
                                                         </TableCell>
                                                         <TableCell className="text-center">
                                                             {data.account_mapping[String(account.id)] ? (
-                                                                <ArrowLeftRight className="mx-auto h-4 w-4 text-green-600" />
+                                                                <ArrowLeftRight className="mx-auto h-4 w-4 text-status-success" />
                                                             ) : (
                                                                 <span className="text-muted-foreground/30">-</span>
                                                             )}

@@ -103,30 +103,30 @@ interface Props {
 
 const statusColours: Record<string, string> = {
     not_started: 'bg-muted text-foreground border-border',
-    in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
-    completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    cancelled: 'bg-red-100 text-red-800 border-red-200',
+    in_progress: 'bg-status-info-bg text-status-info border-status-info/30',
+    completed: 'bg-status-success-bg text-status-success border-status-success/30',
+    cancelled: 'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
 const statusBadgeWhite: Record<string, string> = {
     not_started: 'bg-white/10 text-white/90 border-white/20',
     in_progress: 'bg-white/10 text-white/90 border-white/20',
-    completed: 'bg-emerald-400/20 text-white border-emerald-300/30',
-    cancelled: 'bg-red-400/20 text-white border-red-300/30',
+    completed: 'bg-status-success text-white border-status-success/30',
+    cancelled: 'bg-status-critical text-white border-status-critical/30',
 };
 
 const priorityColours: Record<string, string> = {
     low: 'bg-muted text-foreground',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-red-100 text-red-800',
-    critical: 'bg-red-200 text-red-900',
+    medium: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-critical-bg text-status-critical',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 const priorityBadgeWhite: Record<string, string> = {
     low: 'bg-white/10 text-white/80 border-white/20',
-    medium: 'bg-amber-400/20 text-white border-amber-300/30',
-    high: 'bg-red-400/20 text-white border-red-300/30',
-    critical: 'bg-red-500/30 text-white border-red-400/40',
+    medium: 'bg-status-warning text-white border-status-warning/30',
+    high: 'bg-status-critical text-white border-status-critical/30',
+    critical: 'bg-status-critical text-white border-status-critical/40',
 };
 
 const typeBadgeWhite: Record<string, string> = {
@@ -137,18 +137,18 @@ const typeBadgeWhite: Record<string, string> = {
 };
 
 function progressBarColour(pct: number): string {
-    if (pct > 66) return 'bg-green-500';
-    if (pct >= 33) return 'bg-amber-500';
-    return 'bg-red-500';
+    if (pct > 66) return 'bg-status-success';
+    if (pct >= 33) return 'bg-status-warning';
+    return 'bg-status-critical';
 }
 
 function krStatusColour(status: string): string {
     switch (status) {
-        case 'completed': return 'bg-emerald-500';
-        case 'in_progress': return 'bg-blue-500';
-        case 'at_risk': return 'bg-amber-500';
-        case 'behind': return 'bg-red-500';
-        default: return 'bg-slate-400';
+        case 'completed': return 'bg-status-success';
+        case 'in_progress': return 'bg-status-info';
+        case 'at_risk': return 'bg-status-warning';
+        case 'behind': return 'bg-status-critical';
+        default: return 'bg-muted';
     }
 }
 
@@ -411,7 +411,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     placeholder="e.g. Increase customer satisfaction score"
                                                     required
                                                 />
-                                                {krForm.errors.title && <p className="mt-1 text-xs text-red-500">{krForm.errors.title}</p>}
+                                                {krForm.errors.title && <p className="mt-1 text-xs text-status-critical">{krForm.errors.title}</p>}
                                             </div>
                                             <div>
                                                 <Label htmlFor="kr-target">Target Value</Label>
@@ -424,7 +424,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     placeholder="100"
                                                     required
                                                 />
-                                                {krForm.errors.target_value && <p className="mt-1 text-xs text-red-500">{krForm.errors.target_value}</p>}
+                                                {krForm.errors.target_value && <p className="mt-1 text-xs text-status-critical">{krForm.errors.target_value}</p>}
                                             </div>
                                             <div>
                                                 <Label htmlFor="kr-unit">Unit</Label>
@@ -434,7 +434,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     onChange={(e) => krForm.setData('unit', e.target.value)}
                                                     placeholder="e.g. %, points, hours"
                                                 />
-                                                {krForm.errors.unit && <p className="mt-1 text-xs text-red-500">{krForm.errors.unit}</p>}
+                                                {krForm.errors.unit && <p className="mt-1 text-xs text-status-critical">{krForm.errors.unit}</p>}
                                             </div>
                                             <div>
                                                 <Label htmlFor="kr-due">Due Date</Label>
@@ -444,7 +444,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                     value={krForm.data.due_date}
                                                     onChange={(e) => krForm.setData('due_date', e.target.value)}
                                                 />
-                                                {krForm.errors.due_date && <p className="mt-1 text-xs text-red-500">{krForm.errors.due_date}</p>}
+                                                {krForm.errors.due_date && <p className="mt-1 text-xs text-status-critical">{krForm.errors.due_date}</p>}
                                             </div>
                                             <div>
                                                 <Label htmlFor="kr-owner">Owner</Label>
@@ -461,7 +461,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                {krForm.errors.owner_id && <p className="mt-1 text-xs text-red-500">{krForm.errors.owner_id}</p>}
+                                                {krForm.errors.owner_id && <p className="mt-1 text-xs text-status-critical">{krForm.errors.owner_id}</p>}
                                             </div>
                                             <div className="sm:col-span-2 flex justify-end gap-2">
                                                 <Button type="button" variant="outline" onClick={() => setShowKrForm(false)}>Cancel</Button>
@@ -571,7 +571,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
-                                                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                                                                className="h-8 w-8 p-0 text-status-critical hover:text-status-critical"
                                                                 onClick={() => deleteKeyResult(kr.id)}
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />

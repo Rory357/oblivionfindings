@@ -404,8 +404,8 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                 <div
                                                     className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-medium text-white ${
                                                         thread.type === 'alert'
-                                                            ? 'bg-orange-500'
-                                                            : 'bg-blue-500'
+                                                            ? 'bg-status-warning'
+                                                            : 'bg-status-info'
                                                     }`}
                                                 >
                                                     {thread.type === 'alert' ? (
@@ -431,7 +431,7 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                             {thread.last_message || 'No messages'}
                                                         </p>
                                                         {thread.unread_count > 0 && (
-                                                            <span className="ml-2 inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                                                            <span className="ml-2 inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-status-critical px-1.5 text-[10px] font-bold text-white">
                                                                 {thread.unread_count}
                                                             </span>
                                                         )}
@@ -453,8 +453,8 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                         <div
                                             className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white ${
                                                 activeThread.type === 'alert'
-                                                    ? 'bg-orange-500'
-                                                    : 'bg-blue-500'
+                                                    ? 'bg-status-warning'
+                                                    : 'bg-status-info'
                                             }`}
                                         >
                                             {activeThread.type === 'alert' ? (
@@ -484,7 +484,7 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                             {activeThread.alert_id && (
                                                 <a
                                                     href={`/control-room/alerts/${activeThread.alert_id}`}
-                                                    className="text-xs text-blue-600 hover:underline"
+                                                    className="text-xs text-status-info hover:underline"
                                                 >
                                                     View linked alert #{activeThread.alert_id}
                                                 </a>

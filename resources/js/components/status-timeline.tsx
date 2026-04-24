@@ -31,10 +31,10 @@ export function StatusTimeline({ currentStatus, statuses = DEFAULT_STATUSES }: S
                             <div
                                 className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors ${
                                     isCompleted
-                                        ? 'border-emerald-500 bg-emerald-500'
+                                        ? 'border-status-success/30 bg-status-success'
                                         : isCurrent
                                           ? 'border-primary bg-primary'
-                                          : 'border-border bg-white dark:border-slate-600 dark:bg-muted'
+                                          : 'border-border bg-white dark:border-border dark:bg-muted'
                                 }`}
                             >
                                 {isCompleted ? (
@@ -42,13 +42,13 @@ export function StatusTimeline({ currentStatus, statuses = DEFAULT_STATUSES }: S
                                 ) : isCurrent ? (
                                     <div className="h-2.5 w-2.5 rounded-full bg-white" />
                                 ) : (
-                                    <div className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+                                    <div className="h-2.5 w-2.5 rounded-full bg-muted dark:bg-muted-foreground/80" />
                                 )}
                             </div>
                             <span
                                 className={`mt-1.5 text-[10px] font-medium whitespace-nowrap ${
                                     isCompleted
-                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        ? 'text-status-success dark:text-status-success'
                                         : isCurrent
                                           ? 'text-primary dark:text-primary'
                                           : 'text-muted-foreground dark:text-muted-foreground'
@@ -63,8 +63,8 @@ export function StatusTimeline({ currentStatus, statuses = DEFAULT_STATUSES }: S
                             <div
                                 className={`h-0.5 flex-1 mx-1 ${
                                     currentIndex > i
-                                        ? 'bg-emerald-500'
-                                        : 'bg-muted dark:bg-slate-700'
+                                        ? 'bg-status-success'
+                                        : 'bg-muted dark:bg-muted'
                                 }`}
                             />
                         )}

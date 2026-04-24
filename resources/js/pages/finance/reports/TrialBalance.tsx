@@ -106,12 +106,12 @@ export default function TrialBalance({ report, filters }: Props) {
                         <CardContent className="flex items-center justify-between pt-6">
                             <div>
                                 <p className="text-sm text-muted-foreground">Total Debits</p>
-                                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                <p className="text-2xl font-bold text-status-info dark:text-status-info">
                                     {formatCurrency(report.total_debits)}
                                 </p>
                             </div>
                             {isBalanced ? (
-                                <Badge variant="outline" className="border-emerald-300 text-emerald-600 dark:text-emerald-400">
+                                <Badge variant="outline" className="border-status-success/30 text-status-success dark:text-status-success">
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Balanced
                                 </Badge>
@@ -134,7 +134,7 @@ export default function TrialBalance({ report, filters }: Props) {
                             {!isBalanced && (
                                 <div className="text-right">
                                     <p className="text-xs text-muted-foreground">Difference</p>
-                                    <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                                    <p className="text-sm font-semibold text-status-critical dark:text-status-critical">
                                         {formatCurrency(Math.abs(report.total_debits - report.total_credits))}
                                     </p>
                                 </div>
@@ -235,11 +235,11 @@ export default function TrialBalance({ report, filters }: Props) {
                                 <TableRow>
                                     <TableCell colSpan={4} className="text-center">
                                         {isBalanced ? (
-                                            <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                            <span className="font-medium text-status-success dark:text-status-success">
                                                 Trial balance is in balance.
                                             </span>
                                         ) : (
-                                            <span className="font-medium text-red-600 dark:text-red-400">
+                                            <span className="font-medium text-status-critical dark:text-status-critical">
                                                 Warning: Trial balance is out of balance by{' '}
                                                 {formatCurrency(Math.abs(report.total_debits - report.total_credits))}.
                                             </span>

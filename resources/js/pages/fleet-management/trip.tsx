@@ -104,8 +104,8 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
     };
 
     const statusColors: Record<string, string> = {
-        open: 'bg-blue-100 text-blue-800',
-        closed: 'bg-green-100 text-green-800',
+        open: 'bg-status-info-bg text-status-info',
+        closed: 'bg-status-success-bg text-status-success',
         cancelled: 'bg-muted text-foreground',
     };
 
@@ -127,7 +127,7 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                                 {trip.status}
                             </Badge>
                             {trip.consent_blocked && (
-                                <Badge variant="outline" className="border-orange-300 text-orange-600">
+                                <Badge variant="outline" className="border-status-warning/30 text-status-warning">
                                     Consent Blocked
                                 </Badge>
                             )}

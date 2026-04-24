@@ -59,12 +59,12 @@ export default function RespiteProcedureCreate() {
                                 <div>
                                     <Label>Name *</Label>
                                     <Input value={data.name} onChange={(e) => setData('name', e.target.value)} />
-                                    {errors.name && <div className="mt-1 text-xs text-red-500">{errors.name}</div>}
+                                    {errors.name && <div className="mt-1 text-xs text-status-critical">{errors.name}</div>}
                                 </div>
                                 <div>
                                     <Label>Version *</Label>
                                     <Input type="number" min={1} value={data.version} onChange={(e) => setData('version', Number(e.target.value))} />
-                                    {errors.version && <div className="mt-1 text-xs text-red-500">{errors.version}</div>}
+                                    {errors.version && <div className="mt-1 text-xs text-status-critical">{errors.version}</div>}
                                 </div>
                             </div>
 
@@ -98,7 +98,7 @@ export default function RespiteProcedureCreate() {
                                         {JSON.stringify(example, null, 2)}
                                     </pre>
                                 </div>
-                                {errors.steps_json && <div className="mt-1 text-xs text-red-500">{errors.steps_json}</div>}
+                                {errors.steps_json && <div className="mt-1 text-xs text-status-critical">{errors.steps_json}</div>}
                             </div>
                         </CardContent>
                     </Card>

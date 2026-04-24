@@ -56,12 +56,12 @@ type Props = {
 };
 
 const severityColors: Record<string, string> = {
-    low: 'bg-blue-100 text-blue-800',
-    mild: 'bg-blue-100 text-blue-800',
-    moderate: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-orange-100 text-orange-800',
-    severe: 'bg-red-100 text-red-800',
-    critical: 'bg-red-100 text-red-800',
+    low: 'bg-status-info-bg text-status-info',
+    mild: 'bg-status-info-bg text-status-info',
+    moderate: 'bg-status-warning-bg text-status-warning',
+    high: 'bg-status-warning-bg text-status-warning',
+    severe: 'bg-status-critical-bg text-status-critical',
+    critical: 'bg-status-critical-bg text-status-critical',
 };
 
 export default function Health({
@@ -130,7 +130,7 @@ export default function Health({
                                         <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                             Allergies
                                         </p>
-                                        <div className="rounded-md bg-rose-50 p-3 text-sm text-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+                                        <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical dark:bg-rose-950/30 dark:text-status-critical">
                                             <div className="flex items-start gap-2">
                                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                                 <span>{medicalProfile.allergies}</span>

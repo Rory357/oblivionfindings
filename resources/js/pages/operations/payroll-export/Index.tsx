@@ -206,7 +206,7 @@ export default function PayrollExportIndex({
                                             )} - {formatDate(exp.period_end)}
                                         </span>
                                         <span>{exp.total_hours} hrs</span>
-                                        <span className="font-semibold text-emerald-700 tabular-nums dark:text-emerald-400">
+                                        <span className="font-semibold text-status-success tabular-nums dark:text-status-success">
                                             {nzd.format(exp.total_amount)}
                                         </span>
                                         {exp.exported_at && (

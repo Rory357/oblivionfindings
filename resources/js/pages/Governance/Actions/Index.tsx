@@ -34,19 +34,19 @@ interface Props extends PageProps {
 export default function ActionsIndex({ auth, items, summary }: Props) {
   const getStatusColor = (status: string) => {
     return {
-      open: 'bg-blue-100 text-blue-800',
-      in_progress: 'bg-yellow-100 text-yellow-800',
-      complete: 'bg-green-100 text-green-800',
-      overdue: 'bg-red-100 text-red-800',
+      open: 'bg-status-info-bg text-status-info',
+      in_progress: 'bg-status-warning-bg text-status-warning',
+      complete: 'bg-status-success-bg text-status-success',
+      overdue: 'bg-status-critical-bg text-status-critical',
     }[status] || 'bg-muted text-foreground';
   };
 
   const getPriorityColor = (priority: string) => {
     return {
       low: 'bg-muted text-foreground',
-      medium: 'bg-blue-100 text-blue-800',
-      high: 'bg-orange-100 text-orange-800',
-      critical: 'bg-red-100 text-red-800',
+      medium: 'bg-status-info-bg text-status-info',
+      high: 'bg-status-warning-bg text-status-warning',
+      critical: 'bg-status-critical-bg text-status-critical',
     }[priority] || 'bg-muted text-foreground';
   };
 
@@ -54,9 +54,9 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
     const date = new Date(dateString);
     const days = Math.ceil((date.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     
-    if (days < 0) return { text: `${Math.abs(days)} days overdue`, color: 'text-red-600' };
-    if (days === 0) return { text: 'Due today', color: 'text-orange-600' };
-    return { text: `${days} days left`, color: days <= 3 ? 'text-yellow-600' : 'text-muted-foreground' };
+    if (days < 0) return { text: `${Math.abs(days)} days overdue`, color: 'text-status-critical' };
+    if (days === 0) return { text: 'Due today', color: 'text-status-warning' };
+    return { text: `${days} days left`, color: days <= 3 ? 'text-status-warning' : 'text-muted-foreground' };
   };
 
   return (
@@ -86,10 +86,10 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
                 <p className="text-3xl font-bold">{summary.total_open}</p>
               </CardContent>
             </Card>
-            <Card className="border-red-200">
+            <Card className="border-status-critical/30">
               <CardContent className="pt-6">
-                <p className="text-sm text-red-600">Overdue</p>
-                <p className="text-3xl font-bold text-red-600">{summary.overdue}</p>
+                <p className="text-sm text-status-critical">Overdue</p>
+                <p className="text-3xl font-bold text-status-critical">{summary.overdue}</p>
               </CardContent>
             </Card>
             <Card>
@@ -98,10 +98,10 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
                 <p className="text-3xl font-bold">{summary.my_open}</p>
               </CardContent>
             </Card>
-            <Card className="border-orange-200">
+            <Card className="border-status-warning/30">
               <CardContent className="pt-6">
-                <p className="text-sm text-orange-600">High Priority</p>
-                <p className="text-3xl font-bold text-orange-600">{summary.high_priority}</p>
+                <p className="text-sm text-status-warning">High Priority</p>
+                <p className="text-3xl font-bold text-status-warning">{summary.high_priority}</p>
               </CardContent>
             </Card>
           </div>
@@ -120,7 +120,7 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
                       key={item.id}
                       className={cn(
                         "flex items-start justify-between p-4 rounded-lg border",
-                        dateInfo.text.includes('overdue') && "bg-red-50 border-red-200"
+                        dateInfo.text.includes('overdue') && "bg-status-critical-bg border-status-critical/30"
                       )}
                     >
                       <div className="flex-1">

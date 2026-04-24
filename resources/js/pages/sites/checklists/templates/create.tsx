@@ -62,7 +62,7 @@ export default function CreateTemplate() {
                                         required
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">Unique identifier, no spaces</p>
-                                    {form.errors.key && <p className="text-sm text-red-400 mt-1">{form.errors.key}</p>}
+                                    {form.errors.key && <p className="text-sm text-status-critical mt-1">{form.errors.key}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="name">Template Name *</Label>
@@ -73,7 +73,7 @@ export default function CreateTemplate() {
                                         placeholder="e.g., Daily Safety Check"
                                         required
                                     />
-                                    {form.errors.name && <p className="text-sm text-red-400 mt-1">{form.errors.name}</p>}
+                                    {form.errors.name && <p className="text-sm text-status-critical mt-1">{form.errors.name}</p>}
                                 </div>
                             </div>
 

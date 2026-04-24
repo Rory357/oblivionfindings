@@ -21,13 +21,13 @@ export default function ShowDataBreach({ breach }: Props) {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'under_investigation':
-                return 'bg-blue-100 text-blue-800';
+                return 'bg-status-info-bg text-status-info';
             case 'discovered':
-                return 'bg-yellow-100 text-yellow-800';
+                return 'bg-status-warning-bg text-status-warning';
             case 'contained':
-                return 'bg-orange-100 text-orange-800';
+                return 'bg-status-warning-bg text-status-warning';
             case 'resolved':
-                return 'bg-green-100 text-green-800';
+                return 'bg-status-success-bg text-status-success';
             case 'notified':
                 return 'bg-primary/10 text-primary';
             default:
@@ -68,7 +68,7 @@ export default function ShowDataBreach({ breach }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-red-500" />
+                            <AlertTriangle className="h-5 w-5 text-status-critical" />
                             {breach.breach_reference}
                         </h1>
                         <div className="mt-2 flex flex-wrap gap-2">
@@ -76,25 +76,25 @@ export default function ShowDataBreach({ breach }: Props) {
                                 {statusLabels[breach.status] ?? breach.status}
                             </Badge>
                             {icoDeadlinePassed && (
-                                <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
+                                <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                     <AlertTriangle className="mr-1 h-3 w-3" />
                                     ICO deadline exceeded ({hours}h since discovery)
                                 </Badge>
                             )}
                             {icoDeadlineApproaching && (
-                                <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">
+                                <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
                                     <Clock className="mr-1 h-3 w-3" />
                                     {72 - hours}h until ICO deadline
                                 </Badge>
                             )}
                             {breach.authority_notified_at && (
-                                <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                                <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     ICO Notified
                                 </Badge>
                             )}
                             {breach.subjects_notified_at && (
-                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                                <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info">
                                     <CheckCircle className="mr-1 h-3 w-3" />
                                     Subjects Notified
                                 </Badge>
@@ -153,7 +153,7 @@ export default function ShowDataBreach({ breach }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <User className="h-5 w-5 text-blue-500" />
+                                <User className="h-5 w-5 text-status-info" />
                                 Impact
                             </CardTitle>
                         </CardHeader>
@@ -181,7 +181,7 @@ export default function ShowDataBreach({ breach }: Props) {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Shield className="h-5 w-5 text-red-500" />
+                            <Shield className="h-5 w-5 text-status-critical" />
                             Breach Details
                         </CardTitle>
                     </CardHeader>

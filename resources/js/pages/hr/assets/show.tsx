@@ -60,9 +60,9 @@ interface Props {
 }
 
 const statusColors: Record<string, string> = {
-    available: 'bg-green-100 text-green-800',
-    assigned: 'bg-blue-100 text-blue-800',
-    maintenance: 'bg-yellow-100 text-yellow-800',
+    available: 'bg-status-success-bg text-status-success',
+    assigned: 'bg-status-info-bg text-status-info',
+    maintenance: 'bg-status-warning-bg text-status-warning',
     retired: 'bg-muted text-foreground',
 };
 
@@ -202,10 +202,10 @@ export default function AssetShow({ asset, employees, can }: Props) {
                             </div>
                         )}
                         {asset.current_assignment && (
-                            <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
-                                <span className="font-medium text-blue-800">Currently Assigned to:</span>{' '}
+                            <div className="mt-4 rounded-md border border-status-info/30 bg-status-info-bg p-3 text-sm">
+                                <span className="font-medium text-status-info">Currently Assigned to:</span>{' '}
                                 <span>{asset.current_assignment.employee_profile?.user?.name}</span>
-                                <span className="ml-2 text-blue-600">
+                                <span className="ml-2 text-status-info">
                                     since {formatDate(asset.current_assignment.assigned_at)}
                                 </span>
                             </div>

@@ -31,12 +31,12 @@ interface Props extends PageProps {
 export default function MeetingsIndex({ auth, meetings }: Props) {
   const getStatusColor = (status: string) => {
     return {
-      scheduled: 'bg-blue-100 text-blue-800',
-      agenda_draft: 'bg-yellow-100 text-yellow-800',
-      agenda_final: 'bg-green-100 text-green-800',
+      scheduled: 'bg-status-info-bg text-status-info',
+      agenda_draft: 'bg-status-warning-bg text-status-warning',
+      agenda_final: 'bg-status-success-bg text-status-success',
       in_progress: 'bg-primary/10 text-primary',
-      minutes_draft: 'bg-orange-100 text-orange-800',
-      minutes_approved: 'bg-green-100 text-green-800',
+      minutes_draft: 'bg-status-warning-bg text-status-warning',
+      minutes_approved: 'bg-status-success-bg text-status-success',
       archived: 'bg-muted text-foreground',
     }[status] || 'bg-muted text-foreground';
   };
@@ -117,7 +117,7 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
                         <h3 className="font-semibold text-lg text-foreground">
                           <Link 
                             href={showMeeting.url({ meeting: meeting.id })}
-                            className="hover:text-blue-600"
+                            className="hover:text-status-info"
                           >
                             {meeting.title}
                           </Link>
@@ -163,7 +163,7 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
 
                     <div className="flex items-center gap-2">
                       {meeting.quorum_met && (
-                        <Badge variant="outline" className="text-green-600 border-green-200">
+                        <Badge variant="outline" className="text-status-success border-status-success/30">
                           Quorum Met
                         </Badge>
                       )}

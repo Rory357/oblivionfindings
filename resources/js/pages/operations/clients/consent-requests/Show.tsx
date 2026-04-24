@@ -54,9 +54,9 @@ type Props = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-800',
-    approved: 'bg-emerald-100 text-emerald-800',
-    declined: 'bg-red-100 text-red-800',
+    pending: 'bg-status-warning-bg text-status-warning',
+    approved: 'bg-status-success-bg text-status-success',
+    declined: 'bg-status-critical-bg text-status-critical',
     cancelled: 'bg-muted text-muted-foreground',
     expired: 'bg-muted text-muted-foreground',
 };
@@ -103,7 +103,7 @@ export default function ConsentRequestShow({ client, request }: Props) {
                                 <Row label="Viewed by recipient" value={formatDateTime(request.viewed_at) ?? 'Not yet'} />
                                 <Row label="Responded" value={formatDateTime(request.responded_at) ?? '—'} />
                                 {request.is_expired && request.status === 'pending' && (
-                                    <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                                    <div className="mt-2 rounded border border-status-critical/30 bg-status-critical-bg p-2 text-xs text-status-critical">
                                         This request has passed its expiry and will auto-close on the next sweep.
                                     </div>
                                 )}
@@ -221,10 +221,10 @@ export default function ConsentRequestShow({ client, request }: Props) {
                         </Card>
 
                         {request.resulting_consent && (
-                            <Card className="border-emerald-200 bg-emerald-50">
+                            <Card className="border-status-success/30 bg-status-success-bg">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
-                                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                        <CheckCircle2 className="h-5 w-5 text-status-success" />
                                         Consent recorded
                                     </CardTitle>
                                 </CardHeader>
