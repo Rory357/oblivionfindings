@@ -27,6 +27,7 @@ class ProfileUpdateRequest extends FormRequest
             'phone' => $this->has('phone') ? $this->input('phone') : $user->cellphone,
             'job_title' => $this->has('job_title') ? $this->input('job_title') : $user->staffProfile?->job_title,
             'timezone' => $this->input('timezone', $user->timezone ?? 'Pacific/Auckland'),
+            'locale' => $this->input('locale', $user->locale ?? 'en'),
             'date_format' => $this->input('date_format', $user->date_format ?? 'DD/MM/YYYY'),
             'time_format' => $this->input('time_format', $user->time_format ?? '24'),
         ]);
@@ -53,6 +54,7 @@ class ProfileUpdateRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:50'],
             'job_title' => ['nullable', 'string', 'max:255'],
             'timezone' => ['required', 'timezone'],
+            'locale' => ['required', Rule::in(array_keys((array) config('locales.available', ['en' => []])))],
             'date_format' => ['required', Rule::in(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'])],
             'time_format' => ['required', Rule::in(['12', '24'])],
         ];

@@ -90,7 +90,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Petty Cash - ${fund.name}`} />
 
-            <div className="mx-auto max-w-7xl space-y-6 p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="flex items-center gap-4">
                     <Button asChild variant="ghost" size="sm">
                         <Link href={'/finance/petty-cash'}>

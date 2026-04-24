@@ -14,7 +14,7 @@ const CELL_COLORS: Record<string, string> = {
     extreme: 'bg-status-critical-bg dark:bg-status-critical',
 };
 
-const ACTIVE_RING = 'ring-2 ring-offset-1 ring-slate-900 dark:ring-white';
+const ACTIVE_RING = 'ring-2 ring-offset-1 ring-ring';
 const RESIDUAL_RING = 'ring-2 ring-offset-1 ring-status-info ring-dashed';
 
 function scoreToLevel(score: number): string {
@@ -124,7 +124,7 @@ export function RiskMatrix({
             {!compact && (residualLikelihood != null && residualConsequence != null) && (
                 <div className="mt-2 flex gap-4 text-[10px] text-muted-foreground">
                     <span className="flex items-center gap-1">
-                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-slate-900 dark:ring-white ring-offset-1 bg-muted" />
+                        <span className="inline-block h-3 w-3 rounded-sm ring-2 ring-ring ring-offset-1 bg-muted" />
                         Inherent
                     </span>
                     <span className="flex items-center gap-1">

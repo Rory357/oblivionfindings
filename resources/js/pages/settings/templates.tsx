@@ -366,13 +366,13 @@ function TemplateCard({
 function PhoneMockup({ message }: { message: string }) {
     return (
         <div className="mx-auto w-64">
-            <div className="rounded-[2rem] border-4 border-slate-800 bg-muted p-4 dark:border-border dark:bg-muted">
+            <div className="rounded-[2rem] border-4 border-foreground bg-muted p-4 dark:border-border dark:bg-muted">
                 {/* Notch */}
                 <div className="mx-auto mb-3 h-5 w-20 rounded-full bg-muted dark:bg-muted-foreground/80" />
                 {/* Screen */}
-                <div className="min-h-[200px] rounded-xl bg-white p-3 dark:bg-muted">
+                <div className="min-h-[200px] rounded-xl bg-card p-3 dark:bg-muted">
                     <p className="mb-2 text-center text-[10px] text-muted-foreground">Today 09:00</p>
-                    <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-xs text-white">
+                    <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-xs text-primary-foreground">
                         {message}
                     </div>
                 </div>

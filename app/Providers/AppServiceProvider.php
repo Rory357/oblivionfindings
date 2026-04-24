@@ -46,6 +46,12 @@ use App\Events\FleetWanderingAlertTriggered;
 use App\Services\AuditLogger;
 use App\Services\Integration\Adapters\UnifiAdapter;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Notifications\ExpoPushProvider;
+use App\Services\Notifications\FailingSmsProvider;
+use App\Services\Notifications\FailingPushProvider;
+use App\Services\Notifications\PushProvider;
+use App\Services\Notifications\SmsProvider;
+use App\Services\Notifications\TwilioSmsProvider;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Auth\Events\PasswordReset;
@@ -75,6 +81,33 @@ class AppServiceProvider extends ServiceProvider
             );
 
             return $registry;
+        });
+
+        $this->app->bind(SmsProvider::class, function () {
+            $provider = config('services.sms.provider');
+
+            return match ($provider) {
+                'twilio' => new TwilioSmsProvider(
+                    config('services.sms.twilio.account_sid'),
+                    config('services.sms.twilio.auth_token'),
+                    config('services.sms.twilio.from'),
+                ),
+                null, '' => new FailingSmsProvider('SMS provider is not configured.'),
+                default => new FailingSmsProvider('Unsupported SMS provider: '.$provider),
+            };
+        });
+
+        $this->app->bind(PushProvider::class, function () {
+            $provider = config('services.push.provider');
+
+            return match ($provider) {
+                'expo' => new ExpoPushProvider(
+                    config('services.push.expo.endpoint'),
+                    config('services.push.expo.access_token'),
+                ),
+                null, '' => new FailingPushProvider('Push provider is not configured.'),
+                default => new FailingPushProvider('Unsupported push provider: '.$provider),
+            };
         });
     }
 

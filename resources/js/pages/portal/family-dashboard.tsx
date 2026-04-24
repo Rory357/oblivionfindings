@@ -418,9 +418,9 @@ export default function FamilyDashboard({
         >
             <Head title={`${name} - Family Portal`} />
 
-            <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* ── Hero header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl border bg-primary/10/20 p-6 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-rose-950/10">
+                <div className="relative overflow-hidden rounded-2xl border bg-primary/10 p-6">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
                             <Avatar className="h-16 w-16 ring-2 ring-status-warning ring-offset-2 dark:ring-status-warning">
@@ -695,7 +695,7 @@ export default function FamilyDashboard({
                                 ? `${stats.shiftsToday} visit${stats.shiftsToday !== 1 ? 's' : ''} planned for today`
                                 : 'A quiet day \u2014 no visits scheduled'
                         }
-                        bgClass="bg-status-info-bg dark:from-sky-950/20 dark:to-blue-950/20"
+                        bgClass="bg-status-info-bg"
                     />
                     <GlanceCard
                         emoji={
@@ -712,7 +712,7 @@ export default function FamilyDashboard({
                                   ? `${stats.shiftsThisWeek} visit${stats.shiftsThisWeek !== 1 ? 's' : ''} this week`
                                   : 'A clear week ahead \u2014 enjoy!'
                         }
-                        bgClass="bg-primary/10 dark:from-violet-950/20 dark:to-purple-950/20"
+                        bgClass="bg-primary/10"
                     />
                     <GlanceCard
                         emoji={stats.pendingVisitRequests > 0 ? '⏳' : '✅'}
@@ -721,7 +721,7 @@ export default function FamilyDashboard({
                                 ? `${stats.pendingVisitRequests} visit request${stats.pendingVisitRequests !== 1 ? 's' : ''} being reviewed`
                                 : 'All caught up! No pending requests'
                         }
-                        bgClass="bg-status-warning-bg dark:from-amber-950/20 dark:to-yellow-950/20"
+                        bgClass="bg-status-warning-bg"
                     />
                 </div>
 
@@ -1095,7 +1095,7 @@ export default function FamilyDashboard({
                                                 </div>
                                             )}
                                             {carePlan.dislikes && (
-                                                <div className="rounded-lg bg-status-critical-bg p-3 dark:bg-rose-950/20">
+                                                <div className="rounded-lg bg-status-critical-bg p-3">
                                                     <p className="mb-1 text-xs font-medium text-status-critical dark:text-status-critical">
                                                         Not a Fan Of
                                                     </p>

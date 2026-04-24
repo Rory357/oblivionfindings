@@ -1,8 +1,4 @@
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { type BreadcrumbItem } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import SettingsLayout from '@/layouts/settings/layout';
-import { edit as editAppearance } from '@/routes/appearance';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -11,16 +7,31 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useAppearance, type Appearance as AppearanceType } from '@/hooks/use-appearance';
+import {
+    useAppearance,
+    type Appearance as AppearanceType,
+} from '@/hooks/use-appearance';
+import AppLayout from '@/layouts/app-layout';
+import SettingsLayout from '@/layouts/settings/layout';
 import { DEFAULT_BRAND_HEX } from '@/lib/derive-palette';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { HexColorPicker } from 'react-colorful';
+import { edit as editAppearance } from '@/routes/appearance';
+import { type BreadcrumbItem } from '@/types';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { Check, Monitor, Moon, RotateCcw, Sun } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { HexColorPicker } from 'react-colorful';
 
-interface AppearancePageProps {
+interface AppearancePageProps extends Record<string, unknown> {
     appearance: {
         theme: AppearanceType;
         accent_colour: string | null;
@@ -30,6 +41,7 @@ interface AppearancePageProps {
         first_day_of_week: 'monday' | 'sunday';
         date_format: string;
         time_format: '12' | '24';
+        locale: string;
     };
     orgDefaults: {
         first_day_of_week: string;
@@ -105,6 +117,7 @@ const dateFormats = [
 
 export default function Appearance() {
     const page = usePage<AppearancePageProps>();
+    const { availableLocales, t } = useI18n();
     const {
         appearance: themeSetting,
         updateAppearance,
@@ -126,6 +139,7 @@ export default function Appearance() {
         first_day_of_week: 'monday' | 'sunday';
         date_format: string;
         time_format: '12' | '24';
+        locale: string;
     }>({
         theme: server.theme,
         accent_colour: server.accent_colour,
@@ -135,6 +149,7 @@ export default function Appearance() {
         first_day_of_week: server.first_day_of_week,
         date_format: server.date_format,
         time_format: server.time_format,
+        locale: server.locale,
     });
 
     const [accentOpen, setAccentOpen] = useState(false);
@@ -250,7 +265,9 @@ export default function Appearance() {
                                 return (
                                     <button
                                         key={option.value}
-                                        onClick={() => handleTheme(option.value)}
+                                        onClick={() =>
+                                            handleTheme(option.value)
+                                        }
                                         className={cn(
                                             'group relative flex flex-col items-center gap-3 rounded-xl border-2 p-4 transition-all',
                                             isActive
@@ -369,25 +386,35 @@ export default function Appearance() {
                                 >
                                     <span
                                         className="h-6 w-6 rounded-md border"
-                                        style={{ backgroundColor: form.data.accent_colour ?? DEFAULT_BRAND_HEX }}
+                                        style={{
+                                            backgroundColor:
+                                                form.data.accent_colour ??
+                                                DEFAULT_BRAND_HEX,
+                                        }}
                                     />
                                     <span className="font-mono uppercase">
-                                        {form.data.accent_colour ?? 'Brand default'}
+                                        {form.data.accent_colour ??
+                                            'Brand default'}
                                     </span>
                                 </button>
                                 {accentOpen && (
                                     <div className="absolute left-0 z-50 mt-2 rounded-lg border bg-popover p-3 shadow-lg">
                                         <HexColorPicker
-                                            color={form.data.accent_colour ?? DEFAULT_BRAND_HEX}
+                                            color={
+                                                form.data.accent_colour ??
+                                                DEFAULT_BRAND_HEX
+                                            }
                                             onChange={handleAccent}
                                         />
                                         <input
                                             type="text"
-                                            value={form.data.accent_colour ?? ''}
+                                            value={
+                                                form.data.accent_colour ?? ''
+                                            }
                                             onChange={(e) =>
                                                 handleAccent(e.target.value)
                                             }
-                                            className="mt-2 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm font-mono uppercase"
+                                            className="mt-2 w-full rounded-md border border-input bg-transparent px-2 py-1 font-mono text-sm uppercase"
                                             placeholder="#7c3aed"
                                         />
                                     </div>
@@ -418,14 +445,19 @@ export default function Appearance() {
                     <CardContent className="space-y-8">
                         {/* Font size */}
                         <div className="space-y-3">
-                            <Label className="text-sm font-medium">Font Size</Label>
+                            <Label className="text-sm font-medium">
+                                Font Size
+                            </Label>
                             <div className="grid grid-cols-3 gap-3">
                                 {fontSizes.map((opt) => {
-                                    const isActive = form.data.font_size === opt.px;
+                                    const isActive =
+                                        form.data.font_size === opt.px;
                                     return (
                                         <button
                                             key={opt.value}
-                                            onClick={() => handleFontSize(opt.px)}
+                                            onClick={() =>
+                                                handleFontSize(opt.px)
+                                            }
                                             className={cn(
                                                 'flex flex-col items-center gap-2 rounded-lg border-2 px-4 py-4 transition-all',
                                                 isActive
@@ -435,12 +467,14 @@ export default function Appearance() {
                                         >
                                             <span
                                                 className={cn(
-                                                    'font-semibold leading-none',
+                                                    'leading-none font-semibold',
                                                     isActive
                                                         ? 'text-primary'
                                                         : 'text-foreground',
                                                 )}
-                                                style={{ fontSize: `${opt.px}px` }}
+                                                style={{
+                                                    fontSize: `${opt.px}px`,
+                                                }}
                                             >
                                                 Aa
                                             </span>
@@ -459,42 +493,52 @@ export default function Appearance() {
                                 Sidebar Density
                             </Label>
                             <div className="grid grid-cols-2 gap-3">
-                                {(['comfortable', 'compact'] as const).map((density) => {
-                                    const isActive = form.data.sidebar_density === density;
-                                    const gap =
-                                        density === 'comfortable' ? 'gap-2' : 'gap-0.5';
-                                    const pad =
-                                        density === 'comfortable' ? 'p-2' : 'p-1.5';
-                                    return (
-                                        <button
-                                            key={density}
-                                            onClick={() => handleDensity(density)}
-                                            className={cn(
-                                                'flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all',
-                                                isActive
-                                                    ? 'border-primary bg-primary/5'
-                                                    : 'border-transparent bg-muted/30 hover:border-muted-foreground/20',
-                                            )}
-                                        >
-                                            <div
+                                {(['comfortable', 'compact'] as const).map(
+                                    (density) => {
+                                        const isActive =
+                                            form.data.sidebar_density ===
+                                            density;
+                                        const gap =
+                                            density === 'comfortable'
+                                                ? 'gap-2'
+                                                : 'gap-0.5';
+                                        const pad =
+                                            density === 'comfortable'
+                                                ? 'p-2'
+                                                : 'p-1.5';
+                                        return (
+                                            <button
+                                                key={density}
+                                                onClick={() =>
+                                                    handleDensity(density)
+                                                }
                                                 className={cn(
-                                                    'flex w-20 flex-col rounded-md border bg-muted/40',
-                                                    pad,
-                                                    gap,
+                                                    'flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all',
+                                                    isActive
+                                                        ? 'border-primary bg-primary/5'
+                                                        : 'border-transparent bg-muted/30 hover:border-muted-foreground/20',
                                                 )}
                                             >
-                                                <div className="h-1.5 w-full rounded-sm bg-primary" />
-                                                <div className="h-1 w-full rounded-sm bg-current opacity-10" />
-                                                <div className="h-1 w-3/4 rounded-sm bg-current opacity-10" />
-                                                <div className="h-1 w-full rounded-sm bg-current opacity-10" />
-                                                <div className="h-1 w-2/3 rounded-sm bg-current opacity-10" />
-                                            </div>
-                                            <span className="text-xs capitalize text-muted-foreground">
-                                                {density}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
+                                                <div
+                                                    className={cn(
+                                                        'flex w-20 flex-col rounded-md border bg-muted/40',
+                                                        pad,
+                                                        gap,
+                                                    )}
+                                                >
+                                                    <div className="h-1.5 w-full rounded-sm bg-primary" />
+                                                    <div className="h-1 w-full rounded-sm bg-current opacity-10" />
+                                                    <div className="h-1 w-3/4 rounded-sm bg-current opacity-10" />
+                                                    <div className="h-1 w-full rounded-sm bg-current opacity-10" />
+                                                    <div className="h-1 w-2/3 rounded-sm bg-current opacity-10" />
+                                                </div>
+                                                <span className="text-xs text-muted-foreground capitalize">
+                                                    {density}
+                                                </span>
+                                            </button>
+                                        );
+                                    },
+                                )}
                             </div>
                         </div>
 
@@ -534,8 +578,10 @@ export default function Appearance() {
                             <select
                                 id="dateFormat"
                                 value={form.data.date_format}
-                                onChange={(e) => form.setData('date_format', e.target.value)}
-                                className="flex h-9 max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                onChange={(e) =>
+                                    form.setData('date_format', e.target.value)
+                                }
+                                className="flex h-9 max-w-xs rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                             >
                                 {dateFormats.map((f) => (
                                     <option key={f.value} value={f.value}>
@@ -551,7 +597,9 @@ export default function Appearance() {
                                 {(['12', '24'] as const).map((fmt) => (
                                     <button
                                         key={fmt}
-                                        onClick={() => form.setData('time_format', fmt)}
+                                        onClick={() =>
+                                            form.setData('time_format', fmt)
+                                        }
                                         className={cn(
                                             'rounded-md border px-4 py-2 text-sm font-medium transition-all',
                                             form.data.time_format === fmt
@@ -570,16 +618,28 @@ export default function Appearance() {
                             <div className="flex gap-2">
                                 {(
                                     [
-                                        { value: 'monday' as const, label: 'Monday' },
-                                        { value: 'sunday' as const, label: 'Sunday' },
+                                        {
+                                            value: 'monday' as const,
+                                            label: 'Monday',
+                                        },
+                                        {
+                                            value: 'sunday' as const,
+                                            label: 'Sunday',
+                                        },
                                     ] as const
                                 ).map((opt) => (
                                     <button
                                         key={opt.value}
-                                        onClick={() => form.setData('first_day_of_week', opt.value)}
+                                        onClick={() =>
+                                            form.setData(
+                                                'first_day_of_week',
+                                                opt.value,
+                                            )
+                                        }
                                         className={cn(
                                             'rounded-md border px-4 py-2 text-sm font-medium transition-all',
-                                            form.data.first_day_of_week === opt.value
+                                            form.data.first_day_of_week ===
+                                                opt.value
                                                 ? 'border-primary bg-primary text-primary-foreground shadow-sm'
                                                 : 'border-input bg-transparent text-foreground hover:bg-muted/50',
                                         )}
@@ -591,18 +651,34 @@ export default function Appearance() {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="language">Language</Label>
-                            <div className="flex items-center gap-3">
-                                <input
+                            <Label htmlFor="language">
+                                {t('app.settings.language', 'Language')}
+                            </Label>
+                            <Select
+                                value={form.data.locale}
+                                onValueChange={(value) =>
+                                    form.setData('locale', value)
+                                }
+                            >
+                                <SelectTrigger
                                     id="language"
-                                    disabled
-                                    value="English (NZ)"
-                                    className="flex h-9 max-w-xs rounded-md border border-input bg-muted/50 px-3 py-1 text-sm text-muted-foreground shadow-sm"
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                    More languages coming soon
-                                </span>
-                            </div>
+                                    className="max-w-xs"
+                                >
+                                    <SelectValue placeholder="Select language" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Object.entries(availableLocales).map(
+                                        ([value, meta]) => (
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {meta.label}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </CardContent>
                 </Card>
@@ -610,12 +686,20 @@ export default function Appearance() {
                 {/* Save */}
                 <div className="flex items-center gap-4">
                     <Button onClick={handleSave} disabled={form.processing}>
-                        {form.processing ? 'Saving…' : 'Save preferences'}
+                        {form.processing
+                            ? 'Saving…'
+                            : t(
+                                  'app.settings.save_preferences',
+                                  'Save preferences',
+                              )}
                     </Button>
                     {saved && (
                         <span className="flex items-center gap-1.5 text-sm font-medium text-status-success">
                             <Check className="h-4 w-4" />
-                            Preferences saved
+                            {t(
+                                'app.settings.preferences_saved',
+                                'Preferences saved',
+                            )}
                         </span>
                     )}
                 </div>

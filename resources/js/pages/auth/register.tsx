@@ -9,14 +9,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
+import { useI18n } from '@/lib/i18n';
 
 export default function Register() {
+    const { t } = useI18n();
+
     return (
         <AuthLayout
-            title="Create an account"
-            description="Enter your details below to create your account"
+            title={t('app.auth.register.title', 'Create an account')}
+            description={t(
+                'app.auth.register.description',
+                'Enter your details below to create your account',
+            )}
         >
-            <Head title="Register" />
+            <Head title={t('app.auth.register.head', 'Register')} />
             <Form
                 {...store.form()}
                 resetOnSuccess={['password', 'password_confirmation']}
@@ -27,8 +33,11 @@ export default function Register() {
                     <>
                         <div className="grid gap-6">
                             <div className="grid gap-2">
-                                <Label htmlFor="name" className="text-foreground">
-                                    Name
+                                <Label
+                                    htmlFor="name"
+                                    className="text-foreground"
+                                >
+                                    {t('app.auth.register.name', 'Name')}
                                 </Label>
                                 <Input
                                     id="name"
@@ -38,7 +47,10 @@ export default function Register() {
                                     tabIndex={1}
                                     autoComplete="name"
                                     name="name"
-                                    placeholder="Full name"
+                                    placeholder={t(
+                                        'app.auth.full_name',
+                                        'Full name',
+                                    )}
                                     className="bg-background/80"
                                 />
                                 <InputError
@@ -48,8 +60,14 @@ export default function Register() {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email" className="text-foreground">
-                                    Email address
+                                <Label
+                                    htmlFor="email"
+                                    className="text-foreground"
+                                >
+                                    {t(
+                                        'app.auth.email_address',
+                                        'Email address',
+                                    )}
                                 </Label>
                                 <Input
                                     id="email"
@@ -65,8 +83,11 @@ export default function Register() {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="password" className="text-foreground">
-                                    Password
+                                <Label
+                                    htmlFor="password"
+                                    className="text-foreground"
+                                >
+                                    {t('app.auth.password', 'Password')}
                                 </Label>
                                 <Input
                                     id="password"
@@ -75,7 +96,10 @@ export default function Register() {
                                     tabIndex={3}
                                     autoComplete="new-password"
                                     name="password"
-                                    placeholder="Password"
+                                    placeholder={t(
+                                        'app.auth.password',
+                                        'Password',
+                                    )}
                                     className="bg-background/80"
                                 />
                                 <InputError message={errors.password} />
@@ -86,7 +110,10 @@ export default function Register() {
                                     htmlFor="password_confirmation"
                                     className="text-foreground"
                                 >
-                                    Confirm password
+                                    {t(
+                                        'app.auth.confirm_password',
+                                        'Confirm password',
+                                    )}
                                 </Label>
                                 <Input
                                     id="password_confirmation"
@@ -95,7 +122,10 @@ export default function Register() {
                                     tabIndex={4}
                                     autoComplete="new-password"
                                     name="password_confirmation"
-                                    placeholder="Confirm password"
+                                    placeholder={t(
+                                        'app.auth.confirm_password',
+                                        'Confirm password',
+                                    )}
                                     className="bg-background/80"
                                 />
                                 <InputError
@@ -110,14 +140,20 @@ export default function Register() {
                                 data-test="register-user-button"
                             >
                                 {processing && <Spinner />}
-                                Create account
+                                {t(
+                                    'app.auth.register.submit',
+                                    'Create account',
+                                )}
                             </Button>
                         </div>
 
                         <div className="text-center text-sm text-muted-foreground">
-                            Already have an account?{' '}
+                            {t(
+                                'app.auth.register.has_account',
+                                'Already have an account?',
+                            )}{' '}
                             <TextLink href={login()} tabIndex={6}>
-                                Log in
+                                {t('app.auth.login.submit', 'Log in')}
                             </TextLink>
                         </div>
                     </>

@@ -125,7 +125,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`IRD Filing - ${filingTypeLabels[filing.filing_type]}`} />
 
-            <div className="mx-auto max-w-6xl space-y-6 p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between">
                     <div>

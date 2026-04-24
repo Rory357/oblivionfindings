@@ -153,7 +153,7 @@ const TRANSPORT_TYPE_BANNER: Record<string, string> = {
     shopping:
         'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70',
     community:
-        'bg-status-info-bg border-status-info/30 text-status-info dark:bg-teal-950/30 dark:border-status-info/30 dark:text-status-info',
+        'bg-status-info-bg border-status-info/30 text-status-info dark:bg-status-info-bg dark:border-status-info/30 dark:text-status-info',
     respite:
         'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
     other: 'bg-muted border-border text-foreground dark:bg-muted/30 dark:border-border dark:text-foreground',

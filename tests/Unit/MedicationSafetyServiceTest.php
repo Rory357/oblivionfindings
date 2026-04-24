@@ -2,7 +2,6 @@
 
 use App\Models\Client;
 use App\Models\ClientMedication;
-use App\Models\ClientMedicationAdministration;
 use App\Services\MedicationSafetyService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -11,6 +10,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 beforeEach(function () {
     $this->service = new MedicationSafetyService();
 });
+
+function mockAdministrationRelation(?object $lastAdmin): HasMany
+{
+    $relation = Mockery::mock(HasMany::class);
+    $relation->shouldReceive('where')->with('status', 'given')->andReturnSelf();
+    $relation->shouldReceive('orderByDesc')->with('administered_at')->andReturnSelf();
+    $relation->shouldReceive('first')->andReturn($lastAdmin);
+
+    return $relation;
+}
 
 // ─── validateDoseAgainstPrescribed ─────────────────────────────────────
 
@@ -141,19 +150,14 @@ test('checkPrnLimits returns safe when not a PRN medication', function () {
 test('checkPrnInterval blocks when minimum hours not elapsed', function () {
     $lastAdminTime = Carbon::now()->subMinutes(30); // 30 minutes ago
 
-    $lastAdmin = Mockery::mock(ClientMedicationAdministration::class)->makePartial();
-    $lastAdmin->status = 'given';
-    $lastAdmin->administered_at = $lastAdminTime;
-
-    // Build the query chain mock
-    $query = Mockery::mock();
-    $query->shouldReceive('where')->with('status', 'given')->andReturnSelf();
-    $query->shouldReceive('orderByDesc')->with('administered_at')->andReturnSelf();
-    $query->shouldReceive('first')->andReturn($lastAdmin);
+    $lastAdmin = (object) [
+        'status' => 'given',
+        'administered_at' => $lastAdminTime,
+    ];
 
     $medication = Mockery::mock(ClientMedication::class)->makePartial();
     $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn($query);
+    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation($lastAdmin));
 
     $result = $this->service->checkPrnInterval($medication);
 
@@ -165,18 +169,14 @@ test('checkPrnInterval blocks when minimum hours not elapsed', function () {
 test('checkPrnInterval does not block when minimum hours have elapsed', function () {
     $lastAdminTime = Carbon::now()->subHours(5); // 5 hours ago
 
-    $lastAdmin = Mockery::mock(ClientMedicationAdministration::class)->makePartial();
-    $lastAdmin->status = 'given';
-    $lastAdmin->administered_at = $lastAdminTime;
-
-    $query = Mockery::mock();
-    $query->shouldReceive('where')->with('status', 'given')->andReturnSelf();
-    $query->shouldReceive('orderByDesc')->with('administered_at')->andReturnSelf();
-    $query->shouldReceive('first')->andReturn($lastAdmin);
+    $lastAdmin = (object) [
+        'status' => 'given',
+        'administered_at' => $lastAdminTime,
+    ];
 
     $medication = Mockery::mock(ClientMedication::class)->makePartial();
     $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn($query);
+    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation($lastAdmin));
 
     $result = $this->service->checkPrnInterval($medication);
 
@@ -184,14 +184,9 @@ test('checkPrnInterval does not block when minimum hours have elapsed', function
 });
 
 test('checkPrnInterval does not block when no previous administrations', function () {
-    $query = Mockery::mock();
-    $query->shouldReceive('where')->with('status', 'given')->andReturnSelf();
-    $query->shouldReceive('orderByDesc')->with('administered_at')->andReturnSelf();
-    $query->shouldReceive('first')->andReturnNull();
-
     $medication = Mockery::mock(ClientMedication::class)->makePartial();
     $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn($query);
+    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation(null));
 
     $result = $this->service->checkPrnInterval($medication);
 

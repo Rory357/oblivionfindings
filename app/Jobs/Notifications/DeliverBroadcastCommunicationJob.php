@@ -5,6 +5,8 @@ namespace App\Jobs\Notifications;
 use App\Mail\BroadcastMail;
 use App\Models\ControlRoom\Communication;
 use App\Models\UserNotificationPreference;
+use App\Services\Notifications\PushProvider;
+use App\Services\Notifications\SmsProvider;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -116,28 +118,87 @@ class DeliverBroadcastCommunicationJob implements ShouldQueue
 
     private function sendSms(Communication $comm): void
     {
-        $provider = config('services.sms.provider');
+        $phone = $comm->target_phone
+            ?? optional($comm->targetUser)->cellphone
+            ?? optional($comm->targetUser)->work_phone;
 
-        if (! $provider) {
-            $this->markFailed($comm, 'SMS provider is not configured.');
+        if (! $phone) {
+            $this->markFailed($comm, 'No phone number on record for the recipient.');
             return;
         }
 
-        // Real SMS transport can be plugged in here once a provider is chosen.
-        // For now, fail loudly so ops can see the config gap.
-        $this->markFailed($comm, 'SMS provider "' . $provider . '" is not yet implemented.');
+        $result = app(SmsProvider::class)->send($phone, (string) $comm->content);
+
+        if (! $result->sent) {
+            $this->markFailed($comm, $result->error ?? 'SMS provider failed to send the message.');
+            return;
+        }
+
+        $comm->forceFill([
+            'status' => 'delivered',
+            'delivered_at' => now(),
+            'status_detail' => null,
+        ])->save();
     }
 
     private function sendPush(Communication $comm): void
     {
-        $provider = config('services.push.provider');
+        $tokens = $this->pushTokensFor($comm);
 
-        if (! $provider) {
-            $this->markFailed($comm, 'Push provider is not configured.');
+        $result = app(PushProvider::class)->send(
+            $tokens,
+            (string) $comm->content,
+            'Broadcast alert',
+            [
+                'communication_id' => $comm->id,
+                'broadcast_group_id' => $comm->broadcast_group_id,
+                'purpose' => $comm->purpose,
+            ],
+        );
+
+        if (! $result->sent) {
+            $this->markFailed($comm, $result->error ?? 'Push provider failed to send the message.');
             return;
         }
 
-        $this->markFailed($comm, 'Push provider "' . $provider . '" is not yet implemented.');
+        $comm->forceFill([
+            'status' => 'delivered',
+            'delivered_at' => now(),
+            'status_detail' => null,
+        ])->save();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function pushTokensFor(Communication $comm): array
+    {
+        if (filled($comm->target_external)) {
+            $decoded = json_decode((string) $comm->target_external, true);
+
+            if (is_array($decoded)) {
+                return array_values(array_filter(array_map('strval', $decoded)));
+            }
+
+            return [(string) $comm->target_external];
+        }
+
+        $targetUser = $comm->targetUser;
+
+        if (! $targetUser) {
+            return [];
+        }
+
+        return $targetUser->pushSubscriptions()
+            ->where('enabled', true)
+            ->when(
+                config('services.push.provider'),
+                fn ($query, string $provider) => $query->where('provider', $provider),
+            )
+            ->pluck('token')
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function markFailed(Communication $comm, string $reason): void
@@ -176,6 +237,7 @@ class DeliverBroadcastCommunicationJob implements ShouldQueue
             'in_app' => ! $pref->channel_inapp,
             'email' => ! $pref->channel_email,
             'push' => ! $pref->channel_push,
+            'sms' => ! (bool) $pref->channel_sms,
             default => false,
         };
     }

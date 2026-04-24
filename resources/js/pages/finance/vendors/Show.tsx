@@ -130,7 +130,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={vendor.name} />
 
-            <div className="mx-auto max-w-7xl space-y-6 p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">

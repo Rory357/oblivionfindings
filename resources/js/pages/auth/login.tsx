@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
+import { useI18n } from '@/lib/i18n';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
@@ -23,12 +24,17 @@ export default function Login({
     canResetPassword,
     canRegister,
 }: LoginProps) {
+    const { t } = useI18n();
+
     return (
         <AuthLayout
-            title="Log in to your account"
-            description="Enter your email and password below to log in"
+            title={t('app.auth.login.title', 'Log in to your account')}
+            description={t(
+                'app.auth.login.description',
+                'Enter your email and password below to log in',
+            )}
         >
-            <Head title="Log in" />
+            <Head title={t('app.auth.login.head', 'Log in')} />
 
             <Form
                 {...store.form()}
@@ -43,7 +49,10 @@ export default function Login({
                                     htmlFor="email"
                                     className="text-foreground"
                                 >
-                                    Email address
+                                    {t(
+                                        'app.auth.email_address',
+                                        'Email address',
+                                    )}
                                 </Label>
                                 <Input
                                     id="email"
@@ -65,7 +74,7 @@ export default function Login({
                                         htmlFor="password"
                                         className="text-foreground"
                                     >
-                                        Password
+                                        {t('app.auth.password', 'Password')}
                                     </Label>
                                     {canResetPassword && (
                                         <TextLink
@@ -73,7 +82,10 @@ export default function Login({
                                             className="ml-auto text-sm"
                                             tabIndex={5}
                                         >
-                                            Forgot password?
+                                            {t(
+                                                'app.auth.forgot_password_link',
+                                                'Forgot password?',
+                                            )}
                                         </TextLink>
                                     )}
                                 </div>
@@ -84,7 +96,10 @@ export default function Login({
                                     required
                                     tabIndex={2}
                                     autoComplete="current-password"
-                                    placeholder="Password"
+                                    placeholder={t(
+                                        'app.auth.password',
+                                        'Password',
+                                    )}
                                     className="bg-background/80"
                                 />
                                 <InputError message={errors.password} />
@@ -100,7 +115,10 @@ export default function Login({
                                     htmlFor="remember"
                                     className="text-foreground"
                                 >
-                                    Remember me
+                                    {t(
+                                        'app.auth.login.remember',
+                                        'Remember me',
+                                    )}
                                 </Label>
                             </div>
 
@@ -112,7 +130,7 @@ export default function Login({
                                 data-test="login-button"
                             >
                                 {processing && <Spinner />}
-                                Log in
+                                {t('app.auth.login.submit', 'Log in')}
                             </Button>
                         </div>
 
@@ -159,7 +177,10 @@ export default function Login({
                                             fill="#FFB900"
                                         />
                                     </svg>
-                                    Continue with Microsoft (Organization)
+                                    {t(
+                                        'app.auth.login.microsoft',
+                                        'Continue with Microsoft (Organization)',
+                                    )}
                                 </a>
                             </Button>
 
@@ -193,7 +214,10 @@ export default function Login({
                                             d="M43.6 20.4H42V20H24v8h11.3c-1.3 3.6-4.5 6.4-8.3 7.5l.1.1 6.2 5.2c-.4.4 7.4-5.4 7.4-16.8z"
                                         />
                                     </svg>
-                                    Continue with Google
+                                    {t(
+                                        'app.auth.login.google',
+                                        'Continue with Google',
+                                    )}
                                 </a>
                             </Button>
 
@@ -202,9 +226,12 @@ export default function Login({
 
                         {canRegister && (
                             <div className="text-center text-sm text-foreground">
-                                Don't have an account?{' '}
+                                {t(
+                                    'app.auth.login.no_account',
+                                    "Don't have an account?",
+                                )}{' '}
                                 <TextLink href={register()} tabIndex={5}>
-                                    Sign up
+                                    {t('app.auth.login.sign_up', 'Sign up')}
                                 </TextLink>
                             </div>
                         )}

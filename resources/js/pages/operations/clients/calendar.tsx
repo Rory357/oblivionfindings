@@ -40,7 +40,7 @@ const categories = [
     { dot: 'bg-status-success', label: 'Family Visits', icon: Users, bg: 'bg-status-success-bg dark:bg-status-success' },
     { dot: 'bg-status-warning', label: 'GP Visits', icon: Stethoscope, bg: 'bg-status-warning-bg dark:bg-status-warning' },
     { dot: 'bg-primary', label: 'Specialist', icon: Heart, bg: 'bg-primary/10 dark:bg-primary/40' },
-    { dot: 'bg-status-critical', label: 'Therapy', icon: Heart, bg: 'bg-status-critical-bg dark:bg-pink-950/40' },
+    { dot: 'bg-status-critical', label: 'Therapy', icon: Heart, bg: 'bg-status-critical-bg dark:bg-status-critical-bg' },
     { dot: 'bg-status-info', label: 'Activities', icon: Calendar, bg: 'bg-status-info-bg dark:bg-status-info' },
 ];
 

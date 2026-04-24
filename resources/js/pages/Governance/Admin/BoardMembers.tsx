@@ -58,7 +58,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
     >
       <Head title="Manage Board Members" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
         <h1 className="text-3xl font-bold text-foreground mb-6">Board Member Management</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

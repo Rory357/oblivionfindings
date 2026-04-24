@@ -282,7 +282,7 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                                                             <td
                                                                 key={l}
                                                                 className={`p-1.5 text-center rounded ${matrixCellColor(cellRating)} ${
-                                                                    isActive ? 'ring-2 ring-offset-1 ring-slate-900 font-bold text-xs' : ''
+                                                                    isActive ? 'ring-2 ring-offset-1 ring-ring font-bold text-xs' : ''
                                                                 }`}
                                                             >
                                                                 {cellRating.charAt(0).toUpperCase()}

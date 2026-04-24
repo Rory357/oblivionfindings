@@ -356,22 +356,22 @@ export default function ClientMedical({
                     <div className="space-y-4">
                         {/* KPI Row */}
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                            <div className="rounded-xl border bg-status-critical-bg p-4 dark:from-rose-950/20 dark:to-pink-950/20">
+                            <div className="rounded-xl border bg-status-critical-bg p-4">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-status-critical">Allergies</p>
                                 <p className="mt-1 text-lg font-bold text-status-critical dark:text-status-critical">{profile?.allergies || 'None recorded'}</p>
                             </div>
-                            <div className="rounded-xl border bg-primary/10 p-4 dark:from-violet-950/20 dark:to-purple-950/20">
+                            <div className="rounded-xl border bg-primary/10 p-4">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Active Medications</p>
                                 <p className="mt-1 text-lg font-bold text-primary dark:text-primary/70">{medications.filter((m: any) => m.active !== false && m.state !== 'ceased').length}</p>
                                 {medications.some((m: any) => m.controlled_drug || m.is_controlled_drug) && (
                                     <p className="mt-0.5 text-[10px] text-status-warning">{medications.filter((m: any) => m.controlled_drug || m.is_controlled_drug).length} controlled</p>
                                 )}
                             </div>
-                            <div className="rounded-xl border bg-status-info-bg p-4 dark:from-blue-950/20 dark:to-sky-950/20">
+                            <div className="rounded-xl border bg-status-info-bg p-4">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-status-info">Conditions</p>
                                 <p className="mt-1 text-lg font-bold text-status-info dark:text-status-info">{conditions.length || 'None'}</p>
                             </div>
-                            <div className="rounded-xl border bg-status-success-bg p-4 dark:from-emerald-950/20 dark:to-green-950/20">
+                            <div className="rounded-xl border bg-status-success-bg p-4">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-status-success">Emergency Contacts</p>
                                 <p className="mt-1 text-lg font-bold text-status-success dark:text-status-success">{emergency_contacts.length || 'None'}</p>
                             </div>

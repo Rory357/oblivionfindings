@@ -1,0 +1,113 @@
+name: visual-regression
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: oblivion_findings_visual
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: testUser
+          MYSQL_PASSWORD: test101
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          tools: composer:v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci
+
+      - name: Install PHP Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Assets
+        run: npm run build
+
+      - name: Prepare Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Grant testUser global privileges
+        run: |
+          mysql --host=127.0.0.1 --port=3306 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'testUser'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
+
+      - name: Run Fresh Migrations And Seeders
+        env:
+          APP_URL: http://127.0.0.1:4173
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: oblivion_findings_visual
+          DB_USERNAME: testUser
+          DB_PASSWORD: test101
+          BROADCAST_CONNECTION: log
+          CACHE_STORE: array
+          MAIL_MAILER: array
+          QUEUE_CONNECTION: sync
+          SESSION_DRIVER: file
+        run: php artisan migrate:fresh --seed --force
+
+      - name: Visual Regression
+        env:
+          APP_URL: http://127.0.0.1:4173
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: oblivion_findings_visual
+          DB_USERNAME: testUser
+          DB_PASSWORD: test101
+          BROADCAST_CONNECTION: log
+          CACHE_STORE: array
+          MAIL_MAILER: array
+          PLAYWRIGHT_PORT: 4173
+          QUEUE_CONNECTION: sync
+          SESSION_DRIVER: file
+          VISUAL_EMAIL: admin@demo.test
+          VISUAL_PASSWORD: password
+        run: npm run visual:test
+
+      - name: Upload Playwright Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright-report
+            test-results

@@ -56,6 +56,7 @@ class ProfileController extends Controller
                 'phone' => $user->cellphone ?? $user->staffProfile?->mobile_phone,
                 'jobTitle' => $user->staffProfile?->job_title,
                 'timezone' => $user->timezone ?? 'Pacific/Auckland',
+                'locale' => $user->locale ?? 'en',
                 'dateFormat' => $user->date_format ?? 'DD/MM/YYYY',
                 'timeFormat' => $user->time_format ?? '24',
                 'landingRoutePreference' => $user->landing_route_preference,
@@ -125,6 +126,7 @@ class ProfileController extends Controller
             'email' => $validated['email'],
             'cellphone' => $validated['phone'],
             'timezone' => $validated['timezone'],
+            'locale' => $validated['locale'],
             'date_format' => $validated['date_format'],
             'time_format' => $validated['time_format'],
         ]);

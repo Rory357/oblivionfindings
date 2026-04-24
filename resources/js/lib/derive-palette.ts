@@ -132,3 +132,11 @@ export function applyPalette(hex: string): () => void {
 }
 
 export const DEFAULT_BRAND_HEX = '#7c3aed';
+
+export const BRAND_PRESETS = {
+    'nz-health-default': { hex: '#7c3aed', label: 'NZ Health Default' },
+    'high-contrast': { hex: '#111827', label: 'High Contrast' },
+    warm: { hex: '#ea580c', label: 'Warm Orange' },
+    cool: { hex: '#0891b2', label: 'Cool Teal' },
+    forest: { hex: '#059669', label: 'Forest Green' },
+} as const;

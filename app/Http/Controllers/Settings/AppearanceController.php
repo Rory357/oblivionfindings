@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,6 +52,7 @@ class AppearanceController extends Controller
             'first_day_of_week' => ['nullable', 'string', 'in:' . implode(',', self::ALLOWED_FIRST_DAYS)],
             'date_format' => ['nullable', 'string', 'in:' . implode(',', self::ALLOWED_DATE_FORMATS)],
             'time_format' => ['nullable', 'string', 'in:' . implode(',', self::ALLOWED_TIME_FORMATS)],
+            'locale' => ['nullable', 'string', 'in:' . implode(',', array_keys((array) config('locales.available', ['en' => []])))],
         ]);
 
         // Only update columns that were explicitly submitted — null means "leave
@@ -62,6 +64,10 @@ class AppearanceController extends Controller
         );
 
         if ($payload !== []) {
+            if (! Schema::hasColumn('users', 'locale')) {
+                unset($payload['locale']);
+            }
+
             $user->fill($payload)->save();
         }
 
@@ -105,6 +111,7 @@ class AppearanceController extends Controller
             'first_day_of_week' => $user->first_day_of_week ?? $org['first_day_of_week'],
             'date_format' => $user->date_format ?? $org['date_format'],
             'time_format' => $user->time_format ?? $org['time_format'],
+            'locale' => $user->locale ?? app()->getLocale(),
         ];
     }
 

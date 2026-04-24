@@ -68,7 +68,7 @@ export default function BankFeedLogs({ feed, logs }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Bank Feed Logs - ${feed.bank_account_name}`} />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="flex items-center gap-4 mb-6">
                     <Button variant="outline" size="sm" asChild>
                         <Link href="/finance/bank-feeds">

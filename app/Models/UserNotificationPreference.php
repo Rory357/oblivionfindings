@@ -14,6 +14,7 @@ class UserNotificationPreference extends Model
         'channel_inapp',
         'channel_email',
         'channel_push',
+        'channel_sms',
     ];
 
     protected $casts = [
@@ -21,6 +22,7 @@ class UserNotificationPreference extends Model
         'channel_inapp' => 'boolean',
         'channel_email' => 'boolean',
         'channel_push' => 'boolean',
+        'channel_sms' => 'boolean',
     ];
 
     public function user(): BelongsTo

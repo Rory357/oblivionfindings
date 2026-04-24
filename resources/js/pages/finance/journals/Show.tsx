@@ -160,7 +160,7 @@ export default function JournalsShow({ auth, journal }: Props) {
         >
             <Head title={`Journal ${journal.journal_number}`} />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Back link */}
                 <div className="mb-4">
                     <Button variant="ghost" size="sm" asChild>

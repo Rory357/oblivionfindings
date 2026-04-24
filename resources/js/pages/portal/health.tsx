@@ -84,7 +84,7 @@ export default function Health({
                 ]}
             >
                 <Head title={`${clientName} - Health`} />
-                <div className="mx-auto max-w-7xl p-4 md:p-6">
+                <div className="flex flex-col gap-6 p-4 md:p-6">
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                             <Lock className="mb-3 h-10 w-10 text-muted-foreground/40" />
@@ -111,7 +111,7 @@ export default function Health({
         >
             <Head title={`${clientName} - Health`} />
 
-            <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Two-column layout */}
                 <div className="grid gap-6 lg:grid-cols-2">
                     {/* Left Column */}
@@ -130,7 +130,7 @@ export default function Health({
                                         <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                             Allergies
                                         </p>
-                                        <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical dark:bg-rose-950/30 dark:text-status-critical">
+                                        <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical dark:text-status-critical">
                                             <div className="flex items-start gap-2">
                                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                                 <span>{medicalProfile.allergies}</span>

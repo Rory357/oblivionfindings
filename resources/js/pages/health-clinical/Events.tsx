@@ -154,7 +154,7 @@ export default function EventRegister({
         <AppLayout>
             <Head title="Clinical Event Register — Health & Clinical" />
 
-            <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">

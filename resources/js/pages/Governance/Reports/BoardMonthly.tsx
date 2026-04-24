@@ -63,7 +63,7 @@ export default function BoardMonthly({ auth, report, generatedAt }: Props) {
     >
       <Head title="Board Monthly Report" />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
         <div className="mb-6 space-y-2">
           <h1 className="text-3xl font-bold text-foreground">Board Monthly Report</h1>
           <p className="text-sm text-muted-foreground">A board-ready summary of decisions, delivery, assurance, and organisational controls.</p>

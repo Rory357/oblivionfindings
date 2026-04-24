@@ -65,7 +65,7 @@ export default function ChecklistTemplates({ templates, filters }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: 'Checklist Templates', href: '/sites/checklists/templates' }]}>
             <Head title="Checklist Templates" />
 
-            <div className="m-4 max-w-6xl mx-auto space-y-4">
+            <div className="flex flex-col gap-4 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>

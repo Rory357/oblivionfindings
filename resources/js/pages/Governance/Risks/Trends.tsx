@@ -56,7 +56,7 @@ export default function RiskTrends({ auth, snapshots }: Props) {
         >
             <Head title="Risk Trends" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold text-foreground">Risk Trends</h1>
                     <p className="text-muted-foreground mt-1">Historical risk snapshot analysis</p>

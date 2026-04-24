@@ -10,14 +10,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
+import { useI18n } from '@/lib/i18n';
 
 export default function ForgotPassword({ status }: { status?: string }) {
+    const { t } = useI18n();
+
     return (
         <AuthLayout
-            title="Forgot password"
-            description="Enter your email to receive a password reset link"
+            title={t('app.auth.forgot.title', 'Forgot password')}
+            description={t(
+                'app.auth.forgot.description',
+                'Enter your email to receive a password reset link',
+            )}
         >
-            <Head title="Forgot password" />
+            <Head title={t('app.auth.forgot_password', 'Forgot password')} />
 
             {status && (
                 <div className="mb-4 text-center text-sm font-medium text-status-success">
@@ -30,8 +36,14 @@ export default function ForgotPassword({ status }: { status?: string }) {
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">
-                                <Label htmlFor="email" className="text-foreground">
-                                    Email address
+                                <Label
+                                    htmlFor="email"
+                                    className="text-foreground"
+                                >
+                                    {t(
+                                        'app.auth.email_address',
+                                        'Email address',
+                                    )}
                                 </Label>
                                 <Input
                                     id="email"
@@ -55,7 +67,10 @@ export default function ForgotPassword({ status }: { status?: string }) {
                                     {processing && (
                                         <LoaderCircle className="h-4 w-4 animate-spin" />
                                     )}
-                                    Email password reset link
+                                    {t(
+                                        'app.auth.forgot.submit',
+                                        'Email password reset link',
+                                    )}
                                 </Button>
                             </div>
                         </>
@@ -63,8 +78,12 @@ export default function ForgotPassword({ status }: { status?: string }) {
                 </Form>
 
                 <div className="space-x-1 text-center text-sm text-muted-foreground">
-                    <span>Or, return to</span>
-                    <TextLink href={login()}>log in</TextLink>
+                    <span>
+                        {t('app.auth.forgot.return_prefix', 'Or, return to')}
+                    </span>
+                    <TextLink href={login()}>
+                        {t('app.auth.forgot.return_link', 'log in')}
+                    </TextLink>
                 </div>
             </div>
         </AuthLayout>

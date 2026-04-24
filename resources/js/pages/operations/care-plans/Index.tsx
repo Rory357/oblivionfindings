@@ -168,7 +168,7 @@ export default function CarePlansIndex({
 
                 {/* ─── Compliance Alert Banner ─── */}
                 {showComplianceBanner && (
-                    <div className="flex items-start gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 shadow-sm dark:border-status-warning/30 dark:from-amber-950/30 dark:to-orange-950/30">
+                    <div className="flex items-start gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 shadow-sm dark:border-status-warning/30">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
                             <AlertTriangle className="h-5 w-5" />
                         </div>

@@ -10143,7 +10143,7 @@ const CAL_CATEGORIES = [
         dot: 'bg-status-critical',
         label: 'Medications',
         icon: Pill,
-        bg: 'bg-status-critical-bg dark:bg-pink-950/40',
+        bg: 'bg-status-critical-bg dark:bg-status-critical-bg',
     },
     {
         dot: 'bg-status-warning',

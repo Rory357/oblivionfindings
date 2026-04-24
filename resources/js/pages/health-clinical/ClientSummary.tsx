@@ -72,7 +72,7 @@ export default function ClientSummary({ client, summary, observation_types, even
     return (
         <AppLayout>
             <Head title={`Health Summary — ${name}`} />
-            <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">{name}</h1>

@@ -35,7 +35,7 @@ type DeliveryPrefs = {
     desktop_notifications_enabled: boolean;
     notification_sounds_enabled: boolean;
     email_digest_frequency: 'instant' | 'daily' | 'weekly' | 'off';
-};
+} & Record<string, boolean | string | null>;
 
 type Props = {
     groups: Record<string, string[]>;
@@ -173,9 +173,9 @@ export default function NotificationPreferences({
     });
 
     const saveDelivery = (patch: Partial<DeliveryPrefs>) => {
-        const next = { ...deliveryState, ...patch };
+        const next = { ...deliveryState, ...patch } as DeliveryPrefs;
         setDeliveryState(next);
-        router.put('/settings/notifications/delivery', next as unknown as Record<string, unknown>, {
+        router.put('/settings/notifications/delivery', next, {
             preserveScroll: true,
             preserveState: true,
         });

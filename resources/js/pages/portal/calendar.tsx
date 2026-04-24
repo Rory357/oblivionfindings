@@ -89,7 +89,7 @@ const categories = [
         dot: 'bg-status-critical',
         label: 'Therapy',
         icon: Heart,
-        bg: 'bg-status-critical-bg dark:bg-pink-950/40',
+        bg: 'bg-status-critical-bg dark:bg-status-critical-bg',
     },
     {
         dot: 'bg-status-info',

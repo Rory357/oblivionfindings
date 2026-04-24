@@ -203,7 +203,7 @@ export default function Reconcile({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Reconcile - ${reconciliation.bank_account_name}`} />
 
-            <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>

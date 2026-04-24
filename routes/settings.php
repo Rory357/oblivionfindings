@@ -3,6 +3,7 @@
 use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\PushSubscriptionController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use App\Http\Controllers\Settings\TerminologyController;
 use App\Http\Controllers\Settings\AccessController;
@@ -126,6 +127,10 @@ Route::middleware('auth')->group(function () {
         ->name('settings.notifications.update');
     Route::put('settings/notifications/delivery', [NotificationPreferencesController::class, 'updateDelivery'])
         ->name('settings.notifications.delivery.update');
+    Route::post('settings/notifications/push-subscriptions', [PushSubscriptionController::class, 'store'])
+        ->name('settings.notifications.push-subscriptions.store');
+    Route::delete('settings/notifications/push-subscriptions', [PushSubscriptionController::class, 'destroy'])
+        ->name('settings.notifications.push-subscriptions.destroy');
 
     // Role defaults (admin)
     Route::get('settings/notifications/roles', [NotificationPreferencesController::class, 'roles'])

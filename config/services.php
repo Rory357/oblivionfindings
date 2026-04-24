@@ -59,4 +59,23 @@ return [
         'ingest_token' => env('TELEMETRY_INGEST_TOKEN'),
     ],
 
+    'sms' => [
+        'provider' => env('SMS_PROVIDER'),
+
+        'twilio' => [
+            'account_sid' => env('TWILIO_ACCOUNT_SID'),
+            'auth_token' => env('TWILIO_AUTH_TOKEN'),
+            'from' => env('TWILIO_FROM'),
+        ],
+    ],
+
+    'push' => [
+        'provider' => env('PUSH_PROVIDER'),
+
+        'expo' => [
+            'endpoint' => env('EXPO_PUSH_ENDPOINT', 'https://exp.host/--/api/v2/push/send'),
+            'access_token' => env('EXPO_ACCESS_TOKEN'),
+        ],
+    ],
+
 ];

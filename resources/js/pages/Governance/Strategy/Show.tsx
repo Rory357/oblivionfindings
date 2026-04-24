@@ -122,7 +122,7 @@ export default function StrategyShow({ auth, plan }: Props) {
     >
       <Head title={plan.title} />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
           {/* Back Link */}
           <div className="mb-4">
             <Link href={strategyIndex.url()} className="text-sm text-status-info hover:underline">

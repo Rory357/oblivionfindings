@@ -105,7 +105,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Invoices" />
 
-            <div className="max-w-7xl mx-auto p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>

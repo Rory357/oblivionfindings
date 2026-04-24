@@ -154,7 +154,7 @@ export default function HsEventShow({ event, investigations, corrective_actions,
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${event.reference_number} - H&S Event`} />
-            <div className="mx-auto max-w-[1200px] space-y-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
 
                 {/* ── Hero Summary ── */}
                 <Card>

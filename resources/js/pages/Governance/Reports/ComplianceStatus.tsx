@@ -50,7 +50,7 @@ export default function ComplianceStatus({ auth, report }: Props) {
     >
       <Head title="Compliance Status Report" />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
         <div className="mb-6 space-y-2">
           <h1 className="text-3xl font-bold text-foreground">Compliance Status Report</h1>
           <p className="text-sm text-muted-foreground">A framework-by-framework view of obligations due, overdue, and complete.</p>

@@ -1,6 +1,7 @@
 /.phpunit.cache
 /bootstrap/ssr
 /node_modules
+/playwright-report
 /public/build
 /public/build_backup
 /public/hot
@@ -10,6 +11,7 @@
 /resources/js/wayfinder
 /storage/*.key
 /storage/pail
+/test-results
 /vendor
 .DS_Store
 .env

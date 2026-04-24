@@ -172,7 +172,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={asset.asset_name} />
 
-            <div className="mx-auto max-w-6xl space-y-6 p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">

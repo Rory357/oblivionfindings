@@ -26,6 +26,16 @@ class HandleInertiaRequests extends Middleware
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
         $user = $request->user();
+        $availableLocales = (array) config('locales.available', [
+            'en' => ['label' => 'English (NZ)', 'native' => 'English (NZ)'],
+        ]);
+        $locale = (string) ($user?->locale ?? config('app.locale', 'en'));
+
+        if (! array_key_exists($locale, $availableLocales)) {
+            $locale = (string) config('app.fallback_locale', 'en');
+        }
+
+        app()->setLocale($locale);
 
         // Build permissions for frontend (RBAC)
         // Optimized: Cache permissions during request to reduce DB queries
@@ -121,6 +131,11 @@ class HandleInertiaRequests extends Middleware
             ],
 
             'labels' => $labels,
+            'locale' => $locale,
+            'availableLocales' => $availableLocales,
+            'translations' => [
+                'app' => trans('app'),
+            ],
 
             // NEW: organisation theme tokens and branding assets
             'theme' => [

@@ -165,11 +165,14 @@ export default function DriverShow({ driver, assigned_vehicles, sessions, drivin
 
                 {/* License expiry warning banner */}
                 {(isExpired || isExpiringSoon) && (
-                    <div className={cn('rounded-lg border p-4', {
-                        'border-status-critical/30 bg-status-critical': isExpired,
-                        'border-status-warning/30 bg-status-warning': !isExpired && expiryDays !== null && expiryDays <= 30,
-                        'border-status-warning/30 bg-status-warning': !isExpired && expiryDays !== null && expiryDays > 30,
-                    })}>
+                    <div
+                        className={cn(
+                            'rounded-lg border p-4',
+                            isExpired
+                                ? 'border-status-critical/30 bg-status-critical-bg'
+                                : 'border-status-warning/30 bg-status-warning-bg',
+                        )}
+                    >
                         <div className="flex items-center gap-3">
                             <AlertTriangle className={cn('h-5 w-5', isExpired ? 'text-status-critical' : 'text-status-warning')} />
                             <div>

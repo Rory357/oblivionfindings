@@ -191,7 +191,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
     <AppLayout user={auth.user} breadcrumbs={[{ title: 'Governance', href: '/governance/dashboard' }]}>
       <Head title="Governance Dashboard" />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Governance Dashboard</p>

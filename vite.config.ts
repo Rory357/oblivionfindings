@@ -5,6 +5,9 @@ import laravel from 'laravel-vite-plugin';
 import { defineConfig } from 'vite';
 
 const heavyVendorChunkGroups: Array<[string, string[]]> = [
+    ['vendor-react', ['/react/', '/react-dom/', '/scheduler/', '/@inertiajs/']],
+    ['vendor-ui', ['/@radix-ui/', '/@headlessui/', '/cmdk/', '/input-otp/', '/sonner/']],
+    ['vendor-utils', ['/class-variance-authority/', '/clsx/', '/tailwind-merge/']],
     ['vendor-calendar', ['/@fullcalendar/', '/preact/']],
     ['vendor-charts', ['/recharts/', '/d3-']],
     ['vendor-maps', ['/leaflet/', '/react-leaflet/']],

@@ -177,7 +177,7 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
 
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border bg-status-info-bg p-3 text-center dark:from-blue-950/20">
+                    <div className="rounded-xl border bg-status-info-bg p-3 text-center">
                         <div className="text-xl font-bold text-status-info">
                             {stats.open}
                         </div>
@@ -185,7 +185,7 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                             Open
                         </div>
                     </div>
-                    <div className="rounded-xl border bg-status-success-bg p-3 text-center dark:from-emerald-950/20">
+                    <div className="rounded-xl border bg-status-success-bg p-3 text-center">
                         <div className="text-xl font-bold text-status-success">
                             {stats.completed}
                         </div>
@@ -194,7 +194,7 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                         </div>
                     </div>
                     <div
-                        className={`rounded-xl border p-3 text-center ${stats.overdue > 0 ? 'bg-status-critical-bg dark:from-red-950/20' : ''}`}
+                        className={`rounded-xl border p-3 text-center ${stats.overdue > 0 ? 'bg-status-critical-bg' : ''}`}
                     >
                         <div
                             className={`text-xl font-bold ${stats.overdue > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}

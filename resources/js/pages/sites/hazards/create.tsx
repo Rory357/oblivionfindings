@@ -319,7 +319,7 @@ export default function CreateHazard() {
                                                             <td
                                                                 key={l}
                                                                 className={`p-1 text-center rounded ${matrixCellColor(cellRating)} ${
-                                                                    isActive ? 'ring-2 ring-offset-1 ring-slate-900 font-bold' : ''
+                                                                    isActive ? 'ring-2 ring-offset-1 ring-ring font-bold' : ''
                                                                 }`}
                                                                 style={{ width: 40, height: 24 }}
                                                             >

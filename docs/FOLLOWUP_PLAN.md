@@ -19,6 +19,26 @@ regressions. Full details in the merge commits.
 
 This plan addresses everything that was out of scope or deferred.
 
+## Implementation status — 2026-04-24
+
+This follow-up pass shipped the remaining practical items from the plan:
+
+- Unit-test drift resolved for medication safety, operational snapshots, and broadcast delivery provider behaviour.
+- Remaining hardcoded colour usage was reduced to intentional recruitment-stage exceptions and protected with ESLint guardrails.
+- SMS delivery now uses the configured `SmsProvider` binding with Twilio support and tests.
+- Push delivery now uses the configured `PushProvider` binding with Expo support, persisted user push subscriptions, settings routes, and tests.
+- Branding now has tabbed structure, curated presets, and a sticky save flow.
+- Locale scaffolding now exists across Laravel and Inertia, including `en` and `mi` catalogs, a `users.locale` migration, shared translation props, and live language selectors on profile/appearance settings.
+- Bundle splitting now separates React/Inertia, UI primitives, utilities, charts, calendar, and maps so the app entry chunk no longer trips Vite's 500 kB warning.
+- Playwright visual regression now has desktop/mobile baseline coverage for the dashboard and key settings/control-room pages, plus a GitHub Actions workflow that builds, seeds MySQL, and runs the snapshot suite.
+- Finance, Governance, Sites, Health/Clinical, Health/Safety, Notifications, Portal dashboard/media, and integrations data-heavy pages now use the same full-width operational page shell as HR; Finance plus cross-module desktop/mobile snapshots are covered, with Governance using the steadier policies index baseline instead of the async cockpit dashboard.
+- Button/Card follow-up is protected by lint guardrails, with safe focused conversions applied; broad raw element conversion remains an incremental design cleanup rather than a mechanical rewrite.
+
+Remaining follow-ons are content expansion rather than missing plumbing:
+extracting every hardcoded UI string into translation catalogs and
+continuing incremental Button/Card conversions where the design intent is
+clear.
+
 ---
 
 ## Part 1 — Outstanding deferred work (in-scope)

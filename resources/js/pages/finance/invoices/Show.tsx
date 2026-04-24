@@ -97,7 +97,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title={`Invoice ${invoice.invoice_number}`} />
 
-            <div className="max-w-7xl mx-auto p-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-6">
                     <div>

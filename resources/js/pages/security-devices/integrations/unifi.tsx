@@ -228,7 +228,7 @@ export default function UnifiIntegration({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="UniFi Integration" />
-            <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div>
                     <Link href="/security-devices/integrations" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                         <ArrowLeft className="h-4 w-4" />

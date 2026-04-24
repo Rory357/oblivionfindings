@@ -27,7 +27,7 @@ const STAT_COLORS = {
     amber: { bg: 'bg-status-warning-bg dark:bg-status-warning', icon: 'text-status-warning dark:text-status-warning', ring: 'ring-status-warning dark:ring-status-warning/20' },
     red: { bg: 'bg-status-critical-bg dark:bg-status-critical', icon: 'text-status-critical dark:text-status-critical', ring: 'ring-status-critical dark:ring-status-critical/20' },
     purple: { bg: 'bg-primary/10 dark:bg-primary/10', icon: 'text-primary dark:text-primary', ring: 'ring-ring dark:ring-ring/20' },
-    slate: { bg: 'bg-muted dark:bg-muted-foreground/80/10', icon: 'text-muted-foreground dark:text-muted-foreground', ring: 'ring-slate-100 dark:ring-slate-500/20' },
+    slate: { bg: 'bg-muted dark:bg-muted', icon: 'text-muted-foreground dark:text-muted-foreground', ring: 'ring-border dark:ring-border' },
 };
 
 function StatCard({ label, value, subtitle, icon: Icon, color }: { label: string; value: number | string; subtitle?: string; icon: React.ElementType; color: keyof typeof STAT_COLORS }) {

@@ -18,7 +18,7 @@ class ShiftOperationalSnapshotService
             return $this->emptySnapshot($staff);
         }
 
-        $shift->load([
+        $shift->loadMissing([
             'site:id,name',
             'client:id,first_name,last_name,site_id',
             'client.site:id,name',
@@ -54,7 +54,7 @@ class ShiftOperationalSnapshotService
             return $this->emptySnapshot($staff);
         }
 
-        $client->load([
+        $client->loadMissing([
             'site:id,name',
             'serviceContext:id,name',
         ]);
@@ -79,7 +79,7 @@ class ShiftOperationalSnapshotService
      */
     public function snapshotForTimesheet(Timesheet $timesheet): array
     {
-        $timesheet->load([
+        $timesheet->loadMissing([
             'shift.site:id,name',
             'shift.client:id,first_name,last_name,site_id',
             'shift.client.site:id,name',

@@ -78,7 +78,7 @@ export default function HsEventsIndex({ events, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="H&S Events" />
-            <div className="mx-auto max-w-[1400px] space-y-6">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
 
                 {/* Header */}
                 <div className="flex items-center justify-between">

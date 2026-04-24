@@ -39,6 +39,7 @@ class User extends Authenticatable
         'last_seen_at',
         'presence_status',
         'timezone',
+        'locale',
         'date_format',
         'time_format',
 
@@ -178,6 +179,11 @@ class User extends Authenticatable
     public function identities()
     {
         return $this->hasMany(\App\Models\Identity::class);
+    }
+
+    public function pushSubscriptions()
+    {
+        return $this->hasMany(\App\Models\UserPushSubscription::class);
     }
 
     public function canAccessClientPortal(\App\Models\Client $client): bool

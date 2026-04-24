@@ -286,7 +286,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
     >
       <Head title={`Budget - ${budget.title || budget.fiscal_year}`} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
         {/* Back Link */}
         <div className="mb-4">
           <Link href={budgetsIndex.url()} className="text-sm text-status-info hover:underline">

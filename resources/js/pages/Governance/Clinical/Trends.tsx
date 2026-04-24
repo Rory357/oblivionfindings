@@ -87,7 +87,7 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
         <AppLayout>
             <Head title="Clinical Governance Trends" />
 
-            <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">Clinical Governance Trends</h1>
