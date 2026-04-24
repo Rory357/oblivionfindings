@@ -50,16 +50,10 @@ interface AppearancePageProps extends Record<string, unknown> {
     };
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Appearance settings',
-        href: editAppearance().url,
-    },
-];
-
 interface ThemeOption {
     value: AppearanceType;
     label: string;
+    labelKey: string;
     icon: typeof Sun;
     sidebarBg: string;
     contentBg: string;
@@ -71,6 +65,7 @@ const themeOptions: ThemeOption[] = [
     {
         value: 'light',
         label: 'Light',
+        labelKey: 'app.appearance.theme.light',
         icon: Sun,
         sidebarBg: 'bg-muted',
         contentBg: 'bg-card',
@@ -80,6 +75,7 @@ const themeOptions: ThemeOption[] = [
     {
         value: 'dark',
         label: 'Dark',
+        labelKey: 'app.appearance.theme.dark',
         icon: Moon,
         sidebarBg: 'bg-muted',
         contentBg: 'bg-muted',
@@ -89,6 +85,7 @@ const themeOptions: ThemeOption[] = [
     {
         value: 'system',
         label: 'System',
+        labelKey: 'app.appearance.theme.system',
         icon: Monitor,
         sidebarBg: 'bg-gradient-to-b from-muted to-muted',
         contentBg: 'bg-gradient-to-b from-card to-muted',
@@ -99,20 +96,48 @@ const themeOptions: ThemeOption[] = [
 
 interface FontSizeOption {
     label: string;
+    labelKey: string;
     value: string;
     px: number;
 }
 
 const fontSizes: FontSizeOption[] = [
-    { label: 'Small', value: '13', px: 13 },
-    { label: 'Default', value: '14', px: 14 },
-    { label: 'Large', value: '16', px: 16 },
+    {
+        label: 'Small',
+        labelKey: 'app.appearance.display.font_size_small',
+        value: '13',
+        px: 13,
+    },
+    {
+        label: 'Default',
+        labelKey: 'app.appearance.display.font_size_default',
+        value: '14',
+        px: 14,
+    },
+    {
+        label: 'Large',
+        labelKey: 'app.appearance.display.font_size_large',
+        value: '16',
+        px: 16,
+    },
 ];
 
 const dateFormats = [
-    { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (NZ default)' },
-    { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
-    { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
+    {
+        value: 'DD/MM/YYYY',
+        label: 'DD/MM/YYYY (NZ default)',
+        labelKey: 'app.appearance.regional.date_format_nz',
+    },
+    {
+        value: 'MM/DD/YYYY',
+        label: 'MM/DD/YYYY',
+        labelKey: 'app.appearance.regional.date_format_us',
+    },
+    {
+        value: 'YYYY-MM-DD',
+        label: 'YYYY-MM-DD',
+        labelKey: 'app.appearance.regional.date_format_iso',
+    },
 ];
 
 export default function Appearance() {
@@ -244,17 +269,30 @@ export default function Appearance() {
         }
     }, [saved]);
 
+    const title = t('app.appearance.title', 'Appearance settings');
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title,
+            href: editAppearance().url,
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Appearance settings" />
+            <Head title={title} />
 
             <SettingsLayout>
                 {/* Theme */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Theme</CardTitle>
+                        <CardTitle>
+                            {t('app.appearance.theme.title', 'Theme')}
+                        </CardTitle>
                         <CardDescription>
-                            Choose how the application looks
+                            {t(
+                                'app.appearance.theme.description',
+                                'Choose how the application looks',
+                            )}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -358,7 +396,10 @@ export default function Appearance() {
                                                         : 'text-muted-foreground',
                                                 )}
                                             >
-                                                {option.label}
+                                                {t(
+                                                    option.labelKey,
+                                                    option.label,
+                                                )}
                                             </span>
                                         </div>
                                     </Button>
@@ -371,9 +412,17 @@ export default function Appearance() {
                 {/* Accent colour */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Accent Colour</CardTitle>
+                        <CardTitle>
+                            {t(
+                                'app.appearance.accent.title',
+                                'Accent colour',
+                            )}
+                        </CardTitle>
                         <CardDescription>
-                            Pick any colour &mdash; the whole app re-tints live.
+                            {t(
+                                'app.appearance.accent.description',
+                                'Pick any colour - the whole app re-tints live.',
+                            )}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -397,7 +446,10 @@ export default function Appearance() {
                                     />
                                     <span className="font-mono uppercase">
                                         {form.data.accent_colour ??
-                                            'Brand default'}
+                                            t(
+                                                'app.appearance.accent.brand_default',
+                                                'Brand default',
+                                            )}
                                     </span>
                                 </Button>
                                 {accentOpen && (
@@ -431,7 +483,10 @@ export default function Appearance() {
                                 className="gap-2"
                             >
                                 <RotateCcw className="h-4 w-4" />
-                                Reset to brand default
+                                {t(
+                                    'app.appearance.accent.reset',
+                                    'Reset to brand default',
+                                )}
                             </Button>
                         </div>
                     </CardContent>
@@ -440,16 +495,24 @@ export default function Appearance() {
                 {/* Display */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Display</CardTitle>
+                        <CardTitle>
+                            {t('app.appearance.display.title', 'Display')}
+                        </CardTitle>
                         <CardDescription>
-                            Customise text size and visual density
+                            {t(
+                                'app.appearance.display.description',
+                                'Customise text size and visual density',
+                            )}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-8">
                         {/* Font size */}
                         <div className="space-y-3">
                             <Label className="text-sm font-medium">
-                                Font Size
+                                {t(
+                                    'app.appearance.display.font_size',
+                                    'Font size',
+                                )}
                             </Label>
                             <div className="grid grid-cols-3 gap-3">
                                 {fontSizes.map((opt) => {
@@ -484,7 +547,8 @@ export default function Appearance() {
                                                 Aa
                                             </span>
                                             <span className="text-xs text-muted-foreground">
-                                                {opt.label} ({opt.px}px)
+                                                {t(opt.labelKey, opt.label)} (
+                                                {opt.px}px)
                                             </span>
                                         </Button>
                                     );
@@ -495,7 +559,10 @@ export default function Appearance() {
                         {/* Sidebar density */}
                         <div className="space-y-3">
                             <Label className="text-sm font-medium">
-                                Sidebar Density
+                                {t(
+                                    'app.appearance.display.sidebar_density',
+                                    'Sidebar density',
+                                )}
                             </Label>
                             <div className="grid grid-cols-2 gap-3">
                                 {(['comfortable', 'compact'] as const).map(
@@ -540,7 +607,10 @@ export default function Appearance() {
                                                     <div className="h-1 w-2/3 rounded-sm bg-current opacity-10" />
                                                 </div>
                                                 <span className="text-xs text-muted-foreground capitalize">
-                                                    {density}
+                                                    {t(
+                                                        `app.appearance.display.${density}`,
+                                                        density,
+                                                    )}
                                                 </span>
                                             </Button>
                                         );
@@ -556,10 +626,16 @@ export default function Appearance() {
                                     htmlFor="reduce-motion"
                                     className="text-sm font-medium"
                                 >
-                                    Reduce motion
+                                    {t(
+                                        'app.appearance.display.reduce_motion',
+                                        'Reduce motion',
+                                    )}
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Disable animations for accessibility
+                                    {t(
+                                        'app.appearance.display.reduce_motion_description',
+                                        'Disable animations for accessibility',
+                                    )}
                                 </p>
                             </div>
                             <Switch
@@ -574,14 +650,24 @@ export default function Appearance() {
                 {/* Regional */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Regional</CardTitle>
+                        <CardTitle>
+                            {t('app.appearance.regional.title', 'Regional')}
+                        </CardTitle>
                         <CardDescription>
-                            Date, time, and language preferences
+                            {t(
+                                'app.appearance.regional.description',
+                                'Date, time, and language preferences',
+                            )}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="dateFormat">Date format</Label>
+                            <Label htmlFor="dateFormat">
+                                {t(
+                                    'app.appearance.regional.date_format',
+                                    'Date format',
+                                )}
+                            </Label>
                             <select
                                 id="dateFormat"
                                 value={form.data.date_format}
@@ -592,14 +678,19 @@ export default function Appearance() {
                             >
                                 {dateFormats.map((f) => (
                                     <option key={f.value} value={f.value}>
-                                        {f.label}
+                                        {t(f.labelKey, f.label)}
                                     </option>
                                 ))}
                             </select>
                         </div>
 
                         <div className="grid gap-2">
-                            <Label>Time format</Label>
+                            <Label>
+                                {t(
+                                    'app.appearance.regional.time_format',
+                                    'Time format',
+                                )}
+                            </Label>
                             <div className="flex gap-2">
                                 {(['12', '24'] as const).map((fmt) => (
                                     <Button
@@ -620,24 +711,36 @@ export default function Appearance() {
                                                 : 'bg-transparent text-foreground hover:bg-muted/50',
                                         )}
                                     >
-                                        {fmt}-hour
+                                        {t(
+                                            `app.appearance.regional.time_format_${fmt}`,
+                                            `${fmt}-hour`,
+                                        )}
                                     </Button>
                                 ))}
                             </div>
                         </div>
 
                         <div className="grid gap-2">
-                            <Label>First day of week</Label>
+                            <Label>
+                                {t(
+                                    'app.appearance.regional.first_day_of_week',
+                                    'First day of week',
+                                )}
+                            </Label>
                             <div className="flex gap-2">
                                 {(
                                     [
                                         {
                                             value: 'monday' as const,
                                             label: 'Monday',
+                                            labelKey:
+                                                'app.appearance.regional.monday',
                                         },
                                         {
                                             value: 'sunday' as const,
                                             label: 'Sunday',
+                                            labelKey:
+                                                'app.appearance.regional.sunday',
                                         },
                                     ] as const
                                 ).map((opt) => (
@@ -664,7 +767,7 @@ export default function Appearance() {
                                                 : 'bg-transparent text-foreground hover:bg-muted/50',
                                         )}
                                     >
-                                        {opt.label}
+                                        {t(opt.labelKey, opt.label)}
                                     </Button>
                                 ))}
                             </div>
@@ -684,7 +787,12 @@ export default function Appearance() {
                                     id="language"
                                     className="max-w-xs"
                                 >
-                                    <SelectValue placeholder="Select language" />
+                                    <SelectValue
+                                        placeholder={t(
+                                            'app.appearance.regional.select_language',
+                                            'Select language',
+                                        )}
+                                    />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {Object.entries(availableLocales).map(
@@ -707,7 +815,7 @@ export default function Appearance() {
                 <div className="flex items-center gap-4">
                     <Button onClick={handleSave} disabled={form.processing}>
                         {form.processing
-                            ? 'Saving…'
+                            ? t('app.actions.saving', 'Saving...')
                             : t(
                                   'app.settings.save_preferences',
                                   'Save preferences',
